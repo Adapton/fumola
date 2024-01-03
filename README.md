@@ -1,12 +1,22 @@
-# `motoko.rs`
+# `fumola`
 
-Motoko tools for Rust.
+## FUnctional MOtoko meta-LAnguage.
+
+Motoko extensions and tools, in Rust.
 
 - Lexing.
 - Parsing.
 - Interpreter (partially implemented):
   - Interactive, break-point-style debugging.
   - Hot reload of code changes while preserving data.
+
+## Extensions (WIP)
+
+- Quoting and unquoting, with quoted ASTs as a value.
+- Incremental caching and memoization (a la Adapton).
+- local file system access (optional).
+- local web system access (optional).
+- REPL that interacts with IC, or a local replica.
 
 ## Out of scope
 
