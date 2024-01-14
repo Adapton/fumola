@@ -7,8 +7,8 @@ use quote::quote;
 pub fn parse_static(input: TokenStream) -> TokenStream {
     let input = get_input_string(input);
     expand_static(
-        &motoko::check::parse(&input).expect("Parse error"),
-        "::motoko::ast::Prog",
+        &fumola::check::parse(&input).expect("Parse error"),
+        "::fumola::ast::Prog",
     )
 }
 
@@ -18,8 +18,8 @@ pub fn parse_static(input: TokenStream) -> TokenStream {
 // pub fn eval_static(input: TokenStream) -> TokenStream {
 //     let input = get_input_string(input);
 //     expand_static(
-//         &motoko::vm::eval(&input).expect("Evaluation error"),
-//         "::motoko::value::Value",
+//         &fumola::vm::eval(&input).expect("Evaluation error"),
+//         "::fumola::value::Value",
 //     )
 // }
 
@@ -27,7 +27,7 @@ fn expand_static<'de, T: Sized + serde::Serialize + serde::Deserialize<'de>>(
     value: &T,
     type_path: &'static str,
 ) -> TokenStream {
-    let serialized = motoko::proc_macro::serialize(value).expect("Serialization error");
+    let serialized = fumola::proc_macro::serialize(value).expect("Serialization error");
     let serialized_ast = proc_macro2::Literal::byte_string(&serialized);
     let typ = syn::Type::Verbatim(type_path.parse().expect("Type parse error"));
 
@@ -43,7 +43,7 @@ fn expand_static<'de, T: Sized + serde::Serialize + serde::Deserialize<'de>>(
                 static mut VALUE: *mut #typ = 0 as *mut #typ;
                 unsafe {
                     ONCE.call_once(|| VALUE = Box::into_raw(Box::new(
-                        ::motoko::proc_macro::deserialize::<#typ>(#serialized_ast).expect("Deserialization error")
+                        ::fumola::proc_macro::deserialize::<#typ>(#serialized_ast).expect("Deserialization error")
                     )));
                     &*VALUE
                 }

@@ -1,25 +1,25 @@
 [package]
-name = "motoko_proc_macro"
-version = "0.0.28"
+name = "fumola_proc_macro"
+version = "0.0.29"
 authors = ["Matthew Hammer", "Ryan Vandersmith"]
 edition = "2018"
 license = "Apache-2.0"
-description = "Procedural macros for compile-time Motoko expressions in Rust."
+description = "Procedural macros for compile-time Fumola expressions in Rust."
 readme = "README.md"
-documentation = "https://docs.rs/motoko_proc_macro"
-repository = "https://github.com/dfinity/motoko.rs"
+documentation = "https://docs.rs/fumola_proc_macro"
+repository = "https://github.com/dfinity/fumola.rs"
 categories = ["wasm"]
-keywords = ["internet-computer", "motoko", "wasm"]
+keywords = ["internet-computer", "fumola", "wasm"]
 include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 
 [lib]
-name = "motoko_proc_macro"
+name = "fumola_proc_macro"
 proc-macro = true
 
 [dependencies]
 # TODO: set this up as a "workspace dependency"? 
 # https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#inheriting-a-dependency-from-a-workspace
-motoko = { path = "../motoko", version = "0.0.28", default-features = false, features = ["parser"] }
+fumola = { path = "../fumola", version = "0.0.28", default-features = false, features = ["parser"] }
 syn = "1.0.100"
 quote = "1.0.21"
 proc-macro2 = "1.0.44"

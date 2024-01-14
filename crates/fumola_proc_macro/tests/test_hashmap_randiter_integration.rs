@@ -1,7 +1,7 @@
-use motoko::shared::Share;
-use motoko::value::Value;
-use motoko::vm_types::{Core, Limits};
-use motoko_proc_macro::parse_static;
+use fumola::shared::Share;
+use fumola::value::Value;
+use fumola::vm_types::{Core, Limits};
+use fumola_proc_macro::parse_static;
 use num_bigint::BigUint;
 
 use test_log::test; // enable logging output for tests by default.
