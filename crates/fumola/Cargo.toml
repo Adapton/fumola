@@ -1,16 +1,16 @@
 [package]
-name = "motoko"
-version = "0.0.28"
+name = "fumola"
+version = "0.0.29"
 authors = ["Matthew Hammer", "Ryan Vandersmith"]
 edition = "2018"
 build = "build.rs"
 license = "Apache-2.0"
-description = "A library for parsing and running Motoko in Rust"
+description = "A library for parsing and running Fumola in Rust"
 readme = "README.md"
-documentation = "https://docs.rs/motoko"
-repository = "https://github.com/dfinity/motoko.rs"
+documentation = "https://docs.rs/fumola"
+repository = "https://github.com/dfinity/fumola.rs"
 categories = ["wasm"]
-keywords = ["internet-computer", "motoko", "wasm"]
+keywords = ["internet-computer", "fumola", "wasm"]
 include = ["src", "build.rs", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
@@ -42,7 +42,7 @@ criterion = "0.4.0"
 lalrpop = "0.19.7"
 
 [lib]
-name = "motoko"
+name = "fumola"
 path = "src/lib/mod.rs"
 test = true             # Is tested by default.
 doctest = true          # Documentation examples are tested by default.

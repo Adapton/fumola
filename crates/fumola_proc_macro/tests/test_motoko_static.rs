@@ -1,4 +1,4 @@
-use motoko_proc_macro::parse_static;
+use fumola_proc_macro::parse_static;
 
 #[test]
 fn literal_123() {
