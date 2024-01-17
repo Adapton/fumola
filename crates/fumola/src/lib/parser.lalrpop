@@ -375,12 +375,6 @@ ExpPlain: Exp = {
     "``" "{" <d:Delim0<PatField_, ";">> "}" => panic!(),
 }
 
-// Brace Quoted = cases, decls, declfields,
-
-// Paren Quoted = exps,
-
-// Either style = pats (uses double leading backtick to distinguish pattern case from other cases)
-
 #[inline]
 ExpNest_: Exp_ = Node<ExpNest>;
 
