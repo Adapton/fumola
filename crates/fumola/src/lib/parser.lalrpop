@@ -369,7 +369,10 @@ ExpPlain: Exp = {
     "(" <es:Delim1<ExpIfNoElse_<Exp<Ob>>, ",">> ")" => get_one(es).map(Exp::Paren).unwrap_or_else(Exp::Tuple),
     "`" "(" ")" => Exp::QuotedAst(QuotedAst::Empty),
     "`" "(" <es:Delim1<ExpIfNoElse_<Exp<Ob>>, ",">> ")" => Exp::QuotedAst(QuotedAst::TupleExps(es)),
+    "`" "do" "{" <ds:Decs> "}" => panic!(),
+    "`" "{" <e:ExpObjBody> "}" => panic!(),
     "``" "(" <ps:Delim1<Pat_, ",">> ")" => Exp::QuotedAst(QuotedAst::TuplePats(ps)),
+    "``" "{" <d:Delim0<PatField_, ";">> "}" => panic!(),
 }
 
 // Brace Quoted = cases, decls, declfields,
@@ -391,7 +394,7 @@ Block_: Exp_ = Node<Block>;
 
 Block: Exp = {
     "~" <e:ExpPost_<Ob>> => panic!(),
-    "{" <ds:Decs> "}" => Exp::Block(ds)
+    "{" <ds:Decs> "}" => Exp::Block(ds),
 }
 
 #[inline]
