@@ -1,3 +1,4 @@
+
 use crate::shared::{Share, Shared};
 use crate::value::{PrimFunction, Value_};
 use serde::{Deserialize, Serialize};
@@ -507,6 +508,18 @@ pub enum ProjIndex {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum QuotedAst {
+    Empty,
+    TupleExps(Delim<Exp_>),
+    TuplePats(Delim<Pat_>),
+    RecordExps(ExpFields),
+    RecordPats(PatFields),
+    Cases(Cases),
+    Decs(Decs),
+    DecFields(DecFields),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Exp {
     Value_(Value_),
     Hole,
@@ -563,6 +576,7 @@ pub enum Exp {
     Try(Exp_, Case_),
     Ignore(Exp_),
     Paren(Exp_),
+    QuotedAst(QuotedAst),
 }
 
 impl Exp {

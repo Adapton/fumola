@@ -4,8 +4,8 @@ use log::info;
 use std::io;
 use structopt::{clap, clap::Shell};
 
-use motoko::format::{format_one_line, format_pretty};
-use motoko::vm_types::Limits;
+use fumola::format::{format_one_line, format_pretty};
+use fumola::vm_types::Limits;
 
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -18,14 +18,14 @@ impl From<()> for OurError {
     }
 }
 
-impl From<motoko::vm_types::Error> for OurError {
-    fn from(err: motoko::vm_types::Error) -> Self {
+impl From<fumola::vm_types::Error> for OurError {
+    fn from(err: fumola::vm_types::Error) -> Self {
         OurError::VM(err)
     }
 }
 
-impl From<motoko::parser_types::SyntaxError> for OurError {
-    fn from(err: motoko::parser_types::SyntaxError) -> Self {
+impl From<fumola::parser_types::SyntaxError> for OurError {
+    fn from(err: fumola::parser_types::SyntaxError) -> Self {
         OurError::Syntax(err)
     }
 }
@@ -34,11 +34,11 @@ impl From<motoko::parser_types::SyntaxError> for OurError {
 pub enum OurError {
     Unknown,
     String(String),
-    VM(motoko::vm_types::Error),
-    Syntax(motoko::parser_types::SyntaxError),
+    VM(fumola::vm_types::Error),
+    Syntax(fumola::parser_types::SyntaxError),
 }
 
-/// Motoko tools in Rust.
+/// Fumola tools in Rust.
 #[derive(StructOpt, Debug, Clone)]
 #[structopt(
     name = "mo-rs",
@@ -117,15 +117,15 @@ fn main() -> OurResult<()> {
             info!("done");
         }
         CliCommand::Check { input } => {
-            let _ = motoko::check::parse(&input)?;
+            let _ = fumola::check::parse(&input)?;
             println!("check::parse: okay.");
         }
         CliCommand::Echo { input } => {
-            let p = motoko::check::parse(&input)?;
+            let p = fumola::check::parse(&input)?;
             println!("{}", format_one_line(&p));
         }
         CliCommand::Format { input, width } => {
-            let p = motoko::lexer::create_token_tree(&input)?;
+            let p = fumola::lexer::create_token_tree(&input)?;
             println!("{}", format_pretty(&p, width));
         }
         CliCommand::Eval { input, step_limit } => {
@@ -133,7 +133,7 @@ fn main() -> OurResult<()> {
                 None => Limits::none(),
                 Some(limit) => Limits::none().step(limit),
             };
-            let v = motoko::vm::eval_limit(&input, &limits);
+            let v = fumola::vm::eval_limit(&input, &limits);
             println!("final value: {:?}", v)
         }
         CliCommand::Repl => {
@@ -141,7 +141,7 @@ fn main() -> OurResult<()> {
             if rl.load_history("history.txt").is_err() {
                 println!("No previous history.");
             }
-            use motoko::vm_types::Core;
+            use fumola::vm_types::Core;
             let mut core = Core::empty();
             loop {
                 let readline = rl.readline("mo> ");
