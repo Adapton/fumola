@@ -1,4 +1,3 @@
-
 use crate::shared::{Share, Shared};
 use crate::value::{PrimFunction, Value_};
 use serde::{Deserialize, Serialize};
@@ -512,12 +511,14 @@ pub enum QuotedAst {
     Empty,
     TupleExps(Delim<Exp_>),
     TuplePats(Delim<Pat_>),
-    RecordExps(ExpFields),
+    RecordExps(ExpObjectBody),
     RecordPats(PatFields),
     Cases(Cases),
     Decs(Decs),
     DecFields(DecFields),
 }
+
+pub type ExpObjectBody = (Option<Delim<Exp_>>, Option<ExpFields>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Exp {
@@ -539,7 +540,7 @@ pub enum Exp {
     DoOpt(Exp_),
     Bang(Exp_),
     ObjectBlock(ObjSort, DecFields),
-    Object(Option<Delim<Exp_>>, Option<ExpFields>),
+    Object(ExpObjectBody),
     Variant(Id_, Option<Exp_>),
     Dot(Exp_, Id_),
     Assign(Exp_, Exp_),
@@ -580,12 +581,19 @@ pub enum Exp {
 }
 
 impl Exp {
+    pub fn object_body(&self) -> ExpObjectBody {
+        match self {
+            Exp::Object(body) => body.clone(),
+            _ => panic!(),
+        }
+    }
+
     pub fn obj_field_fields(f1: ExpField_, fs: Option<ExpFields>) -> Exp {
         match fs {
-            None => Exp::Object(None, Some(Delim::one(f1))),
+            None => Exp::Object((None, Some(Delim::one(f1)))),
             Some(mut fs) => {
                 fs.vec.push_front(f1);
-                Exp::Object(None, Some(fs))
+                Exp::Object((None, Some(fs)))
             }
         }
     }
@@ -604,7 +612,7 @@ impl Exp {
         .share();
         let mut fields = fields;
         fields.vec.push_front(field1);
-        Exp::Object(None, Some(fields))
+        Exp::Object((None, Some(fields)))
     }
     pub fn obj_base_bases(base1: Exp_, bases: Option<Delim<Exp_>>, efs: Option<ExpFields>) -> Exp {
         match (bases, efs) {
@@ -615,10 +623,10 @@ impl Exp {
                 }
                 _ => unimplemented!("parse error"),
             },
-            (None, efs) => Exp::Object(Some(Delim::one(base1)), efs),
+            (None, efs) => Exp::Object((Some(Delim::one(base1)), efs)),
             (Some(mut bs), efs) => {
                 bs.vec.push_front(base1);
-                Exp::Object(Some(bs), efs)
+                Exp::Object((Some(bs), efs))
             }
         }
     }

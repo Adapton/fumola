@@ -2,7 +2,7 @@
 //use std::collections::HashMap;
 // use crate::ast_utils::Syntax;
 use crate::parser_utils::{dec_node_into_exp, get_one};
-use crate::ast::{BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, NodeData, Source, SourceKnown, Id, Id_, ToId, Pat, Pat_, PatField, PatField_, Exp, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, Cases, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFields, ProjIndex, QuotedAst};
+use crate::ast::{BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, NodeData, Source, SourceKnown, Id, Id_, ToId, Pat, Pat_, PatField, PatField_, Exp, ExpObjectBody, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, Cases, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFields, ProjIndex, QuotedAst};
 use crate::value::PrimFunction;
 // use crate::lexer_types::Token;
 use line_col::LineColLookup;
@@ -55,7 +55,7 @@ Bl : Exp = {
 }
 
 Ob : Exp = {
-    ExpObj
+    ExpObj => Exp::Object(<>)
 }
 
 // --- Terminals --- //
@@ -107,6 +107,8 @@ PatPlain: Pat = {
     Id_ => Pat::Var(<>),
     Literal => Pat::Literal(<>),
     "(" <ps:Delim1<PatBin_, ",">> ")" => get_one(ps).map(Pat::Paren).unwrap_or_else(Pat::Tuple),
+    // to do -- unquote quoted pattern value:
+    //   "~" Exp<Ob>
 }
 
 #[inline]
@@ -366,13 +368,30 @@ ExpPlain_: Exp_ = Node<ExpPlain>;
 
 ExpPlain: Exp = {
     Literal => Exp::Literal(<>),
-    "(" <es:Delim1<ExpIfNoElse_<Exp<Ob>>, ",">> ")" => get_one(es).map(Exp::Paren).unwrap_or_else(Exp::Tuple),
-    "`" "(" ")" => Exp::QuotedAst(QuotedAst::Empty),
-    "`" "(" <es:Delim1<ExpIfNoElse_<Exp<Ob>>, ",">> ")" => Exp::QuotedAst(QuotedAst::TupleExps(es)),
-    "`" "do" "{" <ds:Decs> "}" => panic!(),
-    "`" "{" <e:ExpObjBody> "}" => panic!(),
-    "``" "(" <ps:Delim1<Pat_, ",">> ")" => Exp::QuotedAst(QuotedAst::TuplePats(ps)),
-    "``" "{" <d:Delim0<PatField_, ";">> "}" => panic!(),
+    "(" <es:Delim1<ExpIfNoElse_<Exp<Ob>>, ",">> ")" => get_one(es).map(Exp::Paren).unwrap_or_else(Exp::Tuple),    
+    QuotedAst => Exp::QuotedAst(<>),
+}
+
+QuotedAst: QuotedAst = {
+    // Empty collections of quoted ASTs, in various concrete syntax.
+    "`" "{" "}" => QuotedAst::Empty,
+    "`" "(" ")" => QuotedAst::Empty,
+    "``" "{" "}" => QuotedAst::Empty,
+    "``" "(" ")" => QuotedAst::Empty,
+
+    // Collections of expressions (that are either tuple or record components):
+    "`" "(" <es:Delim1<ExpIfNoElse_<Exp<Ob>>, ",">> ")" => QuotedAst::TupleExps(es),
+    "`" "{" <ob:ExpObjectBody> "}" => QuotedAst::RecordExps(ob),
+
+    // Declarations (and imperative code):
+    "`" "do" "{" <ds:Decs> "}" => QuotedAst::Decs(ds),
+
+    // Switch cases
+    "`" "{" <cs:Delim1<Node<Case>, ";">> "}" => QuotedAst::Cases(cs),
+
+    // Collections of patterns (matching either tuple or record components):
+    "``" "(" <ps:Delim1<Pat_, ",">> ")" => QuotedAst::TuplePats(ps),
+    "``" "{" <ps:Delim1<PatField_, ";">> "}" => QuotedAst::RecordPats(ps),
 }
 
 #[inline]
@@ -426,13 +445,13 @@ ExpUn<B>: Exp = {
     "from_candid" <e:ExpUn_<B>> => Exp::FromCandid(e),
 }
 
-ExpObj: Exp = {
+ExpObj: ExpObjectBody = {
     "~" <e:ExpNullary_<Ob>> => panic!(),
-    "{" "}" => Exp::Object(None, None),
-    "{" <e:ExpObjBody> "}" => e,
+    "{" "}" => (None, None),
+    "{" <e:ExpObjectBody> "}" => e,
 }
 
-ExpObjBody: Exp = {
+ExpObjectBody: ExpObjectBody = {
     // Object body syntax.
     //
     // We want to use this concise rule, like in the Menhir version of
@@ -448,9 +467,9 @@ ExpObjBody: Exp = {
     // LR(1) language of menhir.  To bridge this gap, we parse the
     // first field in a more case-by-case way.
     //
-    <field1:ExpFieldNoBareId_> <fields:(";" <Delim0<ExpField_, ";">>)?> => Exp::obj_field_fields(field1, fields),
-    <id:Id_> ";" <fields:Delim1<ExpField_, ";">> => Exp::obj_id_fields(id, fields),
-    <base1:ExpPost_<Ob>> <bases:("and" <Delim1<ExpPost_<Ob>, "and">>)?> <efs:("with" <Delim1<ExpField_, ";">>)?> => Exp::obj_base_bases(base1, bases, efs),
+    <field1:ExpFieldNoBareId_> <fields:(";" <Delim0<ExpField_, ";">>)?> => Exp::obj_field_fields(field1, fields).object_body(),
+    <id:Id_> ";" <fields:Delim1<ExpField_, ";">> => Exp::obj_id_fields(id, fields).object_body(),
+    <base1:ExpPost_<Ob>> <bases:("and" <Delim1<ExpPost_<Ob>, "and">>)?> <efs:("with" <Delim1<ExpField_, ";">>)?> => Exp::obj_base_bases(base1, bases, efs).object_body(),
 }
 
 #[inline]

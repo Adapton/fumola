@@ -84,7 +84,7 @@ fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> 
         ),
         Do(e) => exp_conts(active, FrameCont::Do, e),
         Assert(e) => exp_conts(active, FrameCont::Assert, e),
-        Object(bases, fields) => {
+        Object((bases, fields)) => {
             if let Some(_bases) = bases {
                 return nyi!(line!());
             };

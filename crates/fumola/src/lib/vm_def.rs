@@ -658,7 +658,7 @@ fn delim_is_static(d: &crate::ast::Delim<Exp_>) -> bool {
 fn exp_is_static(e: &Exp) -> bool {
     match e {
         Exp::ActorUrl(_) => true,
-        Exp::Object(_, efs) => {
+        Exp::Object((_, efs)) => {
             if let Some(efs) = efs {
                 object_is_static(efs)
             } else {
