@@ -86,6 +86,11 @@ IdPos: Id = {
     "~" Id => panic!(),
 }
 
+IdPosParen: Id = {
+    Id => <>,
+    "(" "~" Id ")" => panic!(),
+}
+
 #[inline]
 IdPos_: IdPos_ = Node<IdPos>;
 
@@ -443,7 +448,7 @@ Block_: Exp_ = Node<Block>;
 
 Block: Exp = {
     // "~" <e:ExpPost_<Ob>> => panic!(),
-    // UnquotePos => panic!(),
+    UnquotePos => panic!(),
     "{" <ds:Decs> "}" => Exp::Block(ds),
 }
 
@@ -473,7 +478,6 @@ ExpUn_<B>: Exp_ = Node<ExpUn<B>>;
 ExpUn<B>: Exp = {
     ExpPost<B>,
     "#" <x:IdPos_> <e:(ExpNullary_<B>)?> => Exp::Variant(x, e),
-    //UnquotePos => panic!(),
     "?" <e:ExpUn_<Ob>> => Exp::Opt(e),
     "actor" <e:ExpPlain_> => Exp::ActorUrl(e),
     <u:UnOp> <e:ExpUn_<B>> => Exp::Un(u, e),
@@ -647,7 +651,7 @@ ExpBin9<B>: Exp = {
 
 Cases: Cases = {
     //"~" <e:ExpPost_<Ob>> => panic!(),
-    // UnquotePos => panic!(),
+    UnquotePos => panic!(),
     "{" <cs:Delim0<Node<Case>, ";">> "}" => cs,
 }
 
@@ -685,13 +689,13 @@ DecNonVar: Dec = {
         name: id2,
         fields: b
     }),
-    "module" <i:(Id_)?> <s:"="?> <ob:ObjBody> => Dec::LetModule(i, Sugar(s.is_some()), ob),
-    "actor" <i:(Id_)?> <s:"="?> <ob:ObjBody> => Dec::LetActor(i, Sugar(s.is_some()), ob),
-    "object" <i:(Id_)?> <s:"="?> <ob:ObjBody> => Dec::LetObject(i, Sugar(s.is_some()), ob),
-    <sp:SharedPatOpt> "func" <i:(Id_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> <b:Block_> => Dec::Func(Function {
+    "module" <i:(IdPos_)?> <s:"="?> <ob:ObjBody> => Dec::LetModule(i, Sugar(s.is_some()), ob),
+    "actor" <i:(IdPos_)?> <s:"="?> <ob:ObjBody> => Dec::LetActor(i, Sugar(s.is_some()), ob),
+    "object" <i:(IdPos_)?> <s:"="?> <ob:ObjBody> => Dec::LetObject(i, Sugar(s.is_some()), ob),
+    <sp:SharedPatOpt> "func" <i:(IdPos_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> <b:Block_> => Dec::Func(Function {
         name: i, shared: sp, binds: tpo, input: p, output: t.map(|t|{t.1}), sugar: Sugar(false), exp: b,
     }),
-    <sp:SharedPatOpt> "func" <i:(Id_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> "=" <e:Exp_<Ob>> => Dec::Func(Function {
+    <sp:SharedPatOpt> "func" <i:(IdPos_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> "=" <e:Exp_<Ob>> => Dec::Func(Function {
         name: i, shared: sp, binds: tpo, input: p, output: t.map(|t|{t.1}), sugar: Sugar(true), exp: e,
     }),
     <sp:SharedPatOpt> "class" <oso:ObjSortOpt> <id:(Id_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" <Type_>)?> <b:ObjBody> => Dec::Class(Class {
@@ -766,7 +770,7 @@ BinOp: BinOp = {
 
 ObjBody: DecFields = {
     // "~" <e:ExpPost_<Ob>> => panic!(),
-    // UnquotePos => panic!(),
+    UnquotePos => panic!(),
     "{" <dfs:Delim0<DecField_, ";">> "}" => dfs
 }
 
