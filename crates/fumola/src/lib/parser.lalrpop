@@ -472,7 +472,7 @@ ExpUn_<B>: Exp_ = Node<ExpUn<B>>;
 
 ExpUn<B>: Exp = {
     ExpPost<B>,
-    "#" <x:Id_> <e:(ExpNullary_<B>)?> => Exp::Variant(x, e),
+    "#" <x:IdPos_> <e:(ExpNullary_<B>)?> => Exp::Variant(x, e),
     //UnquotePos => panic!(),
     "?" <e:ExpUn_<Ob>> => Exp::Opt(e),
     "actor" <e:ExpPlain_> => Exp::ActorUrl(e),
