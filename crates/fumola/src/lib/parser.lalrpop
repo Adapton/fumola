@@ -2,7 +2,7 @@
 //use std::collections::HashMap;
 // use crate::ast_utils::Syntax;
 use crate::parser_utils::{dec_node_into_exp, get_one};
-use crate::ast::{BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, NodeData, Source, SourceKnown, Id, Id_, ToId, Pat, Pat_, PatField, PatField_, Exp, ExpObjectBody, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, Cases, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFields, ProjIndex, QuotedAst};
+use crate::ast::{BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, NodeData, Source, SourceKnown, Id, Id_, IdPos, IdPos_, ToId, Pat, Pat_, PatField, PatField_, Exp, ExpObjectBody, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, Cases, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFields, ProjIndex, QuotedAst};
 use crate::value::PrimFunction;
 // use crate::lexer_types::Token;
 use line_col::LineColLookup;
@@ -89,6 +89,13 @@ IdPos: Id = {
 #[inline]
 IdPos_: Id_ = Node<Id>;
 
+UnquotePos: IdPos = {
+    "~" <id:Id_> => IdPos{ unquote: true, id },
+}
+
+#[inline]
+UnquotePos_: IdPos_ = Node<IdPos>;
+
 // --- Literals --- //
 
 #[inline]
@@ -125,8 +132,6 @@ PatPlain: Pat = {
     IdPos_ => Pat::Var(<>),
     Literal => Pat::Literal(<>),
     "(" <ps:Delim1<PatBin_, ",">> ")" => get_one(ps).map(Pat::Paren).unwrap_or_else(Pat::Tuple),
-    // to do -- unquote quoted pattern value:
-    //   "~" Exp<Ob>
 }
 
 #[inline]
@@ -437,7 +442,8 @@ ExpNest: Exp = {
 Block_: Exp_ = Node<Block>;
 
 Block: Exp = {
-    "~" <e:ExpPost_<Ob>> => panic!(),
+    // "~" <e:ExpPost_<Ob>> => panic!(),
+    UnquotePos => panic!(),
     "{" <ds:Decs> "}" => Exp::Block(ds),
 }
 
@@ -467,7 +473,7 @@ ExpUn_<B>: Exp_ = Node<ExpUn<B>>;
 ExpUn<B>: Exp = {
     ExpPost<B>,
     "#" <x:IdPos_> <e:(ExpNullary_<B>)?> => Exp::Variant(x, e),
-    // "#" "~" <x:Id_> <e:(ExpNullary_<B>)?> => panic!(),
+    //UnquotePos => panic!(),
     "?" <e:ExpUn_<Ob>> => Exp::Opt(e),
     "actor" <e:ExpPlain_> => Exp::ActorUrl(e),
     <u:UnOp> <e:ExpUn_<B>> => Exp::Un(u, e),
@@ -478,7 +484,6 @@ ExpUn<B>: Exp = {
 }
 
 ExpObj: ExpObjectBody = {
-    "~" <e:ExpNullary_<Ob>> => panic!(),
     "{" "}" => (None, None),
     "{" <e:ExpObjectBody> "}" => e,
 }
@@ -641,7 +646,8 @@ ExpBin9<B>: Exp = {
 }
 
 Cases: Cases = {
-    "~" <e:ExpPost_<Ob>> => panic!(),
+    //"~" <e:ExpPost_<Ob>> => panic!(),
+    UnquotePos => panic!(),
     "{" <cs:Delim0<Node<Case>, ";">> "}" => cs,
 }
 
@@ -759,7 +765,8 @@ BinOp: BinOp = {
 }
 
 ObjBody: DecFields = {
-    "~" <e:ExpPost_<Ob>> => panic!(),
+    // "~" <e:ExpPost_<Ob>> => panic!(),
+    UnquotePos => panic!(),
     "{" <dfs:Delim0<DecField_, ";">> "}" => dfs
 }
 

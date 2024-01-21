@@ -698,6 +698,11 @@ pub enum RelOp {
     Ge,
 }
 
+pub struct IdPos {
+    unquote: bool,
+    id: Id_
+}
+
 #[derive(Clone)]
 pub struct Id {
     pub string: Shared<String>,
