@@ -513,16 +513,16 @@ ExpObjectBody: ExpObjectBody = {
 ExpField_: Node<ExpField> = Node<ExpField>;
 
 ExpField: ExpField = {
-    <mut_:VarOpt> <id:Id_> <typ:(":" <Type_>)?> <exp:("=" <ExpIfNoElse_<Exp<Ob>>>)?> => ExpField{ mut_, id, exp, typ }
+    <mut_:VarOpt> <id:IdPos_> <typ:(":" <Type_>)?> <exp:("=" <ExpIfNoElse_<Exp<Ob>>>)?> => ExpField{ mut_, id, exp, typ }
 }
 
 #[inline]
 ExpFieldNoBareId_: Node<ExpField> = Node<ExpFieldNoBareId>;
 
 ExpFieldNoBareId: ExpField = { // like ExpField, except that a "bare" Id is not permitted.  Helps disambiguate the parse tree.
-    "var" <id:Id_> <typ:(":" <TypeNoBin_>)?> "=" <exp:ExpIfNoElse_<Exp<Ob>>> => ExpField{ mut_:Mut::Var, id, exp:Some(exp), typ },
-    <id:Id_> ":" <typ:TypeNoBin_> <exp:("=" <ExpIfNoElse_<Exp<Ob>>>)?> => ExpField{ mut_:Mut::Const, id, exp, typ:Some(typ) },
-    <id:Id_> "=" <exp:ExpIfNoElse_<Exp<Ob>>> => ExpField{ mut_:Mut::Const, id, exp:Some(exp), typ:None },
+    "var" <id:IdPos_> <typ:(":" <TypeNoBin_>)?> "=" <exp:ExpIfNoElse_<Exp<Ob>>> => ExpField{ mut_:Mut::Var, id, exp:Some(exp), typ },
+    <id:IdPos_> ":" <typ:TypeNoBin_> <exp:("=" <ExpIfNoElse_<Exp<Ob>>>)?> => ExpField{ mut_:Mut::Const, id, exp, typ:Some(typ) },
+    <id:IdPos_> "=" <exp:ExpIfNoElse_<Exp<Ob>>> => ExpField{ mut_:Mut::Const, id, exp:Some(exp), typ:None },
 }
 
 #[inline]
