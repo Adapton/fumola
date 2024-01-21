@@ -7,7 +7,7 @@ use crate::value::PrimFunction;
 // use crate::lexer_types::Token;
 use line_col::LineColLookup;
 use im_rc::vector;
-use crate::shared::{Share};
+use crate::shared::Share;
 use std::rc::Rc;
 
 grammar(lookup: &LineColLookup<'input>);
@@ -87,7 +87,7 @@ IdPos: Id = {
 }
 
 #[inline]
-IdPos_: Id_ = Node<Id>;
+IdPos_: IdPos_ = Node<IdPos>;
 
 UnquotePos: IdPos = {
     "~" <id:Id_> => IdPos{ unquote: true, id },
@@ -129,7 +129,7 @@ PatPlain_: Pat_ = Node<PatPlain>;
 
 PatPlain: Pat = {
     "_" => Pat::Wild,
-    IdPos_ => Pat::Var(<>),
+    // IdPos_ => Pat::Var(<>),
     Literal => Pat::Literal(<>),
     "(" <ps:Delim1<PatBin_, ",">> ")" => get_one(ps).map(Pat::Paren).unwrap_or_else(Pat::Tuple),
 }
@@ -156,8 +156,8 @@ PatUn_: Pat_ = Node<PatUn>;
 
 PatUn: Pat = {
     PatNullary,
-    "#" <s:IdPos_> => Pat::Variant(s, None),
-    "#" <s:IdPos_> <p:PatNullary_> => Pat::Variant(s, Some(p)),
+    "#" <s:Id_> => Pat::Variant(s, None),
+    "#" <s:Id_> <p:PatNullary_> => Pat::Variant(s, Some(p)),
     // "#" "~" <s:Id_> <p:PatNullary_> => panic!(),
     "?" <p:PatUn_> => Pat::Optional(p),
     <u:UnOp_> <l:Literal_> => Pat::UnOpLiteral(u, l),
@@ -175,10 +175,10 @@ pub Pat: Pat = {
 PatField_: PatField_ = Node<PatField>;
 
 PatField: PatField = {
-    <id:IdPos_> => PatField{ id, pat:None },
-    <id:IdPos_> ":" <t:Type_> => PatField{ id:id.clone(), pat:Some(Pat::Annot(t)) },
-    <id:IdPos_> "=" <pat:Pat> => PatField{ id, pat:Some(pat) },
-    <id:IdPos_> ":" <t:Type_> "=" <pat:Pat_> => PatField{ id, pat:Some(Pat::AnnotPat(pat, t ))},
+    <id:Id_> => PatField{ id, pat:None },
+    <id:Id_> ":" <t:Type_> => PatField{ id:id.clone(), pat:Some(Pat::Annot(t)) },
+    <id:Id_> "=" <pat:Pat> => PatField{ id, pat:Some(pat) },
+    <id:Id_> ":" <t:Type_> "=" <pat:Pat_> => PatField{ id, pat:Some(Pat::AnnotPat(pat, t ))},
 
     // Mirror cases, for when the name of the field is unquoted:
     // "~" <id:Id_> => panic!(),
@@ -443,7 +443,7 @@ Block_: Exp_ = Node<Block>;
 
 Block: Exp = {
     // "~" <e:ExpPost_<Ob>> => panic!(),
-    UnquotePos => panic!(),
+    // UnquotePos => panic!(),
     "{" <ds:Decs> "}" => Exp::Block(ds),
 }
 
@@ -456,7 +456,7 @@ ExpPost<B>: Exp = {
     <e1:ExpPost_<B>> "[" <e2:Exp_<Ob>> "]" => Exp::Index(e1, e2),
     <e1:ExpPost_<B>> "." <i:NatIndex> => Exp::Proj(e1, ProjIndex::Usize(i)),
     <e1:ExpPost_<B>> "." <f:FloatIndex> => Exp::Proj(e1, ProjIndex::FloatLike(f)),
-    <e1:ExpPost_<B>> "." <i:IdPos_> => Exp::Dot(e1, i),
+    <e1:ExpPost_<B>> "." <i:Id_> => Exp::Dot(e1, i),
     <e1:ExpPost_<B>> "<" <inst:Delim0<Type_, ",">> ">" <e2:ExpNullary_<Ob>> => Exp::Call(e1, Some(inst), e2),
     <e1:ExpPost_<B>> <e2:ExpNullary_<Ob>> => Exp::Call(e1, None, e2),
     <e:ExpPost_<B>> "!" => Exp::Bang(e),
@@ -472,7 +472,7 @@ ExpUn_<B>: Exp_ = Node<ExpUn<B>>;
 
 ExpUn<B>: Exp = {
     ExpPost<B>,
-    "#" <x:IdPos_> <e:(ExpNullary_<B>)?> => Exp::Variant(x, e),
+    "#" <x:Id_> <e:(ExpNullary_<B>)?> => Exp::Variant(x, e),
     //UnquotePos => panic!(),
     "?" <e:ExpUn_<Ob>> => Exp::Opt(e),
     "actor" <e:ExpPlain_> => Exp::ActorUrl(e),
@@ -505,7 +505,7 @@ ExpObjectBody: ExpObjectBody = {
     // first field in a more case-by-case way.
     //
     <field1:ExpFieldNoBareId_> <fields:(";" <Delim0<ExpField_, ";">>)?> => Exp::obj_field_fields(field1, fields).object_body(),
-    <id:IdPos_> ";" <fields:Delim1<ExpField_, ";">> => Exp::obj_id_fields(id, fields).object_body(),
+    <id:Id_> ";" <fields:Delim1<ExpField_, ";">> => Exp::obj_id_fields(id, fields).object_body(),
     <base1:ExpPost_<Ob>> <bases:("and" <Delim1<ExpPost_<Ob>, "and">>)?> <efs:("with" <Delim1<ExpField_, ";">>)?> => Exp::obj_base_bases(base1, bases, efs).object_body(),
 }
 
@@ -513,16 +513,16 @@ ExpObjectBody: ExpObjectBody = {
 ExpField_: Node<ExpField> = Node<ExpField>;
 
 ExpField: ExpField = {
-    <mut_:VarOpt> <id:IdPos_> <typ:(":" <Type_>)?> <exp:("=" <ExpIfNoElse_<Exp<Ob>>>)?> => ExpField{ mut_, id, exp, typ }
+    <mut_:VarOpt> <id:Id_> <typ:(":" <Type_>)?> <exp:("=" <ExpIfNoElse_<Exp<Ob>>>)?> => ExpField{ mut_, id, exp, typ }
 }
 
 #[inline]
 ExpFieldNoBareId_: Node<ExpField> = Node<ExpFieldNoBareId>;
 
 ExpFieldNoBareId: ExpField = { // like ExpField, except that a "bare" Id is not permitted.  Helps disambiguate the parse tree.
-    "var" <id:IdPos_> <typ:(":" <TypeNoBin_>)?> "=" <exp:ExpIfNoElse_<Exp<Ob>>> => ExpField{ mut_:Mut::Var, id, exp:Some(exp), typ },
-    <id:IdPos_> ":" <typ:TypeNoBin_> <exp:("=" <ExpIfNoElse_<Exp<Ob>>>)?> => ExpField{ mut_:Mut::Const, id, exp, typ:Some(typ) },
-    <id:IdPos_> "=" <exp:ExpIfNoElse_<Exp<Ob>>> => ExpField{ mut_:Mut::Const, id, exp:Some(exp), typ:None },
+    "var" <id:Id_> <typ:(":" <TypeNoBin_>)?> "=" <exp:ExpIfNoElse_<Exp<Ob>>> => ExpField{ mut_:Mut::Var, id, exp:Some(exp), typ },
+    <id:Id_> ":" <typ:TypeNoBin_> <exp:("=" <ExpIfNoElse_<Exp<Ob>>>)?> => ExpField{ mut_:Mut::Const, id, exp, typ:Some(typ) },
+    <id:Id_> "=" <exp:ExpIfNoElse_<Exp<Ob>>> => ExpField{ mut_:Mut::Const, id, exp:Some(exp), typ:None },
 }
 
 #[inline]
@@ -647,7 +647,7 @@ ExpBin9<B>: Exp = {
 
 Cases: Cases = {
     //"~" <e:ExpPost_<Ob>> => panic!(),
-    UnquotePos => panic!(),
+    // UnquotePos => panic!(),
     "{" <cs:Delim0<Node<Case>, ";">> "}" => cs,
 }
 
@@ -685,16 +685,16 @@ DecNonVar: Dec = {
         name: id2,
         fields: b
     }),
-    "module" <i:(IdPos_)?> <s:"="?> <ob:ObjBody> => Dec::LetModule(i, Sugar(s.is_some()), ob),
-    "actor" <i:(IdPos_)?> <s:"="?> <ob:ObjBody> => Dec::LetActor(i, Sugar(s.is_some()), ob),
-    "object" <i:(IdPos_)?> <s:"="?> <ob:ObjBody> => Dec::LetObject(i, Sugar(s.is_some()), ob),
-    <sp:SharedPatOpt> "func" <i:(IdPos_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> <b:Block_> => Dec::Func(Function {
+    "module" <i:(Id_)?> <s:"="?> <ob:ObjBody> => Dec::LetModule(i, Sugar(s.is_some()), ob),
+    "actor" <i:(Id_)?> <s:"="?> <ob:ObjBody> => Dec::LetActor(i, Sugar(s.is_some()), ob),
+    "object" <i:(Id_)?> <s:"="?> <ob:ObjBody> => Dec::LetObject(i, Sugar(s.is_some()), ob),
+    <sp:SharedPatOpt> "func" <i:(Id_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> <b:Block_> => Dec::Func(Function {
         name: i, shared: sp, binds: tpo, input: p, output: t.map(|t|{t.1}), sugar: Sugar(false), exp: b,
     }),
-    <sp:SharedPatOpt> "func" <i:(IdPos_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> "=" <e:Exp_<Ob>> => Dec::Func(Function {
+    <sp:SharedPatOpt> "func" <i:(Id_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> "=" <e:Exp_<Ob>> => Dec::Func(Function {
         name: i, shared: sp, binds: tpo, input: p, output: t.map(|t|{t.1}), sugar: Sugar(true), exp: e,
     }),
-    <sp:SharedPatOpt> "class" <oso:ObjSortOpt> <id:(IdPos_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" <Type_>)?> <b:ObjBody> => Dec::Class(Class {
+    <sp:SharedPatOpt> "class" <oso:ObjSortOpt> <id:(Id_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" <Type_>)?> <b:ObjBody> => Dec::Class(Class {
         shared: sp,
         sort: oso,
         typ_id: id,
@@ -766,7 +766,7 @@ BinOp: BinOp = {
 
 ObjBody: DecFields = {
     // "~" <e:ExpPost_<Ob>> => panic!(),
-    UnquotePos => panic!(),
+    // UnquotePos => panic!(),
     "{" <dfs:Delim0<DecField_, ";">> "}" => dfs
 }
 

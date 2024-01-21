@@ -699,9 +699,11 @@ pub enum RelOp {
 }
 
 pub struct IdPos {
-    unquote: bool,
-    id: Id_
+    pub unquote: bool,
+    pub id: Id_
 }
+
+pub type IdPos_ = Node<IdPos>;
 
 #[derive(Clone)]
 pub struct Id {
