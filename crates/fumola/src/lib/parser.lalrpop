@@ -156,8 +156,8 @@ PatUn_: Pat_ = Node<PatUn>;
 
 PatUn: Pat = {
     PatNullary,
-    "#" <s:Id_> => Pat::Variant(s, None),
-    "#" <s:Id_> <p:PatNullary_> => Pat::Variant(s, Some(p)),
+    "#" <s:IdPos_> => Pat::Variant(s, None),
+    "#" <s:IdPos_> <p:PatNullary_> => Pat::Variant(s, Some(p)),
     // "#" "~" <s:Id_> <p:PatNullary_> => panic!(),
     "?" <p:PatUn_> => Pat::Optional(p),
     <u:UnOp_> <l:Literal_> => Pat::UnOpLiteral(u, l),
