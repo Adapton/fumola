@@ -175,10 +175,10 @@ pub Pat: Pat = {
 PatField_: PatField_ = Node<PatField>;
 
 PatField: PatField = {
-    <id:Id_> => PatField{ id, pat:None },
-    <id:Id_> ":" <t:Type_> => PatField{ id:id.clone(), pat:Some(Pat::Annot(t)) },
-    <id:Id_> "=" <pat:Pat> => PatField{ id, pat:Some(pat) },
-    <id:Id_> ":" <t:Type_> "=" <pat:Pat_> => PatField{ id, pat:Some(Pat::AnnotPat(pat, t ))},
+    <id:IdPos_> => PatField{ id, pat:None },
+    <id:IdPos_> ":" <t:Type_> => PatField{ id:id.clone(), pat:Some(Pat::Annot(t)) },
+    <id:IdPos_> "=" <pat:Pat> => PatField{ id, pat:Some(pat) },
+    <id:IdPos_> ":" <t:Type_> "=" <pat:Pat_> => PatField{ id, pat:Some(Pat::AnnotPat(pat, t ))},
 
     // Mirror cases, for when the name of the field is unquoted:
     // "~" <id:Id_> => panic!(),
