@@ -75,8 +75,6 @@ Id: Id = {
 #[inline]
 Id_: Id_ = Node<Id>;
 
-// 2024-01-21-0731 -- to do --
-//
 // "Id Position" grammar:
 //   Introduces the unquote-Id form here ("~ Id"),
 //   when one wishes to use a quoted Id value as the
