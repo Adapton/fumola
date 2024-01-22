@@ -2,7 +2,7 @@
 //use std::collections::HashMap;
 // use crate::ast_utils::Syntax;
 use crate::parser_utils::{dec_node_into_exp, get_one};
-use crate::ast::{BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, NodeData, Source, SourceKnown, Id, Id_, IdPos, IdPos_, ToId, Pat, Pat_, PatField, PatField_, Exp, ExpObjectBody, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, Cases, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFields, ProjIndex, QuotedAst};
+use crate::ast::{BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, NodeData, Source, SourceKnown, Id, Id_, IdPos, IdPos_, Unquote, Unquote_, ToId, Pat, Pat_, PatField, PatField_, Exp, ExpObjectBody, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, Cases, CasesPos, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFields, DecFieldsPos, ProjIndex, QuotedAst};
 use crate::value::PrimFunction;
 // use crate::lexer_types::Token;
 use line_col::LineColLookup;
@@ -68,8 +68,6 @@ FloatIndex: String = {
     r"[+-]?[0-9]([0-9_]*[0-9])?\.([0-9]([0-9_]*[0-9])?)?([Ee][0-9]([0-9_]*[0-9])?)?" => <>.to_string(), // exponential with decimal
 }
 
-// 2024-01-20-1037 -- to do --
-//
 Id: Id = {
     r"[@]?[a-zA-Z_][a-zA-Z_0-9]*" => <>.to_id(),
 };
@@ -77,29 +75,26 @@ Id: Id = {
 #[inline]
 Id_: Id_ = Node<Id>;
 
+// 2024-01-21-0731 -- to do --
+//
 // "Id Position" grammar:
 //   Introduces the unquote-Id form here ("~ Id"),
 //   when one wishes to use a quoted Id value as the
 //   effective Id for this position in the AST.
-IdPos: Id = {
-    Id => <>,
-    "~" Id => panic!(),
-}
-
-IdPosParen: Id = {
-    Id => <>,
-    "(" "~" Id ")" => panic!(),
+IdPos: IdPos = {
+    Id_ => IdPos{ unquote: true, id:<> },
+    "~" <id:Id_> => IdPos{ unquote: true, id },
 }
 
 #[inline]
 IdPos_: IdPos_ = Node<IdPos>;
 
-UnquotePos: IdPos = {
-    "~" <id:Id_> => IdPos{ unquote: true, id },
+Unquote: Unquote = {
+    "~" <id:Id_> => Unquote{ id },
 }
 
 #[inline]
-UnquotePos_: IdPos_ = Node<IdPos>;
+Unquote_: Unquote_ = Node<Unquote>;
 
 // --- Literals --- //
 
@@ -110,6 +105,9 @@ pub Literal: Literal = {
     "(" ")" => Literal::Unit,
     LiteralNonUnit
 }
+
+#[inline]
+LiteralNonUnit_: Node<Literal> = Node<LiteralNonUnit>;
 
 pub LiteralNonUnit: Literal = {
     r"[+-]?[0-9]([0-9_]*[0-9])?[Ee][0-9]([0-9_]*[0-9])?" => Literal::Float(<>.to_string()), // exponential without decimal
@@ -134,9 +132,16 @@ PatPlain_: Pat_ = Node<PatPlain>;
 
 PatPlain: Pat = {
     "_" => Pat::Wild,
-    // IdPos_ => Pat::Var(<>),
+    Id_ => Pat::Var(<>),
     Literal => Pat::Literal(<>),
     "(" <ps:Delim1<PatBin_, ",">> ")" => get_one(ps).map(Pat::Paren).unwrap_or_else(Pat::Tuple),
+
+    // Pattern-Unquote parser design: We need this "~~" token (vs
+    //   using "~") to disambiguate a lot of cases of
+    //   pattern-unquoting in other productions, as when patterns can
+    //   appear optionally in front of other unquoted ASTs (function
+    //   declarations).  The doubling happens to match the quote-pattern syntax "``" too.
+    "~~" <id:Id_> => Pat::Unquote(Unquote{id})
 }
 
 #[inline]
@@ -163,7 +168,6 @@ PatUn: Pat = {
     PatNullary,
     "#" <s:IdPos_> => Pat::Variant(s, None),
     "#" <s:IdPos_> <p:PatNullary_> => Pat::Variant(s, Some(p)),
-    // "#" "~" <s:Id_> <p:PatNullary_> => panic!(),
     "?" <p:PatUn_> => Pat::Optional(p),
     <u:UnOp_> <l:Literal_> => Pat::UnOpLiteral(u, l),
 
@@ -184,12 +188,6 @@ PatField: PatField = {
     <id:IdPos_> ":" <t:Type_> => PatField{ id:id.clone(), pat:Some(Pat::Annot(t)) },
     <id:IdPos_> "=" <pat:Pat> => PatField{ id, pat:Some(pat) },
     <id:IdPos_> ":" <t:Type_> "=" <pat:Pat_> => PatField{ id, pat:Some(Pat::AnnotPat(pat, t ))},
-
-    // Mirror cases, for when the name of the field is unquoted:
-    // "~" <id:Id_> => panic!(),
-    // "~" <id:Id_> ":" <t:Type_> => panic!(),
-    // "~" <id:Id_> "=" <pat:Pat> => panic!(),
-    // "~" <id:Id_> ":" <t:Type_> "=" <pat:Pat_> => panic!(),
 }
 
 PatOpt: Pat = {
@@ -366,7 +364,7 @@ ExpNonDec<B>: Exp = {
     "async*" <e:Block_> => Exp::AsyncStar(e),
     "await" <e:ExpNest_> => Exp::Async(e),
     "await*" <e:ExpNest_> => Exp::AsyncStar(e),
-    "switch" <e:ExpNullary_<Ob>> <cs:Cases> => Exp::Switch(e, cs),
+    "switch" <e:ExpNullary_<Ob>> <c:Cases> => Exp::Switch(e, c),
     "loop" <e:ExpNest_> => Exp::Loop(e, None),
     "while"  <e1:ExpNullary_<Ob>> <e2:ExpNest_> => Exp::While(e1, e2),
     "for" "(" <p:Pat_> "in" <e1:Exp_<Ob>> ")" <e2:ExpNest_> => Exp::For(p, e1, e2),
@@ -403,7 +401,7 @@ ExpPlain_: Exp_ = Node<ExpPlain>;
 
 ExpPlain: Exp = {
     Literal => Exp::Literal(<>),
-    "(" <es:Delim1<ExpIfNoElse_<Exp<Ob>>, ",">> ")" => get_one(es).map(Exp::Paren).unwrap_or_else(Exp::Tuple),    
+    "(" <es:Delim1<ExpIfNoElse_<Exp<Ob>>, ",">> ")" => get_one(es).map(Exp::Paren).unwrap_or_else(Exp::Tuple),
     QuotedAst => Exp::QuotedAst(<>),
 }
 
@@ -416,9 +414,9 @@ QuotedAst: QuotedAst = {
 
     // Raw Id (used to create Var nodes in and Exp and Pat productions.)
     // Binary composition appends two Ids (promoting second from number literal to Id, if necessary).
-    "`" Id => panic!(),
+    "`" <id:Id_> => QuotedAst::Id(id),
 
-    "`" LiteralNonUnit => panic!(),
+    "`" <lit:LiteralNonUnit_> => QuotedAst::Literal(lit),
 
     // Collections of expressions (that are either tuple or record components):
     "`" "(" <es:Delim1<ExpIfNoElse_<Exp<Ob>>, ",">> ")" => QuotedAst::TupleExps(es),
@@ -447,8 +445,7 @@ ExpNest: Exp = {
 Block_: Exp_ = Node<Block>;
 
 Block: Exp = {
-    // "~" <e:ExpPost_<Ob>> => panic!(),
-    UnquotePos => panic!(),
+    "~" <e:ExpNullary_<Bl>> => Exp::Unquote(e),
     "{" <ds:Decs> "}" => Exp::Block(ds),
 }
 
@@ -649,10 +646,9 @@ ExpBin9<B>: Exp = {
     ExpUn<B>,
 }
 
-Cases: Cases = {
-    //"~" <e:ExpPost_<Ob>> => panic!(),
-    UnquotePos => panic!(),
-    "{" <cs:Delim0<Node<Case>, ";">> "}" => cs,
+Cases: CasesPos = {
+    Unquote_ => CasesPos::Unquote(<>),
+    "{" <cs:Delim0<Node<Case>, ";">> "}" => CasesPos::Cases(cs),
 }
 
 Case: Case = {
@@ -698,6 +694,7 @@ DecNonVar: Dec = {
     <sp:SharedPatOpt> "func" <i:(IdPos_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> "=" <e:Exp_<Ob>> => Dec::Func(Function {
         name: i, shared: sp, binds: tpo, input: p, output: t.map(|t|{t.1}), sugar: Sugar(true), exp: e,
     }),
+    // to do -- IdPos instead of Id
     <sp:SharedPatOpt> "class" <oso:ObjSortOpt> <id:(Id_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" <Type_>)?> <b:ObjBody> => Dec::Class(Class {
         shared: sp,
         sort: oso,
@@ -768,10 +765,9 @@ BinOp: BinOp = {
     "#" => BinOp::Cat,
 }
 
-ObjBody: DecFields = {
-    // "~" <e:ExpPost_<Ob>> => panic!(),
-    UnquotePos => panic!(),
-    "{" <dfs:Delim0<DecField_, ";">> "}" => dfs
+ObjBody: DecFieldsPos = {
+    Unquote_ => DecFieldsPos::Unquote(<>),
+    "{" <dfs:Delim0<DecField_, ";">> "}" => DecFieldsPos::DecFields(dfs),
 }
 
 #[inline]

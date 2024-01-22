@@ -1,14 +1,14 @@
 pub mod ast;
 pub mod ast_traversal;
 pub mod candid_utils;
-#[cfg(feature = "parser")]
-pub mod check;
+//#[cfg(feature = "parser")]
+//pub mod check;
 pub mod convert;
 pub mod dynamic;
-#[cfg(feature = "parser")]
-pub mod format;
-#[cfg(feature = "parser")]
-mod format_utils;
+//#[cfg(feature = "parser")]
+//pub mod format;
+//#[cfg(feature = "parser")]
+//mod format_utils;
 #[cfg(feature = "parser")]
 pub mod lexer;
 #[cfg(feature = "parser")]
@@ -35,8 +35,8 @@ pub mod vm_ops;
 pub mod vm_step;
 pub mod vm_types;
 
-#[cfg(feature = "parser")]
-pub use crate::check::parse;
+//#[cfg(feature = "parser")]
+//pub use crate::check::parse;
 pub use crate::dynamic::Dynamic;
 pub use crate::shared::{Share, Shared};
 #[cfg(feature = "to-motoko")]

@@ -205,6 +205,12 @@ pub type TypId = Id;
 pub type TypId_ = Node<TypId>;
 
 pub type Decs = Delim<Dec_>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum CasesPos {
+    Cases(Cases),
+    Unquote(Unquote_)
+}
 pub type Cases = Delim<Case_>;
 
 pub type Prog = Decs;
@@ -216,9 +222,9 @@ pub enum Dec {
     Exp(Exp_),
     Let(Pat_, Exp_),
     LetImport(Pat_, Sugar, String),
-    LetModule(Option<Id_>, Sugar, DecFields),
-    LetActor(Option<Id_>, Sugar, DecFields),
-    LetObject(Option<Id_>, Sugar, DecFields),
+    LetModule(Option<IdPos_>, Sugar, DecFieldsPos),
+    LetActor(Option<IdPos_>, Sugar, DecFieldsPos),
+    LetObject(Option<IdPos_>, Sugar, DecFieldsPos),
     Func(Function),
     Var(Pat_, Exp_),
     Type(TypId_, Option<TypeBinds>, Type_),
@@ -234,7 +240,7 @@ pub struct Class {
     pub input: Pat_,
     pub typ: Option<Type_>,
     pub name: Option<Id_>,
-    pub fields: DecFields,
+    pub fields: DecFieldsPos,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -272,11 +278,19 @@ pub enum Mut {
     Var,
 }
 
-pub type TypeBinds = Delim<TypeBind_>;
 pub type DecFields = Delim<DecField_>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum DecFieldsPos {
+    DecFields(DecFields),
+    Unquote(Unquote_)
+}
+
+pub type TypeBinds = Delim<TypeBind_>;
 pub type ExpFields = Delim<ExpField_>;
 pub type PatFields = Delim<PatField_>;
 pub type TypeFields = Delim<TypeField_>;
+
 
 pub type Case_ = Node<Case>;
 
@@ -291,7 +305,7 @@ pub type ExpField_ = Node<ExpField>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct ExpField {
     pub mut_: Mut,
-    pub id: Id_,
+    pub id: IdPos_,
     pub typ: Option<Type_>,
     pub exp: Option<Exp_>,
 }
@@ -318,7 +332,7 @@ pub type PatField_ = Node<PatField>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct PatField {
-    pub id: Id_,
+    pub id: IdPos_,
     pub pat: Option<Pat>,
 }
 
@@ -489,7 +503,7 @@ pub type Exp_ = Node<Exp>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct Function {
-    pub name: Option<Id_>,
+    pub name: Option<IdPos_>,
     pub shared: Option<SortPat>,
     pub binds: Option<TypeBinds>,
     pub input: Pat_,
@@ -509,6 +523,8 @@ pub enum ProjIndex {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum QuotedAst {
     Empty,
+    Id(Id_),
+    Literal(Literal_),
     TupleExps(Delim<Exp_>),
     TuplePats(Delim<Pat_>),
     RecordExps(ExpObjectBody),
@@ -539,23 +555,23 @@ pub enum Exp {
     Opt(Exp_),
     DoOpt(Exp_),
     Bang(Exp_),
-    ObjectBlock(ObjSort, DecFields),
+    ObjectBlock(ObjSort, DecFieldsPos),
     Object(ExpObjectBody),
-    Variant(Id_, Option<Exp_>),
-    Dot(Exp_, Id_),
+    Variant(IdPos_, Option<Exp_>),
+    Dot(Exp_, IdPos_),
     Assign(Exp_, Exp_),
     BinAssign(Exp_, BinOp, Exp_),
     Array(Mut, Delim<Exp_>),
     Index(Exp_, Exp_),
     Function(Function),
     Call(Exp_, Option<Inst>, Exp_),
-    Block(Delim<Dec_>),
+    Block(Decs),
     Do(Exp_),
     Not(Exp_),
     And(Exp_, Exp_),
     Or(Exp_, Exp_),
     If(Exp_, Exp_, Option<Exp_>),
-    Switch(Exp_, Cases),
+    Switch(Exp_, CasesPos),
     While(Exp_, Exp_),
     Loop(Exp_, Option<Exp_>),
     For(Pat_, Exp_, Exp_),
@@ -578,6 +594,7 @@ pub enum Exp {
     Ignore(Exp_),
     Paren(Exp_),
     QuotedAst(QuotedAst),
+    Unquote(Exp_)
 }
 
 impl Exp {
@@ -646,11 +663,12 @@ pub enum Pat {
     Tuple(Delim<Pat_>),
     Object(PatFields),
     Optional(Pat_),
-    Variant(Id_, Option<Pat_>),
+    Variant(IdPos_, Option<Pat_>),
     Or(Pat_, Pat_),
     AnnotPat(Pat_, Type_),
     Annot(Type_),
     Paren(Pat_),
+    Unquote(Unquote),
     // used by the VM to pattern-match values.
     TempVar(u16),
 }
@@ -698,6 +716,14 @@ pub enum RelOp {
     Ge,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub struct Unquote {
+    pub id: Id_
+}
+
+pub type Unquote_ = Node<Unquote>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct IdPos {
     pub unquote: bool,
     pub id: Id_
