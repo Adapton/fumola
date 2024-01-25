@@ -94,13 +94,13 @@ fn pattern_matches_temps_(pat: &Pat, v: Value_, mut out: Vec<Value_>) -> Option<
             Some(out)
         }
         (Pat::Variant(id1, None), Value::Variant(id2, None)) => {
-            if &id1.0 != id2 {
+            if &id1.0.id.0 != id2 {
                 return None;
             };
             Some(out)
         }
         (Pat::Variant(id1, Some(pat_)), Value::Variant(id2, Some(v_))) => {
-            if &id1.0 != id2 {
+            if &id1.0.id.0 != id2 {
                 return None;
             };
             pattern_matches_temps_(&pat_.0, v_.fast_clone(), out)
@@ -152,13 +152,13 @@ pub fn pattern_matches(env: Env, pat: &Pat, v: Value_) -> Option<Env> {
             Some(env)
         }
         (Pat::Variant(id1, None), Value::Variant(id2, None)) => {
-            if &id1.0 != id2 {
+            if &id1.0.id.0 != id2 {
                 return None;
             };
             Some(env)
         }
         (Pat::Variant(id1, Some(pat_)), Value::Variant(id2, Some(v_))) => {
-            if &id1.0 != id2 {
+            if &id1.0.id.0 != id2 {
                 return None;
             };
             pattern_matches(env, &pat_.0, v_.fast_clone())

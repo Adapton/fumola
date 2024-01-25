@@ -390,7 +390,7 @@ ExpNullary_<B>: Exp_ = Node<ExpNullary<B>>;
 ExpNullary<B>: Exp = {
     B,
     ExpPlain,
-    Id => Exp::Var(<>),
+    Id_ => Exp::id_var(<>),
     "prim" <t:StringLiteral> => Exp::Prim(PrimFunction::resolve(t)),
 }
 
@@ -504,7 +504,7 @@ ExpObjectBody: ExpObjectBody = {
     // first field in a more case-by-case way.
     //
     <field1:ExpFieldNoBareId_> <fields:(";" <Delim0<ExpField_, ";">>)?> => Exp::obj_field_fields(field1, fields).object_body(),
-    <id:Id_> ";" <fields:Delim1<ExpField_, ";">> => Exp::obj_id_fields(id, fields).object_body(),
+    <id:IdPos_> ";" <fields:Delim1<ExpField_, ";">> => Exp::obj_id_fields(id, fields).object_body(),
     <base1:ExpPost_<Ob>> <bases:("and" <Delim1<ExpPost_<Ob>, "and">>)?> <efs:("with" <Delim1<ExpField_, ";">>)?> => Exp::obj_base_bases(base1, bases, efs).object_body(),
 }
 

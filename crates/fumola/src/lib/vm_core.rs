@@ -490,7 +490,7 @@ impl Core {
         let last = vec.pop_back();
         match last {
             Some(d) => match &d.0 {
-                Dec::LetActor(id, _, dfs) => Ok((vec, id.clone(), dfs.clone())),
+                Dec::LetActor(id, _, dfs) => Ok((vec, id.map(|i| i.0.id_()), dfs.clone())),
                 _ => Err(Interruption::NotAnActorDefinition),
             },
             None => unreachable!(),
@@ -530,7 +530,7 @@ impl Core {
                 Dec::LetModule(id, _, dfs) => Ok(ModuleFileInit {
                     file_content: s.to_string(),
                     outer_decs: vec,
-                    id: id.clone(),
+                    id: id.map(|i| i.0.id_()),
                     fields: dfs.clone(),
                 }),
                 _ => Err(Interruption::NotAModuleDefinition),

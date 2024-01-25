@@ -41,17 +41,17 @@ fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> 
         }
         Return(None) => return_(active, Value::Unit.share()),
         Return(Some(e)) => exp_conts(active, FrameCont::Return, e),
-        Var(x) => match active.env().get(x) {
+        Var(x) => match active.env().get(x.0.id_ref()) {
             None => {
-                if x.string.starts_with("@") {
-                    let f = crate::value::PrimFunction::AtSignVar(x.to_string());
+                if x.0.id().string.starts_with("@") {
+                    let f = crate::value::PrimFunction::AtSignVar(x.0.id_ref().to_string());
                     let v = Value::PrimFunction(f).share();
                     *active.cont() = Cont::Value_(v);
                     Ok(Step {})
                 } else {
                     let ctx = active.defs().active_ctx.clone();
-                    let fd = crate::vm_def::resolve_def(active.defs(), &ctx, false, x)?;
-                    let v = crate::vm_def::def_as_value(active.defs(), x, &fd.def)?;
+                    let fd = crate::vm_def::resolve_def(active.defs(), &ctx, false, x.0.id_ref())?;
+                    let v = crate::vm_def::def_as_value(active.defs(), x.0.id_ref(), &fd.def)?;
                     *active.cont() = Cont::Value_(v);
                     Ok(Step {})
                 }
@@ -70,10 +70,10 @@ fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> 
         Paren(e) => exp_conts(active, FrameCont::Paren, e),
         Variant(id, None) => {
             // TODO: cache and share variants?
-            *active.cont() = cont_value(Value::Variant(id.0.clone(), None));
+            *active.cont() = cont_value(Value::Variant(id.0.id(), None));
             Ok(Step {})
         }
-        Variant(id, Some(e)) => exp_conts(active, FrameCont::Variant(id.fast_clone()), e),
+        Variant(id, Some(e)) => exp_conts(active, FrameCont::Variant(id.0.id_()), e),
         Switch(e1, cases) => exp_conts(active, FrameCont::Switch(cases.clone()), e1),
         Block(decs) => exp_conts_(
             active,
@@ -98,7 +98,7 @@ fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> 
                     Some(f1) => {
                         let fc = FieldContext {
                             mut_: f1.0.mut_.clone(),
-                            id: f1.0.id.fast_clone(),
+                            id: f1.0.id.0.id_(),
                             typ: f1.0.typ.fast_clone(),
                         };
                         exp_conts(
@@ -153,7 +153,7 @@ fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> 
             e1,
         ),
         Proj(e1, i) => exp_conts(active, FrameCont::Proj(i.clone()), e1),
-        Dot(e1, f) => exp_conts(active, FrameCont::Dot(f.fast_clone()), e1),
+        Dot(e1, f) => exp_conts(active, FrameCont::Dot(f.0.id_()), e1),
         If(e1, e2, e3) => exp_conts(active, FrameCont::If(e2.fast_clone(), e3.fast_clone()), e1),
         Rel(e1, relop, e2) => exp_conts(
             active,
@@ -300,10 +300,11 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
                             None => todo!(),
                             Some(local_name) => {
                                 let ctx_id = active.defs().active_ctx.clone();
-                                let old_def =
-                                    ctx_id.get_field(active, &local_name.0).map(|x| x.clone());
+                                let old_def = ctx_id
+                                    .get_field(active, local_name.0.id_ref())
+                                    .map(|x| x.clone());
 
-                                let id = ActorId::Local(local_name.0.clone());
+                                let id = ActorId::Local(local_name.0.id());
                                 match old_def {
                                     None => crate::vm_def::def::actor(
                                         active,
@@ -334,7 +335,7 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
                         match i {
                             None => (),
                             Some(i) => {
-                                active.env().insert(i.0.clone(), v);
+                                active.env().insert(i.0.id(), v);
                             }
                         };
                         *active.cont() = Cont::Decs(decs);
@@ -350,7 +351,7 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
                                 package_name: None,
                                 local_path: format!("<anonymous@{}>", dec_.1),
                             },
-                            &id,
+                            &id.map(|i| i.0.id_()),
                             dec_.1.clone(),
                             None,
                             None,
@@ -360,7 +361,7 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
                         match id {
                             None => (),
                             Some(i) => {
-                                active.env().insert(i.0.clone(), v);
+                                active.env().insert(i.0.id(), v);
                             }
                         };
                         *active.cont() = Cont::Decs(decs);
@@ -396,7 +397,7 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
                             Ok(Step {})
                         } else {
                             if let Some(i) = id {
-                                active.env().insert(i.as_ref().data_ref().clone(), v);
+                                active.env().insert(i.0.id(), v);
                             };
                             *active.cont() = Cont::Decs(decs);
                             Ok(Step {})
@@ -794,7 +795,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                         done,
                         FieldContext {
                             mut_: next.0.mut_.clone(),
-                            id: next.0.id.fast_clone(),
+                            id: next.0.id.0.id_(),
                             typ: next.0.typ.fast_clone(),
                         },
                         rest,
@@ -1410,11 +1411,11 @@ pub fn call_function_def<A: Active>(
         let source = active.cont_source().clone();
         let env_saved = active.env().fast_clone();
         *active.env() = env_;
-        fndef.function.name.fast_clone().map(|f| {
-            active
-                .env()
-                .insert(f.0.clone(), fndef.rec_value.fast_clone())
-        });
+        fndef
+            .function
+            .name
+            .fast_clone()
+            .map(|f| active.env().insert(f.0.id(), fndef.rec_value.fast_clone()));
         active.defs().active_ctx = fndef.context.clone();
         *active.cont() = Cont::Exp_(fndef.function.exp.fast_clone(), Vector::new());
         let context = active.defs().active_ctx.clone();
@@ -1447,7 +1448,7 @@ fn call_function<A: Active>(
         cf.0.content
             .name
             .fast_clone()
-            .map(|f| active.env().insert(f.0.clone(), value));
+            .map(|f| active.env().insert(f.0.id(), value));
         *active.cont() = Cont::Exp_(cf.0.content.exp.fast_clone(), Vector::new());
         let context = active.defs().active_ctx.clone();
         active.defs().active_ctx = cf.0.ctx.clone();

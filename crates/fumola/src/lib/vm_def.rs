@@ -173,11 +173,11 @@ pub fn module_project(
             for f in pat_fields.vec.iter() {
                 match f.0.pat.clone() {
                     None => {
-                        let fd = resolve_def(defs, &m.fields, true, &f.0.id.0)?;
-                        r.push((f.0.id.clone(), fd.def.clone()))
+                        let fd = resolve_def(defs, &m.fields, true, f.0.id.0.id_ref())?;
+                        r.push((f.0.id.0.id_(), fd.def.clone()))
                     }
                     Some(Pat::Var(x)) => {
-                        let fd = resolve_def(defs, &m.fields, true, &f.0.id.0)?;
+                        let fd = resolve_def(defs, &m.fields, true, f.0.id.0.id_ref())?;
                         r.push((x.clone(), fd.def.clone()))
                     }
                     p => return nyi!(line!(), "module_project object-field pattern {:?}", p),
@@ -322,7 +322,7 @@ pub mod def {
                         package_name: None,
                         local_path: format!("<anonymous@{}>", &df.dec.1),
                     },
-                    id,
+                    &id.map(|i| i.0.id_()),
                     df.dec.1.clone(),
                     df.vis.clone(),
                     df.stab.clone(),
@@ -332,7 +332,7 @@ pub mod def {
                 if let Some(id) = id {
                     if let Value::Module(m) = &*v {
                         active.defs().insert_field(
-                            &id.0,
+                            id.0.id_ref(),
                             source.clone(),
                             df.vis.clone(),
                             df.stab.clone(),
@@ -357,7 +357,7 @@ pub mod def {
                         .share(),
                     };
                     active.defs().insert_field(
-                        &name.0,
+                        name.0.id_ref(),
                         source.clone(),
                         df.vis.clone(),
                         df.stab.clone(),
@@ -466,7 +466,7 @@ pub mod def {
                         .share(),
                     };
                     active.defs().insert_field(
-                        &name.0,
+                        name.0.id_ref(),
                         source.clone(),
                         df.vis.clone(),
                         df.stab.clone(),

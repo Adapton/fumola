@@ -209,7 +209,7 @@ pub type Decs = Delim<Dec_>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum CasesPos {
     Cases(Cases),
-    Unquote(Unquote_)
+    Unquote(Unquote_),
 }
 pub type Cases = Delim<Case_>;
 
@@ -283,14 +283,13 @@ pub type DecFields = Delim<DecField_>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum DecFieldsPos {
     DecFields(DecFields),
-    Unquote(Unquote_)
+    Unquote(Unquote_),
 }
 
 pub type TypeBinds = Delim<TypeBind_>;
 pub type ExpFields = Delim<ExpField_>;
 pub type PatFields = Delim<PatField_>;
 pub type TypeFields = Delim<TypeField_>;
-
 
 pub type Case_ = Node<Case>;
 
@@ -314,7 +313,7 @@ impl ExpField {
     pub fn exp_(&self) -> Exp_ {
         match self.exp.clone() {
             Some(e) => e,
-            None => NodeData(Exp::Var(self.id.0.clone()), self.id.1.clone()).share(),
+            None => NodeData(Exp::Var(self.id), self.id.1.clone()).share(),
         }
     }
 }
@@ -541,7 +540,7 @@ pub enum Exp {
     Value_(Value_),
     Hole,
     Prim(Result<PrimFunction, String>),
-    Var(Id),
+    Var(IdPos_),
     Literal(Literal),
     ActorUrl(Exp_),
     Un(UnOp, Exp_),
@@ -594,10 +593,15 @@ pub enum Exp {
     Ignore(Exp_),
     Paren(Exp_),
     QuotedAst(QuotedAst),
-    Unquote(Exp_)
+    Unquote(Exp_),
 }
 
 impl Exp {
+    pub fn id_var(id: Id_) -> Exp {
+        let source = id.1.clone();
+        Exp::Var(NodeData(IdPos { id, unquote: false }, source).share())
+    }
+
     pub fn object_body(&self) -> ExpObjectBody {
         match self {
             Exp::Object(body) => body.clone(),
@@ -614,9 +618,9 @@ impl Exp {
             }
         }
     }
-    pub fn obj_id_fields(id: Id_, fields: ExpFields) -> Exp {
+    pub fn obj_id_fields(id: IdPos_, fields: ExpFields) -> Exp {
         let field1_source = id.1.clone();
-        let exp = Some(NodeData(Exp::Var(id.0.clone()), id.1.clone()).share());
+        let exp = Some(NodeData(Exp::Var(id), id.1.clone()).share());
         let field1 = NodeData(
             ExpField {
                 mut_: Mut::Const,
@@ -634,10 +638,7 @@ impl Exp {
     pub fn obj_base_bases(base1: Exp_, bases: Option<Delim<Exp_>>, efs: Option<ExpFields>) -> Exp {
         match (bases, efs) {
             (None, None) => match &base1.0 {
-                Exp::Var(x) => {
-                    let x = NodeData(x.clone(), base1.1.clone()).share();
-                    Exp::obj_id_fields(x, Delim::new())
-                }
+                Exp::Var(x) => Exp::obj_id_fields(x.clone(), Delim::new()),
                 _ => unimplemented!("parse error"),
             },
             (None, efs) => Exp::Object((Some(Delim::one(base1)), efs)),
@@ -718,7 +719,7 @@ pub enum RelOp {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct Unquote {
-    pub id: Id_
+    pub id: Id_,
 }
 
 pub type Unquote_ = Node<Unquote>;
@@ -726,7 +727,20 @@ pub type Unquote_ = Node<Unquote>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct IdPos {
     pub unquote: bool,
-    pub id: Id_
+    pub id: Id_,
+}
+
+impl IdPos {
+    pub fn id_(&self) -> Id_ {
+        assert_eq!(self.unquote, false);
+        self.id.clone()
+    }
+    pub fn id(&self) -> Id {
+        self.id_().0.clone()
+    }
+    pub fn id_ref<'a>(&'a self) -> &'a Id {
+        &self.id_().0
+    }
 }
 
 pub type IdPos_ = Node<IdPos>;
