@@ -1,6 +1,6 @@
 use crate::ast::{
-    Cases, Dec, Exp, Exp_, IdPos, IdPos_, Id_, Inst, Literal, Mut, NodeData, Pat, Pat_, ProjIndex,
-    QuotedAst, Source, Type,
+    Cases, Dec, Dec_, Exp, Exp_, IdPos, IdPos_, Id_, Inst, Literal, Mut, NodeData, Pat, Pat_,
+    ProjIndex, QuotedAst, Source, Type,
 };
 use crate::shared::{FastClone, Share};
 use crate::value::{
@@ -283,152 +283,154 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
                 _ => stack_cont(active, v),
             }
         }
-        Cont::Decs(mut decs) => {
-            if decs.is_empty() {
-                *active.cont() = cont_value(Value::Unit);
-                *active.cont_source() = Source::Evaluation;
-                Ok(Step {})
-            } else {
-                let dec_ = decs.pop_front().unwrap();
-                match &dec_.0 {
-                    Dec::Type(..) => {
-                        *active.cont() = Cont::Decs(decs);
-                        Ok(Step {})
-                    }
-                    Dec::Exp(e) => {
-                        *active.cont_source() = dec_.1.clone();
-                        *active.cont() = Cont::Exp_(e.fast_clone(), decs);
-                        Ok(Step {})
-                    }
-                    Dec::Let(p, e) => {
-                        if decs.is_empty() {
-                            let i = match &p.0 {
-                                Pat::Var(i) => Some(i.fast_clone()),
-                                _ => None,
-                            };
-                            let source = active.cont_source().clone();
-                            exp_conts(
-                                active,
-                                FrameCont::Let(p.fast_clone(), Cont::LetVarRet(source, i)),
-                                e,
-                            )
-                        } else {
-                            exp_conts(active, FrameCont::Let(p.fast_clone(), Cont::Decs(decs)), e)
-                        }
-                    }
-                    Dec::LetActor(i, _, dfs) => {
-                        let v = match i {
-                            /* Are we upgrading a local Actor? */
-                            None => todo!(),
-                            Some(local_name) => {
-                                let ctx_id = active.defs().active_ctx.clone();
-                                let old_def = ctx_id
-                                    .get_field(active, local_name.0.id_ref())
-                                    .map(|x| x.clone());
+        Cont::Decs(mut decs) => decs_step(active, decs), //_ => unimplemented!(),
+    }
+}
 
-                                let id = ActorId::Local(local_name.0.id());
-                                match old_def {
-                                    None => crate::vm_def::def::actor(
-                                        active,
-                                        format!("<anonymous@{}>", dec_.1),
-                                        &id,
-                                        dec_.1.clone(),
-                                        None,
-                                        None,
-                                        dfs.dec_fields(),
-                                    )?,
-                                    Some(FieldDef {
-                                        def: Def::Actor(old_def),
-                                        ..
-                                    }) => crate::vm_def::def::actor_upgrade(
-                                        active,
-                                        format!("<anonymous@{}>", dec_.1),
-                                        &id,
-                                        dec_.1.clone(),
-                                        None,
-                                        None,
-                                        dfs.dec_fields(),
-                                        &old_def,
-                                    )?,
-                                    _ => unreachable!(),
-                                }
-                            }
-                        };
-                        match i {
-                            None => (),
-                            Some(i) => {
-                                active.env().insert(i.0.id(), v);
-                            }
-                        };
-                        *active.cont() = Cont::Decs(decs);
-                        Ok(Step {})
-                    }
-                    Dec::LetObject(_id, _, _dfs) => {
-                        nyi!(line!())
-                    }
-                    Dec::LetModule(id, _, dfs) => {
-                        let v = crate::vm_def::def::module(
-                            active,
-                            ModulePath {
-                                package_name: None,
-                                local_path: format!("<anonymous@{}>", dec_.1),
-                            },
-                            &id.clone().map(|i| i.0.id_()),
-                            dec_.1.clone(),
-                            None,
-                            None,
-                            dfs.dec_fields(),
-                            None,
-                        )?;
-                        match id {
-                            None => (),
-                            Some(i) => {
-                                active.env().insert(i.0.id(), v);
-                            }
-                        };
-                        *active.cont() = Cont::Decs(decs);
-                        Ok(Step {})
-                    }
-                    Dec::LetImport(pattern, _, path) => {
-                        let m = crate::vm_def::def::import(active, path)?;
-                        let fields = crate::vm_def::module_project(active.defs(), &m, &pattern.0)?;
-                        for (x, def) in fields {
-                            let val = crate::vm_def::def_as_value(active.defs(), &x.0, &def)?;
-                            active.env().insert(x.0.clone(), val);
-                        }
-                        *active.cont() = Cont::Decs(decs);
-                        Ok(Step {})
-                    }
-                    Dec::Var(p, e) => {
-                        if let Some(x) = crate::vm_match::get_pat_var(&p.0) {
-                            exp_conts(active, FrameCont::Var(x.fast_clone(), Cont::Decs(decs)), e)
-                        } else {
-                            nyi!(line!(), "Dec::Var({:?}, _)", p)
-                        }
-                    }
-                    Dec::Func(f) => {
-                        let id = f.name.clone();
-                        let v = Value::Function(ClosedFunction(Closed {
-                            ctx: active.defs().active_ctx.clone(),
-                            env: active.env().fast_clone(),
-                            content: f.clone(),
-                        }))
-                        .share();
-                        if decs.is_empty() {
-                            *active.cont() = Cont::Value_(v);
-                            Ok(Step {})
-                        } else {
-                            if let Some(i) = id {
-                                active.env().insert(i.0.id(), v);
-                            };
-                            *active.cont() = Cont::Decs(decs);
-                            Ok(Step {})
-                        }
-                    }
-                    d => nyi!(line!(), "{:?}", d),
+fn decs_step<A: Active>(active: &mut A, mut decs: Vector<Dec_>) -> Result<Step, Interruption> {
+    if decs.is_empty() {
+        *active.cont() = cont_value(Value::Unit);
+        *active.cont_source() = Source::Evaluation;
+        Ok(Step {})
+    } else {
+        let dec_ = decs.pop_front().unwrap();
+        match &dec_.0 {
+            Dec::Type(..) => {
+                *active.cont() = Cont::Decs(decs);
+                Ok(Step {})
+            }
+            Dec::Exp(e) => {
+                *active.cont_source() = dec_.1.clone();
+                *active.cont() = Cont::Exp_(e.fast_clone(), decs);
+                Ok(Step {})
+            }
+            Dec::Let(p, e) => {
+                if decs.is_empty() {
+                    let i = match &p.0 {
+                        Pat::Var(i) => Some(i.fast_clone()),
+                        _ => None,
+                    };
+                    let source = active.cont_source().clone();
+                    exp_conts(
+                        active,
+                        FrameCont::Let(p.fast_clone(), Cont::LetVarRet(source, i)),
+                        e,
+                    )
+                } else {
+                    exp_conts(active, FrameCont::Let(p.fast_clone(), Cont::Decs(decs)), e)
                 }
             }
-        } //_ => unimplemented!(),
+            Dec::LetActor(i, _, dfs) => {
+                let v = match i {
+                    /* Are we upgrading a local Actor? */
+                    None => todo!(),
+                    Some(local_name) => {
+                        let ctx_id = active.defs().active_ctx.clone();
+                        let old_def = ctx_id
+                            .get_field(active, local_name.0.id_ref())
+                            .map(|x| x.clone());
+
+                        let id = ActorId::Local(local_name.0.id());
+                        match old_def {
+                            None => crate::vm_def::def::actor(
+                                active,
+                                format!("<anonymous@{}>", dec_.1),
+                                &id,
+                                dec_.1.clone(),
+                                None,
+                                None,
+                                dfs.dec_fields(),
+                            )?,
+                            Some(FieldDef {
+                                def: Def::Actor(old_def),
+                                ..
+                            }) => crate::vm_def::def::actor_upgrade(
+                                active,
+                                format!("<anonymous@{}>", dec_.1),
+                                &id,
+                                dec_.1.clone(),
+                                None,
+                                None,
+                                dfs.dec_fields(),
+                                &old_def,
+                            )?,
+                            _ => unreachable!(),
+                        }
+                    }
+                };
+                match i {
+                    None => (),
+                    Some(i) => {
+                        active.env().insert(i.0.id(), v);
+                    }
+                };
+                *active.cont() = Cont::Decs(decs);
+                Ok(Step {})
+            }
+            Dec::LetObject(_id, _, _dfs) => {
+                nyi!(line!())
+            }
+            Dec::LetModule(id, _, dfs) => {
+                let v = crate::vm_def::def::module(
+                    active,
+                    ModulePath {
+                        package_name: None,
+                        local_path: format!("<anonymous@{}>", dec_.1),
+                    },
+                    &id.clone().map(|i| i.0.id_()),
+                    dec_.1.clone(),
+                    None,
+                    None,
+                    dfs.dec_fields(),
+                    None,
+                )?;
+                match id {
+                    None => (),
+                    Some(i) => {
+                        active.env().insert(i.0.id(), v);
+                    }
+                };
+                *active.cont() = Cont::Decs(decs);
+                Ok(Step {})
+            }
+            Dec::LetImport(pattern, _, path) => {
+                let m = crate::vm_def::def::import(active, path)?;
+                let fields = crate::vm_def::module_project(active.defs(), &m, &pattern.0)?;
+                for (x, def) in fields {
+                    let val = crate::vm_def::def_as_value(active.defs(), &x.0, &def)?;
+                    active.env().insert(x.0.clone(), val);
+                }
+                *active.cont() = Cont::Decs(decs);
+                Ok(Step {})
+            }
+            Dec::Var(p, e) => {
+                if let Some(x) = crate::vm_match::get_pat_var(&p.0) {
+                    exp_conts(active, FrameCont::Var(x.fast_clone(), Cont::Decs(decs)), e)
+                } else {
+                    nyi!(line!(), "Dec::Var({:?}, _)", p)
+                }
+            }
+            Dec::Func(f) => {
+                let id = f.name.clone();
+                let v = Value::Function(ClosedFunction(Closed {
+                    ctx: active.defs().active_ctx.clone(),
+                    env: active.env().fast_clone(),
+                    content: f.clone(),
+                }))
+                .share();
+                if decs.is_empty() {
+                    *active.cont() = Cont::Value_(v);
+                    Ok(Step {})
+                } else {
+                    if let Some(i) = id {
+                        active.env().insert(i.0.id(), v);
+                    };
+                    *active.cont() = Cont::Decs(decs);
+                    Ok(Step {})
+                }
+            }
+            d => nyi!(line!(), "{:?}", d),
+        }
     }
 }
 
@@ -1053,9 +1055,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                 QuotedAst::TuplePats(_) => panic!(),
                 QuotedAst::RecordPats(_) => panic!(),
                 QuotedAst::DecFields(dfs) => panic!(),
-                QuotedAst::Decs(d) => {
-                    panic!()
-                }
+                QuotedAst::Decs(d) => decs_step(active, d.vec.clone()),
             },
             _ => type_mismatch!(file!(), line!()),
         },
