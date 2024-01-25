@@ -359,7 +359,7 @@ ExpNonDec<B>: Exp = {
     "if" <e1:ExpNullary_<Ob>> <e2:ExpNest_> "else" <e3:ExpNest_> => Exp::If(e1, e2, Some(e3)),
     "return" <e:Exp_<B>?> => Exp::Return(e),
     "async" <e:ExpNest_> => Exp::Async(e),
-    "async*" <e:Block_> => Exp::AsyncStar(e),
+    "async*" <e:BlockPos_> => Exp::AsyncStar(e),
     "await" <e:ExpNest_> => Exp::Async(e),
     "await*" <e:ExpNest_> => Exp::AsyncStar(e),
     "switch" <e:ExpNullary_<Ob>> <c:Cases> => Exp::Switch(e, c),
@@ -367,14 +367,13 @@ ExpNonDec<B>: Exp = {
     "while"  <e1:ExpNullary_<Ob>> <e2:ExpNest_> => Exp::While(e1, e2),
     "for" "(" <p:Pat_> "in" <e1:Exp_<Ob>> ")" <e2:ExpNest_> => Exp::For(p, e1, e2),
     "ignore" <e:ExpNest_> => Exp::Ignore(e),
-    "do" <e:Block_> => Exp::Do(e),
-    "do" "?" <e:Block_> => Exp::DoOpt(e),
+    "do" <e:BlockPos_> => Exp::Do(e),
+    "do" "?" <e:BlockPos_> => Exp::DoOpt(e),
     "assert" <e:ExpNest_> => Exp::Assert(e),
     "label" <id:Id_> <t:(":" <Type_>)?> <e:ExpNest_> => Exp::Label(id, t, e),
     "debug" <e:ExpNest_> => Exp::Debug(e),
     "import" <txt:StringLiteral> => Exp::Import(txt),
     "try" <e1:ExpNest_> <c:Catch_> => Exp::Try(e1, c),
-
 }
 
 #[inline]
@@ -443,9 +442,17 @@ ExpNest: Exp = {
 Block_: Exp_ = Node<Block>;
 
 Block: Exp = {
+    "{" <ds:Decs> "}" => Exp::Block(ds),
+}
+
+#[inline]
+BlockPos_: Exp_ = Node<BlockPos>;
+
+BlockPos: Exp = {
     "~" <e:ExpNullary_<Bl>> => Exp::Unquote(e),
     "{" <ds:Decs> "}" => Exp::Block(ds),
 }
+
 
 #[inline]
 ExpPost_<B>: Exp_ = Node<ExpPost<B>>;
@@ -480,6 +487,7 @@ ExpUn<B>: Exp = {
     "debug_show" <e:ExpUn_<B>> => Exp::DebugShow(e),
     "to_candid" "(" <d:Delim1<Exp_<Ob>, ",">> ")" => Exp::ToCandid(d),
     "from_candid" <e:ExpUn_<B>> => Exp::FromCandid(e),
+    "~" <e:ExpUn_<B>> => Exp::Unquote(e),
 }
 
 ExpObj: ExpObjectBody = {
@@ -686,7 +694,7 @@ DecNonVar: Dec = {
     "module" <i:(IdPos_)?> <s:"="?> <ob:ObjBody> => Dec::LetModule(i, Sugar(s.is_some()), ob),
     "actor" <i:(IdPos_)?> <s:"="?> <ob:ObjBody> => Dec::LetActor(i, Sugar(s.is_some()), ob),
     "object" <i:(IdPos_)?> <s:"="?> <ob:ObjBody> => Dec::LetObject(i, Sugar(s.is_some()), ob),
-    <sp:SharedPatOpt> "func" <i:(IdPos_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> <b:Block_> => Dec::Func(Function {
+    <sp:SharedPatOpt> "func" <i:(IdPos_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> <b:BlockPos_> => Dec::Func(Function {
         name: i, shared: sp, binds: tpo, input: p, output: t.map(|t|{t.1}), sugar: Sugar(false), exp: b,
     }),
     <sp:SharedPatOpt> "func" <i:(IdPos_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> "=" <e:Exp_<Ob>> => Dec::Func(Function {
