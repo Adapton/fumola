@@ -322,11 +322,11 @@ pub mod def {
                         package_name: None,
                         local_path: format!("<anonymous@{}>", &df.dec.1),
                     },
-                    &id.map(|i| i.0.id_()),
+                    &id.clone().map(|i| i.0.id_()),
                     df.dec.1.clone(),
                     df.vis.clone(),
                     df.stab.clone(),
-                    dfs,
+                    dfs.dec_fields(),
                     None,
                 )?;
                 if let Some(id) = id {

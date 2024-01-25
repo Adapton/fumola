@@ -74,7 +74,7 @@ fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> 
             Ok(Step {})
         }
         Variant(id, Some(e)) => exp_conts(active, FrameCont::Variant(id.0.id_()), e),
-        Switch(e1, cases) => exp_conts(active, FrameCont::Switch(cases.clone()), e1),
+        Switch(e1, cases) => exp_conts(active, FrameCont::Switch(cases.cases().clone()), e1),
         Block(decs) => exp_conts_(
             active,
             source.clone(),
@@ -313,7 +313,7 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
                                         dec_.1.clone(),
                                         None,
                                         None,
-                                        dfs,
+                                        dfs.dec_fields(),
                                     )?,
                                     Some(FieldDef {
                                         def: Def::Actor(old_def),
@@ -325,7 +325,7 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
                                         dec_.1.clone(),
                                         None,
                                         None,
-                                        dfs,
+                                        dfs.dec_fields(),
                                         &old_def,
                                     )?,
                                     _ => unreachable!(),
@@ -351,11 +351,11 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
                                 package_name: None,
                                 local_path: format!("<anonymous@{}>", dec_.1),
                             },
-                            &id.map(|i| i.0.id_()),
+                            &id.clone().map(|i| i.0.id_()),
                             dec_.1.clone(),
                             None,
                             None,
-                            &dfs,
+                            dfs.dec_fields(),
                             None,
                         )?;
                         match id {

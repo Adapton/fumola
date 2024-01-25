@@ -211,6 +211,25 @@ pub enum CasesPos {
     Cases(Cases),
     Unquote(Unquote_),
 }
+
+impl CasesPos {
+    pub fn cases<'a>(&'a self) -> &'a Cases {
+        match self {
+            CasesPos::Cases(c) => c,
+            CasesPos::Unquote(_) => panic!(),
+        }
+    }
+}
+
+impl DecFieldsPos {
+    pub fn dec_fields<'a>(&'a self) -> &'a DecFields {
+        match self {
+            DecFieldsPos::DecFields(dfs) => dfs,
+            DecFieldsPos::Unquote(_)=> panic!(),
+        }
+    }
+}
+
 pub type Cases = Delim<Case_>;
 
 pub type Prog = Decs;
@@ -313,7 +332,7 @@ impl ExpField {
     pub fn exp_(&self) -> Exp_ {
         match self.exp.clone() {
             Some(e) => e,
-            None => NodeData(Exp::Var(self.id), self.id.1.clone()).share(),
+            None => NodeData(Exp::Var(self.id.clone()), self.id.1.clone()).share(),
         }
     }
 }
@@ -620,7 +639,7 @@ impl Exp {
     }
     pub fn obj_id_fields(id: IdPos_, fields: ExpFields) -> Exp {
         let field1_source = id.1.clone();
-        let exp = Some(NodeData(Exp::Var(id), id.1.clone()).share());
+        let exp = Some(NodeData(Exp::Var(id.clone()), id.1.clone()).share());
         let field1 = NodeData(
             ExpField {
                 mut_: Mut::Const,
@@ -739,7 +758,7 @@ impl IdPos {
         self.id_().0.clone()
     }
     pub fn id_ref<'a>(&'a self) -> &'a Id {
-        &self.id_().0
+        &self.id.as_ref().0
     }
 }
 
