@@ -225,7 +225,7 @@ impl DecFieldsPos {
     pub fn dec_fields<'a>(&'a self) -> &'a DecFields {
         match self {
             DecFieldsPos::DecFields(dfs) => dfs,
-            DecFieldsPos::Unquote(_)=> panic!(),
+            DecFieldsPos::Unquote(_) => panic!(),
         }
     }
 }
@@ -750,6 +750,12 @@ pub struct IdPos {
 }
 
 impl IdPos {
+    pub fn from_id(i: &Id_) -> Self {
+        IdPos {
+            unquote: false,
+            id: i.clone(),
+        }
+    }
     pub fn id_(&self) -> Id_ {
         assert_eq!(self.unquote, false);
         self.id.clone()

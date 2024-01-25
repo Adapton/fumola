@@ -41,7 +41,7 @@ pub enum OurError {
 /// Fumola tools in Rust.
 #[derive(StructOpt, Debug, Clone)]
 #[structopt(
-    name = "mo-rs",
+    name = "fumola",
     setting = clap::AppSettings::DeriveDisplayOrder
 )]
 pub struct CliOpt {
@@ -147,6 +147,7 @@ fn main() -> OurResult<()> {
                 let readline = rl.readline("mo> ");
                 match readline {
                     Ok(line) => {
+                        core.clear_cont();
                         let v = core.eval_str(&line);
                         println!("{:?}", v);
                         rl.add_history_entry(line.as_str());

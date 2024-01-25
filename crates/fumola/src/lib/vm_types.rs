@@ -286,6 +286,7 @@ pub mod stack {
         Call3,
         Return,
         Respond(RespTarget),
+        Unquote,
     }
     impl FrameCont {
         pub fn formal(&self) -> Option<FormalFrameCont> {

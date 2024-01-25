@@ -1,8 +1,11 @@
-use crate::ast::{Cases, Dec, Exp, Exp_, Inst, Literal, Mut, Pat, Pat_, ProjIndex, Source, Type};
+use crate::ast::{
+    Cases, Dec, Exp, Exp_, IdPos, IdPos_, Id_, Inst, Literal, Mut, NodeData, Pat, Pat_, ProjIndex,
+    QuotedAst, Source, Type,
+};
 use crate::shared::{FastClone, Share};
 use crate::value::{
     ActorId, ActorMethod, Closed, ClosedFunction, CollectionFunction, FastRandIter,
-    FastRandIterFunction, HashMapFunction, PrimFunction, Value, Value_,
+    FastRandIterFunction, HashMapFunction, PrimFunction, ToMotoko, Value, Value_,
 };
 use crate::vm_types::{
     def::{Def, Field as FieldDef, Function as FunctionDef},
@@ -14,6 +17,39 @@ use im_rc::{HashMap, Vector};
 
 use crate::{nyi, type_mismatch, type_mismatch_};
 
+fn literal_step<A: Active>(active: &mut A, l: &Literal) -> Result<Step, Interruption> {
+    // TODO: partial evaluation would now be highly efficient due to value sharing
+    *active.cont() = cont_value(Value::from_literal(l).map_err(Interruption::ValueError)?);
+    Ok(Step {})
+}
+
+fn var_idpos_step<A: Active>(active: &mut A, x: &IdPos_) -> Result<Step, Interruption> {
+    var_step(active, &x.0.id_())
+}
+
+fn var_step<A: Active>(active: &mut A, x: &Id_) -> Result<Step, Interruption> {
+    match active.env().get(&x.0) {
+        None => {
+            if x.0.string.starts_with("@") {
+                let f = crate::value::PrimFunction::AtSignVar(x.0.to_string());
+                let v = Value::PrimFunction(f).share();
+                *active.cont() = Cont::Value_(v);
+                Ok(Step {})
+            } else {
+                let ctx = active.defs().active_ctx.clone();
+                let fd = crate::vm_def::resolve_def(active.defs(), &ctx, false, &x.0)?;
+                let v = crate::vm_def::def_as_value(active.defs(), &x.0, &fd.def)?;
+                *active.cont() = Cont::Value_(v);
+                Ok(Step {})
+            }
+        }
+        Some(v) => {
+            *active.cont() = Cont::Value_(v.fast_clone());
+            Ok(Step {})
+        }
+    }
+}
+
 fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> {
     use Exp::*;
     let source = exp.1.clone();
@@ -22,11 +58,16 @@ fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> 
             *active.cont() = cont_value((**v).clone());
             Ok(Step {})
         }
-        Literal(l) => {
-            // TODO: partial evaluation would now be highly efficient due to value sharing
-            *active.cont() = cont_value(Value::from_literal(l).map_err(Interruption::ValueError)?);
+        QuotedAst(q) => {
+            *active.cont() = cont_value(Value::QuotedAst(Closed {
+                ctx: active.ctx_id().clone(),
+                env: HashMap::new(),
+                content: q.clone(),
+            }));
             Ok(Step {})
         }
+        Unquote(e) => exp_conts(active, FrameCont::Unquote, e),
+        Literal(l) => literal_step(active, l),
         Function(f) => {
             let env = active.env().fast_clone();
             *active.cont() = cont_value(Value::Function(ClosedFunction(Closed {
@@ -41,26 +82,7 @@ fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> 
         }
         Return(None) => return_(active, Value::Unit.share()),
         Return(Some(e)) => exp_conts(active, FrameCont::Return, e),
-        Var(x) => match active.env().get(x.0.id_ref()) {
-            None => {
-                if x.0.id().string.starts_with("@") {
-                    let f = crate::value::PrimFunction::AtSignVar(x.0.id_ref().to_string());
-                    let v = Value::PrimFunction(f).share();
-                    *active.cont() = Cont::Value_(v);
-                    Ok(Step {})
-                } else {
-                    let ctx = active.defs().active_ctx.clone();
-                    let fd = crate::vm_def::resolve_def(active.defs(), &ctx, false, x.0.id_ref())?;
-                    let v = crate::vm_def::def_as_value(active.defs(), x.0.id_ref(), &fd.def)?;
-                    *active.cont() = Cont::Value_(v);
-                    Ok(Step {})
-                }
-            }
-            Some(v) => {
-                *active.cont() = Cont::Value_(v.fast_clone());
-                Ok(Step {})
-            }
-        },
+        Var(x) => var_idpos_step(active, x),
         Bin(e1, binop, e2) => exp_conts(
             active,
             FrameCont::BinOp1(binop.clone(), e2.fast_clone()),
@@ -529,6 +551,7 @@ fn stack_cont_has_redex<A: ActiveBorrow>(active: &A, v: &Value) -> Result<bool, 
             Call2(..) => true,
             Call3 => false,
             Return => true,
+            Unquote => true,
             //_ => return nyi!(line!()),
         };
         Ok(r)
@@ -1013,6 +1036,29 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             *active.cont() = Cont::Value_(v);
             Ok(Step {})
         }
+        Unquote => match &*v {
+            Value::QuotedAst(cq) => match &cq.content {
+                QuotedAst::Literal(l) => literal_step(active, &l.0),
+                QuotedAst::Empty => {
+                    panic!()
+                }
+                QuotedAst::Id(i) => var_step(active, i),
+                QuotedAst::TupleExps(es) => {
+                    panic!()
+                }
+                QuotedAst::RecordExps(es) => {
+                    panic!()
+                }
+                QuotedAst::Cases(_) => panic!(),
+                QuotedAst::TuplePats(_) => panic!(),
+                QuotedAst::RecordPats(_) => panic!(),
+                QuotedAst::DecFields(dfs) => panic!(),
+                QuotedAst::Decs(d) => {
+                    panic!()
+                }
+            },
+            _ => type_mismatch!(file!(), line!()),
+        },
         Return => return_(active, v),
     }
 }

@@ -490,7 +490,9 @@ impl Core {
         let last = vec.pop_back();
         match last {
             Some(d) => match &d.0 {
-                Dec::LetActor(id, _, dfs) => Ok((vec, id.clone().map(|i| i.0.id_()), dfs.dec_fields().clone())),
+                Dec::LetActor(id, _, dfs) => {
+                    Ok((vec, id.clone().map(|i| i.0.id_()), dfs.dec_fields().clone()))
+                }
                 _ => Err(Interruption::NotAnActorDefinition),
             },
             None => unreachable!(),
@@ -823,6 +825,12 @@ impl Core {
     pub fn eval_str(&mut self, input: &str) -> Result<Value_, Interruption> {
         let prog = crate::check::parse(input)?;
         self.eval_prog(prog)
+    }
+
+    pub fn clear_cont(&mut self) {
+        *self.cont() = Cont::Value_(Value::Unit.share());
+
+        *self.stack() = Vector::new()
     }
 
     /// Evaluate a new program fragment, assuming agent is idle.

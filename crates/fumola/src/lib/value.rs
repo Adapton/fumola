@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::num::Wrapping;
 use std::rc::Rc;
 
-use crate::ast::{Dec, Decs, Exp, Function, Id, Literal, Mut, ToId};
+use crate::ast::{Dec, Decs, Exp, Function, Id, Literal, Mut, QuotedAst, ToId};
 use crate::dynamic::Dynamic;
 use crate::shared::{FastClone, Share, Shared};
 use crate::vm_types::{def::Actor as ActorDef, def::CtxId, def::Module as ModuleDef, Env};
@@ -132,6 +132,7 @@ pub enum Value {
     Actor(Actor),
     ActorMethod(ActorMethod),
     Module(ModuleDef),
+    QuotedAst(Closed<QuotedAst>),
 }
 
 /// Actor value.
@@ -500,6 +501,7 @@ impl Value {
                 );
                 Object(map)
             }
+            Value::QuotedAst(_) => Err(ValueError::ToRust("QuotedAst".to_string()))?,
             Value::Pointer(_) => Err(ValueError::ToRust("Pointer".to_string()))?,
             Value::Actor(_) => Err(ValueError::ToRust("Actor".to_string()))?,
             Value::ActorMethod(_) => Err(ValueError::ToRust("ActorMethod".to_string()))?,
