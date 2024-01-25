@@ -80,7 +80,7 @@ Id_: Id_ = Node<Id>;
 //   when one wishes to use a quoted Id value as the
 //   effective Id for this position in the AST.
 IdPos: IdPos = {
-    Id_ => IdPos{ unquote: true, id:<> },
+    Id_ => IdPos{ unquote: false, id:<> },
     "~" <id:Id_> => IdPos{ unquote: true, id },
 }
 

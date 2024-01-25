@@ -1,6 +1,6 @@
 use crate::ast::{
-    Cases, Dec, Dec_, Exp, Exp_, IdPos, IdPos_, Id_, Inst, Literal, Mut, NodeData, Pat, Pat_,
-    ProjIndex, QuotedAst, Source, Type,
+    Cases, Dec, Dec_, Delim, Exp, ExpField_, Exp_, IdPos, IdPos_, Id_, Inst, Literal, Mut,
+    NodeData, Pat, Pat_, ProjIndex, QuotedAst, Source, Type,
 };
 use crate::shared::{FastClone, Share};
 use crate::value::{
@@ -16,6 +16,11 @@ use crate::vm_types::{
 use im_rc::{HashMap, Vector};
 
 use crate::{nyi, type_mismatch, type_mismatch_};
+
+fn unit_step<A: Active>(active: &mut A) -> Result<Step, Interruption> {
+    *active.cont() = Cont::Value_(Value::Unit.share());
+    Ok(Step {})
+}
 
 fn literal_step<A: Active>(active: &mut A, l: &Literal) -> Result<Step, Interruption> {
     // TODO: partial evaluation would now be highly efficient due to value sharing
@@ -47,6 +52,48 @@ fn var_step<A: Active>(active: &mut A, x: &Id_) -> Result<Step, Interruption> {
             *active.cont() = Cont::Value_(v.fast_clone());
             Ok(Step {})
         }
+    }
+}
+
+fn tuple_step<A: Active>(active: &mut A, es: &Vector<Exp_>) -> Result<Step, Interruption> {
+    let mut es: Vector<_> = es.fast_clone();
+    match es.pop_front() {
+        None => unit_step(active),
+        Some(e1) => exp_conts(active, FrameCont::Tuple(Vector::new(), es), &e1),
+    }
+}
+
+fn object_step<A: Active>(
+    active: &mut A,
+    bases: &Option<Delim<Exp_>>,
+    fields: &Option<Delim<ExpField_>>,
+) -> Result<Step, Interruption> {
+    if let Some(_bases) = bases {
+        return nyi!(line!());
+    };
+    if let Some(fields) = fields {
+        let mut fs: Vector<_> = fields.vec.fast_clone();
+        match fs.pop_front() {
+            None => {
+                *active.cont() = cont_value(Value::Object(HashMap::new()));
+                Ok(Step {})
+            }
+            Some(f1) => {
+                let fc = FieldContext {
+                    mut_: f1.0.mut_.clone(),
+                    id: f1.0.id.0.id_(),
+                    typ: f1.0.typ.fast_clone(),
+                };
+                exp_conts(
+                    active,
+                    FrameCont::Object(Vector::new(), fc, fs),
+                    &f1.0.exp_(),
+                )
+            }
+        }
+    } else {
+        *active.cont() = cont_value(Value::Object(HashMap::new()));
+        Ok(Step {})
     }
 }
 
@@ -106,46 +153,8 @@ fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> 
         ),
         Do(e) => exp_conts(active, FrameCont::Do, e),
         Assert(e) => exp_conts(active, FrameCont::Assert, e),
-        Object((bases, fields)) => {
-            if let Some(_bases) = bases {
-                return nyi!(line!());
-            };
-            if let Some(fields) = fields {
-                let mut fs: Vector<_> = fields.vec.fast_clone();
-                match fs.pop_front() {
-                    None => {
-                        *active.cont() = cont_value(Value::Object(HashMap::new()));
-                        Ok(Step {})
-                    }
-                    Some(f1) => {
-                        let fc = FieldContext {
-                            mut_: f1.0.mut_.clone(),
-                            id: f1.0.id.0.id_(),
-                            typ: f1.0.typ.fast_clone(),
-                        };
-                        exp_conts(
-                            active,
-                            FrameCont::Object(Vector::new(), fc, fs),
-                            &f1.0.exp_(),
-                        )
-                    }
-                }
-            } else {
-                *active.cont() = cont_value(Value::Object(HashMap::new()));
-                Ok(Step {})
-            }
-        }
-        Tuple(es) => {
-            let mut es: Vector<_> = es.vec.fast_clone();
-            match es.pop_front() {
-                None => {
-                    // TODO: globally share (), true, false, null, etc.
-                    *active.cont() = cont_value(Value::Unit);
-                    Ok(Step {})
-                }
-                Some(e1) => exp_conts(active, FrameCont::Tuple(Vector::new(), es), &e1),
-            }
-        }
+        Object((bases, fields)) => object_step(active, bases, fields),
+        Tuple(es) => tuple_step(active, &es.vec),
         Array(mut_, es) => {
             let mut es: Vector<_> = es.vec.fast_clone();
             match es.pop_front() {
@@ -283,7 +292,7 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
                 _ => stack_cont(active, v),
             }
         }
-        Cont::Decs(mut decs) => decs_step(active, decs), //_ => unimplemented!(),
+        Cont::Decs(decs) => decs_step(active, decs), //_ => unimplemented!(),
     }
 }
 
@@ -582,8 +591,7 @@ fn stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Interruption
         match opaque_iter_next(active, &ptr)? {
             None => {
                 active.stack().pop_front();
-                *active.cont() = cont_value(Value::Unit);
-                Ok(Step {})
+                unit_step(active)
             }
             Some(v_) => {
                 if let Some(env) = crate::vm_match::pattern_matches(env, &pat.0, v_.fast_clone()) {
@@ -636,13 +644,11 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
         Assign2(v1) => match &*v1 {
             Value::Pointer(p) => {
                 active.store().mutate(p.clone(), v)?;
-                *active.cont() = cont_value(Value::Unit);
-                Ok(Step {})
+                unit_step(active)
             }
             Value::Index(p, i) => {
                 active.store().mutate_index(p.clone(), i.fast_clone(), v)?;
-                *active.cont() = cont_value(Value::Unit);
-                Ok(Step {})
+                unit_step(active)
             }
             _ => type_mismatch!(file!(), line!()),
         },
@@ -661,8 +667,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             match &*v1 {
                 Value::Pointer(p) => {
                     active.store().mutate(p.clone(), v3.share())?;
-                    *active.cont() = cont_value(Value::Unit);
-                    Ok(Step {})
+                    unit_step(active)
                 }
                 _ => return nyi!(line!()),
             }
@@ -755,17 +760,11 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             Ok(Step {})
         }
         Assert => match &*v {
-            Value::Bool(true) => {
-                *active.cont() = cont_value(Value::Unit);
-                Ok(Step {})
-            }
+            Value::Bool(true) => unit_step(active),
             Value::Bool(false) => Err(Interruption::AssertionFailure),
             _ => type_mismatch!(file!(), line!()),
         },
-        Ignore => {
-            *active.cont() = cont_value(Value::Unit);
-            Ok(Step {})
-        }
+        Ignore => unit_step(active),
         Tuple(mut done, mut rest) => {
             done.push_back(v);
             match rest.pop_front() {
@@ -892,10 +891,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             )),
         },
         Debug => match &*v {
-            Value::Unit => {
-                *active.cont() = Cont::Value_(v);
-                Ok(Step {})
-            }
+            Value::Unit => unit_step(active),
             _ => type_mismatch!(file!(), line!()),
         },
         If(e2, e3) => match &*v {
@@ -917,8 +913,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                 if *b {
                     exp_conts(active, FrameCont::While2(e1, e2.fast_clone()), &e2)
                 } else {
-                    *active.cont() = cont_value(Value::Unit);
-                    Ok(Step {})
+                    unit_step(active)
                 }
             }
             _ => type_mismatch!(file!(), line!()),
@@ -944,17 +939,13 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                         cont_prim_type: None,
                         source,
                     });
-                    *active.cont() = cont_value(Value::Unit);
-                    Ok(Step {})
+                    unit_step(active)
                 }
                 _ => cont_for_call_dot_next(active, p, v, body),
             }
         }
         For2(p, v_iter, body) => match &*v {
-            Value::Null => {
-                *active.cont() = cont_value(Value::Unit);
-                Ok(Step {})
-            }
+            Value::Null => unit_step(active),
             Value::Option(v_) => {
                 if let Some(env) = crate::vm_match::pattern_matches(
                     active.env().fast_clone(),
@@ -1041,20 +1032,18 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
         Unquote => match &*v {
             Value::QuotedAst(cq) => match &cq.content {
                 QuotedAst::Literal(l) => literal_step(active, &l.0),
-                QuotedAst::Empty => {
-                    panic!()
-                }
+                QuotedAst::Empty => unit_step(active),
                 QuotedAst::Id(i) => var_step(active, i),
-                QuotedAst::TupleExps(es) => {
-                    panic!()
-                }
-                QuotedAst::RecordExps(es) => {
-                    panic!()
-                }
-                QuotedAst::Cases(_) => panic!(),
-                QuotedAst::TuplePats(_) => panic!(),
-                QuotedAst::RecordPats(_) => panic!(),
-                QuotedAst::DecFields(dfs) => panic!(),
+                QuotedAst::TupleExps(es) => match es.vec.len() {
+                    0 => unit_step(active),
+                    1 => exp_conts(active, FrameCont::Paren, &es.vec[0]),
+                    _ => tuple_step(active, &es.vec),
+                },
+                QuotedAst::RecordExps((bases, fields)) => object_step(active, bases, fields),
+                QuotedAst::Cases(_) => type_mismatch!(file!(), line!()),
+                QuotedAst::TuplePats(_) => type_mismatch!(file!(), line!()),
+                QuotedAst::RecordPats(_) => type_mismatch!(file!(), line!()),
+                QuotedAst::DecFields(dfs) => type_mismatch!(file!(), line!()),
                 QuotedAst::Decs(d) => decs_step(active, d.vec.clone()),
             },
             _ => type_mismatch!(file!(), line!()),
@@ -1346,8 +1335,7 @@ fn call_prim_function<A: Active>(
                     text: s.clone(),
                     schedule_choice,
                 });
-                *active.cont() = cont_value(Value::Unit);
-                Ok(Step {})
+                unit_step(active)
             }
             v => {
                 let txt = crate::value::string_from_value(v)?;
@@ -1363,8 +1351,7 @@ fn call_prim_function<A: Active>(
                     text: crate::value::Text::from(txt),
                     schedule_choice,
                 });
-                *active.cont() = cont_value(Value::Unit);
-                Ok(Step {})
+                unit_step(active)
             }
         },
         NatToText => match &*args {
