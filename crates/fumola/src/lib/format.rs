@@ -1,8 +1,9 @@
 // Reference: https://github.com/dfinity/candid/blob/master/rust/candid/src/bindings/candid.rs
 
 use crate::ast::{
-    BinOp, BindSort, Case, Dec, DecField, Dec_, Delim, Exp, ExpField, Id, Literal, Loc, Mut,
-    NodeData, ObjSort, Pat, PrimType, RelOp, Stab, Type, TypeBind, TypeField, UnOp, Vis,
+    BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_, Delim, Exp, ExpField, Id,
+    IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat, PrimType, RelOp, Stab, Type, TypeBind,
+    TypeField, UnOp, Unquote, Vis,
 };
 use crate::format_utils::*;
 use crate::lexer::is_keyword;
@@ -211,6 +212,35 @@ impl ToDoc for Id {
     }
 }
 
+impl ToDoc for IdPos {
+    fn doc(&self) -> RcDoc {
+        self.id.doc()
+    }
+}
+
+impl ToDoc for CasesPos {
+    fn doc(&self) -> RcDoc {
+        match self {
+            CasesPos::Cases(cs) => enclose_space("{", delim(cs, ";"), "}"),
+            CasesPos::Unquote(uq) => uq.doc(),
+        }
+    }
+}
+
+impl ToDoc for DecFieldsPos {
+    fn doc(&self) -> RcDoc {
+        match self {
+            DecFieldsPos::DecFields(dfs) => block(dfs),
+            DecFieldsPos::Unquote(uq) => uq.doc(),
+        }
+    }
+}
+impl ToDoc for Unquote {
+    fn doc(&self) -> RcDoc {
+        str("~").append(self.id.doc())
+    }
+}
+
 impl ToDoc for Exp {
     fn doc(&self) -> RcDoc {
         use Exp::*;
@@ -232,7 +262,7 @@ impl ToDoc for Exp {
             Opt(e) => str("?").append(e.doc()),
             DoOpt(e) => kwd("do ?").append(e.doc()),
             Bang(e) => e.doc().append("!"),
-            ObjectBlock(s, fs) => s.doc().append(RcDoc::space()).append(block(fs)),
+            ObjectBlock(s, d) => s.doc().append(RcDoc::space()).append(d.doc()),
             //            Object(fs) => block(fs),
             Variant(id, e) => str("#").append(id.doc()).append(match e {
                 None => RcDoc::nil(),
@@ -265,7 +295,7 @@ impl ToDoc for Exp {
             Switch(e, cs) => kwd("switch")
                 .append(e.doc())
                 .append(RcDoc::space())
-                .append(enclose_space("{", delim(cs, ";"), "}")),
+                .append(cs.doc()),
             While(c, e) => kwd("while")
                 .append(c.doc())
                 .append(RcDoc::space())
