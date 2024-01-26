@@ -42,6 +42,9 @@ impl<T: Clone> Shared<T> {
     pub fn get(&self) -> T {
         self.rc.deref().clone()
     }
+    pub fn as_ref<'a>(&'a self) -> &'a T {
+        self.rc.deref()
+    }
 }
 
 impl<T> Deref for Shared<T> {

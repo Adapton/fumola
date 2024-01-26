@@ -1,4 +1,5 @@
 pub mod ast;
+pub mod quoted;
 //pub mod ast_traversal;
 pub mod candid_utils;
 #[cfg(feature = "parser")]
