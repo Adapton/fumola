@@ -1,3 +1,4 @@
+#![feature(iterator_try_collect)]
 pub mod ast;
 pub mod quoted;
 //pub mod ast_traversal;

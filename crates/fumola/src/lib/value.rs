@@ -2,11 +2,14 @@ use std::fmt::Display;
 use std::num::Wrapping;
 use std::rc::Rc;
 
-use crate::ast::{Dec, Decs, Exp, Function, Id, Literal, Mut, QuotedAst, ToId};
+use crate::ast::{
+    Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat, Pat_, QuotedAst, ToId,
+};
 use crate::dynamic::Dynamic;
 use crate::shared::{FastClone, Share, Shared};
 use crate::vm_types::{def::Actor as ActorDef, def::CtxId, def::Module as ModuleDef, Env};
 use crate::Interruption;
+use crate::{nyi, type_mismatch, type_mismatch_};
 
 use im_rc::HashMap;
 use im_rc::Vector;
@@ -132,7 +135,7 @@ pub enum Value {
     Actor(Actor),
     ActorMethod(ActorMethod),
     Module(ModuleDef),
-    QuotedAst(Closed<QuotedAst>),
+    QuotedAst(QuotedAst),
 }
 
 /// Actor value.
@@ -337,6 +340,57 @@ pub struct Closed<X> {
 }
 
 impl Value {
+    pub fn is_quoted_ast(&self) -> bool {
+        match self {
+            Value::QuotedAst(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_quoted_id(&self) -> bool {
+        match self {
+            Value::QuotedAst(a) => match a {
+                QuotedAst::Id(_) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
+    pub fn unquote_ast(&self) -> Result<QuotedAst, Interruption> {
+        match self {
+            Value::QuotedAst(q) => Ok(q.clone()),
+            _ => type_mismatch!(file!(), line!()),
+        }
+    }
+
+    pub fn unquote_pat(&self) -> Result<Pat_, Interruption> {
+        match self {
+            Value::QuotedAst(QuotedAst::TuplePats(ps)) => match ps.vec.len() {
+                1 => Ok(ps.vec[0].clone()),
+                _ => panic!(),
+            },
+            _ => type_mismatch!(file!(), line!()),
+        }
+    }
+
+    pub fn unquote_exp(&self) -> Result<Exp_, Interruption> {
+        match self {
+            Value::QuotedAst(QuotedAst::TupleExps(es)) => match es.vec.len() {
+                1 => Ok(es.vec[0].clone()),
+                _ => panic!(),
+            },
+            _ => type_mismatch!(file!(), line!()),
+        }
+    }
+
+    pub fn unquote_id(&self) -> Result<Id_, Interruption> {
+        match self {
+            Value::QuotedAst(QuotedAst::Id(i)) => Ok(i.clone()),
+            _ => type_mismatch!(file!(), line!()),
+        }
+    }
+
     pub fn from_dec(dec: &Dec) -> Result {
         match dec {
             Dec::Exp(e) => Value::from_exp(e.as_ref().data_ref()),

@@ -106,11 +106,8 @@ fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> 
             Ok(Step {})
         }
         QuotedAst(q) => {
-            *active.cont() = cont_value(Value::QuotedAst(Closed {
-                ctx: active.ctx_id().clone(),
-                env: HashMap::new(),
-                content: q.clone(),
-            }));
+            use crate::quoted::QuotedClose;
+            *active.cont() = cont_value(Value::QuotedAst(q.quoted_close(active.env())?));
             Ok(Step {})
         }
         Unquote(e) => exp_conts(active, FrameCont::Unquote, e),
@@ -709,6 +706,8 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             }
         }
         Let(p, cont) => {
+            use crate::quoted::QuotedClose;
+            let p = p.quoted_close(active.env())?;
             if let Some(env) =
                 crate::vm_match::pattern_matches(active.env().clone(), p.as_ref().data_ref(), v)
             {
@@ -1030,7 +1029,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             Ok(Step {})
         }
         Unquote => match &*v {
-            Value::QuotedAst(cq) => match &cq.content {
+            Value::QuotedAst(cq) => match cq {
                 QuotedAst::Literal(l) => literal_step(active, &l.0),
                 QuotedAst::Empty => unit_step(active),
                 QuotedAst::Id(i) => var_step(active, i),
