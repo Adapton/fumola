@@ -88,8 +88,8 @@ impl QuotedClose for Pat {
 impl QuotedClose for Dec {
     fn quoted_close(&self, env: &Env) -> Result<Dec, Interruption> {
         match &self {
-            Dec::Exp(_) => todo!(),
-            Dec::Let(_, _) => todo!(),
+            Dec::Exp(e) => Ok(Dec::Exp(e.quoted_close(env)?)),
+            Dec::Let(p, e) => Ok(Dec::Let(p.quoted_close(env)?, e.quoted_close(env)?)), // to do -- remove pattern vars from Env
             Dec::LetImport(_, _, _) => todo!(),
             Dec::LetModule(_, _, _) => todo!(),
             Dec::LetActor(_, _, _) => todo!(),
@@ -167,10 +167,14 @@ impl QuotedClose for Exp {
                     }
                 }
             }
-            Exp::Literal(_) => todo!(),
+            Exp::Literal(l) => Ok(Exp::Literal(l.clone())),
             Exp::ActorUrl(_) => todo!(),
             Exp::Un(_, _) => todo!(),
-            Exp::Bin(_, _, _) => todo!(),
+            Exp::Bin(e1, b, e2) => Ok(Exp::Bin(
+                e1.quoted_close(env)?,
+                b.clone(),
+                e2.quoted_close(env)?,
+            )),
             Exp::Rel(_, _, _) => todo!(),
             Exp::Show(_) => todo!(),
             Exp::ToCandid(_) => todo!(),
@@ -190,8 +194,8 @@ impl QuotedClose for Exp {
             Exp::Index(_, _) => todo!(),
             Exp::Function(_) => todo!(),
             Exp::Call(_, _, _) => todo!(),
-            Exp::Block(_) => todo!(),
-            Exp::Do(_) => todo!(),
+            Exp::Block(b) => Ok(Block(b.quoted_close(env)?)),
+            Exp::Do(e) => Ok(Do(e.quoted_close(env)?)),
             Exp::Not(_) => todo!(),
             Exp::And(_, _) => todo!(),
             Exp::Or(_, _) => todo!(),
