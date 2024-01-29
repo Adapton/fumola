@@ -18,7 +18,7 @@ impl<X: std::fmt::Debug> std::fmt::Debug for Loc<X> {
 
 pub type Node<X> = Shared<NodeData<X>>;
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Clone, PartialEq, Eq, Deserialize, Hash)]
 pub struct NodeData<X>(pub X, pub Source);
 
 impl<X: std::fmt::Debug> std::fmt::Debug for NodeData<X> {
@@ -146,7 +146,7 @@ impl std::default::Default for Source {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Hash)]
 pub struct Delim<X: Clone> {
     pub vec: im_rc::Vector<X>,
     pub has_trailing: bool,

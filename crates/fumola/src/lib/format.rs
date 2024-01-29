@@ -213,10 +213,11 @@ impl ToDoc for Value {
             Value::ActorMethod(_) => todo!(),
             Value::Module(_) => todo!(),
             Value::QuotedAst(QuotedAst::Id(i)) => str("`").append(i.doc()),
+            Value::QuotedAst(QuotedAst::Literal(l)) => str("`").append(l.doc()),
             Value::QuotedAst(QuotedAst::Empty) => str("`()"),
             Value::QuotedAst(QuotedAst::Decs(ds)) => str("`do ").append(block(ds)),
             Value::QuotedAst(QuotedAst::TupleExps(es)) => str("`").append(tuple(es)),
-        
+
             _ => todo!(),
         }
     }
@@ -442,7 +443,7 @@ impl ToDoc for Exp {
             AwaitStar(_) => todo!(),
             Annot(_, _, _) => todo!(),
             QuotedAst(_) => todo!(),
-            Unquote(_) => todo!(),
+            Unquote(e) => kwd("~").append(e.doc()),
         }
         // _ => text("Display-TODO={:?}", self),
     }
