@@ -24,27 +24,24 @@ pub type Result<T = Value, E = ValueError> = std::result::Result<T, E>;
 
 /// Permit sharing and fast concats.
 #[derive(Clone, Debug)]
-pub enum Text {
-    String(Box<String>),
-    Concat(Vector<String>),
-}
+pub struct Text(Vector<Rc<String>>);
 
 impl Text {
     #[allow(dead_code)]
     fn into_string(self) -> String {
-        match self {
-            Text::String(s) => *s,
-            Text::Concat(v) => v.into_iter().collect(),
-        }
+        self.0.into_iter().map(|s| s.as_ref().clone()).collect()
+    }
+
+    pub fn append(&self, other: &Text) -> Text {
+        let mut out = self.0.clone();
+        out.append(other.0.clone());
+        Text(out)
     }
 }
 
 impl PartialEq for Text {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Text::String(a), Text::String(b)) => a == b,
-            _ => self.to_string() == other.to_string(), // TODO: possibly optimize
-        }
+        self.to_string() == other.to_string()
     }
 }
 impl Eq for Text {}
@@ -57,16 +54,14 @@ impl std::hash::Hash for Text {
 
 impl ToString for Text {
     fn to_string(&self) -> String {
-        match self {
-            Text::String(s) => s.to_string(),
-            Text::Concat(v) => v.iter().cloned().collect(),
-        }
+        self.clone().into_string()
     }
 }
 
 impl<S: Into<String>> From<S> for Text {
     fn from(value: S) -> Self {
-        Text::String(Box::new(value.into()))
+        use im_rc::vector;
+        Text(vector!(Rc::new(value.into())))
     }
 }
 

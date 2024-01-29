@@ -1,3 +1,4 @@
+use fumola::ToMotoko;
 use structopt::StructOpt;
 
 use log::info;
@@ -144,12 +145,27 @@ fn main() -> OurResult<()> {
             use fumola::vm_types::Core;
             let mut core = Core::empty();
             loop {
-                let readline = rl.readline("mo> ");
+                let readline = rl.readline("fumola> ");
                 match readline {
                     Ok(line) => {
                         core.clear_cont();
                         let v = core.eval_str(&line);
-                        println!("{:?}", v);
+                        use fumola::format::ToDoc;
+                        match v {
+                            Ok(v) => {
+                                println!("{}", fumola::format::format_pretty(v.as_ref(), 80));
+                                println!(
+                                    "{}",
+                                    fumola::format::format_pretty(
+                                        v.clone().to_motoko().as_ref().unwrap(),
+                                        80
+                                    )
+                                );
+                            }
+                            Err(e) => {
+                                println!("{:?}", e)
+                            }
+                        }
                         rl.add_history_entry(line.as_str());
                     }
                     Err(ReadlineError::Interrupted) => {

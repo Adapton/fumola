@@ -56,7 +56,7 @@ required-features = []  # Features required to build this target (N/A for lib).
 
 [[bin]]
 name = "mo-rs"
-path = "src/bin/mo.rs"
+path = "src/bin/fumola.rs"
 required-features = ["exe"]
 
 [features]

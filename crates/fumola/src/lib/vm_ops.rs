@@ -77,8 +77,12 @@ pub fn binop(
             },
             _ => nyi!(line!()),
         },
+        Cat => match (cont_prim_type, &*v1, &*v2) {
+            (_, Value::Text(t1), Value::Text(t2)) => Ok(Value::Text(t1.append(t2))),
+            (_, _, _) => type_mismatch!(file!(), line!()),
+        },
 
-        Mod | Pow | And | Or | Xor | ShL | ShR | RotL | RotR | WSub | WMul | WPow | Cat | BitOr
+        Mod | Pow | And | Or | Xor | ShL | ShR | RotL | RotR | WSub | WMul | WPow | BitOr
         | BitAnd => nyi!(line!(), "binop({:?}. {:?}, {:?})", binop, v1, v2),
     }
 }
