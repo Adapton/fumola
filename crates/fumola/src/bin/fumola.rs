@@ -150,7 +150,6 @@ fn main() -> OurResult<()> {
                     Ok(line) => {
                         core.clear_cont();
                         let v = core.eval_str(&line);
-                        use fumola::format::ToDoc;
                         match v {
                             Ok(v) => {
                                 println!("{}", fumola::format::format_pretty(v.as_ref(), 80));

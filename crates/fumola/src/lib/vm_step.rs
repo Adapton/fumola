@@ -1,11 +1,11 @@
 use crate::ast::{
-    Cases, Dec, Dec_, Delim, Exp, ExpField_, Exp_, IdPos, IdPos_, Id_, Inst, Literal, Mut,
-    NodeData, Pat, Pat_, ProjIndex, QuotedAst, Source, Type,
+    Cases, Dec, Dec_, Delim, Exp, ExpField_, Exp_, IdPos_, Id_, Inst, Literal, Mut, Pat, Pat_,
+    ProjIndex, QuotedAst, Source, Type,
 };
 use crate::shared::{FastClone, Share};
 use crate::value::{
     ActorId, ActorMethod, Closed, ClosedFunction, CollectionFunction, FastRandIter,
-    FastRandIterFunction, HashMapFunction, PrimFunction, ToMotoko, Value, Value_,
+    FastRandIterFunction, HashMapFunction, PrimFunction, Value, Value_,
 };
 use crate::vm_types::{
     def::{Def, Field as FieldDef, Function as FunctionDef},
@@ -1042,7 +1042,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                 QuotedAst::Cases(_) => type_mismatch!(file!(), line!()),
                 QuotedAst::TuplePats(_) => type_mismatch!(file!(), line!()),
                 QuotedAst::RecordPats(_) => type_mismatch!(file!(), line!()),
-                QuotedAst::DecFields(dfs) => type_mismatch!(file!(), line!()),
+                QuotedAst::DecFields(_dfs) => type_mismatch!(file!(), line!()),
                 QuotedAst::Decs(d) => decs_step(active, d.vec.clone()),
             },
             _ => type_mismatch!(file!(), line!()),

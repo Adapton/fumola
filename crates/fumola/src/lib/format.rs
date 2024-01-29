@@ -212,12 +212,20 @@ impl ToDoc for Value {
             Value::Actor(_) => todo!(),
             Value::ActorMethod(_) => todo!(),
             Value::Module(_) => todo!(),
-            Value::QuotedAst(QuotedAst::Id(i)) => str("`").append(i.doc()),
-            Value::QuotedAst(QuotedAst::Literal(l)) => str("`").append(l.doc()),
-            Value::QuotedAst(QuotedAst::Empty) => str("`()"),
-            Value::QuotedAst(QuotedAst::Decs(ds)) => str("`do ").append(block(ds)),
-            Value::QuotedAst(QuotedAst::TupleExps(es)) => str("`").append(tuple(es)),
+            Value::QuotedAst(q) => q.doc(),
+            _ => todo!(),
+        }
+    }
+}
 
+impl ToDoc for QuotedAst {
+    fn doc(&self) -> RcDoc {
+        match self {
+            QuotedAst::Id(i) => str("`").append(i.doc()),
+            QuotedAst::Literal(l) => str("`").append(l.doc()),
+            QuotedAst::Empty => str("`()"),
+            QuotedAst::Decs(ds) => str("`do ").append(block(ds)),
+            QuotedAst::TupleExps(es) => str("`").append(tuple(es)),
             _ => todo!(),
         }
     }
@@ -442,7 +450,7 @@ impl ToDoc for Exp {
             AsyncStar(_) => todo!(),
             AwaitStar(_) => todo!(),
             Annot(_, _, _) => todo!(),
-            QuotedAst(_) => todo!(),
+            QuotedAst(q) => q.doc(),
             Unquote(e) => kwd("~").append(e.doc()),
         }
         // _ => text("Display-TODO={:?}", self),

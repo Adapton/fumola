@@ -4,7 +4,6 @@ use crate::ast::{
 };
 use crate::shared::Shared;
 use crate::type_mismatch;
-use crate::value::Value;
 use crate::vm_types::{Env, Interruption};
 use im_rc::Vector;
 
@@ -103,37 +102,37 @@ impl QuotedClose for Dec {
 }
 
 impl QuotedClose for ExpField {
-    fn quoted_close(&self, env: &Env) -> Result<ExpField, Interruption> {
+    fn quoted_close(&self, _env: &Env) -> Result<ExpField, Interruption> {
         todo!()
     }
 }
 
 impl QuotedClose for PatField {
-    fn quoted_close(&self, env: &Env) -> Result<PatField, Interruption> {
+    fn quoted_close(&self, _env: &Env) -> Result<PatField, Interruption> {
         todo!()
     }
 }
 
 impl QuotedClose for DecField {
-    fn quoted_close(&self, env: &Env) -> Result<DecField, Interruption> {
+    fn quoted_close(&self, _env: &Env) -> Result<DecField, Interruption> {
         todo!()
     }
 }
 
 impl QuotedClose for CasesPos {
-    fn quoted_close(&self, env: &Env) -> Result<CasesPos, Interruption> {
+    fn quoted_close(&self, _env: &Env) -> Result<CasesPos, Interruption> {
         todo!()
     }
 }
 
 impl QuotedClose for Case {
-    fn quoted_close(&self, env: &Env) -> Result<Case, Interruption> {
+    fn quoted_close(&self, _env: &Env) -> Result<Case, Interruption> {
         todo!()
     }
 }
 
 impl QuotedClose for DecFieldsPos {
-    fn quoted_close(&self, env: &Env) -> Result<DecFieldsPos, Interruption> {
+    fn quoted_close(&self, _env: &Env) -> Result<DecFieldsPos, Interruption> {
         todo!()
     }
 }

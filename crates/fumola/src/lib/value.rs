@@ -2,14 +2,12 @@ use std::fmt::Display;
 use std::num::Wrapping;
 use std::rc::Rc;
 
-use crate::ast::{
-    Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat, Pat_, QuotedAst, ToId,
-};
+use crate::ast::{Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, QuotedAst, ToId};
 use crate::dynamic::Dynamic;
 use crate::shared::{FastClone, Share, Shared};
+use crate::type_mismatch;
 use crate::vm_types::{def::Actor as ActorDef, def::CtxId, def::Module as ModuleDef, Env};
 use crate::Interruption;
-use crate::{nyi, type_mismatch, type_mismatch_};
 
 use im_rc::HashMap;
 use im_rc::Vector;
