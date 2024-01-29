@@ -215,6 +215,8 @@ impl ToDoc for Value {
             Value::QuotedAst(QuotedAst::Id(i)) => str("`").append(i.doc()),
             Value::QuotedAst(QuotedAst::Empty) => str("`()"),
             Value::QuotedAst(QuotedAst::Decs(ds)) => str("`do ").append(block(ds)),
+            Value::QuotedAst(QuotedAst::TupleExps(es)) => str("`").append(tuple(es)),
+        
             _ => todo!(),
         }
     }
