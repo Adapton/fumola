@@ -1,6 +1,8 @@
+use std::hash;
+
 use crate::ast::{
-    Case, CasesPos, Dec, DecField, DecFieldsPos, Delim, Exp, ExpField, NodeData, Pat, PatField,
-    QuotedAst,
+    Case, CasesPos, Dec, DecField, DecFieldsPos, Delim, Exp, ExpField, IdPos, NodeData, Pat,
+    PatField, QuotedAst, Type,
 };
 use crate::shared::Shared;
 use crate::type_mismatch;
@@ -36,6 +38,22 @@ impl<T: QuotedClose + Clone> QuotedClose for Delim<T> {
 impl<T: QuotedClose + Clone> QuotedClose for NodeData<T> {
     fn quoted_close(&self, env: &Env) -> Result<NodeData<T>, Interruption> {
         Ok(NodeData(self.0.quoted_close(env)?, self.1.clone()))
+    }
+}
+
+impl QuotedClose for IdPos {
+    fn quoted_close(&self, env: &Env) -> Result<IdPos, Interruption> {
+        if self.unquote {
+            match env.get(&self.id.0) {
+                None => Ok(self.clone()),
+                Some(v) => Ok(IdPos {
+                    unquote: false,
+                    id: v.unquote_id()?,
+                }),
+            }
+        } else {
+            Ok(self.clone())
+        }
     }
 }
 
@@ -102,8 +120,19 @@ impl QuotedClose for Dec {
 }
 
 impl QuotedClose for ExpField {
-    fn quoted_close(&self, _env: &Env) -> Result<ExpField, Interruption> {
-        todo!()
+    fn quoted_close(&self, env: &Env) -> Result<ExpField, Interruption> {
+        Ok(ExpField {
+            id: self.id.quoted_close(env)?,
+            mut_: self.mut_.clone(),
+            typ: self.typ.quoted_close(env)?,
+            exp: self.exp.quoted_close(env)?,
+        })
+    }
+}
+
+impl QuotedClose for Type {
+    fn quoted_close(&self, _env: &Env) -> Result<Type, Interruption> {
+        Ok(self.clone()) // to do
     }
 }
 
@@ -213,7 +242,7 @@ impl QuotedClose for Exp {
             Exp::Await(_) => todo!(),
             Exp::AwaitStar(_) => todo!(),
             Exp::Assert(_) => todo!(),
-            Exp::Annot(_, _, _) => todo!(),
+            Exp::Annot(h, e, t) => Ok(Annot(h.clone(), e.quoted_close(env)?, t.clone())),
             Exp::Import(_) => todo!(),
             Exp::Throw(_) => todo!(),
             Exp::Try(_, _) => todo!(),

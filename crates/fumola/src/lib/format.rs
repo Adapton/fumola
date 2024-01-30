@@ -213,7 +213,6 @@ impl ToDoc for Value {
             Value::ActorMethod(_) => todo!(),
             Value::Module(_) => todo!(),
             Value::QuotedAst(q) => q.doc(),
-            _ => todo!(),
         }
     }
 }
@@ -226,6 +225,8 @@ impl ToDoc for QuotedAst {
             QuotedAst::Empty => str("`()"),
             QuotedAst::Decs(ds) => str("`do ").append(block(ds)),
             QuotedAst::TupleExps(es) => str("`").append(tuple(es)),
+            QuotedAst::RecordExps((None, Some(fs))) => str("`").append(block(fs)),
+
             _ => todo!(),
         }
     }
