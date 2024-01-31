@@ -1,4 +1,4 @@
-use motoko::{
+use fumola::{
     package::{
         get_base_library, get_base_library_tests, get_matchers_library, get_prim_library, Package,
     },
@@ -87,7 +87,7 @@ fn assert_parse_packages(package: Package) {
     let mut error_count = 0;
     for (path, file) in files {
         count += 1;
-        match motoko::check::parse(&file.content) {
+        match fumola::check::parse(&file.content) {
             Ok(_) => println!(" {}. ✅ {}", count, path),
             Err(i) => {
                 error_count += 1;

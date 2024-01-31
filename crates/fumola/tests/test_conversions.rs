@@ -3,12 +3,12 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use motoko::value::ToMotoko;
+use fumola::value::ToMotoko;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 fn assert<T: Debug + Eq + Serialize + DeserializeOwned>(input: &str, value: T, debug_str: &str) {
     println!("Evaluating: {}", input);
-    let result: T = motoko::vm::eval_into(input).unwrap();
+    let result: T = fumola::vm::eval_into(input).unwrap();
     assert_eq!(result, value);
     assert_eq!(format!("{:?}", result.to_motoko().unwrap()), debug_str);
 }
@@ -29,7 +29,7 @@ fn convert_struct() {
         d: vec![1, 2, 3],
     };
     let item: Item =
-        motoko::vm::eval_into(r#"{ a = 5; b = ("abc", null); c = { x = 0 }; d = [var 1, 2, 3] }"#)
+        fumola::vm::eval_into(r#"{ a = 5; b = ("abc", null); c = { x = 0 }; d = [var 1, 2, 3] }"#)
             .unwrap();
     assert_eq!(expected, item);
 }

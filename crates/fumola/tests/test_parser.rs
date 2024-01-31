@@ -1,11 +1,11 @@
-use motoko::check::{assert_parse as assert_to, assert_roundtrip as assert_};
+use fumola::check::{assert_parse as assert_to, assert_roundtrip as assert_};
 
 fn assert_parse_ok(s: &str) {
-    motoko::check::parse(s).expect("assert_parse_ok");
+    fumola::check::parse(s).expect("assert_parse_ok");
 }
 
 fn assert_parse_err(s: &str) {
-    match motoko::check::parse(s) {
+    match fumola::check::parse(s) {
         Err(_e) => {}
         Ok(_) => {
             unreachable!("expected syntax error, not an 'OK parse'.")
@@ -14,10 +14,10 @@ fn assert_parse_err(s: &str) {
 }
 #[test]
 fn test_prim_types() {
-    let d = motoko::check::parse("type t = Nat8").expect("assert_parse_ok");
+    let d = fumola::check::parse("type t = Nat8").expect("assert_parse_ok");
     match &d.vec.get(0).expect("get parsed decl").0 {
-        motoko::ast::Dec::Type(_, _, t) => match &t.0 {
-            motoko::ast::Type::Prim(_) => {}
+        fumola::ast::Dec::Type(_, _, t) => match &t.0 {
+            fumola::ast::Type::Prim(_) => {}
             t => unreachable!("expected Type::Prim, not {:?}", t),
         },
         d => unreachable!("expected Dec::Type, not {:?}", d),
@@ -106,7 +106,7 @@ fn test_ids() {
     assert_("xxx_");
     assert_("xXx_01");
     assert_("xxx_01_xxX");
-    assert_("_x"); // valid in OCaml Motoko
+    assert_("_x"); // valid in OCaml fumola
 
     // 'let' as a variable -- this is not a legal program, but we want a good parse error, so parse it as a variable.
     // currently results in a parse error
@@ -444,8 +444,8 @@ fn test_block_comments() {
 
 #[test]
 fn test_source_comments() {
-    //use motoko::ast::{Dec, Exp, Loc, Source};
-    use motoko::check::parse;
+    //use fumola::ast::{Dec, Exp, Loc, Source};
+    use fumola::check::parse;
     let ast = parse("//\n/*a*/a").unwrap();
     println!("{:?}", ast);
 

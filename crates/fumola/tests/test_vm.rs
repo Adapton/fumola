@@ -1,7 +1,7 @@
-use motoko::check::assert_vm_eval as assert_;
-use motoko::check::assert_vm_interruption as assert_x;
-use motoko::type_mismatch_;
-use motoko::vm_types::Interruption;
+use fumola::check::assert_vm_eval as assert_;
+use fumola::check::assert_vm_interruption as assert_x;
+use fumola::type_mismatch_;
+use fumola::vm_types::Interruption;
 
 use test_log::test; // enable logging output for tests by default.
 
@@ -459,12 +459,12 @@ f()
 
 #[test]
 fn test_core_eval() {
-    let mut core = motoko::vm_types::Core::empty();
+    let mut core = fumola::vm_types::Core::empty();
     core.eval("var x = 1").expect("oops");
     core.eval("var y = x + 1").expect("oops");
     let y = core.eval("y").expect("oops");
     assert_eq!(
         &*y,
-        &motoko::value::Value::Nat(num_bigint::BigUint::from(2_u32))
+        &fumola::value::Value::Nat(num_bigint::BigUint::from(2_u32))
     )
 }
