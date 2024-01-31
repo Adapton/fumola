@@ -1,5 +1,3 @@
-use std::hash;
-
 use crate::ast::{
     Case, CasesPos, Dec, DecField, DecFieldsPos, Delim, Exp, ExpField, IdPos, NodeData, Pat,
     PatField, QuotedAst, Type,

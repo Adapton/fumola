@@ -1,5 +1,6 @@
 use crate::shared::{Share, Shared};
 use crate::value::{PrimFunction, Value_};
+// use crate::ToMotoko;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -157,6 +158,14 @@ impl<X: Clone> Delim<X> {
         Delim {
             vec: im_rc::vector![],
             has_trailing: false,
+        }
+    }
+    pub fn append(&self, other: &Self) -> Self {
+        let mut vec = self.vec.clone();
+        vec.append(other.vec.clone());
+        Delim {
+            vec,
+            has_trailing: other.has_trailing,
         }
     }
     pub fn one(x: X) -> Self {
@@ -552,6 +561,38 @@ pub enum QuotedAst {
     DecFields(DecFields),
 }
 
+impl QuotedAst {
+    pub fn append(&self, other: &Self) -> Result<Self, crate::vm_types::Interruption> {
+        use QuotedAst::*;
+        match (self, other) {
+            (Empty, _) => Ok(other.clone()),
+            (_, Empty) => Ok(self.clone()),
+            (TupleExps(es1), TupleExps(es2)) => Ok(TupleExps(es1.append(es2))),
+            (RecordExps((None, None)), RecordExps((es1, es2))) => {
+                Ok(RecordExps((es1.clone(), es2.clone())))
+            }
+            (RecordExps((es1, None)), RecordExps((None, Some(es3)))) => {
+                Ok(RecordExps((es1.clone(), Some(es3.clone()))))
+            }
+            (RecordExps((es1, es2)), RecordExps((None, es3))) => Ok(match (es2, es3) {
+                (Some(es2), None) => RecordExps((es1.clone(), Some(es2.clone()))),
+                (None, es3) => RecordExps((es1.clone(), es3.clone())),
+                (Some(es2), Some(es3)) => RecordExps((es1.clone(), Some(es2.append(es3)))),
+            }),
+            (Cases(cs1), Cases(cs2)) => Ok(Cases(cs1.append(cs2))),
+            (Id(i1), Id(i2)) => Ok(Id(NodeData(
+                crate::ast::Id::new(format!("{}{}", i1.0.as_str(), i2.0.as_str())),
+                Source::Evaluation,
+            )
+            .share())),
+            (TuplePats(_), TuplePats(_)) => todo!(),
+            (RecordPats(_), RecordPats(_)) => todo!(),
+            (DecFields(_), DecFields(_)) => todo!(),
+            (_, _) => crate::type_mismatch!(file!(), line!()),
+        }
+    }
+}
+
 pub type ExpObjectBody = (Option<Delim<Exp_>>, Option<ExpFields>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -798,6 +839,9 @@ impl Id {
     }
     pub fn to_string(&self) -> String {
         self.string.to_string()
+    }
+    pub fn share(self) -> Shared<Self> {
+        crate::shared::Shared::new(self)
     }
 }
 

@@ -25,10 +25,10 @@ pub struct SyntaxError {
 #[macro_export]
 macro_rules! type_mismatch_ {
     () => {
-        Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(None))
+        $crate::Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(None))
     };
     ($file:expr, $line:expr) => {
-        Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(Some(
+        $crate::Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(Some(
             $crate::vm_types::CoreSource {
                 name: None,
                 description: None,
@@ -38,7 +38,7 @@ macro_rules! type_mismatch_ {
         )))
     };
     ($file:expr, $line:expr, $name:expr) => {
-        Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(Some(
+        $crate::Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(Some(
             $crate::vm_types::CoreSource {
                 name: Some($name.to_string()),
                 description: None,
@@ -48,7 +48,7 @@ macro_rules! type_mismatch_ {
         )))
     };
     ($file:expr, $line:expr, $name:expr, $description:expr) => {
-        Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(Some(
+        $crate::Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(Some(
             $crate::vm_types::CoreSource {
                 name: Some($name.to_string()),
                 description: Some($description.to_string()),

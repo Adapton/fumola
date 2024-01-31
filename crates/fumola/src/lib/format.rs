@@ -37,8 +37,10 @@ pub trait ToDoc {
 // }
 
 fn object<'a>(m: &'a im_rc::HashMap<Id, FieldValue>) -> RcDoc<'a> {
+    let mut out: Vec<_> = m.iter().collect();
+    out.sort_by(|a, b| a.0.cmp(b.0));
     strict_concat(
-        m.iter().map(|(fi, fv)| match fv.mut_ {
+        out.iter().map(|(fi, fv)| match fv.mut_ {
             Mut::Const => fi.doc().append(" = ").append(fv.val.doc()),
             Mut::Var => str("var ")
                 .append(fi.doc())
@@ -49,11 +51,13 @@ fn object<'a>(m: &'a im_rc::HashMap<Id, FieldValue>) -> RcDoc<'a> {
     )
 }
 
-fn hashmap<'a>(m: &'a im_rc::HashMap<Value_, Value_>) -> RcDoc<'a> {
+fn hashmap<'a>(m: &'a im_rc::HashMap<Id, Value_>) -> RcDoc<'a> {
+    let mut data = m.iter().collect::<Vec<_>>();
+    data.sort_by(|a, b| a.0.cmp(&b.0));
     enclose(
         "[",
         strict_concat(
-            m.iter()
+            data.iter()
                 .map(|(fk, fv)| enclose("(", fk.doc().append(", ").append(fv.doc()), ")")),
             ";",
         ),
@@ -205,7 +209,7 @@ impl ToDoc for Value {
             Value::Function(_) => todo!(),
             Value::PrimFunction(_) => todo!(),
             Value::Collection(c) => match c {
-                crate::value::Collection::HashMap(m) => hashmap(m),
+                crate::value::Collection::HashMap(m) => todo!(), //hashmap(m),
                 crate::value::Collection::FastRandIter(_) => todo!(),
             },
             Value::Dynamic(_) => todo!(),

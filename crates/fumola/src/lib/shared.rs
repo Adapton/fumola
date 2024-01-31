@@ -92,6 +92,24 @@ pub trait Share {
 //     }
 // }
 
+impl<T> PartialOrd for Shared<T>
+where
+    T: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.rc.partial_cmp(&other.rc)
+    }
+}
+
+impl<T> Ord for Shared<T>
+where
+    T: Ord,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.rc.cmp(&other.rc)
+    }
+}
+
 impl<T: Share> From<T> for Shared<T> {
     fn from(value: T) -> Self {
         value.share()

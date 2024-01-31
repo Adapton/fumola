@@ -79,6 +79,7 @@ pub fn binop(
         },
         Cat => match (cont_prim_type, &*v1, &*v2) {
             (_, Value::Text(t1), Value::Text(t2)) => Ok(Value::Text(t1.append(t2))),
+            (_, Value::QuotedAst(q1), Value::QuotedAst(q2)) => Ok(Value::QuotedAst(q1.append(q2)?)),
             (_, _, _) => type_mismatch!(file!(), line!()),
         },
 
