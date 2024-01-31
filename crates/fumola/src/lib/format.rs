@@ -51,9 +51,10 @@ fn object<'a>(m: &'a im_rc::HashMap<Id, FieldValue>) -> RcDoc<'a> {
     )
 }
 
-fn hashmap<'a>(m: &'a im_rc::HashMap<Id, Value_>) -> RcDoc<'a> {
-    let mut data = m.iter().collect::<Vec<_>>();
-    data.sort_by(|a, b| a.0.cmp(&b.0));
+fn hashmap<'a>(m: &'a im_rc::HashMap<Value_, Value_>) -> RcDoc<'a> {
+    let data = m.iter().collect::<Vec<_>>();
+    // to do -- sort general values (but only handle common cases for now)
+    // data.sort_by(|a, b| a.0.cmp(&b.0));
     enclose(
         "[",
         strict_concat(
@@ -209,7 +210,7 @@ impl ToDoc for Value {
             Value::Function(_) => todo!(),
             Value::PrimFunction(_) => todo!(),
             Value::Collection(c) => match c {
-                crate::value::Collection::HashMap(m) => todo!(), //hashmap(m),
+                crate::value::Collection::HashMap(m) => hashmap(m),
                 crate::value::Collection::FastRandIter(_) => todo!(),
             },
             Value::Dynamic(_) => todo!(),
