@@ -104,7 +104,7 @@ fn roundtrip_value() {
     assert(
         "#Text(\"abc\")",
         "abc".to_motoko().unwrap(),
-        "Variant(\"Text\", Some(Text(String(\"abc\"))))",
+        "Variant(\"Text\", Some(Text(Text([\"abc\"]))))",
     );
     // TODO: Blob
     assert(
@@ -115,7 +115,7 @@ fn roundtrip_value() {
     assert(
         "#Tuple([#Nat 123, #Text \"abc\"])",
         (123_usize, "abc").to_motoko().unwrap(),
-        "Variant(\"Tuple\", Some(Array(Var, [Variant(\"Nat\", Some(Nat(123))), Variant(\"Text\", Some(Text(String(\"abc\"))))])))",
+        "Variant(\"Tuple\", Some(Array(Var, [Variant(\"Nat\", Some(Nat(123))), Variant(\"Text\", Some(Text(Text([\"abc\"]))))])))",
     );
     assert(
         // "#Object { x = { mut = #Var; val = #Int(0) } }",
@@ -150,7 +150,7 @@ fn roundtrip_value() {
         }
         .to_motoko()
         .unwrap(),
-        "Variant(\"Variant\", Some(Tuple([Text(String(\"Abc\")), Null])))",
+        "Variant(\"Variant\", Some(Tuple([Text(Text([\"Abc\"])), Null])))",
     );
     // assert(
     //     "#Pointer(123)",
