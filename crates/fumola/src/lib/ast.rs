@@ -559,6 +559,7 @@ pub enum QuotedAst {
     Cases(Cases),
     Decs(Decs),
     DecFields(DecFields),
+    Types(Delim<Type_>),
 }
 
 impl QuotedAst {
@@ -585,6 +586,7 @@ impl QuotedAst {
                 Source::Evaluation,
             )
             .share())),
+            (Decs(ds1), Decs(ds2)) => Ok(Decs(ds1.append(ds2))),
             (TuplePats(_), TuplePats(_)) => todo!(),
             (RecordPats(_), RecordPats(_)) => todo!(),
             (DecFields(_), DecFields(_)) => todo!(),

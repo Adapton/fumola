@@ -428,6 +428,7 @@ QuotedAst: QuotedAst = {
     // Collections of patterns (matching either tuple or record components):
     "``" "(" <ps:Delim1<Pat_, ",">> ")" => QuotedAst::TuplePats(ps),
     "``" "{" <ps:Delim1<PatField_, ";">> "}" => QuotedAst::RecordPats(ps),
+    "`" "type" "("  <types:Delim0<TypeItem_, ",">> ")" => QuotedAst::Types(types),
 }
 
 #[inline]

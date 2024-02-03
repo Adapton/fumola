@@ -75,7 +75,7 @@ impl QuotedClose for Pat {
         match &self {
             Pat::Wild => todo!(),
             Pat::Var(x) => Ok(Pat::Var(x.clone())),
-            Pat::Literal(_) => todo!(),
+            Pat::Literal(l) => Ok(Pat::Literal(l.clone())),
             Pat::UnOpLiteral(_, _) => todo!(),
             Pat::Tuple(_) => todo!(),
             Pat::Object(_) => todo!(),
@@ -104,12 +104,16 @@ impl QuotedClose for Dec {
     fn quoted_close(&self, env: &Env) -> Result<Dec, Interruption> {
         match &self {
             Dec::Exp(e) => Ok(Dec::Exp(e.quoted_close(env)?)),
-            Dec::Let(p, e) => Ok(Dec::Let(p.quoted_close(env)?, e.quoted_close(env)?)), // to do -- remove pattern vars from Env
+            Dec::Let(p, e) => {
+                let p = p.quoted_close(env)?;
+                // to do -- remove vars bound in p from env
+                Ok(Dec::Let(p.quoted_close(env)?, e.quoted_close(env)?))
+            }
             Dec::LetImport(_, _, _) => todo!(),
             Dec::LetModule(_, _, _) => todo!(),
             Dec::LetActor(_, _, _) => todo!(),
             Dec::LetObject(_, _, _) => todo!(),
-            Dec::Func(_) => todo!(),
+            Dec::Func(f) => Ok(Dec::Func(f.clone())), // to do -- fix me
             Dec::Var(_, _) => todo!(),
             Dec::Type(_, _, _) => todo!(),
             Dec::Class(_) => todo!(),
@@ -153,8 +157,11 @@ impl QuotedClose for CasesPos {
 }
 
 impl QuotedClose for Case {
-    fn quoted_close(&self, _env: &Env) -> Result<Case, Interruption> {
-        todo!()
+    fn quoted_close(&self, env: &Env) -> Result<Case, Interruption> {
+        Ok(Case {
+            pat: self.pat.quoted_close(env)?,
+            exp: (self.exp.quoted_close(env)?),
+        })
     }
 }
 
@@ -266,6 +273,7 @@ impl QuotedClose for QuotedAst {
             QuotedAst::Cases(cs) => Cases(cs.quoted_close(env)?),
             QuotedAst::Decs(ds) => Decs(ds.quoted_close(env)?),
             QuotedAst::DecFields(dfs) => DecFields(dfs.quoted_close(env)?),
+            QuotedAst::Types(ts) => Types(ts.clone()), // to do
         })
     }
 }

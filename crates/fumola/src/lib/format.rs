@@ -3,7 +3,7 @@
 use crate::ast::{
     BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_, Delim, Exp, ExpField, Id,
     IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat, PrimType, QuotedAst, RelOp, Stab, Type,
-    TypeBind, TypeField, UnOp, Unquote, Vis,
+    TypeBind, TypeField, TypeTag, TypeTag_, UnOp, Unquote, Vis,
 };
 use crate::format_utils::*;
 use crate::lexer::is_keyword;
@@ -98,6 +98,10 @@ fn vector<'a, T: ToDoc + Clone>(v: &'a im_rc::Vector<T>, sep: &'a str) -> RcDoc<
     strict_concat(v.iter().map(|x| x.doc()), sep)
 }
 
+fn variant_vector<'a>(v: &'a im_rc::Vector<TypeTag_>) -> RcDoc<'a> {
+    strict_concat(v.iter().map(|x| str("#").append(x.doc())), ";")
+}
+
 fn vector_tuple<'a, T: ToDoc + Clone>(v: &'a im_rc::Vector<T>) -> RcDoc<'a> {
     enclose("(", vector(v, ","), ")")
 }
@@ -186,8 +190,8 @@ impl ToDoc for Value {
             Value::Char(_) => todo!(),
             Value::Text(t) => RcDoc::text(format!("{:?}", t.to_string())),
             Value::Blob(_) => todo!(),
-            Value::Array(Mut::Const, vs) => enclose("[", vector_tuple(vs), "]"),
-            Value::Array(Mut::Var, vs) => enclose("[var ", vector_tuple(vs), "]"),
+            Value::Array(Mut::Const, vs) => enclose("[", vector(vs, ","), "]"),
+            Value::Array(Mut::Var, vs) => enclose("[var ", vector(vs, ","), "]"),
             Value::Tuple(vs) => vector_tuple(vs),
             Value::Object(fs) => enclose("{", object(fs), "}"),
             Value::Option(v) => str("?").append(v.doc()),
@@ -231,7 +235,11 @@ impl ToDoc for QuotedAst {
             QuotedAst::Decs(ds) => str("`do ").append(block(ds)),
             QuotedAst::TupleExps(es) => str("`").append(tuple(es)),
             QuotedAst::RecordExps((None, Some(fs))) => str("`").append(block(fs)),
-
+            QuotedAst::Types(ts) => str("`").append("type").append(space()).append(enclose(
+                "(",
+                vector(&ts.vec, ","),
+                ")",
+            )),
             _ => todo!(),
         }
     }
@@ -498,16 +506,40 @@ impl ToDoc for Dec {
     }
 }
 
+impl ToDoc for TypeTag {
+    fn doc(&self) -> RcDoc {
+        let tail = if self.typ.is_some() {
+            space()
+                .append(str(":"))
+                .append(space())
+                .append(self.typ.doc())
+        } else {
+            nil()
+        };
+        self.id.doc().append(tail)
+    }
+}
+
 impl ToDoc for Type {
     fn doc(&self) -> RcDoc {
         use Type::*;
         match self {
             Prim(p) => p.doc(),
             Object(s, fs) => s.doc().append(RcDoc::space()).append(field_block(fs)),
-            Array(_m, _t) => todo!(),
+            Array(m, t) => enclose("[", m.doc().append(t.doc()), "]"),
             Optional(t) => str("?").append(t.doc()),
             Tuple(d) => tuple(d),
-            Function(_, _, _, _) => todo!(),
+            Function(_s, args, src, tgt) => {
+                let args = args.as_ref().map(|t| vector(&t.vec, ","));
+                let args = match args {
+                    None => nil(),
+                    Some(a) => a.clone(),
+                };
+                args.append(src.doc())
+                    .append(space())
+                    .append(str("->"))
+                    .append(space().append(tgt.doc()))
+            }
             Async(t) => kwd("async").append(t.doc()),
             //Async(_, _) => unimplemented!(), // scope?
             And(e1, e2) => bin_op(e1, str("and"), e2),
@@ -516,8 +548,13 @@ impl ToDoc for Type {
             Unknown(id) => id.doc(),
             Known(id, t) => id.doc().append(" : ").append(t.doc()),
             Path(..) => todo!(),
-            Item(..) => todo!(),
-            Variant(..) => todo!(),
+            Item(i, t) => i
+                .doc()
+                .append(space())
+                .append(str(":"))
+                .append(space())
+                .append(t.doc()),
+            Variant(ts) => enclose("{", variant_vector(&ts.vec), "}"),
         }
     }
 }
@@ -578,7 +615,9 @@ impl ToDoc for Pat {
             Annot(_t) => todo!(),
             AnnotPat(_p, _t) => todo!(),
             Paren(p) => enclose("(", p.doc(), ")"),
-            _ => unimplemented!(),
+            Or(_, _) => todo!(),
+            Unquote(_) => todo!(),
+            TempVar(_) => todo!(),
         }
     }
 }
