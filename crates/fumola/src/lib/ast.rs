@@ -6,6 +6,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::ops::Range;
 use std::rc::Rc;
+use im_rc::Vector;
 
 /// A "located `X`" has a source location of type `Source`.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -149,7 +150,7 @@ impl std::default::Default for Source {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Hash)]
 pub struct Delim<X: Clone> {
-    pub vec: im_rc::Vector<X>,
+    pub vec: Vector<X>,
     pub has_trailing: bool,
 }
 
@@ -386,6 +387,17 @@ pub struct TypeTag {
     pub typ: Option<Type_>,
 }
 
+pub type Attrs = Delim<Attr_>;
+
+pub type Attr_ = Node<Attr>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum Attr {
+    Id(Id_),
+    Call(Id_, Delim<Attr_>),
+    Field(Id_, Attr_),
+}
+
 pub type Vis_ = Node<Vis>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -560,6 +572,7 @@ pub enum QuotedAst {
     Decs(Decs),
     DecFields(DecFields),
     Types(Delim<Type_>),
+    Attrs(Attrs)
 }
 
 impl QuotedAst {

@@ -274,6 +274,7 @@ impl QuotedClose for QuotedAst {
             QuotedAst::Decs(ds) => Decs(ds.quoted_close(env)?),
             QuotedAst::DecFields(dfs) => DecFields(dfs.quoted_close(env)?),
             QuotedAst::Types(ts) => Types(ts.clone()), // to do
+            QuotedAst::Attrs(atts) => Attrs(atts.clone()) 
         })
     }
 }

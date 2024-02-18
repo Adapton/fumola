@@ -1045,6 +1045,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                 QuotedAst::DecFields(_dfs) => type_mismatch!(file!(), line!()),
                 QuotedAst::Decs(d) => decs_step(active, d.vec.clone()),
                 QuotedAst::Types(_ts) => type_mismatch!(file!(), line!()),
+                QuotedAst::Attrs(_a) => type_mismatch!(file!(), line!()),
             },
             _ => type_mismatch!(file!(), line!()),
         },

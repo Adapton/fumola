@@ -670,6 +670,10 @@ Decs: Decs = {
 Dec_: Dec_ = Node<Dec>;
 
 Dec: Dec = {
+    ("#" AttrDec)? <dec:DecRaw> => dec, 
+}
+
+DecRaw: Dec = {
     DecVar,
     DecNonVar,
     ExpNonDec0_<Ob> => Dec::Exp(<>),
@@ -797,5 +801,18 @@ Stab: Stab = {
 DecField_: DecField_ = Node<DecField>;
 
 DecField: DecField = {
+    ( AttrDec )?
     <vis:(Vis_)?> <stab:(Stab_)?> <dec:Dec_> => DecField{ vis, stab, dec }
+}
+
+AttrDec: Attrs = {
+    "#" "[" <d:Delim0<Attr_, ",">> "]" => d
+}
+
+#[inline]
+Attr_: Attr_ = Node<Attr>;
+
+Attr: Attr = {
+    <i:Id_> => Attr::Id(i),
+    <i:Id_> "(" <d:Delim0<Attr_, ",">> ")" => Attr::Call(i, d),
 }
