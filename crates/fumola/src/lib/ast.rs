@@ -1,12 +1,12 @@
 use crate::shared::{Share, Shared};
 use crate::value::{PrimFunction, Value_};
 // use crate::ToMotoko;
+use im_rc::Vector;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::ops::Range;
 use std::rc::Rc;
-use im_rc::Vector;
 
 /// A "located `X`" has a source location of type `Source`.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -248,6 +248,7 @@ pub type Dec_ = Node<Dec>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Dec {
+    Attrs(Attrs, Dec_),
     Exp(Exp_),
     Let(Pat_, Exp_),
     LetImport(Pat_, Sugar, String),
@@ -258,6 +259,15 @@ pub enum Dec {
     Var(Pat_, Exp_),
     Type(TypId_, Option<TypeBinds>, Type_),
     Class(Class),
+}
+
+impl Dec {
+    pub fn with_attrs(attrs: Node<Option<(&str, Attrs)>>, dec: Dec_) -> Dec_ {
+        match &attrs.0 {
+            None => dec,
+            Some(a) => NodeData(Dec::Attrs(a.1.clone(), dec), attrs.1.clone()).into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -351,6 +361,7 @@ pub type DecField_ = Node<DecField>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct DecField {
+    pub attrs: Option<Attrs>,
     pub dec: Dec_,
     pub vis: Option<Vis_>,
     pub stab: Option<Stab_>,
@@ -572,7 +583,7 @@ pub enum QuotedAst {
     Decs(Decs),
     DecFields(DecFields),
     Types(Delim<Type_>),
-    Attrs(Attrs)
+    Attrs(Attrs),
 }
 
 impl QuotedAst {

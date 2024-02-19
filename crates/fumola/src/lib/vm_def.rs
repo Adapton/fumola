@@ -244,6 +244,7 @@ pub mod def {
                 for dec in init.outer_decs.iter() {
                     let dec = dec.clone();
                     let df = crate::ast::DecField {
+                        attrs: None,
                         vis: None,
                         stab: None,
                         dec,
@@ -315,6 +316,9 @@ pub mod def {
     ) -> Result<(), Interruption> {
         //println!("{:?} -- {:?} ", source, df);
         match &df.dec.0 {
+            Dec::Attrs(attrs, dec) => {
+                nyi!(line!())
+            }
             Dec::LetModule(id, _, dfs) => {
                 let v = module(
                     active,

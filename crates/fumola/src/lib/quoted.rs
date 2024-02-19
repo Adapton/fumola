@@ -103,6 +103,7 @@ impl QuotedClose for Pat {
 impl QuotedClose for Dec {
     fn quoted_close(&self, env: &Env) -> Result<Dec, Interruption> {
         match &self {
+            Dec::Attrs(a, d) => Ok(Dec::Attrs(a.clone(), d.quoted_close(env)?)),
             Dec::Exp(e) => Ok(Dec::Exp(e.quoted_close(env)?)),
             Dec::Let(p, e) => {
                 let p = p.quoted_close(env)?;
@@ -274,7 +275,7 @@ impl QuotedClose for QuotedAst {
             QuotedAst::Decs(ds) => Decs(ds.quoted_close(env)?),
             QuotedAst::DecFields(dfs) => DecFields(dfs.quoted_close(env)?),
             QuotedAst::Types(ts) => Types(ts.clone()), // to do
-            QuotedAst::Attrs(atts) => Attrs(atts.clone()) 
+            QuotedAst::Attrs(atts) => Attrs(atts.clone()),
         })
     }
 }

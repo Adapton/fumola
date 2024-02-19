@@ -574,6 +574,7 @@ impl Core {
             for dec in init.outer_decs.iter() {
                 let dec = dec.clone();
                 let df = DecField {
+                    attrs: None,
                     vis: None,
                     stab: None,
                     dec,
@@ -642,6 +643,7 @@ impl Core {
         for dec in decs.iter() {
             let dec = dec.clone();
             let df = crate::ast::DecField {
+                attrs: None,
                 vis: None,
                 stab: None,
                 dec,
@@ -670,6 +672,7 @@ impl Core {
         for dec in decs.iter() {
             let dec = dec.clone();
             let df = crate::ast::DecField {
+                attrs: None,
                 vis: None,
                 stab: None,
                 dec,

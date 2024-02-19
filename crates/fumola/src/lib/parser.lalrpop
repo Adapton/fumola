@@ -2,7 +2,7 @@
 //use std::collections::HashMap;
 // use crate::ast_utils::Syntax;
 use crate::parser_utils::{dec_node_into_exp, get_one};
-use crate::ast::{BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, NodeData, Source, SourceKnown, Id, Id_, IdPos, IdPos_, Unquote, Unquote_, ToId, Pat, Pat_, PatField, PatField_, Exp, ExpObjectBody, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, Cases, CasesPos, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFields, DecFieldsPos, ProjIndex, QuotedAst};
+use crate::ast::{Attr_, Attr, Attrs, BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, NodeData, Source, SourceKnown, Id, Id_, IdPos, IdPos_, Unquote, Unquote_, ToId, Pat, Pat_, PatField, PatField_, Exp, ExpObjectBody, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, Cases, CasesPos, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFields, DecFieldsPos, ProjIndex, QuotedAst};
 use crate::value::PrimFunction;
 // use crate::lexer_types::Token;
 use line_col::LineColLookup;
@@ -666,12 +666,12 @@ Decs: Decs = {
     Delim0<Dec_, ";">
 }
 
-#[inline]
-Dec_: Dec_ = Node<Dec>;
-
-Dec: Dec = {
-    ("#" AttrDec)? <dec:DecRaw> => dec, 
+Dec_: Dec_ = {
+    <a:Node<("#" AttrDec)?>> <dec:DecRaw_> => Dec::with_attrs(a, dec), 
 }
+
+#[inline]
+DecRaw_: Dec_ = Node<DecRaw>;
 
 DecRaw: Dec = {
     DecVar,
@@ -801,8 +801,8 @@ Stab: Stab = {
 DecField_: DecField_ = Node<DecField>;
 
 DecField: DecField = {
-    ( AttrDec )?
-    <vis:(Vis_)?> <stab:(Stab_)?> <dec:Dec_> => DecField{ vis, stab, dec }
+    <attrs:( AttrDec )?>
+    <vis:(Vis_)?> <stab:(Stab_)?> <dec:Dec_> => DecField{ attrs, vis, stab, dec }
 }
 
 AttrDec: Attrs = {
@@ -814,5 +814,6 @@ Attr_: Attr_ = Node<Attr>;
 
 Attr: Attr = {
     <i:Id_> => Attr::Id(i),
+    <i:Id_> "=" <a:Attr_> => Attr::Field(i, a),
     <i:Id_> "(" <d:Delim0<Attr_, ",">> ")" => Attr::Call(i, d),
 }

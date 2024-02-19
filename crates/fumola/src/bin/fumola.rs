@@ -150,6 +150,10 @@ fn main() -> OurResult<()> {
                     Ok(line) => {
                         core.clear_cont();
                         let v = core.eval_str(&line);
+                        for line in core.debug_print_out.iter() {
+                            println!("{}", line.text.to_string())
+                        }
+                        core.debug_print_out = im_rc::vector::Vector::new();
                         match v {
                             Ok(v) => {
                                 println!("{}", fumola::format::format_pretty(v.as_ref(), 80));
