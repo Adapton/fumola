@@ -481,7 +481,7 @@ impl ToDoc for Dec {
     fn doc(&self) -> RcDoc {
         use Dec::*;
         match self {
-            Attrs(a, d) => todo!(),
+            Attrs(_a, _d) => todo!(),
             Exp(e) => e.doc(),
             Let(p, e) => kwd("let")
                 .append(p.doc())

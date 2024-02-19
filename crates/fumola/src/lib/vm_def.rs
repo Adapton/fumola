@@ -316,7 +316,7 @@ pub mod def {
     ) -> Result<(), Interruption> {
         //println!("{:?} -- {:?} ", source, df);
         match &df.dec.0 {
-            Dec::Attrs(attrs, dec) => {
+            Dec::Attrs(_attrs, _dec) => {
                 nyi!(line!())
             }
             Dec::LetModule(id, _, dfs) => {

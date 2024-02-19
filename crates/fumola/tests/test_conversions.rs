@@ -29,7 +29,7 @@ fn convert_struct() {
         d: vec![1, 2, 3],
     };
     let item: Item =
-        fumola::vm::eval_into(r#"{ a = 5; b = ("abc", null); c = { x = 0 }; d = [var 1, 2, 3] }"#)
+        fumola::vm::eval_into(r#"{ a = 5; b = ("abc", null); c = { x = 0 }; d = [1, 2, 3] }"#)
             .unwrap();
     assert_eq!(expected, item);
 }
@@ -59,12 +59,12 @@ fn roundtrip_struct_enum() {
         Enum::C {
             c: Box::new(Enum::A),
         },
-        "Variant(\"C\", Some(Object({\"c\": FieldValue { mut_: Var, val: Variant(\"A\", None) }})))",
+        "Variant(\"C\", Some(Object({\"c\": FieldValue { mut_: Const, val: Variant(\"A\", None) }})))",
     );
     assert(
         "{ e = #A }",
         Struct { e: Enum::A },
-        "Object({\"e\": FieldValue { mut_: Var, val: Variant(\"A\", None) }})",
+        "Object({\"e\": FieldValue { mut_: Const, val: Variant(\"A\", None) }})",
     );
 }
 
@@ -108,14 +108,14 @@ fn roundtrip_value() {
     );
     // TODO: Blob
     assert(
-        "#Array(#Var, [])",
+        "#Array(#Const, [])",
         Vec::<()>::new().to_motoko().unwrap(),
-        "Variant(\"Array\", Some(Tuple([Variant(\"Var\", None), Array(Var, [])])))",
+        "Variant(\"Array\", Some(Tuple([Variant(\"Const\", None), Array(Const, [])])))",
     );
     assert(
         "#Tuple([#Nat 123, #Text \"abc\"])",
         (123_usize, "abc").to_motoko().unwrap(),
-        "Variant(\"Tuple\", Some(Array(Var, [Variant(\"Nat\", Some(Nat(123))), Variant(\"Text\", Some(Text(Text([\"abc\"]))))])))",
+        "Variant(\"Tuple\", Some(Array(Const, [Variant(\"Nat\", Some(Nat(123))), Variant(\"Text\", Some(Text(Text([\"abc\"]))))])))",
     );
     assert(
         // "#Object { x = { mut = #Var; val = #Int(0) } }",

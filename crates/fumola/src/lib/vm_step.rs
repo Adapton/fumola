@@ -1339,7 +1339,6 @@ fn call_prim_function<A: Active>(
                 unit_step(active)
             }
             v => {
-                use crate::ToMotoko;
                 //let v = v.to_motoko()?;
                 let txt = crate::format::format_pretty(v, 80);
                 let schedule_choice = active.schedule_choice().clone();
