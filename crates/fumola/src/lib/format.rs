@@ -385,7 +385,7 @@ impl ToDoc for Exp {
             BinAssign(_from, _, _to) => todo!(),
             Array(m, es) => array(m, es),
             Index(e, idx) => e.doc().append("[").append(idx.doc()).append("]"),
-            Function(_) => todo!(),
+            Function(f) => todo!(),
             Call(e, b, a) => e
                 .doc()
                 .append(b.as_ref().map(bind).unwrap_or(RcDoc::nil()))
