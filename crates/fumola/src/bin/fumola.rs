@@ -91,7 +91,7 @@ pub enum CliCommand {
         echo_formatted: bool,
 
         #[structopt(short = "V", long = "echo-as-quoted")]
-        echo_as_quoted: bool,
+        echo_as_reflected: bool,
     },
 }
 
@@ -144,7 +144,7 @@ fn main() -> OurResult<()> {
             println!("final value: {:?}", v)
         }
         CliCommand::Repl {
-            echo_as_quoted,
+            echo_as_reflected,
             echo_formatted,
         } => {
             let mut rl = Editor::<()>::new();
@@ -168,7 +168,7 @@ fn main() -> OurResult<()> {
                                 if echo_formatted {
                                     println!("{}", fumola::format::format_pretty(v.as_ref(), 80));
                                 }
-                                if echo_as_quoted {
+                                if echo_as_reflected {
                                     println!(
                                         "{}",
                                         fumola::format::format_pretty(
