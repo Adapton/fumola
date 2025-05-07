@@ -90,7 +90,7 @@ pub enum CliCommand {
         #[structopt(short = "v", long = "echo-formatted")]
         echo_formatted: bool,
 
-        #[structopt(short = "V", long = "echo-as-quoted")]
+        #[structopt(short = "V", long = "echo-as-reflected")]
         echo_as_reflected: bool,
     },
 }
