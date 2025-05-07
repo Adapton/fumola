@@ -1,10 +1,9 @@
 // Reference: https://github.com/dfinity/candid/blob/master/rust/candid/src/bindings/candid.rs
 
 use crate::ast::{
-    BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_, Delim, Exp, ExpField, Id,
-    IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat, PrimType, QuotedAst, RelOp, Stab, Type,
-    Function,
-    TypeBind, TypeField, TypeTag, TypeTag_, UnOp, Unquote, Vis,
+    BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_, Delim, Exp, ExpField,
+    Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat, PrimType, QuotedAst, RelOp,
+    Stab, Type, TypeBind, TypeField, TypeTag, TypeTag_, UnOp, Unquote, Vis,
 };
 use crate::format_utils::*;
 use crate::lexer::is_keyword;
@@ -482,9 +481,9 @@ impl ToDoc for Function {
     fn doc(&self) -> RcDoc {
         // todo -- check self.sugar, and print the sugared form.
         kwd("func")
-        .append(self.name.doc())
-        .append(self.input.doc())
-        .append(enclose("{", self.exp.doc(), "}"))
+            .append(self.name.doc())
+            .append(self.input.doc())
+            .append(enclose("{", self.exp.doc(), "}"))
     }
 }
 

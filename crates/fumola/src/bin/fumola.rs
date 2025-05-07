@@ -86,7 +86,13 @@ pub enum CliCommand {
 
         input: String,
     },
-    Repl,
+    Repl {
+        #[structopt(short = "v", long = "echo-formatted")]
+        echo_formatted: bool,
+
+        #[structopt(short = "V", long = "echo-as-quoted")]
+        echo_as_quoted: bool,
+    },
 }
 
 fn init_log(level_filter: log::LevelFilter) {
@@ -137,7 +143,10 @@ fn main() -> OurResult<()> {
             let v = fumola::vm::eval_limit(&input, &limits);
             println!("final value: {:?}", v)
         }
-        CliCommand::Repl => {
+        CliCommand::Repl {
+            echo_as_quoted,
+            echo_formatted,
+        } => {
             let mut rl = Editor::<()>::new();
             if rl.load_history("history.txt").is_err() {
                 println!("No previous history.");
@@ -156,14 +165,18 @@ fn main() -> OurResult<()> {
                         core.debug_print_out = im_rc::vector::Vector::new();
                         match v {
                             Ok(v) => {
-                                println!("{}", fumola::format::format_pretty(v.as_ref(), 80));
-                                println!(
-                                    "{}",
-                                    fumola::format::format_pretty(
-                                        v.clone().to_motoko().as_ref().unwrap(),
-                                        80
-                                    )
-                                );
+                                if echo_formatted {
+                                    println!("{}", fumola::format::format_pretty(v.as_ref(), 80));
+                                }
+                                if echo_as_quoted {
+                                    println!(
+                                        "{}",
+                                        fumola::format::format_pretty(
+                                            v.clone().to_motoko().as_ref().unwrap(),
+                                            80
+                                        )
+                                    );
+                                }
                             }
                             Err(e) => {
                                 println!("{:?}", e)
