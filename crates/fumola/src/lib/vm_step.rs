@@ -424,13 +424,13 @@ fn decs_step<A: Active>(active: &mut A, mut decs: Vector<Dec_>) -> Result<Step, 
                     content: f.clone(),
                 }))
                 .share();
+                if let Some(i) = id {
+                    active.env().insert(i.0.id(), v.fast_clone());
+                };
                 if decs.is_empty() {
                     *active.cont() = Cont::Value_(v);
                     Ok(Step {})
                 } else {
-                    if let Some(i) = id {
-                        active.env().insert(i.0.id(), v);
-                    };
                     *active.cont() = Cont::Decs(decs);
                     Ok(Step {})
                 }

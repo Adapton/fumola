@@ -165,7 +165,8 @@ fn main() -> OurResult<()> {
                         core.debug_print_out = im_rc::vector::Vector::new();
                         match v {
                             Ok(v) => {
-                                if echo_formatted {
+                                if true {
+                                    // to do -- check echo formatted when the line is a decl
                                     println!("{}", fumola::format::format_pretty(v.as_ref(), 80));
                                 }
                                 if echo_as_reflected {
