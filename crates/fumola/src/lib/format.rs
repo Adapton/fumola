@@ -3,6 +3,7 @@
 use crate::ast::{
     BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_, Delim, Exp, ExpField, Id,
     IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat, PrimType, QuotedAst, RelOp, Stab, Type,
+    Function,
     TypeBind, TypeField, TypeTag, TypeTag_, UnOp, Unquote, Vis,
 };
 use crate::format_utils::*;
@@ -211,7 +212,7 @@ impl ToDoc for Value {
             Value::Pointer(_) => todo!(),
             Value::Opaque(_) => todo!(),
             Value::Index(_, _) => todo!(),
-            Value::Function(_) => todo!(),
+            Value::Function(f) => enclose("<", f.0.content.doc(), ">"),
             Value::PrimFunction(_) => todo!(),
             Value::Collection(c) => match c {
                 crate::value::Collection::HashMap(m) => hashmap(m),
@@ -385,7 +386,7 @@ impl ToDoc for Exp {
             BinAssign(_from, _, _to) => todo!(),
             Array(m, es) => array(m, es),
             Index(e, idx) => e.doc().append("[").append(idx.doc()).append("]"),
-            Function(f) => todo!(),
+            Function(f) => f.doc(),
             Call(e, b, a) => e
                 .doc()
                 .append(b.as_ref().map(bind).unwrap_or(RcDoc::nil()))
@@ -477,6 +478,16 @@ impl ToDoc for Delim<Dec_> {
     }
 }
 
+impl ToDoc for Function {
+    fn doc(&self) -> RcDoc {
+        // todo -- check self.sugar, and print the sugared form.
+        kwd("func")
+        .append(self.name.doc())
+        .append(self.input.doc())
+        .append(enclose("{", self.exp.doc(), "}"))
+    }
+}
+
 impl ToDoc for Dec {
     fn doc(&self) -> RcDoc {
         use Dec::*;
@@ -487,10 +498,12 @@ impl ToDoc for Dec {
                 .append(p.doc())
                 .append(str(" = "))
                 .append(e.doc()),
-            LetModule(_, _, _) => todo!(),
-            LetActor(..) => todo!(),
-            LetImport(..) => todo!(),
-            Func(_) => todo!(),
+            LetModule(_id, _, _dec) => kwd("let-module-TODO"),
+            LetActor(_id, _, _dec) => kwd("let-actor-TODO"),
+            LetImport(pat, _, import_string) => {
+                kwd("import").append(pat.doc()).append(str(import_string))
+            }
+            Func(f) => f.doc(),
             Var(p, e) => kwd("var")
                 .append(p.doc())
                 .append(str(" = "))
