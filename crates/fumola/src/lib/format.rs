@@ -477,13 +477,24 @@ impl ToDoc for Delim<Dec_> {
     }
 }
 
+fn exp_is_block(e:&Exp) -> bool {
+    match e {
+        Exp::Block(_) => true,
+        _ => false,
+    }
+}
+
 impl ToDoc for Function {
     fn doc(&self) -> RcDoc {
         // todo -- check self.sugar, and print the sugared form.
         kwd("func")
             .append(self.name.doc())
             .append(self.input.doc())
-            .append(enclose("{", self.exp.doc(), "}"))
+            .append(if exp_is_block(&self.exp.0) {
+                self.exp.doc()
+            }else {
+                enclose("{", self.exp.doc(), "}")
+            })
     }
 }
 
@@ -617,7 +628,7 @@ impl ToDoc for Pat {
             Wild => str("_"),
             Var(s) => s.doc(),
             UnOpLiteral(_u, _l) => todo!(),
-            Literal(_l) => todo!(),
+            Literal(l) => l.doc(),
             Tuple(ps) => tuple(ps),
             Object(_) => todo!(),
             Optional(p) => str("?").append(p.doc()),
