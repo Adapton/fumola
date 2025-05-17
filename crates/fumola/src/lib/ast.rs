@@ -680,6 +680,9 @@ pub enum Exp {
     Paren(Exp_),
     QuotedAst(QuotedAst),
     Unquote(Exp_),
+    Force(Exp_),
+    Thunk(Exp_),
+    GetNamedPointer(Exp_),
 }
 
 impl Exp {

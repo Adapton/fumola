@@ -97,6 +97,15 @@ fn object_step<A: Active>(
     }
 }
 
+fn closed<A: Active, Content>(active: &mut A, content: Content) -> Closed<Content> {
+    let env = active.env().fast_clone();
+    Closed {
+        ctx: active.defs().active_ctx.clone(),
+        env,
+        content,
+    }
+}
+
 fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> {
     use Exp::*;
     let source = exp.1.clone();
@@ -113,12 +122,11 @@ fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> 
         Unquote(e) => exp_conts(active, FrameCont::Unquote, e),
         Literal(l) => literal_step(active, l),
         Function(f) => {
-            let env = active.env().fast_clone();
-            *active.cont() = cont_value(Value::Function(ClosedFunction(Closed {
-                ctx: active.defs().active_ctx.clone(),
-                env,
-                content: f.clone(), // TODO: `Shared<Function>`?
-            })));
+            *active.cont() = cont_value(Value::Function(ClosedFunction(closed(active, f.clone()))));
+            Ok(Step {})
+        }
+        Thunk(e) => {
+            *active.cont() = cont_value(Value::Thunk(closed(active, e.fast_clone())));
             Ok(Step {})
         }
         Call(e1, inst, e2) => {

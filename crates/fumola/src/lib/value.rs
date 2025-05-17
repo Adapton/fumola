@@ -2,7 +2,10 @@ use std::fmt::Display;
 use std::num::Wrapping;
 use std::rc::Rc;
 
-use crate::ast::{Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, QuotedAst, ToId};
+use crate::adapton;
+use crate::ast::{
+    BinOp, Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, QuotedAst, ToId,
+};
 use crate::dynamic::Dynamic;
 use crate::shared::{FastClone, Share, Shared};
 use crate::type_mismatch;
@@ -90,6 +93,16 @@ pub struct FieldValue {
     pub val: Value_,
 }
 
+pub type Symbol_ = Shared<Symbol>;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum Symbol {
+    Nat(#[serde(with = "crate::serde_utils::biguint")] BigUint),
+    Int(#[serde(with = "crate::serde_utils::bigint")] BigInt),
+    QuotedAst(QuotedAst),
+    BinOp(Symbol_, BinOp, Symbol_),
+}
+
 pub type Value_ = Shared<Value>;
 
 pub type Pointer = crate::vm_types::Pointer;
@@ -141,6 +154,9 @@ pub enum Value {
     ActorMethod(ActorMethod),
     Module(ModuleDef),
     QuotedAst(QuotedAst),
+    Symbol(Symbol_),
+    NamedPointer(adapton::Name),
+    Thunk(Closed<Exp_>),
 }
 
 /// Actor value.
@@ -451,6 +467,15 @@ impl Value {
             Literal::Blob(v) => Blob(v.clone()),
         })
     }
+
+    pub fn into_sym_or<E>(&self, err: E) -> Result<Symbol_, E> {
+        match self {
+            Value::Symbol(s) => Ok(s.clone()),
+            Value::Nat(n) => Ok(Shared::new(Symbol::Nat(n.clone()))),
+            Value::QuotedAst(q) => Ok(Shared::new(Symbol::QuotedAst(q.clone()))),
+            _ => Err(err),
+        }
+    }
 }
 
 impl Value {
@@ -561,6 +586,10 @@ impl Value {
                 Object(map)
             }
             Value::QuotedAst(_) => Err(ValueError::ToRust("QuotedAst".to_string()))?,
+            Value::Symbol(_) => Err(ValueError::ToRust("Symbol".to_string()))?,
+            Value::NamedPointer(_) => Err(ValueError::ToRust("NamedPointer".to_string()))?,
+            Value::Thunk(_) => Err(ValueError::ToRust("Thunk".to_string()))?,
+
             Value::Pointer(_) => Err(ValueError::ToRust("Pointer".to_string()))?,
             Value::Actor(_) => Err(ValueError::ToRust("Actor".to_string()))?,
             Value::ActorMethod(_) => Err(ValueError::ToRust("ActorMethod".to_string()))?,

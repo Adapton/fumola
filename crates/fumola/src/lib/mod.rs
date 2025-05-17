@@ -1,4 +1,5 @@
 #![feature(iterator_try_collect)]
+pub mod adapton;
 pub mod ast;
 pub mod quoted;
 //pub mod ast_traversal;

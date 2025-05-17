@@ -1,7 +1,8 @@
 // Reference: https://github.com/dfinity/candid/blob/master/rust/candid/src/bindings/candid.rs
 
+use crate::adapton::Name;
 use crate::ast::{
-    BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_, Delim, Exp, ExpField,
+    BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_, Delim, Exp, ExpField, Exp_,
     Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat, PrimType, QuotedAst, RelOp,
     Stab, Type, TypeBind, TypeField, TypeTag, TypeTag_, UnOp, Unquote, Vis,
 };
@@ -9,7 +10,8 @@ use crate::format_utils::*;
 use crate::lexer::is_keyword;
 use crate::lexer_types::{GroupType, Token, TokenTree};
 use crate::shared::Shared;
-use crate::value::{FieldValue, Value, Value_};
+use crate::value::{Closed, FieldValue, Symbol, Value, Value_};
+use crate::vm_types::{def::CtxId, Env};
 use pretty::RcDoc;
 
 fn format_(doc: RcDoc, width: usize) -> String {
@@ -178,6 +180,55 @@ impl<T: ToDoc + Clone> ToDoc for Option<T> {
     }
 }
 
+impl ToDoc for Symbol {
+    fn doc(&self) -> RcDoc {
+        match self {
+            Symbol::Nat(n) => RcDoc::text(n.to_string()),
+            Symbol::Int(i) => RcDoc::text(i.to_string()),
+            Symbol::QuotedAst(q) => q.doc(),
+            Symbol::BinOp(l, b, r) => l.doc().append(b.doc().append(r.doc())),
+        }
+    }
+}
+
+impl ToDoc for Closed<Exp_> {
+    fn doc(&self) -> RcDoc {
+        RcDoc::text("<TODO-Closed<Exp>>")
+    }
+}
+
+impl ToDoc for Name {
+    fn doc(&self) -> RcDoc {
+        match self {
+            Name::Exp_(c) => c.doc(),
+            Name::Symbol(s) => s.doc(),
+        }
+    }
+}
+
+impl ToDoc for CtxId {
+    fn doc(&self) -> RcDoc {
+        RcDoc::text(format!("{}", self.0))
+    }
+}
+
+impl ToDoc for Env {
+    fn doc(&self) -> RcDoc {
+        let data = self.iter().collect::<Vec<_>>();
+        // to do -- sort general values (but only handle common cases for now)
+        // data.sort_by(|a, b| a.0.cmp(&b.0));
+        enclose(
+            "[",
+            strict_concat(
+                data.iter()
+                    .map(|(fk, fv)| enclose("(", fk.doc().append(", ").append(fv.doc()), ")")),
+                ";",
+            ),
+            "]",
+        )
+    }
+}
+
 impl ToDoc for Value {
     fn doc(&self) -> RcDoc {
         match self {
@@ -208,7 +259,13 @@ impl ToDoc for Value {
                     str("#").append(n.doc()).append(optional_paren(v))
                 }
             }
+            Value::NamedPointer(p) => p.doc(),
+            Value::Thunk(c) => kwd("thunk")
+                .append(c.ctx.doc())
+                .append(c.env.doc())
+                .append(c.content.doc()),
             Value::Pointer(_) => todo!(),
+            Value::Symbol(s) => s.doc(),
             Value::Opaque(_) => todo!(),
             Value::Index(_, _) => todo!(),
             Value::Function(f) => enclose("<", f.0.content.doc(), ">"),
@@ -466,6 +523,9 @@ impl ToDoc for Exp {
             Annot(_, _, _) => todo!(),
             QuotedAst(q) => q.doc(),
             Unquote(e) => kwd("~").append(e.doc()),
+            Thunk(e) => kwd("thunk").append(e.doc()),
+            Force(e) => kwd("force").append(e.doc()),
+            GetNamedPointer(e) => kwd("@").append(e.doc()),
         }
         // _ => text("Display-TODO={:?}", self),
     }
@@ -477,7 +537,7 @@ impl ToDoc for Delim<Dec_> {
     }
 }
 
-fn exp_is_block(e:&Exp) -> bool {
+fn exp_is_block(e: &Exp) -> bool {
     match e {
         Exp::Block(_) => true,
         _ => false,
@@ -492,7 +552,7 @@ impl ToDoc for Function {
             .append(self.input.doc())
             .append(if exp_is_block(&self.exp.0) {
                 self.exp.doc()
-            }else {
+            } else {
                 enclose("{", self.exp.doc(), "}")
             })
     }

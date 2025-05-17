@@ -256,6 +256,9 @@ impl QuotedClose for Exp {
             Exp::Paren(e) => Ok(Paren(e.quoted_close(env)?)),
             Exp::QuotedAst(q) => Ok(QuotedAst(q.quoted_close(env)?)),
             Exp::Unquote(e) => Ok(Unquote(e.quoted_close(env)?)),
+            Exp::Thunk(e) => Ok(Thunk(e.quoted_close(env)?)),
+            Exp::GetNamedPointer(e) => Ok(GetNamedPointer(e.quoted_close(env)?)),
+            Exp::Force(e) => Ok(Force(e.quoted_close(env)?)),
         }
     }
 }
