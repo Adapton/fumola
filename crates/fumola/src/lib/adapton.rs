@@ -40,8 +40,8 @@ pub struct State {
 
 pub enum FrameKind {
     DoWithin,
-    Eval(FullPointer),
-    Clean(FullPointer),
+    Eval(EdgeSource),
+    Clean(EdgeSource),
 }
 
 pub struct Frame {
@@ -54,9 +54,15 @@ pub struct Frame {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MetaTime(BigUint);
 
+// the value of a pointer does not include its time.
 pub type PointerValue = Space;
+
+// the target of an edge does not include the "meta time" -- it's always referencing the "latest meta time"
+// ????
 pub type EdgeTarget = (Space, Time);
-pub type FullPointer = (Space, Time, MetaTime);
+
+// the source of an edge has all coordinates' components
+pub type EdgeSource = (Space, Time, MetaTime);
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct EdgeId(BigUint);
@@ -72,8 +78,8 @@ pub struct Edges(HashMap<EdgeId, Edge>);
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Edge {
-    pub source: (Space, Time),
-    pub target: (Space, Time),
+    pub source: EdgeSource,
+    pub target: EdgeTarget,
     pub action: Action,
 }
 
