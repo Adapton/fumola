@@ -26,10 +26,10 @@ pub struct ThunkNode {
 }
 
 #[derive(Clone)]
-pub struct Nodes(im_rc::HashMap<Space, NodeByTime>);
+pub struct Nodes(HashMap<Space, NodeByTime>);
 
 #[derive(Clone)]
-pub struct NodeByTime(im_rc::OrdMap<(MetaTime, Time), Node>);
+pub struct NodeByTime(OrdMap<(MetaTime, Time), Node>);
 
 pub struct State {
     pub meta_time: MetaTime,
