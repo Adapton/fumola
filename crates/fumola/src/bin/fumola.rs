@@ -180,7 +180,24 @@ fn main() -> OurResult<()> {
                                 }
                             }
                             Err(e) => {
-                                println!("{:?}", e)
+                                println!("Error: {:?}", e);
+                                println!("Hint: Inspect lastError variable for details, including clone of Core.");
+                                /* dump core, without chaining with any prior core dump. */
+                                if let Some(_) = core.get_var("lastInterruption") {
+                                    core.define("lastInterruptionCore", fumola::Value::Unit);
+                                    core.define("lastInterruption", fumola::Value::Unit);
+                                    core.define("lastError", fumola::Value::Unit);
+                                };
+                                core.define(
+                                    "lastInterruptionCore",
+                                    core.clone().to_motoko().unwrap(),
+                                );
+                                core.clear_cont();
+                                core.define("lastInterruption", e.to_motoko().unwrap());
+                                core.eval_str(
+                                    "let lastError = {interruption=lastInterruption; core=lastInterruptionCore}",
+                                )
+                                .expect("define errorInfo");
                             }
                         }
                         rl.add_history_entry(line.as_str());

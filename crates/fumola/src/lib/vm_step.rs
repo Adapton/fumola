@@ -217,15 +217,36 @@ fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> 
             ));
             Ok(Step {})
         }
-        e => nyi!(line!(), "{:?}", e),
+        Hole => nyi!(line!(), "Hole"),
+
+        Force(_e) => nyi!(line!(), "step case: Force"),
+        GetNamedPointer(_e) => nyi!(line!(), "step case: GetNamedPointer"),
+
+        Loop(_e1, _e2) => nyi!(line!(), "step case: Loop"),
+
+        Label(_label, _type, _e) => nyi!(line!(), "step case: Label"),
+        Break(_label, _e) => nyi!(line!(), "step case: Break"),
+
+        ActorUrl(_e) => nyi!(line!(), "step case: ActorUrl"),
+        Show(_e) => nyi!(line!(), "step case: Show"),
+        ToCandid(_e) => nyi!(line!(), "step case: ToCandid"),
+        FromCandid(_e) => nyi!(line!(), "step case: FromCandid"),
+        ObjectBlock(_obj_sort, _dec_fields_pos) => nyi!(line!(), "step case: ObjectBlock"),
+        DebugShow(_e) => nyi!(line!(), "step case: DebugShow"),
+        Async(_e) => nyi!(line!(), "step case: Async"),
+        AsyncStar(_e) => nyi!(line!(), "step case: AsyncStar"),
+        Await(_e) => nyi!(line!(), "step case: Await"),
+        AwaitStar(_e) => nyi!(line!(), "step case: AwaitStar"),
+        Import(_) => nyi!(line!(), "step case: Import"),
+        Throw(_e) => nyi!(line!(), "step case: Throw"),
+        Try(_e, _case) => nyi!(line!(), "step case: Try"),
     }
 }
 
 // To advance the active Motoko state by a single step, after all limits are checked.
 fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
     active_trace(active);
-    let mut cont = Cont::Taken;
-    std::mem::swap(active.cont(), &mut cont);
+    let cont = active.cont().clone();
     match cont {
         Cont::Taken => unreachable!("The VM's logic currently has an internal issue."),
         Cont::Exp_(e, decs) => {
@@ -655,7 +676,29 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                 active.store().mutate_index(p.clone(), i.fast_clone(), v)?;
                 unit_step(active)
             }
-            _ => type_mismatch!(file!(), line!()),
+            Value::NamedPointer(name) => {
+                // todo
+                unit_step(active)
+            }
+            Value::Symbol(symbol) => {
+                // todo
+                unit_step(active)
+            }
+            v => {
+                if let Ok(_symbol) = v.into_sym_or(()) {
+                    // to do -- put at symbol; return pointer.
+                    unit_step(active)
+                } else {
+                    return Err(crate::Interruption::TypeMismatch(
+                        crate::vm_types::OptionCoreSource(Some(crate::vm_types::CoreSource {
+                            description: Some("assignment to non-assignable value.".to_string()),
+                            name: Some("assignment".to_string()),
+                            file: (file!()).to_string(),
+                            line: (line!()),
+                        })),
+                    ));
+                }
+            }
         },
         BinAssign2(v1, bop) => {
             let v1d = match &*v1 {

@@ -882,17 +882,24 @@ impl Core {
         self.store().dealloc(&pointer.local)
     }
 
-    // to do -- rename this to "define" or "bind" ("assign" connotes mutation).
     #[inline]
-    pub fn assign(&mut self, id: impl ToId, value: impl Into<Value_>) {
+    pub fn define(&mut self, id: impl ToId, value: impl Into<Value_>) {
         let value = value.into();
         self.env().insert(id.to_id(), value);
     }
 
     #[inline]
+    pub fn get_var(&mut self, id: impl ToId) -> Option<Value_> {
+        match self.env().get(&id.to_id()) {
+            None => None,
+            Some(v) => Some(v.clone()),
+        }
+    }
+
+    #[inline]
     pub fn assign_alloc(&mut self, id: impl ToId, value: impl Into<Value_>) -> Pointer {
         let pointer = self.alloc(value);
-        self.assign(id, Value::Pointer(pointer.fast_clone()).share());
+        self.define(id, Value::Pointer(pointer.fast_clone()).share());
         pointer
     }
 }
