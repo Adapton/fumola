@@ -6,12 +6,12 @@ use crate::ast::{
     Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat, PrimType, QuotedAst, RelOp,
     Stab, Type, TypeBind, TypeField, TypeTag, TypeTag_, UnOp, Unquote, Vis,
 };
-use crate::format_utils::*;
+use crate::{format_utils::*};
 use crate::lexer::is_keyword;
 use crate::lexer_types::{GroupType, Token, TokenTree};
 use crate::shared::Shared;
-use crate::value::{Closed, FieldValue, Symbol, Value, Value_};
-use crate::vm_types::{def::CtxId, Env};
+use crate::value::{Closed, FieldValue, Symbol, Value, Value_, Pointer};
+use crate::vm_types::{def::CtxId, Env, LocalPointer, ScheduleChoice};
 use pretty::RcDoc;
 
 pub fn format_(doc: RcDoc, width: usize) -> String {
@@ -234,6 +234,34 @@ impl ToDoc for Env {
     }
 }
 
+impl ToDoc for ScheduleChoice {
+    fn doc(&self) -> RcDoc {
+        match self {
+            ScheduleChoice::Agent => RcDoc::text("#agent"),
+            ScheduleChoice::Actor(actor_id) => RcDoc::text(format!("#actor({:?})", actor_id))
+        }
+    }
+}
+
+impl ToDoc for LocalPointer {
+    fn doc(&self) -> RcDoc {
+        match self {
+            LocalPointer::Numeric(numeric_pointer) => RcDoc::text(format!("{:?}", numeric_pointer.0)),
+            LocalPointer::Named(named_pointer) => RcDoc::text(format!("{:?}", named_pointer.0))
+        }
+    }
+}
+
+impl ToDoc for Pointer {
+    fn doc(&self) -> RcDoc {
+        kwd("pointer").append(
+            enclose("(",
+            self.local.doc().append(RcDoc::text(",")).append(
+        self.owner.doc()),
+        ")"))
+    }
+}
+
 impl ToDoc for Value {
     fn doc(&self) -> RcDoc {
         match self {
@@ -269,12 +297,12 @@ impl ToDoc for Value {
                 .append(c.ctx.doc())
                 .append(c.env.doc())
                 .append(c.content.doc()),
-            Value::Pointer(_) => todo!(),
+            Value::Pointer(p) => p.doc(),
             Value::Symbol(s) => s.doc(),
             Value::Opaque(_) => todo!(),
             Value::Index(_, _) => todo!(),
             Value::Function(f) => enclose("<", f.0.content.doc(), ">"),
-            Value::PrimFunction(_) => todo!(),
+            Value::PrimFunction(f) => kwd("prim").append(RcDoc::text(format!("\"{:?}\"", f))),
             Value::Collection(c) => match c {
                 crate::value::Collection::HashMap(m) => hashmap(m),
                 crate::value::Collection::FastRandIter(_) => todo!(),

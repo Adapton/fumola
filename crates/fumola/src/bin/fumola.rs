@@ -160,7 +160,8 @@ fn main() -> OurResult<()> {
                             }
                             Err(e) => {
                                 println!("Error: {:?}", e);
-                                println!("Hint: Inspect lastError variable for details, including clone of Core.");
+                                println!("  Hint: Inspect lastError for details.");
+                                println!("  For example, lastError.core.agent.active.cont, if lastError.core.scedule_choice == #Agent");
                                 /* dump core, without chaining with any prior core dump. */
                                 if let Some(_) = core.get_var("lastInterruption") {
                                     core.define("lastInterruptionCore", fumola::Value::Unit);
