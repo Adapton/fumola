@@ -1,6 +1,6 @@
 // Reference: https://github.com/dfinity/candid/blob/master/rust/candid/src/bindings/candid.rs
 
-use crate::adapton::Name;
+use crate::adapton::{Name, Space};
 use crate::ast::{
     BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_, Delim, Exp, ExpField, Exp_,
     Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat, PrimType, QuotedAst, RelOp,
@@ -14,7 +14,7 @@ use crate::value::{Closed, FieldValue, Symbol, Value, Value_};
 use crate::vm_types::{def::CtxId, Env};
 use pretty::RcDoc;
 
-fn format_(doc: RcDoc, width: usize) -> String {
+pub fn format_(doc: RcDoc, width: usize) -> String {
     let mut w = Vec::new();
     doc.render(width, &mut w).unwrap();
     String::from_utf8(w).unwrap()
@@ -203,6 +203,12 @@ impl ToDoc for Name {
             Name::Exp_(c) => c.doc(),
             Name::Symbol(s) => s.doc(),
         }
+    }
+}
+
+impl ToDoc for Space {
+    fn doc(&self) -> RcDoc {
+        self.0.doc()
     }
 }
 

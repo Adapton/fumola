@@ -5,7 +5,7 @@ use log::info;
 use std::io;
 use structopt::{clap, clap::Shell};
 
-use fumola::format::{format_one_line, format_pretty};
+use fumola::format::{format_one_line, format_pretty, ToDoc};
 use fumola::vm_types::Limits;
 
 use rustyline::error::ReadlineError;
@@ -166,8 +166,7 @@ fn main() -> OurResult<()> {
                         match v {
                             Ok(v) => {
                                 if true {
-                                    // to do -- check echo formatted when the line is a decl
-                                    println!("{}", fumola::format::format_pretty(v.as_ref(), 80));
+                                    println!("{}", fumola::format::format_(v.as_ref().doc(), 80));
                                 }
                                 if echo_as_reflected {
                                     println!(

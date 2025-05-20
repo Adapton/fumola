@@ -1,7 +1,4 @@
-use im_rc::{HashMap, Vector};
-use num_traits::ToPrimitive;
-use serde::{Deserialize, Serialize};
-
+use crate::adapton;
 use crate::ast::{Inst, Mut};
 #[cfg(feature = "parser")]
 use crate::parser_types::SyntaxError as SyntaxErrorCode;
@@ -12,6 +9,9 @@ use crate::{
     value::Value_,
 };
 use crate::{Share, Value};
+use im_rc::{HashMap, Vector};
+use num_traits::ToPrimitive;
+use serde::{Deserialize, Serialize};
 
 pub type Result<T = Value_, E = Interruption> = std::result::Result<T, E>;
 
@@ -476,6 +476,7 @@ pub struct Counts {
 ///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Agent {
+    pub adapton_state: adapton::State,
     pub store: Store,
     pub counts: Counts,
     pub active: Activation,
@@ -527,6 +528,7 @@ pub struct Actor {
     pub def: def::Actor,
     pub env: Env,
     pub store: Store,
+    pub adapton_state: adapton::State,
     pub counts: Counts,
     pub active: Option<Activation>,
     pub awaiting: HashMap<RespId, Activation>,
@@ -660,7 +662,7 @@ pub trait Active: ActiveBorrow {
     fn package<'a>(&'a mut self) -> &'a mut Option<String>;
     fn debug_print_out<'a>(&'a mut self) -> &'a mut Vector<DebugPrintLine>;
     fn counts<'a>(&'a mut self) -> &'a mut Counts;
-
+    fn adapton<'a>(&'a mut self) -> &'a mut adapton::State;
     fn alloc(&mut self, value: impl Into<Value_>) -> Pointer {
         self.store().alloc(value)
     }
@@ -809,7 +811,15 @@ pub enum Interruption {
     NotYetImplemented(CoreSource, Option<String>),
     Unknown,
     Impossible,
+    AdaptonError(crate::adapton::Error),
     Other(String),
+}
+
+impl From<crate::adapton::Error> for Interruption {
+    // try to avoid this conversion, except in temp code.
+    fn from(e: crate::adapton::Error) -> Interruption {
+        Interruption::AdaptonError(e)
+    }
 }
 
 impl From<()> for Interruption {

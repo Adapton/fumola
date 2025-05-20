@@ -1,3 +1,4 @@
+use crate::adapton::AdaptonState;
 use crate::ast::PrimType;
 use crate::ast::{Dec, DecField, Dec_, Exp_, Id, Id_, Inst, Prog, Source, ToId};
 use crate::shared::{FastClone, Share};
@@ -26,6 +27,7 @@ fn agent_init(prog: Prog) -> Agent {
     let mut a = Agent {
         store: Store::new(ScheduleChoice::Agent),
         //debug_print_out: Vector::new(),
+        adapton_state: crate::adapton::State::new(),
         counts: Counts::default(),
         active: Activation::new(),
     };
@@ -166,6 +168,14 @@ impl Active for Core {
         }
     }
 
+    fn adapton<'a>(&'a mut self) -> &'a mut crate::adapton::State {
+        use ScheduleChoice::*;
+        match &self.schedule_choice {
+            Agent => &mut self.agent.adapton_state,
+            Actor(ref n) => &mut self.actors.map.get_mut(n).unwrap().adapton_state,
+        }
+    }
+
     fn create(
         &mut self,
         path: String,
@@ -177,6 +187,7 @@ impl Active for Core {
             id: name.clone(),
         });
         //let def = self.defs().map.get(&CtxId(0)).unwrap().fields.get(name).unwrap().def.clone();
+        let adapton_state = crate::adapton::State::new();
         let mut store = Store::new(ScheduleChoice::Actor(name.clone()));
         let mut env = self.env().clone();
         let ctx = self.defs().map.get(&def.fields).unwrap();
@@ -205,6 +216,7 @@ impl Active for Core {
             def,
             env,
             store,
+            adapton_state,
             counts: Counts::default(),
             active: None,
             awaiting: HashMap::new(),
@@ -228,6 +240,7 @@ impl Active for Core {
         });
         let mut env = HashMap::new();
         let mut store = self.actors.map.get(&name).unwrap().store.clone();
+        let adapton_state = crate::adapton::State::new();
         let counts = self.actors.map.get(&name).unwrap().counts.clone();
         let ctx = self.defs().map.get(&def.fields).unwrap();
         for (i, field) in ctx.fields.iter() {
@@ -262,6 +275,7 @@ impl Active for Core {
             def,
             env,
             store,
+            adapton_state,
             counts,
             active: None,
             awaiting: HashMap::new(),

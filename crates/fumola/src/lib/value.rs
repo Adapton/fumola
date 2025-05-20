@@ -155,7 +155,7 @@ pub enum Value {
     Module(ModuleDef),
     QuotedAst(QuotedAst),
     Symbol(Symbol_),
-    NamedPointer(adapton::Name),
+    NamedPointer(adapton::NamedPointer),
     Thunk(Closed<Exp_>),
 }
 

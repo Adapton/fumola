@@ -1,3 +1,4 @@
+use crate::adapton::{self, AdaptonState};
 use crate::ast::{
     Cases, Dec, Dec_, Delim, Exp, ExpField_, Exp_, IdPos_, Id_, Inst, Literal, Mut, Pat, Pat_,
     ProjIndex, QuotedAst, Source, Type,
@@ -15,10 +16,15 @@ use crate::vm_types::{
 };
 use im_rc::{HashMap, Vector};
 
-use crate::{nyi, type_mismatch, type_mismatch_};
+use crate::{nyi, type_mismatch, type_mismatch_, ToMotoko};
 
 fn unit_step<A: Active>(active: &mut A) -> Result<Step, Interruption> {
     *active.cont() = Cont::Value_(Value::Unit.share());
+    Ok(Step {})
+}
+
+fn return_step<A: Active>(active: &mut A, v: Value_) -> Result<Step, Interruption> {
+    *active.cont() = Cont::Value_(v);
     Ok(Step {})
 }
 
@@ -677,17 +683,17 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                 unit_step(active)
             }
             Value::NamedPointer(name) => {
-                // todo
-                unit_step(active)
+                active.adapton().put_pointer(name.clone(), v)?;
+                return_step(active, Value::NamedPointer(name.clone()).to_shared()?)
             }
             Value::Symbol(symbol) => {
-                // todo
-                unit_step(active)
+                let p = active.adapton().put_symbol(symbol.clone(), v)?;
+                return_step(active, Value::NamedPointer(p).to_shared()?)
             }
-            v => {
-                if let Ok(_symbol) = v.into_sym_or(()) {
-                    // to do -- put at symbol; return pointer.
-                    unit_step(active)
+            v1 => {
+                if let Ok(symbol) = v1.into_sym_or(()) {
+                    let p = active.adapton().put_symbol(symbol.clone(), v)?;
+                    return_step(active, Value::NamedPointer(p).to_shared()?)
                 } else {
                     return Err(crate::Interruption::TypeMismatch(
                         crate::vm_types::OptionCoreSource(Some(crate::vm_types::CoreSource {
