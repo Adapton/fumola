@@ -256,7 +256,9 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
     active_trace(active);
     let cont = active.cont().clone();
     match cont {
-        Cont::Frame(_) => unreachable!("VM logic is broken. Old frame continuation (for debugging) should be replaced by now."),
+        Cont::Frame(_) => unreachable!(
+            "VM logic is broken. Old frame continuation (for debugging) should be replaced by now."
+        ),
         Cont::Exp_(e, decs) => {
             if decs.is_empty() {
                 exp_step(active, e)
