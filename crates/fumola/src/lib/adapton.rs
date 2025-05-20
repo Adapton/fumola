@@ -175,7 +175,7 @@ impl AdaptonState for SimpleState {
             stack: Vector::new(),
         }
     }
-    fn put_symbol(&mut self, symbol: Symbol_, value: Value_) -> Res<NamedPointer> {
+    fn put_symbol(&mut self, symbol: Symbol_, _value: Value_) -> Res<NamedPointer> {
         // to do
         Ok(Space::Symbol(symbol))
     }

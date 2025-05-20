@@ -86,13 +86,7 @@ pub enum CliCommand {
 
         input: String,
     },
-    Repl {
-        #[structopt(short = "v", long = "echo-formatted")]
-        echo_formatted: bool,
-
-        #[structopt(short = "V", long = "echo-as-reflected")]
-        echo_as_reflected: bool,
-    },
+    Repl {},
 }
 
 fn init_log(level_filter: log::LevelFilter) {
@@ -143,10 +137,7 @@ fn main() -> OurResult<()> {
             let v = fumola::vm::eval_limit(&input, &limits);
             println!("final value: {:?}", v)
         }
-        CliCommand::Repl {
-            echo_as_reflected,
-            echo_formatted,
-        } => {
+        CliCommand::Repl {} => {
             let mut rl = Editor::<()>::new();
             if rl.load_history("history.txt").is_err() {
                 println!("No previous history.");
@@ -165,18 +156,7 @@ fn main() -> OurResult<()> {
                         core.debug_print_out = im_rc::vector::Vector::new();
                         match v {
                             Ok(v) => {
-                                if true {
-                                    println!("{}", fumola::format::format_(v.doc(), 80));
-                                }
-                                if echo_as_reflected {
-                                    println!(
-                                        "{}",
-                                        fumola::format::format_pretty(
-                                            v.clone().to_motoko().as_ref().unwrap(),
-                                            80
-                                        )
-                                    );
-                                }
+                                println!("{}", fumola::format::format_(v.doc(), 80))
                             }
                             Err(e) => {
                                 println!("Error: {:?}", e);

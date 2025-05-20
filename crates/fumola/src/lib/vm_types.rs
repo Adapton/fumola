@@ -199,13 +199,13 @@ pub enum Cont {
     // Value(Value_),
     Value_(Value_),
     LetVarRet(Source, Option<Id_>),
-    Frame(Box<stack::FrameCont>),
+    Frame(Value_, Box<stack::FrameCont>),
 }
 
 pub fn source_from_cont(cont: &Cont) -> Source {
     use Cont::*;
     match cont {
-        Frame(_) => {
+        Frame(_, _) => {
             unreachable!("no source for Frame continuation. This signals a VM bug.  Please report.")
         }
         Decs(decs) => crate::ast::source_from_decs(decs),

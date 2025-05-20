@@ -3,7 +3,6 @@ use crate::ast::{
     Cases, Dec, Dec_, Delim, Exp, ExpField_, Exp_, IdPos_, Id_, Inst, Literal, Mut, Pat, Pat_,
     ProjIndex, QuotedAst, Source, Type,
 };
-use crate::format::ToDoc;
 use crate::shared::{FastClone, Share};
 use crate::value::{
     ActorId, ActorMethod, Closed, ClosedFunction, CollectionFunction, FastRandIter,
@@ -16,9 +15,8 @@ use crate::vm_types::{
     ModulePath, Pointer, Response, Step,
 };
 use im_rc::{HashMap, Vector};
-use serde::ser::Impossible;
 
-use crate::{nyi, type_mismatch, type_mismatch_, ToMotoko};
+use crate::{nyi, type_mismatch, type_mismatch_};
 
 fn unit_step<A: Active>(active: &mut A) -> Result<Step, Interruption> {
     *active.cont() = Cont::Value_(Value::Unit.share());
@@ -256,7 +254,7 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
     active_trace(active);
     let cont = active.cont().clone();
     match cont {
-        Cont::Frame(_) => unreachable!(
+        Cont::Frame(_, _) => unreachable!(
             "VM logic is broken. Old frame continuation (for debugging) should be replaced by now."
         ),
         Cont::Exp_(e, decs) => {
@@ -656,7 +654,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
     // Save frame continuation as "active continuation" temporarily,
     // in case there is an Interruption and user inspects the active components.
     // otherwise, the "current frame" is always missing from this diagostic.
-    *active.cont() = Cont::Frame(Box::new(frame.cont.clone()));
+    *active.cont() = Cont::Frame(v.clone(), Box::new(frame.cont.clone()));
     active.defs().active_ctx = frame.context;
     *active.cont_prim_type() = frame.cont_prim_type;
     *active.cont_source() = frame.source;
