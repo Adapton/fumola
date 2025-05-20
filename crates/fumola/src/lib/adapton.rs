@@ -4,13 +4,6 @@ use im_rc::{HashMap, Vector};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
-/// Node names.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub enum Name {
-    Exp_(Closed<Exp_>),
-    Symbol(Symbol_),
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Node {
     NonThunk(Value_),
@@ -94,8 +87,13 @@ pub struct EdgeId(pub BigUint);
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Time(pub Symbol_);
 
+/// Node names.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct Space(pub Name);
+pub enum Space {
+    Exp_(Closed<Exp_>),
+    Symbol(Symbol_),
+    Here,
+}
 
 pub type Edges = HashMap<EdgeId, Edge>;
 
@@ -179,7 +177,7 @@ impl AdaptonState for SimpleState {
     }
     fn put_symbol(&mut self, symbol: Symbol_, value: Value_) -> Res<NamedPointer> {
         // to do
-        Ok(Space(Name::Symbol(symbol)))
+        Ok(Space::Symbol(symbol))
     }
     fn force_end(&mut self, _value: Value_) -> Res<()> {
         todo!()

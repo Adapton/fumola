@@ -1,8 +1,9 @@
-use crate::adapton::{self, AdaptonState};
+use crate::adapton::AdaptonState;
 use crate::ast::{
     Cases, Dec, Dec_, Delim, Exp, ExpField_, Exp_, IdPos_, Id_, Inst, Literal, Mut, Pat, Pat_,
     ProjIndex, QuotedAst, Source, Type,
 };
+use crate::format::ToDoc;
 use crate::shared::{FastClone, Share};
 use crate::value::{
     ActorId, ActorMethod, Closed, ClosedFunction, CollectionFunction, FastRandIter,
@@ -684,16 +685,16 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             }
             Value::NamedPointer(name) => {
                 active.adapton().put_pointer(name.clone(), v)?;
-                return_step(active, Value::NamedPointer(name.clone()).to_shared()?)
+                return_step(active, Value::NamedPointer(name.clone()).share())
             }
             Value::Symbol(symbol) => {
                 let p = active.adapton().put_symbol(symbol.clone(), v)?;
-                return_step(active, Value::NamedPointer(p).to_shared()?)
+                return_step(active, Value::NamedPointer(p).share())
             }
             v1 => {
                 if let Ok(symbol) = v1.into_sym_or(()) {
                     let p = active.adapton().put_symbol(symbol.clone(), v)?;
-                    return_step(active, Value::NamedPointer(p).to_shared()?)
+                    return_step(active, Value::NamedPointer(p).share())
                 } else {
                     return Err(crate::Interruption::TypeMismatch(
                         crate::vm_types::OptionCoreSource(Some(crate::vm_types::CoreSource {

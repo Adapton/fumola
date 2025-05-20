@@ -1,6 +1,6 @@
 // Reference: https://github.com/dfinity/candid/blob/master/rust/candid/src/bindings/candid.rs
 
-use crate::adapton::{Name, Space};
+use crate::adapton::Space;
 use crate::ast::{
     BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_, Delim, Exp, ExpField, Exp_,
     Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat, PrimType, QuotedAst, RelOp,
@@ -197,18 +197,17 @@ impl ToDoc for Closed<Exp_> {
     }
 }
 
-impl ToDoc for Name {
-    fn doc(&self) -> RcDoc {
-        match self {
-            Name::Exp_(c) => c.doc(),
-            Name::Symbol(s) => s.doc(),
-        }
-    }
-}
-
 impl ToDoc for Space {
     fn doc(&self) -> RcDoc {
-        self.0.doc()
+        kwd("here").append(enclose(
+            "(",
+            match self {
+                Space::Here => RcDoc::nil(),
+                Space::Exp_(c) => c.doc(),
+                Space::Symbol(s) => s.doc(),
+            },
+            ")",
+        ))
     }
 }
 

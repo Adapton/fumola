@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::num::Wrapping;
 use std::rc::Rc;
 
-use crate::adapton;
+use crate::adapton::NamedPointer;
 use crate::ast::{
     BinOp, Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, QuotedAst, ToId,
 };
@@ -155,7 +155,7 @@ pub enum Value {
     Module(ModuleDef),
     QuotedAst(QuotedAst),
     Symbol(Symbol_),
-    NamedPointer(adapton::NamedPointer),
+    NamedPointer(NamedPointer),
     Thunk(Closed<Exp_>),
 }
 
@@ -728,7 +728,7 @@ impl Value {
 pub trait ToMotoko {
     fn to_motoko(self) -> Result;
 
-    fn to_shared(self) -> Result<Value_>
+    fn to_motoko_shared(self) -> Result<Value_>
     where
         Self: Sized,
     {

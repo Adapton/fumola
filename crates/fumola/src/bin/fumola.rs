@@ -166,7 +166,7 @@ fn main() -> OurResult<()> {
                         match v {
                             Ok(v) => {
                                 if true {
-                                    println!("{}", fumola::format::format_(v.as_ref().doc(), 80));
+                                    println!("{}", fumola::format::format_(v.doc(), 80));
                                 }
                                 if echo_as_reflected {
                                     println!(
