@@ -16,6 +16,7 @@ use crate::vm_types::{
     ModulePath, Pointer, Response, Step,
 };
 use im_rc::{HashMap, Vector};
+use serde::ser::Impossible;
 
 use crate::{nyi, type_mismatch, type_mismatch_, ToMotoko};
 
@@ -255,7 +256,7 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
     active_trace(active);
     let cont = active.cont().clone();
     match cont {
-        Cont::Taken => unreachable!("The VM's logic currently has an internal issue."),
+        Cont::Frame(_) => unreachable!("VM logic is broken. Old frame continuation (for debugging) should be replaced by now."),
         Cont::Exp_(e, decs) => {
             if decs.is_empty() {
                 exp_step(active, e)
@@ -650,6 +651,10 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             *active.env() = frame.env;
         }
     }
+    // Save frame continuation as "active continuation" temporarily,
+    // in case there is an Interruption and user inspects the active components.
+    // otherwise, the "current frame" is always missing from this diagostic.
+    *active.cont() = Cont::Frame(Box::new(frame.cont.clone()));
     active.defs().active_ctx = frame.context;
     *active.cont_prim_type() = frame.cont_prim_type;
     *active.cont_source() = frame.source;

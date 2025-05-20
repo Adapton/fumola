@@ -194,19 +194,19 @@ impl<'a> crate::shared::FastClone<Pointer> for &'a Pointer {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "cont_type", content = "value")]
 pub enum Cont {
-    Taken,
     Decs(Vector<Dec_>),
     Exp_(Exp_, Vector<Dec_>),
     // Value(Value_),
     Value_(Value_),
     LetVarRet(Source, Option<Id_>),
+    Frame(Box<stack::FrameCont>),
 }
 
 pub fn source_from_cont(cont: &Cont) -> Source {
     use Cont::*;
     match cont {
-        Taken => {
-            unreachable!("no source for Taken continuation. This signals a VM bug.  Please report.")
+        Frame(_) => {
+            unreachable!("no source for Frame continuation. This signals a VM bug.  Please report.")
         }
         Decs(decs) => crate::ast::source_from_decs(decs),
         Exp_(exp_, decs) => {
