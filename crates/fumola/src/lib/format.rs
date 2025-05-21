@@ -183,6 +183,7 @@ impl<T: ToDoc + Clone> ToDoc for Option<T> {
 impl ToDoc for Symbol {
     fn doc(&self) -> RcDoc {
         match self {
+            Symbol::Call(s1, s2) => s1.doc().append(enclose("(", s2.doc(), ")")),
             Symbol::Nat(n) => RcDoc::text(n.to_string()),
             Symbol::Int(i) => RcDoc::text(i.to_string()),
             Symbol::QuotedAst(q) => q.doc(),

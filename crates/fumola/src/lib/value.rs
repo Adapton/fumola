@@ -101,6 +101,7 @@ pub enum Symbol {
     Int(#[serde(with = "crate::serde_utils::bigint")] BigInt),
     QuotedAst(QuotedAst),
     BinOp(Symbol_, BinOp, Symbol_),
+    Call(Symbol_, Symbol_),
 }
 
 pub type Value_ = Shared<Value>;
