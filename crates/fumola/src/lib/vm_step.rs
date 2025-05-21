@@ -226,7 +226,7 @@ fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> 
         Hole => nyi!(line!(), "Hole"),
 
         Force(_e) => nyi!(line!(), "step case: Force"),
-        GetNamedPointer(_e) => nyi!(line!(), "step case: GetNamedPointer"),
+        GetAdaptonPointer(_e) => nyi!(line!(), "step case: GetAdaptonPointer"),
 
         Loop(_e1, _e2) => nyi!(line!(), "step case: Loop"),
 
@@ -688,18 +688,18 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                 active.store().mutate_index(p.clone(), i.fast_clone(), v)?;
                 unit_step(active)
             }
-            Value::NamedPointer(name) => {
+            Value::AdaptonPointer(name) => {
                 active.adapton().put_pointer(name.clone(), v)?;
-                return_step(active, Value::NamedPointer(name.clone()).share())
+                return_step(active, Value::AdaptonPointer(name.clone()).share())
             }
             Value::Symbol(symbol) => {
                 let p = active.adapton().put_symbol(symbol.clone(), v)?;
-                return_step(active, Value::NamedPointer(p).share())
+                return_step(active, Value::AdaptonPointer(p).share())
             }
             v1 => {
                 if let Ok(symbol) = v1.into_sym_or(()) {
                     let p = active.adapton().put_symbol(symbol.clone(), v)?;
-                    return_step(active, Value::NamedPointer(p).share())
+                    return_step(active, Value::AdaptonPointer(p).share())
                 } else {
                     return Err(crate::Interruption::TypeMismatch(
                         crate::vm_types::OptionCoreSource(Some(crate::vm_types::CoreSource {

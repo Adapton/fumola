@@ -1,5 +1,5 @@
 use crate::ast::Exp_;
-use crate::value::{Closed, Symbol_, Value_};
+use crate::value::{Closed, Symbol_, ThunkBody, Value, Value_};
 use im_rc::{HashMap, Vector};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
@@ -18,14 +18,14 @@ pub enum Cell {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ThunkCell {
-    pub body: Exp_,
+    pub body: ThunkBody,
     pub space: Space,
     pub result: Option<Value_>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ThunkNode {
-    pub body: Exp_,
+    pub body: ThunkBody,
     pub space: Space,
     pub trace: Vector<EdgeId>,
     pub result: Option<Value_>,
@@ -49,6 +49,8 @@ pub struct GraphicalState {
 pub struct SimpleState {
     pub cells: Cells,
     pub stack: Vector<SimpleFrame>,
+    pub time: Time,
+    pub space: Space,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -76,7 +78,7 @@ pub struct SimpleFrame {
 pub struct MetaTime(BigUint);
 
 // the value of a (named) pointer does not include its times.
-pub type NamedPointer = Space;
+pub type Pointer = Space;
 
 // the full identity of a node includes a Time and MetaTime.
 pub type NodeId = (Space, Time, MetaTime);
@@ -85,13 +87,16 @@ pub type NodeId = (Space, Time, MetaTime);
 pub struct EdgeId(pub BigUint);
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct Time(pub Symbol_);
+pub enum Time {
+    Symbol(Symbol_),
+    Now,
+}
 
 /// Node names.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Space {
-    Exp_(Closed<Exp_>),
     Symbol(Symbol_),
+    Exp_(Closed<Exp_>),
     Here,
 }
 
@@ -126,10 +131,10 @@ pub trait AdaptonState {
     fn new() -> Self
     where
         Self: Sized;
-    fn put_pointer(&mut self, _pointer: NamedPointer, _value: Value_) -> Res<()>;
-    fn put_symbol(&mut self, _symbol: Symbol_, _value: Value_) -> Res<NamedPointer>;
-    fn get_pointer(&mut self, _pointer: NamedPointer) -> Res<Value_>;
-    fn force_begin(&mut self, _pointer: NamedPointer) -> Res<()>;
+    fn put_pointer(&mut self, _pointer: Pointer, _value: Value_) -> Res<()>;
+    fn put_symbol(&mut self, _symbol: Symbol_, _value: Value_) -> Res<Pointer>;
+    fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_>;
+    fn force_begin(&mut self, _pointer: Pointer) -> Res<()>;
     fn force_end(&mut self, _value: Value_) -> Res<()>;
 }
 
@@ -141,25 +146,25 @@ impl AdaptonState for State {
         State::Simple(SimpleState::new())
     }
 
-    fn put_pointer(&mut self, pointer: NamedPointer, value: Value_) -> Res<()> {
+    fn put_pointer(&mut self, pointer: Pointer, value: Value_) -> Res<()> {
         match self {
             Self::Simple(s) => s.put_pointer(pointer, value),
             Self::Graphical(g) => g.put_pointer(pointer, value),
         }
     }
 
-    fn put_symbol(&mut self, symbol: Symbol_, value: Value_) -> Res<NamedPointer> {
+    fn put_symbol(&mut self, symbol: Symbol_, value: Value_) -> Res<Pointer> {
         match self {
             Self::Simple(s) => s.put_symbol(symbol, value),
             Self::Graphical(g) => g.put_symbol(symbol, value),
         }
     }
 
-    fn get_pointer(&mut self, _pointer: NamedPointer) -> Res<Value_> {
+    fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_> {
         todo!()
     }
 
-    fn force_begin(&mut self, _pointer: NamedPointer) -> Res<()> {
+    fn force_begin(&mut self, _pointer: Pointer) -> Res<()> {
         todo!()
     }
 
@@ -168,27 +173,58 @@ impl AdaptonState for State {
     }
 }
 
+impl SimpleState {
+    fn get_cell_by_time_mut<'a>(&'a mut self, p: &Pointer) -> &'a mut CellByTime {
+        let exists = self.cells.get(p) != None;
+        if !exists {
+            self.cells.insert(p.clone(), HashMap::new());
+        }
+        self.cells.get_mut(p).unwrap() // always succeeds, because of check above.
+    }
+    fn get_cell_mut<'a>(&'a mut self, p: &Pointer, t: &Time) -> Option<&'a mut Cell> {
+        self.get_cell_by_time_mut(p).get_mut(t)
+    }
+    fn new_cell(space: Space, value: Value_) -> Cell {
+        match &*value {
+            Value::Thunk(e) => Cell::Thunk(ThunkCell {
+                body: e.clone(),
+                space: space,
+                result: None,
+            }),
+            _ => Cell::NonThunk(value),
+        }
+    }
+}
+
 impl AdaptonState for SimpleState {
     fn new() -> Self {
         SimpleState {
+            time: Time::Now,
+            space: Space::Here,
             cells: HashMap::new(),
             stack: Vector::new(),
         }
     }
-    fn put_symbol(&mut self, symbol: Symbol_, _value: Value_) -> Res<NamedPointer> {
-        // to do
-        Ok(Space::Symbol(symbol))
+    fn put_symbol(&mut self, symbol: Symbol_, value: Value_) -> Res<Pointer> {
+        // to do -- include current space within pointer as well
+        let p: Pointer = Space::Symbol(symbol);
+        self.put_pointer(p.clone(), value)?;
+        Ok(p)
+    }
+    fn put_pointer(&mut self, pointer: Pointer, value: Value_) -> Res<()> {
+        let time = self.time.clone();
+        let space = self.space.clone();
+        let cells = self.get_cell_by_time_mut(&pointer);
+        cells.insert(time, Self::new_cell(space, value));
+        Ok(())
     }
     fn force_end(&mut self, _value: Value_) -> Res<()> {
         todo!()
     }
-    fn force_begin(&mut self, _pointer: NamedPointer) -> Res<()> {
+    fn force_begin(&mut self, _pointer: Pointer) -> Res<()> {
         todo!()
     }
-    fn get_pointer(&mut self, _pointer: NamedPointer) -> Res<Value_> {
-        todo!()
-    }
-    fn put_pointer(&mut self, _pointer: NamedPointer, _value: Value_) -> Res<()> {
+    fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_> {
         todo!()
     }
 }
@@ -206,16 +242,16 @@ impl AdaptonState for GraphicalState {
     // todo -- use result monad.
     // todo -- introduce Result -- interruptions vs normal return types.
 
-    fn put_pointer(&mut self, _pointer: NamedPointer, _value: Value_) -> Res<()> {
+    fn put_pointer(&mut self, _pointer: Pointer, _value: Value_) -> Res<()> {
         todo!()
     }
-    fn put_symbol(&mut self, _symbol: Symbol_, _value: Value_) -> Res<NamedPointer> {
+    fn put_symbol(&mut self, _symbol: Symbol_, _value: Value_) -> Res<Pointer> {
         todo!()
     }
-    fn get_pointer(&mut self, _pointer: NamedPointer) -> Res<Value_> {
+    fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_> {
         todo!()
     }
-    fn force_begin(&mut self, _pointer: NamedPointer) -> Res<()> {
+    fn force_begin(&mut self, _pointer: Pointer) -> Res<()> {
         todo!()
     }
     fn force_end(&mut self, _value: Value_) -> Res<()> {

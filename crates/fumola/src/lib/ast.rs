@@ -682,7 +682,7 @@ pub enum Exp {
     Unquote(Exp_),
     Force(Exp_),
     Thunk(Exp_),
-    GetNamedPointer(Exp_),
+    GetAdaptonPointer(Exp_),
 }
 
 impl Exp {

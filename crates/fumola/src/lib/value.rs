@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::num::Wrapping;
 use std::rc::Rc;
 
-use crate::adapton::NamedPointer;
+use crate::adapton::Pointer as AdaptonPointer;
 use crate::ast::{
     BinOp, Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, QuotedAst, ToId,
 };
@@ -155,9 +155,11 @@ pub enum Value {
     Module(ModuleDef),
     QuotedAst(QuotedAst),
     Symbol(Symbol_),
-    NamedPointer(NamedPointer),
-    Thunk(Closed<Exp_>),
+    AdaptonPointer(AdaptonPointer),
+    Thunk(ThunkBody),
 }
+
+pub type ThunkBody = Closed<Exp_>;
 
 /// Actor value.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -587,7 +589,7 @@ impl Value {
             }
             Value::QuotedAst(_) => Err(ValueError::ToRust("QuotedAst".to_string()))?,
             Value::Symbol(_) => Err(ValueError::ToRust("Symbol".to_string()))?,
-            Value::NamedPointer(_) => Err(ValueError::ToRust("NamedPointer".to_string()))?,
+            Value::AdaptonPointer(_) => Err(ValueError::ToRust("NamedPointer".to_string()))?,
             Value::Thunk(_) => Err(ValueError::ToRust("Thunk".to_string()))?,
 
             Value::Pointer(_) => Err(ValueError::ToRust("Pointer".to_string()))?,

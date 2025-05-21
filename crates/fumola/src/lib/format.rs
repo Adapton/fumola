@@ -6,11 +6,11 @@ use crate::ast::{
     Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat, PrimType, QuotedAst, RelOp,
     Stab, Type, TypeBind, TypeField, TypeTag, TypeTag_, UnOp, Unquote, Vis,
 };
-use crate::{format_utils::*};
+use crate::format_utils::*;
 use crate::lexer::is_keyword;
 use crate::lexer_types::{GroupType, Token, TokenTree};
 use crate::shared::Shared;
-use crate::value::{Closed, FieldValue, Symbol, Value, Value_, Pointer};
+use crate::value::{Closed, FieldValue, Pointer, Symbol, Value, Value_};
 use crate::vm_types::{def::CtxId, Env, LocalPointer, ScheduleChoice};
 use pretty::RcDoc;
 
@@ -238,7 +238,7 @@ impl ToDoc for ScheduleChoice {
     fn doc(&self) -> RcDoc {
         match self {
             ScheduleChoice::Agent => RcDoc::text("#agent"),
-            ScheduleChoice::Actor(actor_id) => RcDoc::text(format!("#actor({:?})", actor_id))
+            ScheduleChoice::Actor(actor_id) => RcDoc::text(format!("#actor({:?})", actor_id)),
         }
     }
 }
@@ -246,19 +246,24 @@ impl ToDoc for ScheduleChoice {
 impl ToDoc for LocalPointer {
     fn doc(&self) -> RcDoc {
         match self {
-            LocalPointer::Numeric(numeric_pointer) => RcDoc::text(format!("{:?}", numeric_pointer.0)),
-            LocalPointer::Named(named_pointer) => RcDoc::text(format!("{:?}", named_pointer.0))
+            LocalPointer::Numeric(numeric_pointer) => {
+                RcDoc::text(format!("{:?}", numeric_pointer.0))
+            }
+            LocalPointer::Named(named_pointer) => RcDoc::text(format!("{:?}", named_pointer.0)),
         }
     }
 }
 
 impl ToDoc for Pointer {
     fn doc(&self) -> RcDoc {
-        kwd("pointer").append(
-            enclose("(",
-            self.local.doc().append(RcDoc::text(",")).append(
-        self.owner.doc()),
-        ")"))
+        kwd("pointer").append(enclose(
+            "(",
+            self.local
+                .doc()
+                .append(RcDoc::text(","))
+                .append(self.owner.doc()),
+            ")",
+        ))
     }
 }
 
@@ -292,7 +297,7 @@ impl ToDoc for Value {
                     str("#").append(n.doc()).append(optional_paren(v))
                 }
             }
-            Value::NamedPointer(p) => p.doc(),
+            Value::AdaptonPointer(p) => p.doc(),
             Value::Thunk(c) => kwd("thunk")
                 .append(c.ctx.doc())
                 .append(c.env.doc())
@@ -558,7 +563,7 @@ impl ToDoc for Exp {
             Unquote(e) => kwd("~").append(e.doc()),
             Thunk(e) => kwd("thunk").append(e.doc()),
             Force(e) => kwd("force").append(e.doc()),
-            GetNamedPointer(e) => kwd("@").append(e.doc()),
+            GetAdaptonPointer(e) => kwd("@").append(e.doc()),
         }
         // _ => text("Display-TODO={:?}", self),
     }
