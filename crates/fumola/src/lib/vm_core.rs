@@ -839,6 +839,23 @@ impl Core {
         self.run(&Limits::none())
     }
 
+    /// Evaluate a new program fragment, NOT assuming agent is idle.
+    /// generally, self.agent.active.stack is non-empty, and we are trying to return something to it that got stuck earlier.
+    #[cfg(feature = "parser")]
+    pub fn resume(&mut self, new_prog_frag: &str) -> Result<Value_, Interruption> {
+        let local_path = "<anonymous>".to_string();
+        let package_name = None;
+        let p = crate::check::parse(new_prog_frag).map_err(|code| {
+            Interruption::SyntaxError(SyntaxError {
+                code,
+                local_path,
+                package_name,
+            })
+        })?;
+        self.agent.active.cont = Cont::Decs(p.vec);
+        self.run(&Limits::none())
+    }
+
     pub fn eval_str(&mut self, input: &str) -> Result<Value_, Interruption> {
         let prog = crate::check::parse(input)?;
         self.eval_prog(prog)

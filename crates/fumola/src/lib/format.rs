@@ -11,6 +11,7 @@ use crate::lexer::is_keyword;
 use crate::lexer_types::{GroupType, Token, TokenTree};
 use crate::shared::Shared;
 use crate::value::{Closed, FieldValue, Pointer, Symbol, Value, Value_};
+use crate::vm_types::def::Module;
 use crate::vm_types::{def::CtxId, Env, LocalPointer, ScheduleChoice};
 use pretty::RcDoc;
 
@@ -268,6 +269,19 @@ impl ToDoc for Pointer {
     }
 }
 
+impl ToDoc for Module {
+    fn doc(&self) -> RcDoc {
+        kwd("module").append(enclose(
+            "(",
+            self.context
+                .doc()
+                .append(RcDoc::text(","))
+                .append(self.fields.doc()),
+            ")",
+        ))
+    }
+}
+
 impl ToDoc for Value {
     fn doc(&self) -> RcDoc {
         match self {
@@ -298,6 +312,7 @@ impl ToDoc for Value {
                     str("#").append(n.doc()).append(optional_paren(v))
                 }
             }
+            Value::Module(m) => m.doc(),
             Value::AdaptonPointer(p) => p.doc(),
             Value::Thunk(c) => kwd("thunk")
                 .append(c.ctx.doc())
@@ -316,7 +331,6 @@ impl ToDoc for Value {
             Value::Dynamic(_) => todo!(),
             Value::Actor(_) => todo!(),
             Value::ActorMethod(_) => todo!(),
-            Value::Module(_) => todo!(),
             Value::QuotedAst(q) => q.doc(),
         }
     }

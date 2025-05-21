@@ -1,15 +1,19 @@
-use fumola::ToMotoko;
+use candid::Int;
+use fumola::{Interruption, ToMotoko, Value_};
 use structopt::StructOpt;
 
-use log::info;
+use log::{error, info, trace};
 use std::io;
 use structopt::{clap, clap::Shell};
 
 use fumola::format::{format_one_line, format_pretty, ToDoc};
-use fumola::vm_types::Limits;
+use fumola::vm_types::{Active, Core, Limits};
 
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
+
+use std::fs;
+use std::path::Path;
 
 pub type OurResult<X> = Result<X, OurError>;
 
@@ -137,67 +141,109 @@ fn main() -> OurResult<()> {
             let v = fumola::vm::eval_limit(&input, &limits);
             println!("final value: {:?}", v)
         }
-        CliCommand::Repl {} => {
-            let mut rl = Editor::<()>::new();
-            if rl.load_history("history.txt").is_err() {
-                println!("No previous history.");
-            }
-            use fumola::vm_types::Core;
-            let mut core = Core::empty();
-            loop {
-                let readline = rl.readline("fumola> ");
-                match readline {
-                    Ok(line) => {
-                        core.clear_cont();
-                        let v = core.eval_str(&line);
-                        for line in core.debug_print_out.iter() {
-                            println!("{}", line.text.to_string())
-                        }
-                        core.debug_print_out = im_rc::vector::Vector::new();
-                        match v {
-                            Ok(v) => {
-                                println!("{}", fumola::format::format_(v.doc(), 80))
-                            }
-                            Err(e) => {
-                                println!("Error: {:?}", e);
-                                println!("  Hint: Inspect lastError for details.");
-                                println!("  For example, lastError.core.agent.active.cont, if lastError.core.scedule_choice == #Agent");
-                                /* dump core, without chaining with any prior core dump. */
-                                if let Some(_) = core.get_var("lastInterruption") {
-                                    core.define("lastInterruptionCore", fumola::Value::Unit);
-                                    core.define("lastInterruption", fumola::Value::Unit);
-                                    core.define("lastError", fumola::Value::Unit);
-                                };
-                                core.define(
-                                    "lastInterruptionCore",
-                                    core.clone().to_motoko().unwrap(),
-                                );
-                                core.clear_cont();
-                                core.define("lastInterruption", e.to_motoko().unwrap());
-                                core.eval_str(
-                                    "let lastError = {interruption=lastInterruption; core=lastInterruptionCore}",
-                                )
-                                .expect("define errorInfo");
-                            }
-                        }
-                        rl.add_history_entry(line.as_str());
-                    }
-                    Err(ReadlineError::Interrupted) => {
-                        println!("CTRL-C");
-                        break;
-                    }
-                    Err(ReadlineError::Eof) => {
-                        println!("CTRL-D");
-                        break;
-                    }
-                    Err(err) => {
-                        println!("Error: {:?}", err);
-                        break;
-                    }
-                }
-            }
-            rl.save_history("history.txt").unwrap();
-        }
+        CliCommand::Repl {} => repl(),
     };
     Ok(())
+}
+
+fn repl() {
+    let mut rl = Editor::<()>::new();
+    if rl.load_history("history.txt").is_err() {
+        println!("No previous history.");
+    }
+    use fumola::vm_types::Core;
+    let mut core = Core::empty();
+    loop {
+        let readline = rl.readline("fumola> ");
+        match readline {
+            Ok(line) => {
+                core.clear_cont();
+                let v = core.eval_str(&line);
+                for line in core.debug_print_out.iter() {
+                    println!("{}", line.text.to_string())
+                }
+                core.debug_print_out = im_rc::vector::Vector::new();
+                rl.add_history_entry(line.as_str());
+                inspect_result(&mut core, v, 0)
+            }
+            Err(ReadlineError::Interrupted) => {
+                println!("CTRL-C");
+                break;
+            }
+            Err(ReadlineError::Eof) => {
+                println!("CTRL-D");
+                break;
+            }
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break;
+            }
+        }
+    }
+    rl.save_history("history.txt").unwrap();
+}
+
+fn inspect_result(core: &mut Core, result: Result<Value_, Interruption>, depth: usize) {
+    match result {
+        Ok(v) => {
+            println!("{}", fumola::format::format_(v.doc(), 80))
+        }
+        Err(Interruption::ModuleFileNotFound(path)) => {
+            if depth > 0 {
+                return report_error(core, Interruption::ModuleFileNotFound(path));
+            }
+            if let None = path.package_name {
+                if let Some(content) = read_file_if_exists(&path.local_path) {
+                    match core.set_module(
+                        path.package_name.clone(),
+                        path.local_path.clone(),
+                        &content,
+                    ) {
+                        Err(e) => {
+                            error!("Error: {:?}", e);
+                            return;
+                        }
+                        Ok(()) => (),
+                    }
+                    let result = core.resume(format!("import {:?}", path.local_path).as_str());
+                    inspect_result(core, result, depth + 1);
+                } else {
+                    report_error(core, Interruption::ModuleFileNotFound(path))
+                }
+            } else {
+                report_error(core, Interruption::ModuleFileNotFound(path))
+            }
+        }
+        Err(e) => report_error(core, e),
+    }
+}
+
+fn report_error(core: &mut Core, error: Interruption) {
+    error!("Error: {:?}", error);
+    info!("  Hint: Inspect lastError for details.");
+    info!("  For example, lastError.core.agent.active.cont, if lastError.core.scedule_choice == #Agent");
+    /* dump core, without chaining with any prior core dump. */
+    if let Some(_) = core.get_var("lastInterruption") {
+        core.define("lastInterruptionCore", fumola::Value::Unit);
+        core.define("lastInterruption", fumola::Value::Unit);
+        core.define("lastError", fumola::Value::Unit);
+    };
+    core.define("lastInterruptionCore", core.clone().to_motoko().unwrap());
+    core.clear_cont();
+    core.define("lastInterruption", error.to_motoko().unwrap());
+    core.eval_str("let lastError = {interruption=lastInterruption; core=lastInterruptionCore}")
+        .expect("define errorInfo");
+}
+
+fn read_file_if_exists(path: &str) -> Option<String> {
+    trace!("Checking for module file at path: {}", path);
+    let path = Path::new(path);
+    if path.exists() && path.is_file() {
+        trace!("...Module file found.");
+        let contents = fs::read_to_string(path).ok()?;
+        Some(contents)
+    } else {
+        trace!("...Module file not found.");
+        None
+    }
 }

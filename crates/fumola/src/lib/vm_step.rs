@@ -1,4 +1,9 @@
-use crate::ast::{Dec, Dec_, Delim, Exp, ExpField_, Exp_, IdPos_, Id_, Literal, Pat, Source, Type};
+use std::path;
+
+use crate::adapton::Res;
+use crate::ast::{
+    Dec, Dec_, Delim, Exp, ExpField_, Exp_, IdPos_, Id_, Literal, Node, Pat, Pat_, Source, Type,
+};
 use crate::shared::{FastClone, Share};
 use crate::value::{ActorId, Closed, ClosedFunction, Value, Value_};
 use crate::vm_types::{
@@ -6,6 +11,7 @@ use crate::vm_types::{
     stack::{FieldContext, Frame, FrameCont},
     Active, ActiveBorrow, Breakpoint, Cont, Interruption, Limit, Limits, ModulePath, Step,
 };
+use crate::Shared;
 use im_rc::{HashMap, Vector};
 
 pub use crate::{nyi, type_mismatch, type_mismatch_};
@@ -223,6 +229,12 @@ pub fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interrupti
         Force(_e) => nyi!(line!(), "step case: Force"),
         GetAdaptonPointer(_e) => nyi!(line!(), "step case: GetAdaptonPointer"),
 
+        Import(path) => {
+            let m = crate::vm_def::def::import(active, &path)?;
+            *active.cont() = cont_value(Value::Module(m));
+            Ok(Step {})
+        }
+
         Loop(_e1, _e2) => nyi!(line!(), "step case: Loop"),
 
         Label(_label, _type, _e) => nyi!(line!(), "step case: Label"),
@@ -238,7 +250,6 @@ pub fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interrupti
         AsyncStar(_e) => nyi!(line!(), "step case: AsyncStar"),
         Await(_e) => nyi!(line!(), "step case: Await"),
         AwaitStar(_e) => nyi!(line!(), "step case: AwaitStar"),
-        Import(_) => nyi!(line!(), "step case: Import"),
         Throw(_e) => nyi!(line!(), "step case: Throw"),
         Try(_e, _case) => nyi!(line!(), "step case: Try"),
     }
@@ -432,12 +443,7 @@ pub fn decs_step<A: Active>(active: &mut A, mut decs: Vector<Dec_>) -> Result<St
                 Ok(Step {})
             }
             Dec::LetImport(pattern, _, path) => {
-                let m = crate::vm_def::def::import(active, path)?;
-                let fields = crate::vm_def::module_project(active.defs(), &m, &pattern.0)?;
-                for (x, def) in fields {
-                    let val = crate::vm_def::def_as_value(active.defs(), &x.0, &def)?;
-                    active.env().insert(x.0.clone(), val);
-                }
+                let_import(active, pattern, path)?;
                 *active.cont() = Cont::Decs(decs);
                 Ok(Step {})
             }
@@ -470,6 +476,20 @@ pub fn decs_step<A: Active>(active: &mut A, mut decs: Vector<Dec_>) -> Result<St
             d => nyi!(line!(), "{:?}", d),
         }
     }
+}
+
+pub fn let_import<A: Active>(
+    active: &mut A,
+    pattern: &Pat_,
+    path: &String,
+) -> Result<(), Interruption> {
+    let m = crate::vm_def::def::import(active, &path)?;
+    let fields = crate::vm_def::module_project(active.defs(), &m, &pattern.0)?;
+    for (x, def) in fields {
+        let val = crate::vm_def::def_as_value(active.defs(), &x.0, &def)?;
+        active.env().insert(x.0.clone(), val);
+    }
+    Ok(())
 }
 
 // TODO: possibly refactor to `Cont::Value(Value)` and `Cont::Value_(Value_)`
