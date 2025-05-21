@@ -7,9 +7,15 @@ use num_bigint::{BigUint, ToBigInt};
 use crate::{nyi, type_mismatch};
 
 pub fn unop(un: UnOp, v: Value_) -> Result<Value, Interruption> {
-    match (un, &*v) {
+    match (&un, &*v) {
         (UnOp::Neg, Value::Nat(n)) => Ok(Value::Int(-n.to_bigint().unwrap())),
-        (UnOp::Neg, _) => crate::nyi!(line!()),
+        (UnOp::Neg, v) => {
+            if let Ok(symbol) = v.into_sym_or(()) {
+                Ok(Value::Symbol(Shared::new(Symbol::UnOp(un, symbol))))
+            } else {
+                crate::nyi!(line!())
+            }
+        }
         (UnOp::Pos, _) => crate::nyi!(line!()),
         (UnOp::Not, _) => crate::nyi!(line!()),
         /* _ => crate::nyi!(line!()), */

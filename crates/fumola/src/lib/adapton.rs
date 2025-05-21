@@ -70,8 +70,9 @@ pub struct Frame {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SimpleFrame {
-    pub space: Space,
-    pub time: Time,
+    pub ambient_space: Space,
+    pub ambient_time: Time,
+    pub thunk_pointer: Pointer,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -218,14 +219,24 @@ impl AdaptonState for SimpleState {
         cells.insert(time, Self::new_cell(space, value));
         Ok(())
     }
-    fn force_end(&mut self, _value: Value_) -> Res<()> {
+    fn force_begin(&mut self, _pointer: Pointer) -> Res<()> {
+        // get the thunk body.
+        // save current time and space on stack.
+        // current space becomes thunk pointer's space.
+        // return thunk body.
         todo!()
     }
-    fn force_begin(&mut self, _pointer: Pointer) -> Res<()> {
+    fn force_end(&mut self, _value: Value_) -> Res<()> {
+        // pop ambient time and space from stack and restore them.
+        // set the value of the thunk cell, for diagnostics (not memoization-based caching).
         todo!()
     }
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_> {
         todo!()
+        // find the cellsbytime.
+        // does the exact time exist?
+        // if so, use it.
+        // if not, do a linear scan and find the nearest time, if any exist before the current time.
     }
 }
 

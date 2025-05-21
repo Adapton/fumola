@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use crate::adapton::Pointer as AdaptonPointer;
 use crate::ast::{
-    BinOp, Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, QuotedAst, ToId,
+    BinOp, Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, QuotedAst, ToId, UnOp,
 };
 use crate::dynamic::Dynamic;
 use crate::shared::{FastClone, Share, Shared};
@@ -100,6 +100,7 @@ pub enum Symbol {
     Nat(#[serde(with = "crate::serde_utils::biguint")] BigUint),
     Int(#[serde(with = "crate::serde_utils::bigint")] BigInt),
     QuotedAst(QuotedAst),
+    UnOp(UnOp, Symbol_),
     BinOp(Symbol_, BinOp, Symbol_),
     Call(Symbol_, Symbol_),
 }
