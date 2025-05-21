@@ -796,13 +796,13 @@ fn call_prim_function<A: Active>(
             Ok(Step {})
         }
         #[cfg(feature = "to-motoko")]
-        #[cfg(feature = "active-reflection")]
+        #[cfg(feature = "core-reflection")]
         ReifyActive => {
             use crate::value::ToMotoko;
             *active.cont() = cont_value(active.to_motoko().map_err(Interruption::ValueError)?);
             Ok(Step {})
         }
-        #[cfg(feature = "active-reflection")]
+        #[cfg(feature = "core-reflection")]
         ReflectActive => {
             *active = args.to_rust::<Active>().map_err(Interruption::ValueError)?;
             Ok(Step {})

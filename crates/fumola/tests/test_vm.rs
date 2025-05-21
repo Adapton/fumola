@@ -310,7 +310,7 @@ fn prim_reflect_value() {
 
 #[test]
 #[cfg(feature = "to-motoko")]
-#[cfg(feature = "agent-reflection")]
+#[cfg(feature = "value-reflection")]
 fn prim_reify_agent() {
     // assert_("let x = 0; prim \"hashMapGet\" ((prim \"reifyAgent\" ()).env, \"x\")", "?#Nat(0)");
     assert_(
@@ -320,7 +320,7 @@ fn prim_reify_agent() {
 }
 
 #[test]
-#[cfg(feature = "agent-reflection")]
+#[cfg(feature = "value-reflection")]
 fn prim_reflect_agent() {
     // assert_("var x = 0; let agent = prim \"reifyAgent\" (); x := 1; prim \"reflectAgent\" (agent); x", "0");
     assert_(

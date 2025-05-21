@@ -1,8 +1,5 @@
-use std::path;
-
-use crate::adapton::Res;
 use crate::ast::{
-    Dec, Dec_, Delim, Exp, ExpField_, Exp_, IdPos_, Id_, Literal, Node, Pat, Pat_, Source, Type,
+    Dec, Dec_, Delim, Exp, ExpField_, Exp_, IdPos_, Id_, Literal, Pat, Pat_, Source, Type,
 };
 use crate::shared::{FastClone, Share};
 use crate::value::{ActorId, Closed, ClosedFunction, Value, Value_};
@@ -11,7 +8,6 @@ use crate::vm_types::{
     stack::{FieldContext, Frame, FrameCont},
     Active, ActiveBorrow, Breakpoint, Cont, Interruption, Limit, Limits, ModulePath, Step,
 };
-use crate::Shared;
 use im_rc::{HashMap, Vector};
 
 pub use crate::{nyi, type_mismatch, type_mismatch_};
