@@ -1,3 +1,5 @@
+use std::arch::naked_asm;
+
 use crate::ast::{
     Dec, Dec_, Delim, Exp, ExpField_, Exp_, IdPos_, Id_, Literal, Pat, Pat_, Source, Type,
 };
@@ -224,7 +226,7 @@ pub fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interrupti
 
         Force(_e) => nyi!(line!(), "step case: Force"),
         GetAdaptonPointer(_e) => nyi!(line!(), "step case: GetAdaptonPointer"),
-
+        DoAdaptonNav(nav, e) => nyi!(line!(), "step case: DoAdaptonNav"),
         Import(path) => {
             let m = crate::vm_def::def::import(active, &path)?;
             *active.cont() = cont_value(Value::Module(m));

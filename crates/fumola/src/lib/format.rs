@@ -2,9 +2,10 @@
 
 use crate::adapton::Space;
 use crate::ast::{
-    BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_, Delim, Exp, ExpField, Exp_,
-    Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat, PrimType, QuotedAst, RelOp,
-    Stab, Type, TypeBind, TypeField, TypeTag, TypeTag_, UnOp, Unquote, Vis,
+    AdaptonNav, AdaptonNavDim, BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_,
+    Delim, Exp, ExpField, Exp_, Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat,
+    PrimType, QuotedAst, RelOp, Stab, Type, TypeBind, TypeField, TypeTag, TypeTag_, UnOp, Unquote,
+    Vis,
 };
 use crate::format_utils::*;
 use crate::lexer::is_keyword;
@@ -463,6 +464,24 @@ impl ToDoc for Unquote {
     }
 }
 
+impl ToDoc for AdaptonNav {
+    fn doc(&self) -> RcDoc {
+        match self {
+            AdaptonNav::Goto(d, e) => kwd("goto").append(d.doc()).append(e.doc()),
+            AdaptonNav::Within(d, e) => kwd("within").append(d.doc()).append(e.doc()),
+        }
+    }
+}
+
+impl ToDoc for AdaptonNavDim {
+    fn doc(&self) -> RcDoc {
+        match self {
+            AdaptonNavDim::Space => kwd("space"),
+            AdaptonNavDim::Time => kwd("time"),
+        }
+    }
+}
+
 impl ToDoc for Exp {
     fn doc(&self) -> RcDoc {
         use Exp::*;
@@ -503,6 +522,7 @@ impl ToDoc for Exp {
                 .append(enclose("(", a.doc(), ")")),
             Block(decs) => block(decs),
             Do(e) => kwd("do").append(e.doc()),
+            DoAdaptonNav(nav, e) => kwd("do").append(vector(nav, " ")).append(e.doc()),
             Not(e) => kwd("not").append(e.doc()),
             And(e1, e2) => bin_op(e1, str("and"), e2),
             Or(e1, e2) => bin_op(e1, str("or"), e2),

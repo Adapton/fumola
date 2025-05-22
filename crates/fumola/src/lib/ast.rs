@@ -619,6 +619,20 @@ impl QuotedAst {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum AdaptonNavDim {
+    Space,
+    Time,
+}
+pub type AdaptonNavDim_ = Node<AdaptonNavDim>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum AdaptonNav {
+    Goto(AdaptonNavDim_, Exp_),
+    Within(AdaptonNavDim_, Exp_),
+}
+pub type AdaptonNav_ = Node<AdaptonNav>;
+
 pub type ExpObjectBody = (Option<Delim<Exp_>>, Option<ExpFields>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -639,6 +653,7 @@ pub enum Exp {
     Proj(Exp_, ProjIndex),
     Opt(Exp_),
     DoOpt(Exp_),
+    DoAdaptonNav(Vector<AdaptonNav_>, Exp_),
     Bang(Exp_),
     ObjectBlock(ObjSort, DecFieldsPos),
     Object(ExpObjectBody),

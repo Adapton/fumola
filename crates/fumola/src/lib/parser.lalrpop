@@ -2,7 +2,7 @@
 //use std::collections::HashMap;
 // use crate::ast_utils::Syntax;
 use crate::parser_utils::{dec_node_into_exp, get_one};
-use crate::ast::{Attr_, Attr, Attrs, BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, NodeData, Source, SourceKnown, Id, Id_, IdPos, IdPos_, Unquote, Unquote_, ToId, Pat, Pat_, PatField, PatField_, Exp, ExpObjectBody, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, CasesPos, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFieldsPos, ProjIndex, QuotedAst};
+use crate::ast::{Attr_, Attr, Attrs, BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, AdaptonNav, AdaptonNav_, AdaptonNavDim, AdaptonNavDim_, NodeData, Source, SourceKnown, Id, Id_, IdPos, IdPos_, Unquote, Unquote_, ToId, Pat, Pat_, PatField, PatField_, Exp, ExpObjectBody, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, CasesPos, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFieldsPos, ProjIndex, QuotedAst};
 use crate::value::PrimFunction;
 // use crate::lexer_types::Token;
 use line_col::LineColLookup;
@@ -369,6 +369,7 @@ ExpNonDec<B>: Exp = {
     "ignore" <e:ExpNest_> => Exp::Ignore(e),
     "do" <e:BlockPos_> => Exp::Do(e),
     "do" "?" <e:BlockPos_> => Exp::DoOpt(e),
+    "do" <an:AdaptonNav_> <e:BlockPos_> => Exp::DoAdaptonNav(vector!(an), e),
     "assert" <e:ExpNest_> => Exp::Assert(e),
     "label" <id:Id_> <t:(":" <Type_>)?> <e:ExpNest_> => Exp::Label(id, t, e),
     "debug" <e:ExpNest_> => Exp::Debug(e),
@@ -376,7 +377,23 @@ ExpNonDec<B>: Exp = {
     "try" <e1:ExpNest_> <c:Catch_> => Exp::Try(e1, c),
     "thunk" <e:Block_> => Exp::Thunk(e),
     "force" <e:ExpNullary_<Ob>> => Exp::Force(e),
-    "@" <e:ExpNullary_<Ob>> => Exp::GetNamedPointer(e),
+    "@" <e:ExpNullary_<Ob>> => Exp::GetAdaptonPointer(e),
+}
+
+#[inline]
+AdaptonNavDim_: AdaptonNavDim_ = Node<AdaptonNavDim>;
+
+AdaptonNavDim: AdaptonNavDim = {
+    "time" => AdaptonNavDim::Time,
+    "space" => AdaptonNavDim::Space,
+}
+
+#[inline]
+AdaptonNav_: AdaptonNav_ = Node<AdaptonNav>;
+
+AdaptonNav: AdaptonNav = {
+    "goto" <d:AdaptonNavDim_> <e:ExpNullary_<Ob>> => AdaptonNav::Goto(d, e),
+    "with" "in" <d:AdaptonNavDim_> <e:ExpNullary_<Ob>> => AdaptonNav::Within(d, e),
 }
 
 #[inline]
