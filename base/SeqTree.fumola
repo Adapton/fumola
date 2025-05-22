@@ -1,0 +1,73 @@
+module {
+  public type SymbolSet = {};
+  public module SymbolSet {
+    public func isMember<X>(s : SymbolSet, x : X) : Bool { loop {} };
+  };
+
+  public type Binary<X> = {
+    symbol : Symbol;
+
+    left : Pointer<SeqTree<X>>;
+    leftSize : Nat;
+    leftSymbols : SymbolSet;
+
+    right : Pointer<SeqTree<X>>;
+    rightSize : Nat;
+    rightSymbols : SymbolSet;
+  };
+
+  public type Element<X> = {
+    element : X;
+    symbol : Symbol;
+  };
+
+  public type SeqTree<X> = {
+    #empty;
+    #element : Element<X>;
+    #binary : Binary<X>;
+  };
+
+  public func getElementBySymbol<X>(t : SeqTree<X>, symbol : Symbol) : ?X {
+    switch t {
+      case (#empty) null;
+      case (#element(e)) {
+        if (e.symbol == symbol) { ?e.element } else { null };
+      };
+      case (#binary(b)) {
+        if (SymbolSet.isMember(b.leftSymbols, symbol)) {
+          getElementBySymbol(@ b.left, symbol);
+        } else if (SymbolSet.isMember(b.rightSymbols, symbol)) {
+          getElementBySymbol(@ b.right, symbol);
+        } else { null };
+      };
+    };
+  };
+
+  public setElementBySymbol<X>(p : Pointer<SeqTree<X>>, symbol : Symbol, element : X) : ?X {
+    setElementBySymbol_(p, @ p, symbol, element);
+  };
+
+  func setElementBySymbol_<X>(p : Pointer<SeqTree<X>>, t : SeqTree<X>, symbol : Symbol, element : X) : ?X {
+    switch t {
+      case (#empty) false;
+      case (#element(e)) {
+        if (e.symbol == symbol) {
+          let old = ?e.element;
+          p := #element({ element; e.symbol });
+          old;
+        } else {
+          null;
+        };
+      };
+      case (#binary(b)) {
+        if (SymbolSet.isMember(b.leftSymbols, symbol)) {
+          setElementBySymbol_(b.left, @ b.left, symbol, element);
+        } else if (SymbolSet.isMember(b.rightSymbols, symbol)) {
+          setElementBySymbol_(b.right, @ b.right, symbol, element);
+        } else {
+          null;
+        };
+      };
+    };
+  };
+};
