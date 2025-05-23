@@ -1,0 +1,6 @@
+import Test3 "test3";
+module {
+    public let Test3 = Test3;
+    public let ModuleName = `Test2;
+    public let p = 3;
+}
