@@ -7,12 +7,13 @@ use crate::value::{
     ActorMethod, ClosedFunction, CollectionFunction, FastRandIter, FastRandIterFunction,
     HashMapFunction, PrimFunction, Symbol, Value, Value_,
 };
+use crate::vm_types::stack::AdaptonNavTag;
 use crate::vm_types::{
     def::Function as FunctionDef,
     stack::{FieldContext, FieldValue, Frame, FrameCont},
     Active, Cont, DebugPrintLine, Env, Interruption, Pointer, Response, Step,
 };
-use crate::{nyi, type_mismatch_, Shared};
+use crate::{nyi, type_mismatch_, vm_step, Shared};
 use im_rc::{HashMap, Vector};
 
 use crate::vm_step::{
@@ -530,6 +531,19 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             _ => type_mismatch!(file!(), line!()),
         },
         Return => return_(active, v),
+        DoAdaptonNav(mut nav_done, nav_here, mut nav_next, ref body) => {
+            nav_done.push_back((nav_here.clone(), v));
+            match nav_next.front() {
+                Some(_) => vm_step::step_adapton_nav(active, nav_done, nav_next, body),
+                None => {
+                    nyi!(line!())
+                }
+            }
+        }
+        GetAdaptonPointer => todo!(),
+        Force1 => todo!(),
+        ForceBegin(space) => todo!(),
+        ForceEnd => todo!(),
     }
 }
 

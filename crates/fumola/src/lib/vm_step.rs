@@ -1,16 +1,16 @@
-use std::arch::naked_asm;
-
 use crate::ast::{
-    Dec, Dec_, Delim, Exp, ExpField_, Exp_, IdPos_, Id_, Literal, Pat, Pat_, Source, Type,
+    AdaptonNav, AdaptonNavDim, AdaptonNav_, Dec, Dec_, Delim, Exp, ExpField_, Exp_, IdPos_, Id_,
+    Literal, Pat, Pat_, Source, Type,
 };
 use crate::shared::{FastClone, Share};
 use crate::value::{ActorId, Closed, ClosedFunction, Value, Value_};
+use crate::vm_types::stack::AdaptonNavTag;
 use crate::vm_types::{
     def::{Def, Field as FieldDef},
     stack::{FieldContext, Frame, FrameCont},
     Active, ActiveBorrow, Breakpoint, Cont, Interruption, Limit, Limits, ModulePath, Step,
 };
-use im_rc::{HashMap, Vector};
+use im_rc::{vector, HashMap, Vector};
 
 pub use crate::{nyi, type_mismatch, type_mismatch_};
 
@@ -109,6 +109,34 @@ pub fn closed<A: Active, Content>(active: &mut A, content: Content) -> Closed<Co
         env,
         content,
     }
+}
+
+pub fn step_adapton_nav<A: Active>(
+    active: &mut A,
+    nav_done: Vector<(AdaptonNavTag, Value_)>,
+    mut nav: Vector<AdaptonNav_>,
+    body: &Exp_,
+) -> Result<Step, Interruption> {
+    let first = nav.pop_front();
+    let first = match first {
+        Some(x) => x,
+        None => unreachable!(),
+    };
+    let (tag, e) = match &first.0 {
+        AdaptonNav::Goto(d, e) => match d.0 {
+            AdaptonNavDim::Time => (AdaptonNavTag::GotoTime, e),
+            AdaptonNavDim::Space => (AdaptonNavTag::GotoSpace, e),
+        },
+        AdaptonNav::Within(d, e) => match d.0 {
+            AdaptonNavDim::Time => (AdaptonNavTag::WithinTime, e),
+            AdaptonNavDim::Space => (AdaptonNavTag::WithinSpace, e),
+        },
+    };
+    exp_conts(
+        active,
+        FrameCont::DoAdaptonNav(nav_done, tag, vector!(), body.clone()),
+        e,
+    )
 }
 
 pub fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interruption> {
@@ -226,7 +254,7 @@ pub fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interrupti
 
         Force(_e) => nyi!(line!(), "step case: Force"),
         GetAdaptonPointer(_e) => nyi!(line!(), "step case: GetAdaptonPointer"),
-        DoAdaptonNav(nav, e) => nyi!(line!(), "step case: DoAdaptonNav"),
+        DoAdaptonNav(nav, e) => step_adapton_nav(active, vector!(), nav.clone(), e),
         Import(path) => {
             let m = crate::vm_def::def::import(active, &path)?;
             *active.cont() = cont_value(Value::Module(m));
@@ -576,7 +604,11 @@ fn stack_cont_has_redex<A: ActiveBorrow>(active: &A, v: &Value) -> Result<bool, 
             Call3 => false,
             Return => true,
             Unquote => true,
-            //_ => return nyi!(line!()),
+            DoAdaptonNav(vector, _, vector1, _) => true,
+            GetAdaptonPointer => true,
+            Force1 => true,
+            ForceBegin(space) => false,
+            ForceEnd => false,
         };
         Ok(r)
     }
