@@ -669,6 +669,7 @@ fn exp_is_static(e: &Exp) -> bool {
                 true
             }
         }
+        Exp::QuotedAst(a) => true,
         Exp::Thunk(_) => true,
         Exp::Literal(_) => true,
         Exp::Function(_) => true,

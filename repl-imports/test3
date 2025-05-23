@@ -1,3 +1,3 @@
 module {
-    public let ModuleName = `Test3; 
+    public let moduleName = `Test3; 
 }

@@ -1,10 +1,9 @@
 use candid::Int;
 use fumola::{Interruption, ToMotoko, Value_};
-use structopt::StructOpt;
 
 use log::{error, info, trace};
 use std::io;
-use structopt::{clap, clap::Shell};
+use std::process::exit;
 
 use fumola::format::{format_one_line, format_pretty, ToDoc};
 use fumola::vm_types::{Active, Core, Limits};
@@ -14,6 +13,8 @@ use rustyline::Editor;
 
 use std::fs;
 use std::path::Path;
+
+use clap::{Parser, Subcommand};
 
 pub type OurResult<X> = Result<X, OurError>;
 
@@ -41,38 +42,32 @@ pub enum OurError {
     String(String),
     VM(fumola::vm_types::Error),
     Syntax(fumola::parser_types::SyntaxError),
+    FileNotFound(String),
 }
 
-/// Fumola tools in Rust.
-#[derive(StructOpt, Debug, Clone)]
-#[structopt(
-    name = "fumola",
-    setting = clap::AppSettings::DeriveDisplayOrder
-)]
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
 pub struct CliOpt {
     /// Trace-level logging (most verbose)
-    #[structopt(short = "t", long = "trace-log")]
+    #[arg(global = true, long)]
     pub log_trace: bool,
     /// Debug-level logging (medium verbose)
-    #[structopt(short = "d", long = "debug-log")]
+    #[arg(global = true, long)]
     pub log_debug: bool,
     /// Coarse logging information (not verbose)
-    #[structopt(short = "L", long = "log")]
+    #[arg(global = true, long)]
     pub log_info: bool,
 
-    #[structopt(subcommand)]
+    /// Import one or more module files
+    #[arg(short, long, value_name = "FILE", num_args = 1.., action = clap::ArgAction::Append, global=true)]
+    pub import: Vec<String>,
+
+    #[command(subcommand)]
     pub command: CliCommand,
 }
 
-#[derive(StructOpt, Debug, Clone)]
+#[derive(Subcommand, Debug)]
 pub enum CliCommand {
-    #[structopt(
-        name = "completions",
-        about = "Generate shell scripts for auto-completions."
-    )]
-    Completions {
-        shell: Shell,
-    },
     Check {
         input: String,
     },
@@ -81,11 +76,11 @@ pub enum CliCommand {
     },
     Format {
         input: String,
-        #[structopt(short = "w")]
+        #[arg(short)]
         width: usize,
     },
     Eval {
-        #[structopt(short = "s", long = "step-limit")]
+        #[arg(short, long)]
         step_limit: Option<usize>,
 
         input: String,
@@ -104,7 +99,9 @@ fn init_log(level_filter: log::LevelFilter) {
 
 fn main() -> OurResult<()> {
     info!("Starting...");
-    let cli_opt = CliOpt::from_args();
+    use fumola::vm_types::Core;
+    let mut core = Core::empty();
+    let cli_opt = CliOpt::parse();
     info!("Init log...");
     init_log(
         match (cli_opt.log_trace, cli_opt.log_debug, cli_opt.log_info) {
@@ -115,12 +112,20 @@ fn main() -> OurResult<()> {
         },
     );
     info!("Evaluating CLI command: {:?} ...", &cli_opt.command);
-    let () = match cli_opt.command {
-        CliCommand::Completions { shell: s } => {
-            // see also: https://clap.rs/effortless-auto-completion/
-            CliOpt::clap().gen_completions_to("caniput", s, &mut io::stdout());
-            info!("done");
+    println!("{:?}", cli_opt.import);
+    for path in cli_opt.import.iter() {
+        let file_content = read_file_if_exists(path);
+        if let Some(file_content) = file_content {
+            let res = core.set_module(None, path.clone(), file_content.as_str());
+            if res.is_err() {
+                return Err(OurError::String(format!("{:?}", res)));
+            }
+        } else {
+            println!("Error: Import path not found: {:?}", path);
+            return Err(OurError::FileNotFound(path.clone()));
         }
+    }
+    let () = match cli_opt.command {
         CliCommand::Check { input } => {
             let _ = fumola::check::parse(&input)?;
             println!("check::parse: okay.");
@@ -134,25 +139,27 @@ fn main() -> OurResult<()> {
             println!("{}", format_pretty(&p, width));
         }
         CliCommand::Eval { input, step_limit } => {
-            let limits = match step_limit {
+            let _limits = match step_limit {
                 None => Limits::none(),
                 Some(limit) => Limits::none().step(limit),
             };
-            let v = fumola::vm::eval_limit(&input, &limits);
-            println!("final value: {:?}", v)
+            let v = core.eval_str(&input); // to do -- use _limits
+            if let Ok(v) = &v {
+                println!("{}", format_pretty(v, 80))
+            } else {
+                println!("Error: {:?}", v)
+            }
         }
-        CliCommand::Repl {} => repl(),
+        CliCommand::Repl {} => repl(&mut core),
     };
     Ok(())
 }
 
-fn repl() {
+fn repl(core: &mut Core) {
     let mut rl = Editor::<()>::new();
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
     }
-    use fumola::vm_types::Core;
-    let mut core = Core::empty();
     loop {
         let readline = rl.readline("fumola> ");
         match readline {
@@ -164,7 +171,7 @@ fn repl() {
                 }
                 core.debug_print_out = im_rc::vector::Vector::new();
                 rl.add_history_entry(line.as_str());
-                inspect_result(&mut core, v, 0)
+                inspect_result(core, v, 0)
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
@@ -189,7 +196,7 @@ fn inspect_result(core: &mut Core, result: Result<Value_, Interruption>, depth: 
             println!("{}", fumola::format::format_(v.doc(), 80))
         }
         Err(Interruption::ModuleFileNotFound(path)) => {
-            if depth > 0 {
+            if depth > 13 {
                 return report_error(core, Interruption::ModuleFileNotFound(path));
             }
             if let None = path.package_name {

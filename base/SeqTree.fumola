@@ -35,9 +35,9 @@ module {
       };
       case (#binary(b)) {
         if (SymbolSet.isMember(b.leftSymbols, symbol)) {
-          getElementBySymbol(@ b.left, symbol);
+          getElementBySymbol(@(b.left), symbol);
         } else if (SymbolSet.isMember(b.rightSymbols, symbol)) {
-          getElementBySymbol(@ b.right, symbol);
+          getElementBySymbol(@(b.right), symbol);
         } else { null };
       };
     };
@@ -53,7 +53,7 @@ module {
       case (#element(e)) {
         if (e.symbol == symbol) {
           let old = ?e.element;
-          p := #element({ element; e.symbol });
+          p := #element({ element; symbol = e.symbol });
           old;
         } else {
           null;
@@ -61,9 +61,9 @@ module {
       };
       case (#binary(b)) {
         if (SymbolSet.isMember(b.leftSymbols, symbol)) {
-          setElementBySymbol_(b.left, @ b.left, symbol, element);
+          setElementBySymbol_(b.left, @(b.left), symbol, element);
         } else if (SymbolSet.isMember(b.rightSymbols, symbol)) {
-          setElementBySymbol_(b.right, @ b.right, symbol, element);
+          setElementBySymbol_(b.right, @(b.right), symbol, element);
         } else {
           null;
         };
