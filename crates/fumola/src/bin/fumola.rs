@@ -193,7 +193,7 @@ fn inspect_result(core: &mut Core, result: Result<Value_, Interruption>, depth: 
             println!("{}", fumola::format::format_(v.doc(), 80))
         }
         Err(Interruption::ModuleFileNotFound(path)) => {
-            if depth > 13 {
+            if depth > 0 {
                 return report_error(core, Interruption::ModuleFileNotFound(path));
             }
             if let None = path.package_name {

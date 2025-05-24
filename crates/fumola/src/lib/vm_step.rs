@@ -122,11 +122,7 @@ pub fn step_adapton_nav<A: Active>(
     mut nav: Vector<AdaptonNav_>,
     body: &Exp_,
 ) -> Result<Step, Interruption> {
-    let first = nav.pop_front();
-    let first = match first {
-        Some(x) => x,
-        None => unreachable!(),
-    };
+    let first = nav.pop_front().unwrap();
     let (tag, e) = match &first.0 {
         AdaptonNavAst::Goto(d, e) => match d.0 {
             AdaptonNavDim::Time => (AdaptonNav::GotoTime, e),
@@ -139,7 +135,7 @@ pub fn step_adapton_nav<A: Active>(
     };
     exp_conts(
         active,
-        FrameCont::DoAdaptonNav1(nav_done, tag, vector!(), body.clone()),
+        FrameCont::DoAdaptonNav1(nav_done, tag, nav, body.clone()),
         e,
     )
 }
