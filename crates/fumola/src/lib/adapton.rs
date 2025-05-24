@@ -237,7 +237,7 @@ impl SimpleState {
         }
         self.cells.get_mut(p).unwrap() // always succeeds, because of check above.
     }
-    fn get_cell_mut<'a>(&'a mut self, p: &Pointer, t: &Time) -> Option<&'a mut Cell> {
+    fn _get_cell_mut<'a>(&'a mut self, p: &Pointer, t: &Time) -> Option<&'a mut Cell> {
         self.get_cell_by_time_mut(p).get_mut(t)
     }
     fn new_cell(space: Space, value: Value_) -> Cell {
@@ -350,7 +350,7 @@ impl AdaptonState for GraphicalState {
         todo!()
     }
 
-    fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()> {
+    fn navigate_begin(&mut self, _nav: Navigation, _symbol: Symbol_) -> Res<()> {
         todo!()
     }
 

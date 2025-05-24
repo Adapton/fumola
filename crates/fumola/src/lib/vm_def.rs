@@ -228,7 +228,7 @@ pub mod def {
             None => return Err(Interruption::ModuleFileNotFound(path)),
             Some(ModuleFileState::Defined(mf)) => mf,
             Some(ModuleFileState::Init(init)) => {
-                // if a module imports itself, directly or indirectly, we we diverge without cycle detection.
+                // if a module imports itself, directly or indirectly, cycle detection prevents .
                 // so, detect a cycle by tracking import paths.
                 let contains_this_path = active.module_files().import_stack.contains(&path);
                 if contains_this_path {
@@ -669,7 +669,7 @@ fn exp_is_static(e: &Exp) -> bool {
                 true
             }
         }
-        Exp::QuotedAst(a) => true,
+        Exp::QuotedAst(_a) => true,
         Exp::Thunk(_) => true,
         Exp::Literal(_) => true,
         Exp::Function(_) => true,

@@ -1,7 +1,6 @@
 //use crate::{ast::{Mut, ProjIndex}, shared::FastClone, type_mismatch, vm_types::{stack::{FieldContext, FieldValue, Frame, FrameCont}, Active, Cont, Step}, Interruption, Value, Value_};
 
 use crate::adapton::AdaptonState;
-use crate::adapton::Navigation as AdaptonNav;
 use crate::ast::{Cases, Exp_, Inst, Literal, Mut, Pat, Pat_, ProjIndex, QuotedAst};
 use crate::shared::{FastClone, Share};
 use crate::value::{
@@ -532,7 +531,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             _ => type_mismatch!(file!(), line!()),
         },
         Return => return_(active, v),
-        DoAdaptonNav1(mut nav_done, nav_here, mut nav_next, ref body) => {
+        DoAdaptonNav1(mut nav_done, nav_here, nav_next, ref body) => {
             nav_done.push_back((nav_here.clone(), v));
             let end_len = nav_done.len();
             match nav_next.front() {
@@ -548,7 +547,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             }
         }
         DoAdaptonNav2(end_count) => {
-            for i in 0..end_count {
+            for _i in 0..end_count {
                 active.adapton().navigate_end()?;
             }
             *active.cont() = cont_value(v.get());
@@ -556,7 +555,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
         }
         GetAdaptonPointer => todo!(),
         Force1 => todo!(),
-        ForceBegin(space) => todo!(),
+        ForceBegin(_space) => todo!(),
         ForceEnd => todo!(),
     }
 }

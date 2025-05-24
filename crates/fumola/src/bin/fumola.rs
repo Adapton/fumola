@@ -1,12 +1,9 @@
-use candid::Int;
 use fumola::{Interruption, ToMotoko, Value_};
 
 use log::{error, info, trace};
-use std::io;
-use std::process::exit;
 
 use fumola::format::{format_one_line, format_pretty, ToDoc};
-use fumola::vm_types::{Active, Core, Limits};
+use fumola::vm_types::{Core, Limits};
 
 use rustyline::error::ReadlineError;
 use rustyline::Editor;

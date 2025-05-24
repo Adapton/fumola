@@ -111,6 +111,11 @@ pub fn closed<A: Active, Content>(active: &mut A, content: Content) -> Closed<Co
     }
 }
 
+// step_adapton_nav
+//
+// Why? -- the parser was designed with fine-grained AST elements, for better or worse.
+// the interface to the adapton module uses a more "normalized" format, which is simpler to pattern match in Rust.
+// step_adapton_nav bridges that "syntantic gap" step by step, as expressions are normalized into each symbolic coordinate.
 pub fn step_adapton_nav<A: Active>(
     active: &mut A,
     nav_done: Vector<(AdaptonNav, Value_)>,
@@ -604,11 +609,11 @@ fn stack_cont_has_redex<A: ActiveBorrow>(active: &A, v: &Value) -> Result<bool, 
             Call3 => false,
             Return => true,
             Unquote => true,
-            DoAdaptonNav1(vector, _, vector1, _) => true,
+            DoAdaptonNav1(_vector, _, _vector11, _) => true,
             DoAdaptonNav2(_) => true,
             GetAdaptonPointer => true,
             Force1 => true,
-            ForceBegin(space) => false,
+            ForceBegin(_space) => false,
             ForceEnd => false,
         };
         Ok(r)
