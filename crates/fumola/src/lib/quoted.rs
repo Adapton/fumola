@@ -78,11 +78,14 @@ impl<T: QuotedClose + Clone> QuotedClose for Option<T> {
 impl QuotedClose for Pat {
     fn quoted_close(&self, env: &Env) -> Result<Pat, Interruption> {
         match &self {
-            Pat::Wild => todo!(),
+            Pat::Wild => Ok(Pat::Wild),
             Pat::Var(x) => Ok(Pat::Var(x.clone())),
             Pat::Literal(l) => Ok(Pat::Literal(l.clone())),
             Pat::UnOpLiteral(_, _) => todo!(),
-            Pat::Tuple(_) => todo!(),
+            Pat::Tuple(ps) => {
+                // to do -- Ok(Pat::Tuple(ps.map(|x| x.quoted_close(env))))
+                Ok(Pat::Tuple(ps.clone()))
+            }
             Pat::Object(_) => todo!(),
             Pat::Optional(_) => todo!(),
             Pat::Variant(_, _) => todo!(),

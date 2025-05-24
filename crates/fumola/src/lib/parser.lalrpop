@@ -431,7 +431,7 @@ QuotedAst: QuotedAst = {
 
     // Raw Id (used to create Var nodes in and Exp and Pat productions.)
     // Binary composition appends two Ids (promoting second from number literal to Id, if necessary).
-    "`" <id:Id_> => QuotedAst::Id(id),
+    "`" <id:Id_> => QuotedAst::Id_(id),
 
     "`" <lit:LiteralNonUnit_> => QuotedAst::Literal(lit),
 
