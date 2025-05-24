@@ -365,6 +365,7 @@ impl AdaptonState for SimpleState {
         }
     }
     fn force_end(&mut self, _value: Value_) -> Res<()> {
+        // to do -- save _value
         self.pop_stack()
     }
 }
