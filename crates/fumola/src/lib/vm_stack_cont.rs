@@ -532,8 +532,9 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             _ => type_mismatch!(file!(), line!()),
         },
         Return => return_(active, v),
-        DoAdaptonNav(mut nav_done, nav_here, mut nav_next, ref body) => {
+        DoAdaptonNav1(mut nav_done, nav_here, mut nav_next, ref body) => {
             nav_done.push_back((nav_here.clone(), v));
+            let end_len = nav_done.len();
             match nav_next.front() {
                 Some(_) => vm_step::step_adapton_nav(active, nav_done, nav_next, body),
                 None => {
@@ -542,10 +543,16 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                             .into_sym_or(Interruption::TypeMismatch(OptionCoreSource(None)))?;
                         active.adapton().navigate_begin(nav, symbol)?;
                     }
-                    // to do -- push stack with a frame for the nav_done pairs.
-                    exp_cont(active, body)
+                    exp_conts(active, FrameCont::DoAdaptonNav2(end_len), body)
                 }
             }
+        }
+        DoAdaptonNav2(end_count) => {
+            for i in 0..end_count {
+                active.adapton().navigate_end()?;
+            }
+            *active.cont() = cont_value(v.get());
+            Ok(Step {})
         }
         GetAdaptonPointer => todo!(),
         Force1 => todo!(),

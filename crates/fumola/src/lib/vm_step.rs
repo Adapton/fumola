@@ -134,7 +134,7 @@ pub fn step_adapton_nav<A: Active>(
     };
     exp_conts(
         active,
-        FrameCont::DoAdaptonNav(nav_done, tag, vector!(), body.clone()),
+        FrameCont::DoAdaptonNav1(nav_done, tag, vector!(), body.clone()),
         e,
     )
 }
@@ -604,7 +604,8 @@ fn stack_cont_has_redex<A: ActiveBorrow>(active: &A, v: &Value) -> Result<bool, 
             Call3 => false,
             Return => true,
             Unquote => true,
-            DoAdaptonNav(vector, _, vector1, _) => true,
+            DoAdaptonNav1(vector, _, vector1, _) => true,
+            DoAdaptonNav2(_) => true,
             GetAdaptonPointer => true,
             Force1 => true,
             ForceBegin(space) => false,

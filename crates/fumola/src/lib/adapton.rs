@@ -222,7 +222,10 @@ impl AdaptonState for State {
     }
 
     fn navigate_end(&mut self) -> Res<()> {
-        todo!()
+        match self {
+            Self::Simple(s) => s.navigate_end(),
+            Self::Graphical(g) => g.navigate_end(),
+        }
     }
 }
 

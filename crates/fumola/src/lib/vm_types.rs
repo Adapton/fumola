@@ -246,12 +246,13 @@ pub mod stack {
         Variant(Id_),
         Switch(Cases),
         Do,
-        DoAdaptonNav(
+        DoAdaptonNav1(
             Vector<(AdaptonNav, Value_)>,
             AdaptonNav,
             Vector<AdaptonNav_>,
             Exp_,
         ),
+        DoAdaptonNav2(usize),
         GetAdaptonPointer,
         Force1,
         ForceBegin(crate::adapton::Pointer),
