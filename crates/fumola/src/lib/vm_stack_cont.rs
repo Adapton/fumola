@@ -17,8 +17,8 @@ use crate::{nyi, type_mismatch_, vm_step, Shared};
 use im_rc::{vector, HashMap, Vector};
 
 use crate::vm_step::{
-    cont_value, decs_step, exp_cont, exp_conts, literal_step, object_step, return_, return_step,
-    tuple_step, type_mismatch, unit_step, var_step,
+    cont_value, decs_step, exp_cont, exp_conts, exp_step, literal_step, object_step, return_,
+    return_step, tuple_step, type_mismatch, unit_step, var_step,
 };
 
 // continue execution using the top-most stack frame, if any.
@@ -565,10 +565,18 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
         Force1 => {
             if let Value::AdaptonPointer(ref p) = *v {
                 let thunk_body = active.adapton().force_begin(p.clone())?;
+                let env = active.env().fast_clone();
+                let context = active.defs().active_ctx.clone();
+                active.stack().push_front(Frame {
+                    context,
+                    env,
+                    cont: FrameCont::Force2,
+                    cont_prim_type: None,
+                    source: crate::vm_types::Source::Evaluation,
+                });
                 *active.env() = thunk_body.env;
                 *active.ctx_id() = thunk_body.ctx;
-                *active.cont() = Cont::Exp_(thunk_body.content, vector!());
-                Ok(Step {})
+                exp_step(active, thunk_body.content)
             } else {
                 type_mismatch!(file!(), line!())
             }

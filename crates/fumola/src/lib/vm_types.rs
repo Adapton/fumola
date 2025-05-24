@@ -4,7 +4,7 @@ use crate::ast::{Inst, Mut};
 use crate::parser_types::SyntaxError as SyntaxErrorCode;
 use crate::shared::FastClone;
 use crate::value::{ActorId, ActorMethod, ValueError};
-use crate::{
+pub use crate::{
     ast::{Dec_, Exp_, Id, Id_, PrimType, Source, Span},
     value::Value_,
 };

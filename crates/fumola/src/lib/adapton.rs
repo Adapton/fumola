@@ -155,6 +155,7 @@ pub enum State {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Error {
     Internal(u32),
+    TypeMismatch(u32),
 }
 
 pub type Res<Ok> = Result<Ok, Error>;
@@ -202,16 +203,25 @@ impl AdaptonState for State {
         }
     }
 
-    fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_> {
-        todo!()
+    fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_> {
+        match self {
+            Self::Simple(s) => s.get_pointer(pointer),
+            Self::Graphical(g) => g.get_pointer(pointer),
+        }
     }
 
-    fn force_begin(&mut self, _pointer: Pointer) -> Res<ThunkBody> {
-        todo!()
+    fn force_begin(&mut self, pointer: Pointer) -> Res<ThunkBody> {
+        match self {
+            Self::Simple(s) => s.force_begin(pointer),
+            Self::Graphical(g) => g.force_begin(pointer),
+        }
     }
 
-    fn force_end(&mut self, _value: Value_) -> Res<()> {
-        todo!()
+    fn force_end(&mut self, value: Value_) -> Res<()> {
+        match self {
+            Self::Simple(s) => s.force_end(value),
+            Self::Graphical(g) => g.force_end(value),
+        }
     }
 
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()> {
@@ -250,6 +260,57 @@ impl SimpleState {
             _ => Cell::NonThunk(value),
         }
     }
+    fn push_stack(&mut self) {
+        self.stack.push_back(SimpleFrame {
+            ambient_space: self.space.clone(),
+            ambient_time: self.time.clone(),
+            thunk_pointer: self.thunk_pointer.clone(),
+        });
+    }
+    fn pop_stack(&mut self) -> Res<()> {
+        if let Some(frame) = self.stack.pop_back() {
+            self.time = frame.ambient_time;
+            self.thunk_pointer = frame.thunk_pointer;
+            self.space = frame.ambient_space;
+            Ok(())
+        } else {
+            Err(Error::Internal(line!()))
+        }
+    }
+    #[allow(dead_code)]
+    fn get_cell_mut<'a>(&'a mut self, pointer: &Pointer) -> Res<&'a mut Cell> {
+        if let Some(cells_by_time) = self.cells.get_mut(pointer) {
+            if let Some(cell) = cells_by_time.get_mut(&self.time) {
+                Ok(cell)
+            } else {
+                todo!()
+                // to do -- linear scan to find nearest one, if it exists.
+            }
+        } else {
+            Err(Error::Internal(line!()))
+        }
+    }
+
+    // get_cell --
+    // find the cellsbytime.
+    // does the exact time exist?
+    // if so, use it.
+    // if not, do a linear scan and find the nearest time, if any exist before the current time.
+    //
+    // (doing a log time search is possible in the future: would require an ordered representation,
+    // and the boilerplate for Serialize/Deserialize for it)
+    fn get_cell<'a>(&'a self, pointer: &Pointer) -> Res<&'a Cell> {
+        if let Some(cells_by_time) = self.cells.get(pointer) {
+            if let Some(cell) = cells_by_time.get(&self.time) {
+                Ok(cell)
+            } else {
+                todo!()
+                // to do -- linear scan to find nearest one, if it exists.
+            }
+        } else {
+            Err(Error::Internal(line!()))
+        }
+    }
 }
 
 impl AdaptonState for SimpleState {
@@ -263,7 +324,6 @@ impl AdaptonState for SimpleState {
         }
     }
     fn put_symbol(&mut self, symbol: Symbol_, value: Value_) -> Res<Pointer> {
-        // to do -- include current space within pointer as well
         let p: Pointer = self.space.apply(symbol);
         self.put_pointer(p.clone(), value)?;
         Ok(p)
@@ -275,19 +335,15 @@ impl AdaptonState for SimpleState {
         cells.insert(time, Self::new_cell(space, value));
         Ok(())
     }
-    fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_> {
-        todo!()
-        // find the cellsbytime.
-        // does the exact time exist?
-        // if so, use it.
-        // if not, do a linear scan and find the nearest time, if any exist before the current time.
+    fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_> {
+        let cell = self.get_cell(&pointer)?;
+        match cell {
+            Cell::NonThunk(v) => Ok(v.clone()),
+            Cell::Thunk(tc) => Ok(Value::Thunk(tc.body.clone()).into()),
+        }
     }
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()> {
-        self.stack.push_back(SimpleFrame {
-            ambient_space: self.space.clone(),
-            ambient_time: self.time.clone(),
-            thunk_pointer: self.thunk_pointer.clone(),
-        });
+        self.push_stack();
         match nav {
             Navigation::GotoSpace => self.space = Space::Symbol(symbol),
             Navigation::GotoTime => self.time = Time::Symbol(symbol),
@@ -298,26 +354,20 @@ impl AdaptonState for SimpleState {
     }
 
     fn navigate_end(&mut self) -> Res<()> {
-        if let Some(frame) = self.stack.pop_back() {
-            self.time = frame.ambient_time;
-            self.thunk_pointer = frame.thunk_pointer;
-            self.space = frame.ambient_space;
-            Ok(())
+        self.pop_stack()
+    }
+    fn force_begin(&mut self, pointer: Pointer) -> Res<ThunkBody> {
+        let cell = self.get_cell(&pointer)?.clone();
+        if let Cell::Thunk(tc) = cell {
+            self.push_stack();
+            self.thunk_pointer = Some(pointer);
+            Ok(tc.body.clone())
         } else {
-            Err(Error::Internal(line!()))
+            Err(Error::TypeMismatch(line!()))
         }
     }
-    fn force_begin(&mut self, _pointer: Pointer) -> Res<ThunkBody> {
-        // get the thunk body.
-        // save current time and space on stack.
-        // current space becomes thunk pointer's space.
-        // return thunk body.
-        todo!()
-    }
     fn force_end(&mut self, _value: Value_) -> Res<()> {
-        // pop ambient time and space from stack and restore them.
-        // set the value of the thunk cell, for diagnostics (not memoization-based caching).
-        todo!()
+        self.pop_stack()
     }
 }
 
