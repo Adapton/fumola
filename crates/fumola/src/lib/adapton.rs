@@ -240,12 +240,20 @@ impl AdaptonState for State {
 }
 
 impl SimpleState {
+    #[allow(dead_code)]
     fn get_cell_by_time_mut<'a>(&'a mut self, p: &Pointer) -> &'a mut CellByTime {
         let exists = self.cells.get(p) != None;
         if !exists {
             self.cells.insert(p.clone(), HashMap::new());
         }
         self.cells.get_mut(p).unwrap() // always succeeds, because of check above.
+    }
+    fn get_cell_by_time<'a>(&'a mut self, p: &Pointer) -> &'a CellByTime {
+        let not_exists = self.cells.get(p) == None;
+        if not_exists {
+            assert_eq!(self.cells.insert(p.clone(), HashMap::new()), None);
+        }
+        self.cells.get(p).unwrap()
     }
     fn _get_cell_mut<'a>(&'a mut self, p: &Pointer, t: &Time) -> Option<&'a mut Cell> {
         self.get_cell_by_time_mut(p).get_mut(t)
@@ -277,19 +285,6 @@ impl SimpleState {
             Err(Error::Internal(line!()))
         }
     }
-    #[allow(dead_code)]
-    fn get_cell_mut<'a>(&'a mut self, pointer: &Pointer) -> Res<&'a mut Cell> {
-        if let Some(cells_by_time) = self.cells.get_mut(pointer) {
-            if let Some(cell) = cells_by_time.get_mut(&self.time) {
-                Ok(cell)
-            } else {
-                todo!()
-                // to do -- linear scan to find nearest one, if it exists.
-            }
-        } else {
-            Err(Error::Internal(line!()))
-        }
-    }
 
     // get_cell --
     // find the cellsbytime.
@@ -304,8 +299,9 @@ impl SimpleState {
             if let Some(cell) = cells_by_time.get(&self.time) {
                 Ok(cell)
             } else {
-                todo!()
+                Err(Error::Internal(line!()))
                 // to do -- linear scan to find nearest one, if it exists.
+                // otherwise, Error::Undefined(pointer, self.time)
             }
         } else {
             Err(Error::Internal(line!()))
@@ -331,8 +327,10 @@ impl AdaptonState for SimpleState {
     fn put_pointer(&mut self, pointer: Pointer, value: Value_) -> Res<()> {
         let time = self.time.clone();
         let space = self.space.clone();
-        let cells = self.get_cell_by_time_mut(&pointer);
-        cells.insert(time, Self::new_cell(space, value));
+        let updated = self
+            .get_cell_by_time(&pointer)
+            .update(time, Self::new_cell(space, value));
+        self.cells.insert(pointer, updated);
         Ok(())
     }
     fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_> {

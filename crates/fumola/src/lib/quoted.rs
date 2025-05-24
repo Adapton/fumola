@@ -35,6 +35,11 @@ impl<T: QuotedClose + Clone> QuotedClose for Delim<T> {
 
 impl<T: QuotedClose + Clone> QuotedClose for NodeData<T> {
     fn quoted_close(&self, env: &Env) -> Result<NodeData<T>, Interruption> {
+        // to do -- sometimes we want to keep the source information.
+        //          sometimes we want to clear it.
+        //
+        // use a special component of Env to indicate that we should "clear" out the source position information, if set.
+        //
         Ok(NodeData(self.0.quoted_close(env)?, self.1.clone()))
     }
 }
@@ -269,6 +274,7 @@ impl QuotedClose for QuotedAst {
         use QuotedAst::*;
         Ok(match &self {
             QuotedAst::Empty => Empty,
+            QuotedAst::Id_(i) => Id_(i.clone()),
             QuotedAst::Id(i) => Id(i.clone()),
             QuotedAst::Literal(l) => Literal(l.clone()),
             QuotedAst::TupleExps(es) => TupleExps(es.quoted_close(env)?),
@@ -278,7 +284,7 @@ impl QuotedClose for QuotedAst {
             QuotedAst::Cases(cs) => Cases(cs.quoted_close(env)?),
             QuotedAst::Decs(ds) => Decs(ds.quoted_close(env)?),
             QuotedAst::DecFields(dfs) => DecFields(dfs.quoted_close(env)?),
-            QuotedAst::Types(ts) => Types(ts.clone()), // to do
+            QuotedAst::Types(ts) => Types(ts.clone()),
             QuotedAst::Attrs(atts) => Attrs(atts.clone()),
         })
     }

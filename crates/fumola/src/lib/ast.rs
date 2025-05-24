@@ -573,7 +573,8 @@ pub enum ProjIndex {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum QuotedAst {
     Empty,
-    Id(Id_),
+    Id(Id),
+    Id_(Id_),
     Literal(Literal_),
     TupleExps(Delim<Exp_>),
     TuplePats(Delim<Pat_>),
@@ -605,7 +606,7 @@ impl QuotedAst {
                 (Some(es2), Some(es3)) => RecordExps((es1.clone(), Some(es2.append(es3)))),
             }),
             (Cases(cs1), Cases(cs2)) => Ok(Cases(cs1.append(cs2))),
-            (Id(i1), Id(i2)) => Ok(Id(NodeData(
+            (Id_(i1), Id_(i2)) => Ok(Id_(NodeData(
                 crate::ast::Id::new(format!("{}{}", i1.0.as_str(), i2.0.as_str())),
                 Source::Evaluation,
             )

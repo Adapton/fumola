@@ -1,7 +1,7 @@
 use crate::adapton::Navigation as AdaptonNav;
 use crate::ast::{
     AdaptonNav as AdaptonNavAst, AdaptonNavDim, AdaptonNav_, Dec, Dec_, Delim, Exp, ExpField_,
-    Exp_, IdPos_, Id_, Literal, Pat, Pat_, Source, Type,
+    Exp_, Id, IdPos_, Literal, Pat, Pat_, Source, Type,
 };
 use crate::shared::{FastClone, Share};
 use crate::value::{ActorId, Closed, ClosedFunction, Value, Value_};
@@ -34,21 +34,21 @@ pub fn literal_step<A: Active>(active: &mut A, l: &Literal) -> Result<Step, Inte
 }
 
 fn var_idpos_step<A: Active>(active: &mut A, x: &IdPos_) -> Result<Step, Interruption> {
-    var_step(active, &x.0.id_())
+    var_step(active, &x.0.id())
 }
 
-pub fn var_step<A: Active>(active: &mut A, x: &Id_) -> Result<Step, Interruption> {
-    match active.env().get(&x.0) {
+pub fn var_step<A: Active>(active: &mut A, x: &Id) -> Result<Step, Interruption> {
+    match active.env().get(&x) {
         None => {
-            if x.0.string.starts_with("@") {
-                let f = crate::value::PrimFunction::AtSignVar(x.0.to_string());
+            if x.string.starts_with("@") {
+                let f = crate::value::PrimFunction::AtSignVar(x.to_string());
                 let v = Value::PrimFunction(f).share();
                 *active.cont() = Cont::Value_(v);
                 Ok(Step {})
             } else {
                 let ctx = active.defs().active_ctx.clone();
-                let fd = crate::vm_def::resolve_def(active.defs(), &ctx, false, &x.0)?;
-                let v = crate::vm_def::def_as_value(active.defs(), &x.0, &fd.def)?;
+                let fd = crate::vm_def::resolve_def(active.defs(), &ctx, false, x)?;
+                let v = crate::vm_def::def_as_value(active.defs(), &x, &fd.def)?;
                 *active.cont() = Cont::Value_(v);
                 Ok(Step {})
             }

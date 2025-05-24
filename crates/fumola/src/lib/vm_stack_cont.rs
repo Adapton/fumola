@@ -14,7 +14,7 @@ use crate::vm_types::{
     Active, Cont, DebugPrintLine, Env, Interruption, Pointer, Response, Step,
 };
 use crate::{nyi, type_mismatch_, vm_step, Shared};
-use im_rc::{vector, HashMap, Vector};
+use im_rc::{HashMap, Vector};
 
 use crate::vm_step::{
     cont_value, decs_step, exp_cont, exp_conts, exp_step, literal_step, object_step, return_,
@@ -513,7 +513,8 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             Value::QuotedAst(cq) => match cq {
                 QuotedAst::Literal(l) => literal_step(active, &l.0),
                 QuotedAst::Empty => unit_step(active),
-                QuotedAst::Id(i) => var_step(active, i),
+                QuotedAst::Id_(i) => var_step(active, &i.0),
+                QuotedAst::Id(id) => var_step(active, id),
                 QuotedAst::TupleExps(es) => match es.vec.len() {
                     0 => unit_step(active),
                     1 => exp_conts(active, FrameCont::Paren, &es.vec[0]),

@@ -338,6 +338,7 @@ impl ToDoc for Value {
 impl ToDoc for QuotedAst {
     fn doc(&self) -> RcDoc {
         match self {
+            QuotedAst::Id_(i) => str("`").append(i.doc()),
             QuotedAst::Id(i) => str("`").append(i.doc()),
             QuotedAst::Literal(l) => str("`").append(l.doc()),
             QuotedAst::Empty => str("`()"),

@@ -375,7 +375,7 @@ impl Value {
     pub fn is_quoted_id(&self) -> bool {
         match self {
             Value::QuotedAst(a) => match a {
-                QuotedAst::Id(_) => true,
+                QuotedAst::Id_(_) => true,
                 _ => false,
             },
             _ => false,
@@ -411,7 +411,7 @@ impl Value {
 
     pub fn unquote_id(&self) -> Result<Id_, Interruption> {
         match self {
-            Value::QuotedAst(QuotedAst::Id(i)) => Ok(i.clone()),
+            Value::QuotedAst(QuotedAst::Id_(i)) => Ok(i.clone()),
             _ => type_mismatch!(file!(), line!()),
         }
     }
@@ -477,6 +477,11 @@ impl Value {
             Value::Symbol(s) => Ok(s.clone()),
             Value::Nat(n) => Ok(Shared::new(Symbol::Nat(n.clone()))),
             Value::Int(i) => Ok(Shared::new(Symbol::Int(i.clone()))),
+            Value::QuotedAst(QuotedAst::Id_(i)) => {
+                // in this very common case, we strip away the position information.
+                // unlike more general quoted ASTs, the Ids are meant to reappear without being distinguished by their occurances.
+                Ok(Shared::new(Symbol::QuotedAst(QuotedAst::Id(i.0.clone()))))
+            }
             Value::QuotedAst(q) => Ok(Shared::new(Symbol::QuotedAst(q.clone()))),
             _ => Err(err),
         }
