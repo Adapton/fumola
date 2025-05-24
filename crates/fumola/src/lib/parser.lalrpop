@@ -393,7 +393,7 @@ AdaptonNav_: AdaptonNav_ = Node<AdaptonNav>;
 
 AdaptonNav: AdaptonNav = {
     "goto" <d:AdaptonNavDim_> <e:ExpNullary_<Ob>> => AdaptonNav::Goto(d, e),
-    "with" "in" <d:AdaptonNavDim_> <e:ExpNullary_<Ob>> => AdaptonNav::Within(d, e),
+    "within" <d:AdaptonNavDim_> <e:ExpNullary_<Ob>> => AdaptonNav::Within(d, e),
 }
 
 #[inline]

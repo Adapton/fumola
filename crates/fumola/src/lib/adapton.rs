@@ -264,7 +264,7 @@ impl AdaptonState for SimpleState {
     }
     fn put_symbol(&mut self, symbol: Symbol_, value: Value_) -> Res<Pointer> {
         // to do -- include current space within pointer as well
-        let p: Pointer = Space::Symbol(symbol);
+        let p: Pointer = self.space.apply(symbol);
         self.put_pointer(p.clone(), value)?;
         Ok(p)
     }

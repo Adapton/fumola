@@ -203,16 +203,12 @@ impl ToDoc for Closed<Exp_> {
 
 impl ToDoc for Space {
     fn doc(&self) -> RcDoc {
-        kwd("here").append(enclose(
-            "(",
-            match self {
-                Space::Here => RcDoc::nil(),
-                Space::Exp_(None, c) => c.doc(),
-                Space::Exp_(Some(s), c) => s.doc().append(enclose("(", c.doc(), ")")),
-                Space::Symbol(s) => s.doc(),
-            },
-            ")",
-        ))
+        match self {
+            Space::Here => RcDoc::text("here"),
+            Space::Exp_(None, c) => c.doc(),
+            Space::Exp_(Some(s), c) => s.doc().append(enclose("(", c.doc(), ")")),
+            Space::Symbol(s) => s.doc(),
+        }
     }
 }
 
