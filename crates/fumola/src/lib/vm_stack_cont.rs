@@ -1,13 +1,14 @@
 //use crate::{ast::{Mut, ProjIndex}, shared::FastClone, type_mismatch, vm_types::{stack::{FieldContext, FieldValue, Frame, FrameCont}, Active, Cont, Step}, Interruption, Value, Value_};
 
 use crate::adapton::AdaptonState;
+use crate::adapton::Navigation as AdaptonNav;
 use crate::ast::{Cases, Exp_, Inst, Literal, Mut, Pat, Pat_, ProjIndex, QuotedAst};
 use crate::shared::{FastClone, Share};
 use crate::value::{
     ActorMethod, ClosedFunction, CollectionFunction, FastRandIter, FastRandIterFunction,
     HashMapFunction, PrimFunction, Symbol, Value, Value_,
 };
-use crate::vm_types::stack::AdaptonNavTag;
+use crate::vm_types::OptionCoreSource;
 use crate::vm_types::{
     def::Function as FunctionDef,
     stack::{FieldContext, FieldValue, Frame, FrameCont},
@@ -536,7 +537,13 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             match nav_next.front() {
                 Some(_) => vm_step::step_adapton_nav(active, nav_done, nav_next, body),
                 None => {
-                    nyi!(line!())
+                    for (nav, symbol) in nav_done {
+                        let symbol = symbol
+                            .into_sym_or(Interruption::TypeMismatch(OptionCoreSource(None)))?;
+                        active.adapton().navigate_begin(nav, symbol)?;
+                    }
+                    // to do -- push stack with a frame for the nav_done pairs.
+                    exp_cont(active, body)
                 }
             }
         }

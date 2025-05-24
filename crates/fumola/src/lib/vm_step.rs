@@ -1,10 +1,10 @@
+use crate::adapton::Navigation as AdaptonNav;
 use crate::ast::{
-    AdaptonNav, AdaptonNavDim, AdaptonNav_, Dec, Dec_, Delim, Exp, ExpField_, Exp_, IdPos_, Id_,
-    Literal, Pat, Pat_, Source, Type,
+    AdaptonNav as AdaptonNavAst, AdaptonNavDim, AdaptonNav_, Dec, Dec_, Delim, Exp, ExpField_,
+    Exp_, IdPos_, Id_, Literal, Pat, Pat_, Source, Type,
 };
 use crate::shared::{FastClone, Share};
 use crate::value::{ActorId, Closed, ClosedFunction, Value, Value_};
-use crate::vm_types::stack::AdaptonNavTag;
 use crate::vm_types::{
     def::{Def, Field as FieldDef},
     stack::{FieldContext, Frame, FrameCont},
@@ -113,7 +113,7 @@ pub fn closed<A: Active, Content>(active: &mut A, content: Content) -> Closed<Co
 
 pub fn step_adapton_nav<A: Active>(
     active: &mut A,
-    nav_done: Vector<(AdaptonNavTag, Value_)>,
+    nav_done: Vector<(AdaptonNav, Value_)>,
     mut nav: Vector<AdaptonNav_>,
     body: &Exp_,
 ) -> Result<Step, Interruption> {
@@ -123,13 +123,13 @@ pub fn step_adapton_nav<A: Active>(
         None => unreachable!(),
     };
     let (tag, e) = match &first.0 {
-        AdaptonNav::Goto(d, e) => match d.0 {
-            AdaptonNavDim::Time => (AdaptonNavTag::GotoTime, e),
-            AdaptonNavDim::Space => (AdaptonNavTag::GotoSpace, e),
+        AdaptonNavAst::Goto(d, e) => match d.0 {
+            AdaptonNavDim::Time => (AdaptonNav::GotoTime, e),
+            AdaptonNavDim::Space => (AdaptonNav::GotoSpace, e),
         },
-        AdaptonNav::Within(d, e) => match d.0 {
-            AdaptonNavDim::Time => (AdaptonNavTag::WithinTime, e),
-            AdaptonNavDim::Space => (AdaptonNavTag::WithinSpace, e),
+        AdaptonNavAst::Within(d, e) => match d.0 {
+            AdaptonNavDim::Time => (AdaptonNav::WithinTime, e),
+            AdaptonNavDim::Space => (AdaptonNav::WithinSpace, e),
         },
     };
     exp_conts(

@@ -1,5 +1,6 @@
 use crate::ast::Exp_;
-use crate::value::{Closed, Symbol_, ThunkBody, Value, Value_};
+use crate::value::{Closed, Symbol, Symbol_, ThunkBody, Value, Value_};
+use crate::Shared;
 use im_rc::{HashMap, Vector};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
@@ -51,6 +52,7 @@ pub struct SimpleState {
     pub stack: Vector<SimpleFrame>,
     pub time: Time,
     pub space: Space,
+    pub thunk_pointer: Option<Pointer>, // None ==> stack(i).thunk_pointer == None, for all i.
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -72,7 +74,7 @@ pub struct Frame {
 pub struct SimpleFrame {
     pub ambient_space: Space,
     pub ambient_time: Time,
-    pub thunk_pointer: Pointer,
+    pub thunk_pointer: Option<Pointer>, // None ==> stack(i).thunk_pointer == None, for all i.
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -93,12 +95,39 @@ pub enum Time {
     Now,
 }
 
+impl Time {
+    pub fn apply(&self, symbol: Symbol_) -> Time {
+        match self {
+            Time::Now => Time::Symbol(symbol),
+            Time::Symbol(ambient) => {
+                Time::Symbol(Shared::new(Symbol::Call(ambient.clone(), symbol)))
+            }
+        }
+    }
+}
+
 /// Node names.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Space {
     Symbol(Symbol_),
-    Exp_(Closed<Exp_>),
+    Exp_(Option<Symbol_>, Closed<Exp_>),
     Here,
+}
+
+impl Space {
+    pub fn apply(&self, symbol: Symbol_) -> Space {
+        match self {
+            Space::Here => Space::Symbol(symbol),
+            Space::Symbol(ambient) => {
+                Space::Symbol(Shared::new(Symbol::Call(ambient.clone(), symbol)))
+            }
+            Space::Exp_(Some(ambient), closed) => Space::Exp_(
+                Some(Shared::new(Symbol::Call(ambient.clone(), symbol))),
+                closed.clone(),
+            ),
+            Space::Exp_(None, closed) => Space::Exp_(Some(symbol), closed.clone()),
+        }
+    }
 }
 
 pub type Edges = HashMap<EdgeId, Edge>;
@@ -124,9 +153,19 @@ pub enum State {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum Error {}
+pub enum Error {
+    Internal(u32),
+}
 
 pub type Res<Ok> = Result<Ok, Error>;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Navigation {
+    GotoTime,
+    GotoSpace,
+    WithinTime,
+    WithinSpace,
+}
 
 pub trait AdaptonState {
     fn new() -> Self
@@ -137,6 +176,8 @@ pub trait AdaptonState {
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_>;
     fn force_begin(&mut self, _pointer: Pointer) -> Res<()>;
     fn force_end(&mut self, _value: Value_) -> Res<()>;
+    fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()>;
+    fn navigate_end(&mut self) -> Res<()>;
 }
 
 impl AdaptonState for State {
@@ -172,6 +213,17 @@ impl AdaptonState for State {
     fn force_end(&mut self, _value: Value_) -> Res<()> {
         todo!()
     }
+
+    fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()> {
+        match self {
+            Self::Simple(s) => s.navigate_begin(nav, symbol),
+            Self::Graphical(g) => g.navigate_begin(nav, symbol),
+        }
+    }
+
+    fn navigate_end(&mut self) -> Res<()> {
+        todo!()
+    }
 }
 
 impl SimpleState {
@@ -204,6 +256,7 @@ impl AdaptonState for SimpleState {
             space: Space::Here,
             cells: HashMap::new(),
             stack: Vector::new(),
+            thunk_pointer: None,
         }
     }
     fn put_symbol(&mut self, symbol: Symbol_, value: Value_) -> Res<Pointer> {
@@ -219,6 +272,38 @@ impl AdaptonState for SimpleState {
         cells.insert(time, Self::new_cell(space, value));
         Ok(())
     }
+    fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_> {
+        todo!()
+        // find the cellsbytime.
+        // does the exact time exist?
+        // if so, use it.
+        // if not, do a linear scan and find the nearest time, if any exist before the current time.
+    }
+    fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()> {
+        self.stack.push_back(SimpleFrame {
+            ambient_space: self.space.clone(),
+            ambient_time: self.time.clone(),
+            thunk_pointer: self.thunk_pointer.clone(),
+        });
+        match nav {
+            Navigation::GotoSpace => self.space = Space::Symbol(symbol),
+            Navigation::GotoTime => self.time = Time::Symbol(symbol),
+            Navigation::WithinTime => self.time = self.time.apply(symbol),
+            Navigation::WithinSpace => self.space = self.space.apply(symbol),
+        };
+        Ok(())
+    }
+
+    fn navigate_end(&mut self) -> Res<()> {
+        if let Some(frame) = self.stack.pop_back() {
+            self.time = frame.ambient_time;
+            self.thunk_pointer = frame.thunk_pointer;
+            self.space = frame.ambient_space;
+            Ok(())
+        } else {
+            Err(Error::Internal(line!()))
+        }
+    }
     fn force_begin(&mut self, _pointer: Pointer) -> Res<()> {
         // get the thunk body.
         // save current time and space on stack.
@@ -230,13 +315,6 @@ impl AdaptonState for SimpleState {
         // pop ambient time and space from stack and restore them.
         // set the value of the thunk cell, for diagnostics (not memoization-based caching).
         todo!()
-    }
-    fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_> {
-        todo!()
-        // find the cellsbytime.
-        // does the exact time exist?
-        // if so, use it.
-        // if not, do a linear scan and find the nearest time, if any exist before the current time.
     }
 }
 
@@ -266,6 +344,14 @@ impl AdaptonState for GraphicalState {
         todo!()
     }
     fn force_end(&mut self, _value: Value_) -> Res<()> {
+        todo!()
+    }
+
+    fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()> {
+        todo!()
+    }
+
+    fn navigate_end(&mut self) -> Res<()> {
         todo!()
     }
 }

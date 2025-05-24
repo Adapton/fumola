@@ -223,20 +223,13 @@ pub fn source_from_cont(cont: &Cont) -> Source {
 
 pub mod stack {
     use super::{def::CtxId, Cont, Env, Pointer, RespTarget, Vector};
+    pub use crate::adapton::Navigation as AdaptonNav;
     use crate::ast::{
         AdaptonNav_, BinOp, Cases, Dec_, ExpField_, Exp_, Id_, Inst, Mut, Pat_, PrimType,
         ProjIndex, RelOp, Source, Type_, UnOp,
     };
     use crate::value::{Value, Value_};
     use serde::{Deserialize, Serialize};
-
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub enum AdaptonNavTag {
-        GotoTime,
-        GotoSpace,
-        WithinTime,
-        WithinSpace,
-    }
 
     /// Local continuation, stored in a stack frame.
     #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -254,8 +247,8 @@ pub mod stack {
         Switch(Cases),
         Do,
         DoAdaptonNav(
-            Vector<(AdaptonNavTag, Value_)>,
-            AdaptonNavTag,
+            Vector<(AdaptonNav, Value_)>,
+            AdaptonNav,
             Vector<AdaptonNav_>,
             Exp_,
         ),

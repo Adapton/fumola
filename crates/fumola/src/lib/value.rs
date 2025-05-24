@@ -476,6 +476,7 @@ impl Value {
         match self {
             Value::Symbol(s) => Ok(s.clone()),
             Value::Nat(n) => Ok(Shared::new(Symbol::Nat(n.clone()))),
+            Value::Int(i) => Ok(Shared::new(Symbol::Int(i.clone()))),
             Value::QuotedAst(q) => Ok(Shared::new(Symbol::QuotedAst(q.clone()))),
             _ => Err(err),
         }

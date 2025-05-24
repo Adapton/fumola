@@ -207,7 +207,8 @@ impl ToDoc for Space {
             "(",
             match self {
                 Space::Here => RcDoc::nil(),
-                Space::Exp_(c) => c.doc(),
+                Space::Exp_(None, c) => c.doc(),
+                Space::Exp_(Some(s), c) => s.doc().append(enclose("(", c.doc(), ")")),
                 Space::Symbol(s) => s.doc(),
             },
             ")",
