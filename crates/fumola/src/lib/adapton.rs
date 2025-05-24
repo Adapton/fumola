@@ -174,7 +174,7 @@ pub trait AdaptonState {
     fn put_pointer(&mut self, _pointer: Pointer, _value: Value_) -> Res<()>;
     fn put_symbol(&mut self, _symbol: Symbol_, _value: Value_) -> Res<Pointer>;
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_>;
-    fn force_begin(&mut self, _pointer: Pointer) -> Res<()>;
+    fn force_begin(&mut self, _pointer: Pointer) -> Res<ThunkBody>;
     fn force_end(&mut self, _value: Value_) -> Res<()>;
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()>;
     fn navigate_end(&mut self) -> Res<()>;
@@ -206,7 +206,7 @@ impl AdaptonState for State {
         todo!()
     }
 
-    fn force_begin(&mut self, _pointer: Pointer) -> Res<()> {
+    fn force_begin(&mut self, _pointer: Pointer) -> Res<ThunkBody> {
         todo!()
     }
 
@@ -307,7 +307,7 @@ impl AdaptonState for SimpleState {
             Err(Error::Internal(line!()))
         }
     }
-    fn force_begin(&mut self, _pointer: Pointer) -> Res<()> {
+    fn force_begin(&mut self, _pointer: Pointer) -> Res<ThunkBody> {
         // get the thunk body.
         // save current time and space on stack.
         // current space becomes thunk pointer's space.
@@ -343,7 +343,7 @@ impl AdaptonState for GraphicalState {
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_> {
         todo!()
     }
-    fn force_begin(&mut self, _pointer: Pointer) -> Res<()> {
+    fn force_begin(&mut self, _pointer: Pointer) -> Res<ThunkBody> {
         todo!()
     }
     fn force_end(&mut self, _value: Value_) -> Res<()> {

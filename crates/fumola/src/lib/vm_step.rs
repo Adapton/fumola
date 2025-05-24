@@ -253,8 +253,8 @@ pub fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interrupti
         }
         Hole => nyi!(line!(), "Hole"),
 
-        Force(_e) => nyi!(line!(), "step case: Force"),
-        GetAdaptonPointer(_e) => nyi!(line!(), "step case: GetAdaptonPointer"),
+        Force(e) => exp_conts(active, FrameCont::Force1, e),
+        GetAdaptonPointer(e) => exp_conts(active, FrameCont::GetAdaptonPointer, e),
         DoAdaptonNav(nav, e) => step_adapton_nav(active, vector!(), nav.clone(), e),
         Import(path) => {
             let m = crate::vm_def::def::import(active, &path)?;
@@ -526,6 +526,13 @@ pub fn cont_value(value: Value) -> Cont {
     Cont::Value_(value.share())
 }
 
+// TODO: possibly refactor to `Cont::Value(Value)` and `Cont::Value_(Value_)`
+#[inline(always)]
+pub fn cont_value_(value: Value_) -> Cont {
+    // TODO: memoize (), true, false, null, variants, etc.
+    Cont::Value_(value)
+}
+
 pub fn return_<A: Active>(active: &mut A, v: Value_) -> Result<Step, Interruption> {
     let mut stack = active.stack().fast_clone();
     loop {
@@ -609,8 +616,7 @@ fn stack_cont_has_redex<A: ActiveBorrow>(active: &A, v: &Value) -> Result<bool, 
             DoAdaptonNav2(_) => true,
             GetAdaptonPointer => true,
             Force1 => true,
-            ForceBegin(_space) => false,
-            ForceEnd => false,
+            Force2 => true,
         };
         Ok(r)
     }

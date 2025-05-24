@@ -14,7 +14,7 @@ use crate::vm_types::{
     Active, Cont, DebugPrintLine, Env, Interruption, Pointer, Response, Step,
 };
 use crate::{nyi, type_mismatch_, vm_step, Shared};
-use im_rc::{HashMap, Vector};
+use im_rc::{vector, HashMap, Vector};
 
 use crate::vm_step::{
     cont_value, decs_step, exp_cont, exp_conts, literal_step, object_step, return_, return_step,
@@ -553,10 +553,31 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             *active.cont() = cont_value(v.get());
             Ok(Step {})
         }
-        GetAdaptonPointer => todo!(),
-        Force1 => todo!(),
-        ForceBegin(_space) => todo!(),
-        ForceEnd => todo!(),
+        GetAdaptonPointer => {
+            if let Value::AdaptonPointer(p) = v.get() {
+                let v = active.adapton().get_pointer(p)?;
+                *active.cont() = Cont::Value_(v);
+                Ok(Step {})
+            } else {
+                type_mismatch!(file!(), line!())
+            }
+        }
+        Force1 => {
+            if let Value::AdaptonPointer(ref p) = *v {
+                let thunk_body = active.adapton().force_begin(p.clone())?;
+                *active.env() = thunk_body.env;
+                *active.ctx_id() = thunk_body.ctx;
+                *active.cont() = Cont::Exp_(thunk_body.content, vector!());
+                Ok(Step {})
+            } else {
+                type_mismatch!(file!(), line!())
+            }
+        }
+        Force2 => {
+            active.adapton().force_end(v.clone())?;
+            *active.cont() = Cont::Value_(v);
+            Ok(Step {})
+        }
     }
 }
 
