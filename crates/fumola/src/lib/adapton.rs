@@ -1,5 +1,4 @@
 use std::cmp::Ordering;
-use std::convert::TryInto;
 
 use crate::ast::Exp_;
 use crate::value::{Closed, Symbol, Symbol_, ThunkBody, Value, Value_};

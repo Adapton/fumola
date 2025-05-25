@@ -60,6 +60,16 @@ fn get_relevant_time_pair() {
         "(2, 1)",
     )
 }
+
+#[test]
+fn symbol_identity() {
+    assert_("1-`x == (1)-(`x)", "true");
+    assert_("1+`x == (1)+(`x)", "true");
+    assert_("1(`x) == 1(`x)", "true");
+    assert_("-(`x) == -(`x)", "true");
+    assert_("+(`x) == +(`x)", "true");
+}
+
 #[test]
 fn symbol_ordering() {
     assert_("1-`x == 1-`x", "true");
