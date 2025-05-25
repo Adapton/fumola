@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::num::Wrapping;
 use std::rc::Rc;
 
-use crate::adapton::Pointer as AdaptonPointer;
+use crate::adapton::{Pointer as AdaptonPointer, Space as AdaptonSpace, Time as AdaptonTime};
 use crate::ast::{
     BinOp, Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, QuotedAst, ToId, UnOp,
 };
@@ -158,6 +158,8 @@ pub enum Value {
     QuotedAst(QuotedAst),
     Symbol(Symbol_),
     AdaptonPointer(AdaptonPointer),
+    AdaptonTime(AdaptonTime),
+    AdaptonSpace(AdaptonSpace),
     Thunk(ThunkBody),
 }
 
@@ -292,6 +294,10 @@ impl FastRandIter {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum PrimFunction {
+    AdaptonNow,
+    AdaptonHere,
+    AdaptonSpace,
+    AdaptonTime,
     AtSignVar(String),
     DebugPrint,
     NatToText,
@@ -313,6 +319,10 @@ impl PrimFunction {
         use CollectionFunction::*;
         use PrimFunction::*;
         Ok(match name.as_str() {
+            "\"adaptonNow\"" => AdaptonNow,
+            "\"adaptonHere\"" => AdaptonHere,
+            "\"adaptonTime\"" => AdaptonTime,
+            "\"adaptonSpace\"" => AdaptonSpace,
             "\"print\"" => DebugPrint,
             "\"natToText\"" => NatToText,
             "\"hashMapNew\"" => Collection(HashMap(HashMapFunction::New)),
@@ -599,7 +609,6 @@ impl Value {
             Value::Symbol(_) => Err(ValueError::ToRust("Symbol".to_string()))?,
             Value::AdaptonPointer(_) => Err(ValueError::ToRust("NamedPointer".to_string()))?,
             Value::Thunk(_) => Err(ValueError::ToRust("Thunk".to_string()))?,
-
             Value::Pointer(_) => Err(ValueError::ToRust("Pointer".to_string()))?,
             Value::Actor(_) => Err(ValueError::ToRust("Actor".to_string()))?,
             Value::ActorMethod(_) => Err(ValueError::ToRust("ActorMethod".to_string()))?,
@@ -628,6 +637,8 @@ impl Value {
             Value::Dynamic(d) => {
                 serde_json::to_value(d).map_err(|e| ValueError::ToRust(e.to_string()))?
             }
+            Value::AdaptonTime(time) => todo!(),
+            Value::AdaptonSpace(space) => todo!(),
         })
     }
 

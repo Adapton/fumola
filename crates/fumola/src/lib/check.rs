@@ -3,6 +3,7 @@ use crate::format::{format_one_line, format_pretty};
 use crate::lexer::create_token_tree;
 use crate::lexer_types::{GroupType, Token, TokenTree};
 use crate::parser_types::SyntaxError;
+use log::{debug, info};
 use regex::Regex;
 use structopt::lazy_static::lazy_static;
 
@@ -38,11 +39,10 @@ fn prepare_token_tree(tt: TokenTree) -> TokenTree {
 }
 
 pub fn parse(input: &str) -> Result<Prog, SyntaxError> {
-    use log::info;
     let tt = create_token_tree(input).map_err(|_| SyntaxError::Custom {
         message: "Unknown lexer error".to_string(),
     })?;
-    info!("parse::tt= {:?}", tt);
+    debug!("parse::tt= {:?}", tt);
     let prepared_tt = prepare_token_tree(tt);
     let input = format!("{}", prepared_tt);
 
@@ -73,12 +73,12 @@ pub fn assert_lex_roundtrip(input: &str, width: Option<usize>) -> TokenTree {
 }
 
 pub fn assert_parse(input: &str, expected: &str) -> Prog {
-    println!("testing {}", input);
+    info!("testing {}", input);
     let prog = parse(input).unwrap();
-    println!(" * input {}", input);
-    println!(" * parsed {:?}", prog);
+    info!(" * input {}", input);
+    info!(" * parsed {:?}", prog);
     let formatted = format_one_line(&prog);
-    println!(" * formatted {}", formatted);
+    info!(" * formatted {}", formatted);
     assert_eq!(&formatted, expected);
     prog
 }

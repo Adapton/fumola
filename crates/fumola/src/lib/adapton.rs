@@ -236,6 +236,8 @@ pub trait AdaptonState {
     fn new() -> Self
     where
         Self: Sized;
+    fn now(&self) -> Time;
+    fn here(&self) -> Space;
     fn put_pointer(&mut self, _pointer: Pointer, _value: Value_) -> Res<()>;
     fn put_symbol(&mut self, _symbol: Symbol_, _value: Value_) -> Res<Pointer>;
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_>;
@@ -299,6 +301,20 @@ impl AdaptonState for State {
         match self {
             Self::Simple(s) => s.navigate_end(),
             Self::Graphical(g) => g.navigate_end(),
+        }
+    }
+
+    fn now(&self) -> Time {
+        match self {
+            Self::Simple(s) => s.now(),
+            Self::Graphical(g) => g.now(),
+        }
+    }
+
+    fn here(&self) -> Space {
+        match self {
+            Self::Simple(s) => s.here(),
+            Self::Graphical(g) => g.here(),
         }
     }
 }
@@ -449,6 +465,14 @@ impl AdaptonState for SimpleState {
         // to do -- save _value
         self.pop_stack()
     }
+
+    fn now(&self) -> Time {
+        self.time.clone()
+    }
+
+    fn here(&self) -> Space {
+        self.space.clone()
+    }
 }
 
 impl AdaptonState for GraphicalState {
@@ -485,6 +509,14 @@ impl AdaptonState for GraphicalState {
     }
 
     fn navigate_end(&mut self) -> Res<()> {
+        todo!()
+    }
+
+    fn now(&self) -> Time {
+        todo!()
+    }
+
+    fn here(&self) -> Space {
         todo!()
     }
 }

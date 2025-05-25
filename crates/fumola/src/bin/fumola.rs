@@ -51,9 +51,9 @@ pub struct CliOpt {
     /// Debug-level logging (medium verbose)
     #[arg(global = true, long)]
     pub log_debug: bool,
-    /// Coarse logging information (not verbose)
+    /// Coarse logging information (only warnings and errors)
     #[arg(global = true, long)]
-    pub log_info: bool,
+    pub log_warn: bool,
 
     /// Import one or more module files
     #[arg(short, long, value_name = "FILE", num_args = 1.., action = clap::ArgAction::Append, global=true)]
@@ -101,15 +101,14 @@ fn main() -> OurResult<()> {
     let cli_opt = CliOpt::parse();
     info!("Init log...");
     init_log(
-        match (cli_opt.log_trace, cli_opt.log_debug, cli_opt.log_info) {
+        match (cli_opt.log_trace, cli_opt.log_debug, cli_opt.log_warn) {
             (true, _, _) => log::LevelFilter::Trace,
             (_, true, _) => log::LevelFilter::Debug,
-            (_, _, true) => log::LevelFilter::Info,
-            (_, _, _) => log::LevelFilter::Warn,
+            (_, _, true) => log::LevelFilter::Warn,
+            (_, _, _) => log::LevelFilter::Info,
         },
     );
-    info!("Evaluating CLI command: {:?} ...", &cli_opt.command);
-    println!("{:?}", cli_opt.import);
+    info!("Importing files: {:?}", cli_opt.import);
     for path in cli_opt.import.iter() {
         let file_content = read_file_if_exists(path);
         if let Some(file_content) = file_content {
@@ -122,6 +121,7 @@ fn main() -> OurResult<()> {
             return Err(OurError::FileNotFound(path.clone()));
         }
     }
+    info!("{:?} ...", &cli_opt.command);
     let () = match cli_opt.command {
         CliCommand::Check { input } => {
             let _ = fumola::check::parse(&input)?;

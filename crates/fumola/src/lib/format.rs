@@ -313,15 +313,29 @@ impl ToDoc for Value {
             }
             Value::Module(m) => m.doc(),
             Value::AdaptonPointer(p) => p.doc(),
-            Value::Thunk(c) => kwd("thunk")
-                .append(c.ctx.doc())
-                .append(c.env.doc())
-                .append(c.content.doc()),
+            Value::Thunk(c) => kwd("@thunk").append(enclose(
+                "(",
+                c.ctx
+                    .doc()
+                    .append(RcDoc::text(","))
+                    .append(c.env.doc())
+                    .append(RcDoc::text(","))
+                    .append(c.content.doc()),
+                ")",
+            )),
             Value::Pointer(p) => p.doc(),
             Value::Symbol(s) => s.doc(),
             Value::Opaque(_) => todo!(),
             Value::Index(_, _) => todo!(),
-            Value::Function(f) => enclose("<", f.0.content.doc(), ">"),
+            Value::Function(f) => kwd("@func").append(enclose(
+                "(",
+                f.0.ctx
+                    .doc()
+                    .append(RcDoc::text(","))
+                    .append(f.0.env.doc().append(RcDoc::text(",")))
+                    .append(f.0.content.doc()),
+                ")",
+            )),
             Value::PrimFunction(f) => kwd("prim").append(RcDoc::text(format!("\"{:?}\"", f))),
             Value::Collection(c) => match c {
                 crate::value::Collection::HashMap(m) => hashmap(m),
@@ -331,6 +345,8 @@ impl ToDoc for Value {
             Value::Actor(_) => todo!(),
             Value::ActorMethod(_) => todo!(),
             Value::QuotedAst(q) => q.doc(),
+            Value::AdaptonTime(time) => todo!(),
+            Value::AdaptonSpace(space) => todo!(),
         }
     }
 }

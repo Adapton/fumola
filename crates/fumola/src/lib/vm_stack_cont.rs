@@ -1,6 +1,6 @@
 //use crate::{ast::{Mut, ProjIndex}, shared::FastClone, type_mismatch, vm_types::{stack::{FieldContext, FieldValue, Frame, FrameCont}, Active, Cont, Step}, Interruption, Value, Value_};
 
-use crate::adapton::AdaptonState;
+use crate::adapton::{self, AdaptonState};
 use crate::ast::{Cases, Exp_, Inst, Literal, Mut, Pat, Pat_, ProjIndex, QuotedAst};
 use crate::shared::{FastClone, Share};
 use crate::value::{
@@ -571,18 +571,35 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                 active.stack().push_front(Frame {
                     context,
                     env,
-                    cont: FrameCont::Force2,
+                    cont: FrameCont::ForceAdaptonPointer,
                     cont_prim_type: None,
                     source: crate::vm_types::Source::Evaluation,
                 });
                 *active.env() = thunk_body.env;
                 *active.ctx_id() = thunk_body.ctx;
                 exp_step(active, thunk_body.content)
+            } else if let Value::Thunk(ref thunk_body) = *v {
+                let env = active.env().fast_clone();
+                let context = active.defs().active_ctx.clone();
+                active.stack().push_front(Frame {
+                    context,
+                    env,
+                    cont: FrameCont::ForceThunk,
+                    cont_prim_type: None,
+                    source: crate::vm_types::Source::Evaluation,
+                });
+                *active.env() = thunk_body.env.fast_clone();
+                *active.ctx_id() = thunk_body.ctx.clone();
+                exp_step(active, thunk_body.content.fast_clone())
             } else {
                 type_mismatch!(file!(), line!())
             }
         }
-        Force2 => {
+        ForceThunk => {
+            *active.cont() = Cont::Value_(v);
+            Ok(Step {})
+        }
+        ForceAdaptonPointer => {
             active.adapton().force_end(v.clone())?;
             *active.cont() = Cont::Value_(v);
             Ok(Step {})
@@ -865,6 +882,30 @@ fn call_prim_function<A: Active>(
             Ok(Step {})
         }
         Collection(cf) => call_collection_function(active, cf, targs, args),
+        AdaptonNow => {
+            *active.cont() = cont_value(Value::AdaptonTime(active.adapton().now()));
+            Ok(Step {})
+        }
+        AdaptonHere => {
+            *active.cont() = cont_value(Value::AdaptonSpace(active.adapton().here()));
+            Ok(Step {})
+        }
+        AdaptonSpace => {
+            if let Ok(symbol) = args.into_sym_or(()) {
+                *active.cont() = cont_value(Value::AdaptonSpace(adapton::Space::Symbol(symbol)));
+                Ok(Step {})
+            } else {
+                type_mismatch!(file!(), line!())
+            }
+        }
+        AdaptonTime => {
+            if let Ok(symbol) = args.into_sym_or(()) {
+                *active.cont() = cont_value(Value::AdaptonTime(adapton::Time::Symbol(symbol)));
+                Ok(Step {})
+            } else {
+                type_mismatch!(file!(), line!())
+            }
+        }
     }
 }
 

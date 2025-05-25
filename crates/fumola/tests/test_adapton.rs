@@ -1,6 +1,11 @@
 use fumola::check::assert_vm_eval as assert_;
 
 #[test]
+fn force_thunk() {
+    assert_("force (thunk {1 + 2})", "3")
+}
+
+#[test]
 fn get_put() {
     assert_("@(1 := 1)", "1")
 }
@@ -71,6 +76,22 @@ fn symbol_identity() {
 }
 
 #[test]
+fn here() {
+    assert_(
+        "do goto space `x { prim \"adaptonHere\" () }",
+        "prim \"adaptonSpace\" `x",
+    );
+}
+
+#[test]
+fn now() {
+    assert_(
+        "do goto time `x { prim \"adaptonNow\" () }",
+        "prim \"adaptonTime\" `x",
+    );
+}
+
+#[test]
 fn symbol_ordering() {
     assert_("1-`x == 1-`x", "true");
     assert_("1-`x == 2-`x", "false");
@@ -93,4 +114,20 @@ fn symbol_ordering() {
 
     assert_("`b-`x >= `b-`x", "true");
     assert_("`a-`x >= `a-`x", "true");
+}
+
+#[test]
+fn delayed_put() {
+    assert_(
+        r#"
+  let t = (prim "adaptonNow") ();
+  let cell = 0 := null;
+  do goto time `t { 
+    (cell, t) := ?1;
+    assert ((@ cell) == null)
+  };
+  assert ((@ cell) == ?1)
+"#,
+        "()",
+    )
 }
