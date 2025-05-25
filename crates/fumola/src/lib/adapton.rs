@@ -1,3 +1,6 @@
+use std::cmp::Ordering;
+use std::convert::TryInto;
+
 use crate::ast::Exp_;
 use crate::value::{Closed, Symbol, Symbol_, ThunkBody, Value, Value_};
 use crate::Shared;
@@ -156,6 +159,7 @@ pub enum State {
 pub enum Error {
     Internal(u32),
     TypeMismatch(u32),
+    UndefinedNow(Pointer),
 }
 
 pub type Res<Ok> = Result<Ok, Error>;
@@ -166,6 +170,67 @@ pub enum Navigation {
     GotoSpace,
     WithinTime,
     WithinSpace,
+}
+
+impl PartialOrd for Symbol {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (Symbol::QuotedAst(q1), Symbol::QuotedAst(q2)) => {
+                // We choose non-equal QuotedAsts (including symbols) to be incomparable.
+                // That permits their use to express certain kinds of independence/parallelism in the time ordering.
+                if q1 == q2 {
+                    Some(Ordering::Equal)
+                } else {
+                    None
+                }
+            }
+            (Symbol::Nat(n1), Symbol::Nat(n2)) => Some(n1.cmp(n2)),
+            (Symbol::Nat(_), Symbol::QuotedAst(_)) => Some(Ordering::Less),
+            (Symbol::QuotedAst(_), Symbol::Nat(_)) => Some(Ordering::Greater),
+            (Symbol::Nat(_), Symbol::UnOp(_, _)) => Some(Ordering::Less),
+            (Symbol::Nat(_), Symbol::BinOp(_, _, _)) => Some(Ordering::Less),
+            (Symbol::Nat(_), Symbol::Call(_, _)) => Some(Ordering::Less),
+            (Symbol::Call(_, _), Symbol::Nat(_)) => Some(Ordering::Greater),
+            (Symbol::Call(_, _), Symbol::Int(_)) => Some(Ordering::Greater),
+            (Symbol::Call(s11, s12), Symbol::Call(s21, s22)) => {
+                let cmp1 = s11.get().partial_cmp(s21);
+                if let Some(Ordering::Equal) = cmp1 {
+                    s12.get().partial_cmp(s22)
+                } else {
+                    cmp1
+                }
+            }
+            (Symbol::Call(s1, _), s2) => s1.get().partial_cmp(s2),
+            (s1, Symbol::Call(s2, _)) => s1.partial_cmp(&*s2),
+            (Symbol::BinOp(s11, b1, s12), Symbol::BinOp(s21, b2, s22)) => {
+                let cmp1 = s11.get().partial_cmp(s21);
+                if let Some(Ordering::Equal) = cmp1 {
+                    let cmp2 = s12.get().partial_cmp(s22);
+                    if let Some(Ordering::Equal) = cmp2 {
+                        b1.partial_cmp(b2)
+                    } else {
+                        cmp2
+                    }
+                } else {
+                    cmp1
+                }
+            }
+            (s1, s2) => {
+                todo!("{:?} <= {:?}", s1, s2)
+            }
+        }
+    }
+}
+
+impl PartialOrd for Time {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (Time::Now, Time::Now) => Some(Ordering::Equal),
+            (Time::Now, _) => Some(Ordering::Less),
+            (_, Time::Now) => Some(Ordering::Greater),
+            (Time::Symbol(s1), Time::Symbol(s2)) => s1.partial_cmp(s2),
+        }
+    }
 }
 
 pub trait AdaptonState {
@@ -299,9 +364,26 @@ impl SimpleState {
             if let Some(cell) = cells_by_time.get(&self.time) {
                 Ok(cell)
             } else {
-                Err(Error::Internal(line!()))
-                // to do -- linear scan to find nearest one, if it exists.
-                // otherwise, Error::Undefined(pointer, self.time)
+                let mut time = None;
+                let mut cell = None;
+                for (time_, cell_) in cells_by_time.iter() {
+                    if &self.time >= time_ && time == None {
+                        // Initialize with a viable cell's time.
+                        time = Some(time_);
+                        cell = Some(cell_);
+                    } else if let Some(t) = time {
+                        // This cell's time is closer to the current moment.
+                        // It shadows the earlier cell we found.
+                        if t < time_ && time_ <= &self.time {
+                            time = Some(time_);
+                            cell = Some(cell_);
+                        }
+                    }
+                }
+                match cell {
+                    Some(c) => Ok(c),
+                    None => Err(Error::UndefinedNow(pointer.clone())),
+                }
             }
         } else {
             Err(Error::Internal(line!()))

@@ -781,14 +781,14 @@ pub enum Pat {
 
 pub type UnOp_ = Node<UnOp>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd)]
 pub enum UnOp {
     Pos,
     Neg,
     Not,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd)]
 pub enum BinOp {
     Add,
     Sub,

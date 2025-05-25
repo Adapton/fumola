@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use crate::ast::{BinOp, PrimType, RelOp, UnOp};
 use crate::value::{Symbol, Value, Value_};
 use crate::vm_types::Interruption;
@@ -135,24 +137,36 @@ pub fn relop(
             (Unit, Unit) => false,
             (Nat(n1), Nat(n2)) => n1 < n2,
             (Int(i1), Int(i2)) => i1 < i2,
+            (Symbol(s1), Symbol(s2)) => s1.partial_cmp(s2) == Some(Ordering::Less),
             _ => nyi!(line!(), "{:?} < {:?}", v1, v2)?,
         },
         Le => match (&*v1, &*v2) {
             (Unit, Unit) => false,
             (Nat(n1), Nat(n2)) => n1 <= n2,
             (Int(i1), Int(i2)) => i1 <= i2,
+            (Symbol(s1), Symbol(s2)) => match s1.partial_cmp(s2) {
+                Some(Ordering::Less) => true,
+                Some(Ordering::Equal) => true,
+                _ => false,
+            },
             _ => nyi!(line!(), "{:?} <= {:?}", v1, v2)?,
         },
         Gt => match (&*v1, &*v2) {
             (Unit, Unit) => false,
             (Nat(n1), Nat(n2)) => n1 > n2,
             (Int(i1), Int(i2)) => i1 > i2,
+            (Symbol(s1), Symbol(s2)) => s1.partial_cmp(s2) == Some(Ordering::Greater),
             _ => nyi!(line!(), "{:?} > {:?}", v1, v2)?,
         },
         Ge => match (&*v1, &*v2) {
             (Unit, Unit) => false,
             (Nat(n1), Nat(n2)) => n1 >= n2,
             (Int(i1), Int(i2)) => i1 >= i2,
+            (Symbol(s1), Symbol(s2)) => match s1.partial_cmp(s2) {
+                Some(Ordering::Greater) => true,
+                Some(Ordering::Equal) => true,
+                _ => false,
+            },
             _ => nyi!(line!(), "{:?} >= {:?}", v1, v2)?,
         },
         //        _ => nyi!(line!(), "relop({:?}, {:?}, {:?})", relop, v1, v2)?,
