@@ -1,3 +1,7 @@
+//
+// 2025-05-26 -- Playing with some ideas for a collections library.
+// This code's status is still "sketch", not something nailed down. 
+//
 module {
   public type SymbolSet = {};
   public module SymbolSet {

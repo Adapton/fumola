@@ -1,3 +1,7 @@
+//
+// 2025-05-26 -- test code for delayed puts 
+// that required some interaction in REPL to debug.
+//
 module {
 public func go() {
 
