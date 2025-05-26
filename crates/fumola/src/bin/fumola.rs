@@ -45,13 +45,13 @@ pub enum OurError {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct CliOpt {
-    /// Trace-level logging (most verbose)
+    /// Log at trace level, most verbose.
     #[arg(global = true, long)]
     pub log_trace: bool,
-    /// Debug-level logging (medium verbose)
+    /// Log at debug level, medium verbose.
     #[arg(global = true, long)]
     pub log_debug: bool,
-    /// Coarse logging information (only warnings and errors)
+    /// Do not log, except for warnings/errors.
     #[arg(global = true, long)]
     pub log_warn: bool,
 

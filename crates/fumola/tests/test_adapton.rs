@@ -145,7 +145,7 @@ while ((@ cell) == null) {
     (cell, start) := ?1;
     assert ((@ cell) == null)
   };
-  assert ((prim "adaptonNow") == start);
+  assert ((prim "adaptonNow" ()) == start);
 };
 assert ((@ cell) == ?1)
 "#,

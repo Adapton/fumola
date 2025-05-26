@@ -647,8 +647,8 @@ impl Value {
             Value::Dynamic(d) => {
                 serde_json::to_value(d).map_err(|e| ValueError::ToRust(e.to_string()))?
             }
-            Value::AdaptonTime(time) => todo!(),
-            Value::AdaptonSpace(space) => todo!(),
+            Value::AdaptonTime(_time) => todo!(),
+            Value::AdaptonSpace(_space) => todo!(),
         })
     }
 
