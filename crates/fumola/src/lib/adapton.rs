@@ -340,17 +340,17 @@ impl SimpleState {
     }
 
     fn undelay(&mut self) -> Res<()> {
-           let delayed_cells = self
-                    .time_space
-                    .get(&self.time)
-                    .map(|x| x.clone())
-                    .unwrap_or(HashMap::new());
-                self.time_space.insert(self.time.clone(), HashMap::new());
-                for (pointer, cell) in delayed_cells.iter() {
-                    let cell_value = cell.get_value()?;
-                    self.put_pointer(pointer.clone(), cell_value)?;
-                };
-                Ok(())
+        let delayed_cells = self
+            .time_space
+            .get(&self.time)
+            .map(|x| x.clone())
+            .unwrap_or(HashMap::new());
+        self.time_space.insert(self.time.clone(), HashMap::new());
+        for (pointer, cell) in delayed_cells.iter() {
+            let cell_value = cell.get_value()?;
+            self.put_pointer(pointer.clone(), cell_value)?;
+        }
+        Ok(())
     }
 
     // get_cell --
@@ -431,9 +431,7 @@ impl AdaptonState for SimpleState {
             Navigation::WithinTime => self.time = self.time.apply(symbol),
         };
         match &nav {
-            Navigation::GotoTime | Navigation::WithinTime => {
-             self.undelay()?
-            }
+            Navigation::GotoTime | Navigation::WithinTime => self.undelay()?,
             _ => (),
         }
         Ok(())

@@ -355,7 +355,9 @@ impl ToDoc for Value {
             Value::ActorMethod(_) => todo!(),
             Value::QuotedAst(q) => q.doc(),
             Value::AdaptonTime(time) => kwd("@adaptonTime").append(enclose("(", time.doc(), ")")),
-            Value::AdaptonSpace(_space) => todo!(),
+            Value::AdaptonSpace(space) => {
+                kwd("@adaptonSpace").append(enclose("(", space.doc(), ")"))
+            }
         }
     }
 }
