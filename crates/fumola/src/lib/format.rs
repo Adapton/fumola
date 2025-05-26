@@ -1,6 +1,6 @@
 // Reference: https://github.com/dfinity/candid/blob/master/rust/candid/src/bindings/candid.rs
 
-use crate::adapton::Space;
+use crate::adapton::{Space, Time};
 use crate::ast::{
     AdaptonNav, AdaptonNavDim, BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_,
     Delim, Exp, ExpField, Exp_, Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat,
@@ -204,10 +204,19 @@ impl ToDoc for Closed<Exp_> {
 impl ToDoc for Space {
     fn doc(&self) -> RcDoc {
         match self {
-            Space::Here => RcDoc::text("here"),
+            Space::Here => RcDoc::text("@here"),
             Space::Exp_(None, c) => c.doc(),
             Space::Exp_(Some(s), c) => s.doc().append(enclose("(", c.doc(), ")")),
             Space::Symbol(s) => s.doc(),
+        }
+    }
+}
+
+impl ToDoc for Time {
+    fn doc(&self) -> RcDoc {
+        match self {
+            Time::Now => RcDoc::text("@now"),
+            Time::Symbol(s) => s.doc(),
         }
     }
 }
@@ -345,8 +354,8 @@ impl ToDoc for Value {
             Value::Actor(_) => todo!(),
             Value::ActorMethod(_) => todo!(),
             Value::QuotedAst(q) => q.doc(),
-            Value::AdaptonTime(time) => todo!(),
-            Value::AdaptonSpace(space) => todo!(),
+            Value::AdaptonTime(time) => kwd("@adaptonTime").append(enclose("(", time.doc(), ")")),
+            Value::AdaptonSpace(_space) => todo!(),
         }
     }
 }

@@ -98,6 +98,16 @@ pub fn assert_vm_eval(input_prog: &str, expected_result: &str) {
     assert_eq!(v1, v2)
 }
 
+pub fn assert_vm_eval_result_line(input_prog: &str, expected_result: &str) {
+    log::info!(
+        "\nassert_vm_eval(\"{}\", \"{}\")",
+        input_prog,
+        expected_result
+    );
+    let v1 = crate::vm::eval(input_prog).unwrap();
+    assert_eq!(format_one_line(&v1), expected_result)
+}
+
 pub fn assert_vm_interruption(
     input_prog: &str,
     expected_interruption: &crate::vm_types::Interruption,

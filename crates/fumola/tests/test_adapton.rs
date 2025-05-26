@@ -1,4 +1,5 @@
 use fumola::check::assert_vm_eval as assert_;
+//use fumola::check::assert_vm_eval_result_line as assert__;
 
 #[test]
 fn force_thunk() {
@@ -8,6 +9,22 @@ fn force_thunk() {
 #[test]
 fn get_put() {
     assert_("@(1 := 1)", "1")
+}
+
+#[test]
+fn do_within_time() {
+    assert_(
+        "do goto time 1 { prim \"adaptonNow\" () }",
+        "prim \"adaptonTime\" 1",
+    )
+}
+
+#[test]
+fn do_within_space() {
+    assert_(
+        "do goto space 1 { prim \"adaptonHere\" () }",
+        "prim \"adaptonSpace\" 1",
+    )
 }
 
 #[test]
@@ -46,12 +63,12 @@ fn goto_space_force_put_thunk_time() {
 }
 
 #[test]
-fn get_relevant_time_now() {
+fn two_puts_get_relevant_time_now() {
     assert_("let p = 0 := 0; do goto time `t { 0 := 1 }; @ p", "0")
 }
 
 #[test]
-fn get_relevant_time_later() {
+fn two_puts_get_relevant_time_later() {
     assert_(
         "let p = 0 := 0; do goto time 1 { 0 := 1 }; do goto time 2 { @ p }",
         "1",
@@ -59,7 +76,7 @@ fn get_relevant_time_later() {
 }
 
 #[test]
-fn get_relevant_time_pair() {
+fn two_puts_get_relevant_time_pair() {
     assert_(
         "let p = 0 := 0; do goto time 1 { 0 := 1 }; 0 := 2; (@ p, do goto time 1 { @ p })",
         "(2, 1)",
@@ -119,14 +136,18 @@ fn symbol_ordering() {
 #[test]
 fn delayed_put() {
     assert_(
-        r#"
-  let t = (prim "adaptonNow") ();
-  let cell = 0 := null;
+        r#"let start = (prim "adaptonNow") ();
+let cell = 0 := null;
+while ((@ cell) == null) { 
   do goto time `t { 
-    (cell, t) := ?1;
+    assert ((prim "adaptonNow" ()) == (prim "adaptonTime" `t));
+    assert ((@ cell) == null);
+    (cell, start) := ?1;
     assert ((@ cell) == null)
   };
-  assert ((@ cell) == ?1)
+  assert ((prim "adaptonNow") == start);
+};
+assert ((@ cell) == ?1)
 "#,
         "()",
     )

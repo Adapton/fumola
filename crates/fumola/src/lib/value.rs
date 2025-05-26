@@ -482,6 +482,16 @@ impl Value {
         })
     }
 
+    pub fn into_time_or<E>(&self, err: E) -> Result<AdaptonTime, E> {
+        match self {
+            Value::AdaptonTime(t) => Ok(t.clone()),
+            _ => {
+                let symbol = self.into_sym_or(err)?;
+                Ok(AdaptonTime::Symbol(symbol))
+            }
+        }
+    }
+
     pub fn into_sym_or<E>(&self, err: E) -> Result<Symbol_, E> {
         match self {
             Value::Symbol(s) => Ok(s.clone()),

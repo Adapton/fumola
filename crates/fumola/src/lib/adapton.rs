@@ -34,7 +34,7 @@ pub struct ThunkNode {
     pub result: Option<Value_>,
 }
 
-pub type Cells = HashMap<Space, CellByTime>;
+pub type SpaceTime = HashMap<Space, CellByTime>;
 pub type CellByTime = HashMap<Time, Cell>;
 
 pub type Nodes = HashMap<Space, NodeByTime>;
@@ -50,7 +50,7 @@ pub struct GraphicalState {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SimpleState {
-    pub cells: Cells,
+    pub space_time: SpaceTime,
     pub stack: Vector<SimpleFrame>,
     pub time: Time,
     pub space: Space,
@@ -241,6 +241,8 @@ pub trait AdaptonState {
     fn put_pointer(&mut self, _pointer: Pointer, _value: Value_) -> Res<()>;
     fn put_symbol(&mut self, _symbol: Symbol_, _value: Value_) -> Res<Pointer>;
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_>;
+    fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()>;
+    fn put_symbol_delay(&mut self, symbol: Symbol_, time: Time, value: Value_) -> Res<Pointer>;
     fn force_begin(&mut self, _pointer: Pointer) -> Res<ThunkBody>;
     fn force_end(&mut self, _value: Value_) -> Res<()>;
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()>;
@@ -317,23 +319,37 @@ impl AdaptonState for State {
             Self::Graphical(g) => g.here(),
         }
     }
+
+    fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()> {
+        match self {
+            Self::Simple(s) => s.put_pointer_delay(pointer, time, value),
+            Self::Graphical(g) => g.put_pointer_delay(pointer, time, value),
+        }
+    }
+
+    fn put_symbol_delay(&mut self, symbol: Symbol_, time: Time, value: Value_) -> Res<Pointer> {
+        match self {
+            Self::Simple(s) => s.put_symbol_delay(symbol, time, value),
+            Self::Graphical(g) => g.put_symbol_delay(symbol, time, value),
+        }
+    }
 }
 
 impl SimpleState {
     #[allow(dead_code)]
     fn get_cell_by_time_mut<'a>(&'a mut self, p: &Pointer) -> &'a mut CellByTime {
-        let exists = self.cells.get(p) != None;
+        let exists = self.space_time.get(p) != None;
         if !exists {
-            self.cells.insert(p.clone(), HashMap::new());
+            self.space_time.insert(p.clone(), HashMap::new());
         }
-        self.cells.get_mut(p).unwrap() // always succeeds, because of check above.
+        self.space_time.get_mut(p).unwrap() // always succeeds, because of check above.
     }
     fn get_cell_by_time<'a>(&'a mut self, p: &Pointer) -> &'a CellByTime {
-        let not_exists = self.cells.get(p) == None;
+        let not_exists = self.space_time.get(p) == None;
         if not_exists {
-            assert_eq!(self.cells.insert(p.clone(), HashMap::new()), None);
+            assert_eq!(self.space_time.insert(p.clone(), HashMap::new()), None);
         }
-        self.cells.get(p).unwrap()
+        self.space_time.get(p).unwrap()
     }
     fn _get_cell_mut<'a>(&'a mut self, p: &Pointer, t: &Time) -> Option<&'a mut Cell> {
         self.get_cell_by_time_mut(p).get_mut(t)
@@ -375,7 +391,7 @@ impl SimpleState {
     // (doing a log time search is possible in the future: would require an ordered representation,
     // and the boilerplate for Serialize/Deserialize for it)
     fn get_cell<'a>(&'a self, pointer: &Pointer) -> Res<&'a Cell> {
-        if let Some(cells_by_time) = self.cells.get(pointer) {
+        if let Some(cells_by_time) = self.space_time.get(pointer) {
             if let Some(cell) = cells_by_time.get(&self.time) {
                 Ok(cell)
             } else {
@@ -411,7 +427,7 @@ impl AdaptonState for SimpleState {
         SimpleState {
             time: Time::Now,
             space: Space::Here,
-            cells: HashMap::new(),
+            space_time: HashMap::new(),
             stack: Vector::new(),
             thunk_pointer: None,
         }
@@ -427,7 +443,7 @@ impl AdaptonState for SimpleState {
         let updated = self
             .get_cell_by_time(&pointer)
             .update(time, Self::new_cell(space, value));
-        self.cells.insert(pointer, updated);
+        self.space_time.insert(pointer, updated);
         Ok(())
     }
     fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_> {
@@ -473,6 +489,14 @@ impl AdaptonState for SimpleState {
     fn here(&self) -> Space {
         self.space.clone()
     }
+
+    fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()> {
+        todo!()
+    }
+
+    fn put_symbol_delay(&mut self, symbol: Symbol_, time: Time, value: Value_) -> Res<Pointer> {
+        todo!()
+    }
 }
 
 impl AdaptonState for GraphicalState {
@@ -517,6 +541,14 @@ impl AdaptonState for GraphicalState {
     }
 
     fn here(&self) -> Space {
+        todo!()
+    }
+
+    fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()> {
+        todo!()
+    }
+
+    fn put_symbol_delay(&mut self, symbol: Symbol_, time: Time, value: Value_) -> Res<Pointer> {
         todo!()
     }
 }

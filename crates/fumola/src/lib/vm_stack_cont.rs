@@ -114,6 +114,30 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                 let p = active.adapton().put_symbol(symbol.clone(), v)?;
                 return_step(active, Value::AdaptonPointer(p).share())
             }
+            Value::Tuple(vs) => match (vs.get(0), vs.get(1)) {
+                (Some(v11), Some(v12)) => {
+                    let time = v12.into_time_or(Interruption::TypeMismatch(OptionCoreSource(
+                        Some(crate::vm_types::CoreSource {
+                            name: Some("adapton put, delayed".to_owned()),
+                            description: Some("Expected a symbol or time value in second component of assigned pair.".to_owned()),
+                            file: file!().to_string(),
+                            line: line!(),
+                        }),
+                    )))?;
+                    if let Value::AdaptonPointer(ref pointer) = &**v11 {
+                        active
+                            .adapton()
+                            .put_pointer_delay(pointer.clone(), time, v)?;
+                        unit_step(active)
+                    } else if let Ok(symbol) = v11.into_sym_or(()) {
+                        active.adapton().put_symbol_delay(symbol, time, v)?;
+                        unit_step(active)
+                    } else {
+                        type_mismatch!(file!(), line!())
+                    }
+                }
+                _ => type_mismatch!(file!(), line!()),
+            },
             v1 => {
                 if let Ok(symbol) = v1.into_sym_or(()) {
                     let p = active.adapton().put_symbol(symbol.clone(), v)?;
@@ -131,6 +155,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             }
         },
         BinAssign2(v1, bop) => {
+            // to do -- generalize to work with Adapton pointers.
             let v1d = match &*v1 {
                 Value::Pointer(p) => active.deref(p)?,
                 x => {
