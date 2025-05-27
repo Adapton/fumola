@@ -1,17 +1,37 @@
+use std::cmp::Ordering;
+
 use crate::ast::{BinOp, PrimType, RelOp, UnOp};
-use crate::value::{Value, Value_};
+use crate::value::{Symbol, Value, Value_};
 use crate::vm_types::Interruption;
+use crate::{type_mismatch_, Shared};
 use num_bigint::{BigUint, ToBigInt};
 
 use crate::{nyi, type_mismatch};
 
 pub fn unop(un: UnOp, v: Value_) -> Result<Value, Interruption> {
-    match (un, &*v) {
+    match (&un, &*v) {
         (UnOp::Neg, Value::Nat(n)) => Ok(Value::Int(-n.to_bigint().unwrap())),
-        (UnOp::Neg, _) => crate::nyi!(line!()),
-        (UnOp::Pos, _) => crate::nyi!(line!()),
-        (UnOp::Not, _) => crate::nyi!(line!()),
-        /* _ => crate::nyi!(line!()), */
+        (unop, v) => {
+            if let Ok(symbol) = v.into_sym_or(()) {
+                Ok(Value::Symbol(Shared::new(Symbol::UnOp(
+                    unop.clone(),
+                    symbol,
+                ))))
+            } else {
+                crate::nyi!(line!())
+            }
+        }
+    }
+}
+
+pub fn try_symbolic_binop(binop: &BinOp, v1: &Value, v2: &Value) -> Option<Value> {
+    match (v1.into_sym_or(()), v2.into_sym_or(())) {
+        (Ok(s1), Ok(s2)) => Some(Value::Symbol(Shared::new(Symbol::BinOp(
+            s1,
+            binop.clone(),
+            s2,
+        )))),
+        _ => None,
     }
 }
 
@@ -35,14 +55,14 @@ pub fn binop(
             (Int(i1), Int(i2)) => Ok(Int(i1 + i2)),
             (Float(f1), Float(f2)) => Ok(Float(*f1 + *f2)),
             // _ => nyi!(line!()),
-            (v1, v2) => unimplemented!("{:?} + {:?}", v1, v2),
+            (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
         Div => match (&*v1, &*v2) {
             (Nat(n1), Nat(n2)) => Ok(Nat(n1 / n2)),
             (Int(i1), Int(i2)) => Ok(Int(i1 / i2)),
             (Float(f1), Float(f2)) => Ok(Float(*f1 / *f2)),
             // _ => nyi!(line!()),
-            (v1, v2) => unimplemented!("{:?} + {:?}", v1, v2),
+            (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
         Sub => match (&*v1, &*v2) {
             (Nat(n1), Nat(n2)) => {
@@ -57,14 +77,14 @@ pub fn binop(
             (Nat(n1), Int(i2)) => Ok(Int(n1.to_bigint().unwrap() - i2)),
             (Float(f1), Float(f2)) => Ok(Float(*f1 - *f2)),
             // _ => nyi!(line!()),
-            (v1, v2) => unimplemented!("{:?} - {:?}", v1, v2),
+            (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
         Mul => match (&*v1, &*v2) {
             (Nat(n1), Nat(n2)) => Ok(Nat(n1 * n2)),
             (Int(i1), Int(i2)) => Ok(Int(i1 * i2)),
             (Float(f1), Float(f2)) => Ok(Float(*f1 * *f2)),
             // _ => nyi!(line!()),
-            (v1, v2) => unimplemented!("{:?} * {:?}", v1, v2),
+            (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
         WAdd => match (cont_prim_type, &*v1, &*v2) {
             (None, _, _) => Err(Interruption::AmbiguousOperation),
@@ -80,11 +100,11 @@ pub fn binop(
         Cat => match (cont_prim_type, &*v1, &*v2) {
             (_, Value::Text(t1), Value::Text(t2)) => Ok(Value::Text(t1.append(t2))),
             (_, Value::QuotedAst(q1), Value::QuotedAst(q2)) => Ok(Value::QuotedAst(q1.append(q2)?)),
-            (_, _, _) => type_mismatch!(file!(), line!()),
+            (_, v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
 
         Mod | Pow | And | Or | Xor | ShL | ShR | RotL | RotR | WSub | WMul | WPow | BitOr
-        | BitAnd => nyi!(line!(), "binop({:?}. {:?}, {:?})", binop, v1, v2),
+        | BitAnd => try_symbolic_binop(&binop, &*v1, &*v2).ok_or(type_mismatch_!()),
     }
 }
 
@@ -117,24 +137,36 @@ pub fn relop(
             (Unit, Unit) => false,
             (Nat(n1), Nat(n2)) => n1 < n2,
             (Int(i1), Int(i2)) => i1 < i2,
+            (Symbol(s1), Symbol(s2)) => s1.partial_cmp(s2) == Some(Ordering::Less),
             _ => nyi!(line!(), "{:?} < {:?}", v1, v2)?,
         },
         Le => match (&*v1, &*v2) {
             (Unit, Unit) => false,
             (Nat(n1), Nat(n2)) => n1 <= n2,
             (Int(i1), Int(i2)) => i1 <= i2,
+            (Symbol(s1), Symbol(s2)) => match s1.partial_cmp(s2) {
+                Some(Ordering::Less) => true,
+                Some(Ordering::Equal) => true,
+                _ => false,
+            },
             _ => nyi!(line!(), "{:?} <= {:?}", v1, v2)?,
         },
         Gt => match (&*v1, &*v2) {
             (Unit, Unit) => false,
             (Nat(n1), Nat(n2)) => n1 > n2,
             (Int(i1), Int(i2)) => i1 > i2,
+            (Symbol(s1), Symbol(s2)) => s1.partial_cmp(s2) == Some(Ordering::Greater),
             _ => nyi!(line!(), "{:?} > {:?}", v1, v2)?,
         },
         Ge => match (&*v1, &*v2) {
             (Unit, Unit) => false,
             (Nat(n1), Nat(n2)) => n1 >= n2,
             (Int(i1), Int(i2)) => i1 >= i2,
+            (Symbol(s1), Symbol(s2)) => match s1.partial_cmp(s2) {
+                Some(Ordering::Greater) => true,
+                Some(Ordering::Equal) => true,
+                _ => false,
+            },
             _ => nyi!(line!(), "{:?} >= {:?}", v1, v2)?,
         },
         //        _ => nyi!(line!(), "relop({:?}, {:?}, {:?})", relop, v1, v2)?,

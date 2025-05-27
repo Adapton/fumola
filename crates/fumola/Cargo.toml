@@ -34,6 +34,7 @@ test-log = "0.2.11"
 dyn-clone = "1.0.9"
 candid = "0.8"
 rustyline = { version = "7.0.0", optional = true }
+clap = { version = "4", features = ["derive"] }
 
 [dev-dependencies]
 criterion = "0.4.0"
@@ -55,9 +56,10 @@ crate-type = ["lib"]    # The crate types to generate.
 required-features = []  # Features required to build this target (N/A for lib).
 
 [[bin]]
-name = "mo-rs"
+name = "fumola"
 path = "src/bin/fumola.rs"
 required-features = ["exe"]
+
 
 [features]
 default = ["parser", "to-motoko"]

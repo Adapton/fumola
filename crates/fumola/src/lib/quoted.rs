@@ -35,6 +35,11 @@ impl<T: QuotedClose + Clone> QuotedClose for Delim<T> {
 
 impl<T: QuotedClose + Clone> QuotedClose for NodeData<T> {
     fn quoted_close(&self, env: &Env) -> Result<NodeData<T>, Interruption> {
+        // to do -- sometimes we want to keep the source information.
+        //          sometimes we want to clear it.
+        //
+        // use a special component of Env to indicate that we should "clear" out the source position information, if set.
+        //
         Ok(NodeData(self.0.quoted_close(env)?, self.1.clone()))
     }
 }
@@ -73,11 +78,14 @@ impl<T: QuotedClose + Clone> QuotedClose for Option<T> {
 impl QuotedClose for Pat {
     fn quoted_close(&self, env: &Env) -> Result<Pat, Interruption> {
         match &self {
-            Pat::Wild => todo!(),
+            Pat::Wild => Ok(Pat::Wild),
             Pat::Var(x) => Ok(Pat::Var(x.clone())),
             Pat::Literal(l) => Ok(Pat::Literal(l.clone())),
             Pat::UnOpLiteral(_, _) => todo!(),
-            Pat::Tuple(_) => todo!(),
+            Pat::Tuple(ps) => {
+                // to do -- Ok(Pat::Tuple(ps.map(|x| x.quoted_close(env))))
+                Ok(Pat::Tuple(ps.clone()))
+            }
             Pat::Object(_) => todo!(),
             Pat::Optional(_) => todo!(),
             Pat::Variant(_, _) => todo!(),
@@ -217,6 +225,7 @@ impl QuotedClose for Exp {
             Exp::Proj(_, _) => todo!(),
             Exp::Opt(_) => todo!(),
             Exp::DoOpt(_) => todo!(),
+            Exp::DoAdaptonNav(_, _) => todo!(),
             Exp::Bang(_) => todo!(),
             Exp::ObjectBlock(_, _) => todo!(),
             Exp::Object(_) => todo!(),
@@ -256,6 +265,9 @@ impl QuotedClose for Exp {
             Exp::Paren(e) => Ok(Paren(e.quoted_close(env)?)),
             Exp::QuotedAst(q) => Ok(QuotedAst(q.quoted_close(env)?)),
             Exp::Unquote(e) => Ok(Unquote(e.quoted_close(env)?)),
+            Exp::Thunk(e) => Ok(Thunk(e.quoted_close(env)?)),
+            Exp::GetAdaptonPointer(e) => Ok(GetAdaptonPointer(e.quoted_close(env)?)),
+            Exp::Force(e) => Ok(Force(e.quoted_close(env)?)),
         }
     }
 }
@@ -265,6 +277,7 @@ impl QuotedClose for QuotedAst {
         use QuotedAst::*;
         Ok(match &self {
             QuotedAst::Empty => Empty,
+            QuotedAst::Id_(i) => Id_(i.clone()),
             QuotedAst::Id(i) => Id(i.clone()),
             QuotedAst::Literal(l) => Literal(l.clone()),
             QuotedAst::TupleExps(es) => TupleExps(es.quoted_close(env)?),
@@ -274,7 +287,7 @@ impl QuotedClose for QuotedAst {
             QuotedAst::Cases(cs) => Cases(cs.quoted_close(env)?),
             QuotedAst::Decs(ds) => Decs(ds.quoted_close(env)?),
             QuotedAst::DecFields(dfs) => DecFields(dfs.quoted_close(env)?),
-            QuotedAst::Types(ts) => Types(ts.clone()), // to do
+            QuotedAst::Types(ts) => Types(ts.clone()),
             QuotedAst::Attrs(atts) => Attrs(atts.clone()),
         })
     }

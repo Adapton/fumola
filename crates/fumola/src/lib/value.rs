@@ -2,7 +2,10 @@ use std::fmt::Display;
 use std::num::Wrapping;
 use std::rc::Rc;
 
-use crate::ast::{Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, QuotedAst, ToId};
+use crate::adapton::{Pointer as AdaptonPointer, Space as AdaptonSpace, Time as AdaptonTime};
+use crate::ast::{
+    BinOp, Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, QuotedAst, ToId, UnOp,
+};
 use crate::dynamic::Dynamic;
 use crate::shared::{FastClone, Share, Shared};
 use crate::type_mismatch;
@@ -90,6 +93,18 @@ pub struct FieldValue {
     pub val: Value_,
 }
 
+pub type Symbol_ = Shared<Symbol>;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum Symbol {
+    Nat(#[serde(with = "crate::serde_utils::biguint")] BigUint),
+    Int(#[serde(with = "crate::serde_utils::bigint")] BigInt),
+    QuotedAst(QuotedAst),
+    UnOp(UnOp, Symbol_),
+    BinOp(Symbol_, BinOp, Symbol_),
+    Call(Symbol_, Symbol_),
+}
+
 pub type Value_ = Shared<Value>;
 
 pub type Pointer = crate::vm_types::Pointer;
@@ -141,7 +156,14 @@ pub enum Value {
     ActorMethod(ActorMethod),
     Module(ModuleDef),
     QuotedAst(QuotedAst),
+    Symbol(Symbol_),
+    AdaptonPointer(AdaptonPointer),
+    AdaptonTime(AdaptonTime),
+    AdaptonSpace(AdaptonSpace),
+    Thunk(ThunkBody),
 }
+
+pub type ThunkBody = Closed<Exp_>;
 
 /// Actor value.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -272,6 +294,10 @@ impl FastRandIter {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum PrimFunction {
+    AdaptonNow,
+    AdaptonHere,
+    AdaptonSpace,
+    AdaptonTime,
     AtSignVar(String),
     DebugPrint,
     NatToText,
@@ -293,6 +319,10 @@ impl PrimFunction {
         use CollectionFunction::*;
         use PrimFunction::*;
         Ok(match name.as_str() {
+            "\"adaptonNow\"" => AdaptonNow,
+            "\"adaptonHere\"" => AdaptonHere,
+            "\"adaptonTime\"" => AdaptonTime,
+            "\"adaptonSpace\"" => AdaptonSpace,
             "\"print\"" => DebugPrint,
             "\"natToText\"" => NatToText,
             "\"hashMapNew\"" => Collection(HashMap(HashMapFunction::New)),
@@ -355,7 +385,7 @@ impl Value {
     pub fn is_quoted_id(&self) -> bool {
         match self {
             Value::QuotedAst(a) => match a {
-                QuotedAst::Id(_) => true,
+                QuotedAst::Id_(_) => true,
                 _ => false,
             },
             _ => false,
@@ -391,7 +421,7 @@ impl Value {
 
     pub fn unquote_id(&self) -> Result<Id_, Interruption> {
         match self {
-            Value::QuotedAst(QuotedAst::Id(i)) => Ok(i.clone()),
+            Value::QuotedAst(QuotedAst::Id_(i)) => Ok(i.clone()),
             _ => type_mismatch!(file!(), line!()),
         }
     }
@@ -450,6 +480,31 @@ impl Value {
             Literal::Text(s) => Text(crate::value::Text::from(s[1..s.len() - 1].to_string())),
             Literal::Blob(v) => Blob(v.clone()),
         })
+    }
+
+    pub fn into_time_or<E>(&self, err: E) -> Result<AdaptonTime, E> {
+        match self {
+            Value::AdaptonTime(t) => Ok(t.clone()),
+            _ => {
+                let symbol = self.into_sym_or(err)?;
+                Ok(AdaptonTime::Symbol(symbol))
+            }
+        }
+    }
+
+    pub fn into_sym_or<E>(&self, err: E) -> Result<Symbol_, E> {
+        match self {
+            Value::Symbol(s) => Ok(s.clone()),
+            Value::Nat(n) => Ok(Shared::new(Symbol::Nat(n.clone()))),
+            Value::Int(i) => Ok(Shared::new(Symbol::Int(i.clone()))),
+            Value::QuotedAst(QuotedAst::Id_(i)) => {
+                // in this very common case, we strip away the position information.
+                // unlike more general quoted ASTs, the Ids are meant to reappear without being distinguished by their occurances.
+                Ok(Shared::new(Symbol::QuotedAst(QuotedAst::Id(i.0.clone()))))
+            }
+            Value::QuotedAst(q) => Ok(Shared::new(Symbol::QuotedAst(q.clone()))),
+            _ => Err(err),
+        }
     }
 }
 
@@ -561,6 +616,9 @@ impl Value {
                 Object(map)
             }
             Value::QuotedAst(_) => Err(ValueError::ToRust("QuotedAst".to_string()))?,
+            Value::Symbol(_) => Err(ValueError::ToRust("Symbol".to_string()))?,
+            Value::AdaptonPointer(_) => Err(ValueError::ToRust("NamedPointer".to_string()))?,
+            Value::Thunk(_) => Err(ValueError::ToRust("Thunk".to_string()))?,
             Value::Pointer(_) => Err(ValueError::ToRust("Pointer".to_string()))?,
             Value::Actor(_) => Err(ValueError::ToRust("Actor".to_string()))?,
             Value::ActorMethod(_) => Err(ValueError::ToRust("ActorMethod".to_string()))?,
@@ -589,6 +647,8 @@ impl Value {
             Value::Dynamic(d) => {
                 serde_json::to_value(d).map_err(|e| ValueError::ToRust(e.to_string()))?
             }
+            Value::AdaptonTime(_time) => todo!(),
+            Value::AdaptonSpace(_space) => todo!(),
         })
     }
 
@@ -699,7 +759,7 @@ impl Value {
 pub trait ToMotoko {
     fn to_motoko(self) -> Result;
 
-    fn to_shared(self) -> Result<Value_>
+    fn to_motoko_shared(self) -> Result<Value_>
     where
         Self: Sized,
     {

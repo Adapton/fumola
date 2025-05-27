@@ -573,7 +573,8 @@ pub enum ProjIndex {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum QuotedAst {
     Empty,
-    Id(Id_),
+    Id(Id),
+    Id_(Id_),
     Literal(Literal_),
     TupleExps(Delim<Exp_>),
     TuplePats(Delim<Pat_>),
@@ -605,7 +606,7 @@ impl QuotedAst {
                 (Some(es2), Some(es3)) => RecordExps((es1.clone(), Some(es2.append(es3)))),
             }),
             (Cases(cs1), Cases(cs2)) => Ok(Cases(cs1.append(cs2))),
-            (Id(i1), Id(i2)) => Ok(Id(NodeData(
+            (Id_(i1), Id_(i2)) => Ok(Id_(NodeData(
                 crate::ast::Id::new(format!("{}{}", i1.0.as_str(), i2.0.as_str())),
                 Source::Evaluation,
             )
@@ -618,6 +619,20 @@ impl QuotedAst {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum AdaptonNavDim {
+    Space,
+    Time,
+}
+pub type AdaptonNavDim_ = Node<AdaptonNavDim>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum AdaptonNav {
+    Goto(Option<AdaptonNavDim_>, Exp_),
+    Within(Option<AdaptonNavDim_>, Exp_),
+}
+pub type AdaptonNav_ = Node<AdaptonNav>;
 
 pub type ExpObjectBody = (Option<Delim<Exp_>>, Option<ExpFields>);
 
@@ -639,6 +654,7 @@ pub enum Exp {
     Proj(Exp_, ProjIndex),
     Opt(Exp_),
     DoOpt(Exp_),
+    DoAdaptonNav(Vector<AdaptonNav_>, Exp_),
     Bang(Exp_),
     ObjectBlock(ObjSort, DecFieldsPos),
     Object(ExpObjectBody),
@@ -680,6 +696,9 @@ pub enum Exp {
     Paren(Exp_),
     QuotedAst(QuotedAst),
     Unquote(Exp_),
+    Force(Exp_),
+    Thunk(Exp_),
+    GetAdaptonPointer(Exp_),
 }
 
 impl Exp {
@@ -762,14 +781,25 @@ pub enum Pat {
 
 pub type UnOp_ = Node<UnOp>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd)]
 pub enum UnOp {
     Pos,
     Neg,
     Not,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+// time and space are not keywords, which means we can still use
+// them as identifiers in Motoko modules that we use.
+// this hack makes that flexibility possible.
+pub fn into_adapton_nav_dim(id: IdPos_) -> Option<AdaptonNavDim_> {
+    match id.0.id.0.string.as_str() {
+        "time" => Some(NodeData::new(AdaptonNavDim::Time, id.1.clone()).into()),
+        "space" => Some(NodeData::new(AdaptonNavDim::Space, id.1.clone()).into()),
+        _ => None,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd)]
 pub enum BinOp {
     Add,
     Sub,

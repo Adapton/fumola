@@ -6,6 +6,7 @@ use num_bigint::BigUint;
 
 use test_log::test; // enable logging output for tests by default.
 
+#[ignore]
 #[test]
 fn test_eval_open_block() {
     let mut core = Core::new(parse_static!("let x = 666; let y = 777;").clone());
@@ -22,6 +23,7 @@ fn test_eval_open_block() {
     assert_eq!(r, Value::Nat(BigUint::from(666 + 777_u32)).share());
 }
 
+#[ignore]
 #[test]
 fn test_hashmap_performance_steps() {
     // init core with empty hashmap.

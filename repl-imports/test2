@@ -1,0 +1,6 @@
+import Test3 "repl-imports/test3";
+module {
+    public let Test3 = Test3;
+    public let moduleName = `Test2;
+    public let p = 3;
+}

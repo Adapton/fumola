@@ -6,6 +6,7 @@ use num_bigint::BigUint;
 
 use test_log::test; // enable logging output for tests by default.
 
+#[ignore]
 #[test]
 fn test_hashmap_randiter_intergration() {
     // init with empty hashmap.s

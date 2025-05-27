@@ -1,4 +1,5 @@
 #![feature(iterator_try_collect)]
+pub mod adapton;
 pub mod ast;
 pub mod quoted;
 //pub mod ast_traversal;
@@ -34,6 +35,7 @@ pub mod vm_core;
 pub mod vm_def;
 pub mod vm_match;
 pub mod vm_ops;
+pub mod vm_stack_cont;
 pub mod vm_step;
 pub mod vm_types;
 

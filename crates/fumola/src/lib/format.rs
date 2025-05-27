@@ -1,18 +1,22 @@
 // Reference: https://github.com/dfinity/candid/blob/master/rust/candid/src/bindings/candid.rs
 
+use crate::adapton::{Space, Time};
 use crate::ast::{
-    BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_, Delim, Exp, ExpField,
-    Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat, PrimType, QuotedAst, RelOp,
-    Stab, Type, TypeBind, TypeField, TypeTag, TypeTag_, UnOp, Unquote, Vis,
+    AdaptonNav, AdaptonNavDim, BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_,
+    Delim, Exp, ExpField, Exp_, Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat,
+    PrimType, QuotedAst, RelOp, Stab, Type, TypeBind, TypeField, TypeTag, TypeTag_, UnOp, Unquote,
+    Vis,
 };
 use crate::format_utils::*;
 use crate::lexer::is_keyword;
 use crate::lexer_types::{GroupType, Token, TokenTree};
 use crate::shared::Shared;
-use crate::value::{FieldValue, Value, Value_};
+use crate::value::{Closed, FieldValue, Pointer, Symbol, Value, Value_};
+use crate::vm_types::def::Module;
+use crate::vm_types::{def::CtxId, Env, LocalPointer, ScheduleChoice};
 use pretty::RcDoc;
 
-fn format_(doc: RcDoc, width: usize) -> String {
+pub fn format_(doc: RcDoc, width: usize) -> String {
     let mut w = Vec::new();
     doc.render(width, &mut w).unwrap();
     String::from_utf8(w).unwrap()
@@ -178,6 +182,114 @@ impl<T: ToDoc + Clone> ToDoc for Option<T> {
     }
 }
 
+impl ToDoc for Symbol {
+    fn doc(&self) -> RcDoc {
+        match self {
+            Symbol::UnOp(u, s) => u.doc().append(s.doc()),
+            Symbol::Call(s1, s2) => s1.doc().append(enclose("(", s2.doc(), ")")),
+            Symbol::Nat(n) => RcDoc::text(n.to_string()),
+            Symbol::Int(i) => RcDoc::text(i.to_string()),
+            Symbol::QuotedAst(q) => q.doc(),
+            Symbol::BinOp(l, b, r) => l.doc().append(b.doc().append(r.doc())),
+        }
+    }
+}
+
+impl ToDoc for Closed<Exp_> {
+    fn doc(&self) -> RcDoc {
+        RcDoc::text("<TODO-Closed<Exp>>")
+    }
+}
+
+impl ToDoc for Space {
+    fn doc(&self) -> RcDoc {
+        match self {
+            Space::Here => RcDoc::text("@here"),
+            Space::Exp_(None, c) => c.doc(),
+            Space::Exp_(Some(s), c) => s.doc().append(enclose("(", c.doc(), ")")),
+            Space::Symbol(s) => s.doc(),
+        }
+    }
+}
+
+impl ToDoc for Time {
+    fn doc(&self) -> RcDoc {
+        match self {
+            Time::Now => RcDoc::text("@now"),
+            Time::Symbol(s) => s.doc(),
+        }
+    }
+}
+
+impl ToDoc for CtxId {
+    fn doc(&self) -> RcDoc {
+        RcDoc::text(format!("{}", self.0))
+    }
+}
+
+impl ToDoc for Env {
+    fn doc(&self) -> RcDoc {
+        let data = self.iter().collect::<Vec<_>>();
+        // to do -- sort general values (but only handle common cases for now)
+        // data.sort_by(|a, b| a.0.cmp(&b.0));
+        enclose(
+            "[",
+            strict_concat(
+                data.iter()
+                    .map(|(fk, fv)| enclose("(", fk.doc().append(", ").append(fv.doc()), ")")),
+                ";",
+            ),
+            "]",
+        )
+    }
+}
+
+impl ToDoc for ScheduleChoice {
+    fn doc(&self) -> RcDoc {
+        match self {
+            ScheduleChoice::Agent => RcDoc::text("#agent"),
+            ScheduleChoice::Actor(actor_id) => RcDoc::text(format!("#actor({:?})", actor_id)),
+        }
+    }
+}
+
+impl ToDoc for LocalPointer {
+    fn doc(&self) -> RcDoc {
+        match self {
+            LocalPointer::Numeric(numeric_pointer) => {
+                RcDoc::text(format!("{:?}", numeric_pointer.0))
+            }
+            LocalPointer::Named(named_pointer) => RcDoc::text(format!("{:?}", named_pointer.0)),
+        }
+    }
+}
+
+impl ToDoc for Pointer {
+    fn doc(&self) -> RcDoc {
+        kwd("pointer").append(enclose(
+            "(",
+            self.local
+                .doc()
+                .append(RcDoc::text(","))
+                .append(self.owner.doc()),
+            ")",
+        ))
+    }
+}
+
+impl ToDoc for Module {
+    fn doc(&self) -> RcDoc {
+        kwd("module").append(enclose(
+            "(",
+            self.context
+                .doc()
+                .append(RcDoc::text(","))
+                .append(self.fields.doc()),
+            ")",
+        ))
+    }
+}
+
 impl ToDoc for Value {
     fn doc(&self) -> RcDoc {
         match self {
@@ -208,11 +320,32 @@ impl ToDoc for Value {
                     str("#").append(n.doc()).append(optional_paren(v))
                 }
             }
-            Value::Pointer(_) => todo!(),
+            Value::Module(m) => m.doc(),
+            Value::AdaptonPointer(p) => p.doc(),
+            Value::Thunk(c) => kwd("@thunk").append(enclose(
+                "(",
+                c.ctx
+                    .doc()
+                    .append(RcDoc::text(","))
+                    .append(c.env.doc())
+                    .append(RcDoc::text(","))
+                    .append(c.content.doc()),
+                ")",
+            )),
+            Value::Pointer(p) => p.doc(),
+            Value::Symbol(s) => s.doc(),
             Value::Opaque(_) => todo!(),
             Value::Index(_, _) => todo!(),
-            Value::Function(f) => enclose("<", f.0.content.doc(), ">"),
-            Value::PrimFunction(_) => todo!(),
+            Value::Function(f) => kwd("@func").append(enclose(
+                "(",
+                f.0.ctx
+                    .doc()
+                    .append(RcDoc::text(","))
+                    .append(f.0.env.doc().append(RcDoc::text(",")))
+                    .append(f.0.content.doc()),
+                ")",
+            )),
+            Value::PrimFunction(f) => kwd("prim").append(RcDoc::text(format!("\"{:?}\"", f))),
             Value::Collection(c) => match c {
                 crate::value::Collection::HashMap(m) => hashmap(m),
                 crate::value::Collection::FastRandIter(_) => todo!(),
@@ -220,8 +353,11 @@ impl ToDoc for Value {
             Value::Dynamic(_) => todo!(),
             Value::Actor(_) => todo!(),
             Value::ActorMethod(_) => todo!(),
-            Value::Module(_) => todo!(),
             Value::QuotedAst(q) => q.doc(),
+            Value::AdaptonTime(time) => kwd("@adaptonTime").append(enclose("(", time.doc(), ")")),
+            Value::AdaptonSpace(space) => {
+                kwd("@adaptonSpace").append(enclose("(", space.doc(), ")"))
+            }
         }
     }
 }
@@ -229,6 +365,7 @@ impl ToDoc for Value {
 impl ToDoc for QuotedAst {
     fn doc(&self) -> RcDoc {
         match self {
+            QuotedAst::Id_(i) => str("`").append(i.doc()),
             QuotedAst::Id(i) => str("`").append(i.doc()),
             QuotedAst::Literal(l) => str("`").append(l.doc()),
             QuotedAst::Empty => str("`()"),
@@ -352,6 +489,24 @@ impl ToDoc for Unquote {
     }
 }
 
+impl ToDoc for AdaptonNav {
+    fn doc(&self) -> RcDoc {
+        match self {
+            AdaptonNav::Goto(d, e) => kwd("goto").append(d.doc()).append(e.doc()),
+            AdaptonNav::Within(d, e) => kwd("within").append(d.doc()).append(e.doc()),
+        }
+    }
+}
+
+impl ToDoc for AdaptonNavDim {
+    fn doc(&self) -> RcDoc {
+        match self {
+            AdaptonNavDim::Space => kwd("space"),
+            AdaptonNavDim::Time => kwd("time"),
+        }
+    }
+}
+
 impl ToDoc for Exp {
     fn doc(&self) -> RcDoc {
         use Exp::*;
@@ -392,6 +547,7 @@ impl ToDoc for Exp {
                 .append(enclose("(", a.doc(), ")")),
             Block(decs) => block(decs),
             Do(e) => kwd("do").append(e.doc()),
+            DoAdaptonNav(nav, e) => kwd("do").append(vector(nav, " ")).append(e.doc()),
             Not(e) => kwd("not").append(e.doc()),
             And(e1, e2) => bin_op(e1, str("and"), e2),
             Or(e1, e2) => bin_op(e1, str("or"), e2),
@@ -466,6 +622,9 @@ impl ToDoc for Exp {
             Annot(_, _, _) => todo!(),
             QuotedAst(q) => q.doc(),
             Unquote(e) => kwd("~").append(e.doc()),
+            Thunk(e) => kwd("thunk").append(e.doc()),
+            Force(e) => kwd("force").append(e.doc()),
+            GetAdaptonPointer(e) => kwd("@").append(e.doc()),
         }
         // _ => text("Display-TODO={:?}", self),
     }
@@ -477,7 +636,7 @@ impl ToDoc for Delim<Dec_> {
     }
 }
 
-fn exp_is_block(e:&Exp) -> bool {
+fn exp_is_block(e: &Exp) -> bool {
     match e {
         Exp::Block(_) => true,
         _ => false,
@@ -492,7 +651,7 @@ impl ToDoc for Function {
             .append(self.input.doc())
             .append(if exp_is_block(&self.exp.0) {
                 self.exp.doc()
-            }else {
+            } else {
                 enclose("{", self.exp.doc(), "}")
             })
     }
