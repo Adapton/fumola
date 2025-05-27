@@ -124,14 +124,16 @@ pub fn step_adapton_nav<A: Active>(
 ) -> Result<Step, Interruption> {
     let first = nav.pop_front().unwrap();
     let (tag, e) = match &first.0 {
-        AdaptonNavAst::Goto(d, e) => match d.0 {
+        AdaptonNavAst::Goto(Some(d), e) => match d.0 {
             AdaptonNavDim::Time => (AdaptonNav::GotoTime, e),
             AdaptonNavDim::Space => (AdaptonNav::GotoSpace, e),
         },
-        AdaptonNavAst::Within(d, e) => match d.0 {
+        AdaptonNavAst::Goto(None, _) => type_mismatch!(file!(), line!()),
+        AdaptonNavAst::Within(Some(d), e) => match d.0 {
             AdaptonNavDim::Time => (AdaptonNav::WithinTime, e),
             AdaptonNavDim::Space => (AdaptonNav::WithinSpace, e),
         },
+        AdaptonNavAst::Within(None, _) => type_mismatch!(file!(), line!()),
     };
     exp_conts(
         active,

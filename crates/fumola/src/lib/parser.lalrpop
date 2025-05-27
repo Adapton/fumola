@@ -2,7 +2,7 @@
 //use std::collections::HashMap;
 // use crate::ast_utils::Syntax;
 use crate::parser_utils::{dec_node_into_exp, get_one};
-use crate::ast::{Attr_, Attr, Attrs, BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, AdaptonNav, AdaptonNav_, AdaptonNavDim, AdaptonNavDim_, NodeData, Source, SourceKnown, Id, Id_, IdPos, IdPos_, Unquote, Unquote_, ToId, Pat, Pat_, PatField, PatField_, Exp, ExpObjectBody, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, CasesPos, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFieldsPos, ProjIndex, QuotedAst};
+use crate::ast::{into_adapton_nav_dim, Attr_, Attr, Attrs, BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, AdaptonNav, AdaptonNav_, NodeData, Source, SourceKnown, Id, Id_, IdPos, IdPos_, Unquote, Unquote_, ToId, Pat, Pat_, PatField, PatField_, Exp, ExpObjectBody, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, CasesPos, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFieldsPos, ProjIndex, QuotedAst};
 use crate::value::PrimFunction;
 // use crate::lexer_types::Token;
 use line_col::LineColLookup;
@@ -381,19 +381,11 @@ ExpNonDec<B>: Exp = {
 }
 
 #[inline]
-AdaptonNavDim_: AdaptonNavDim_ = Node<AdaptonNavDim>;
-
-AdaptonNavDim: AdaptonNavDim = {
-    "time" => AdaptonNavDim::Time,
-    "space" => AdaptonNavDim::Space,
-}
-
-#[inline]
 AdaptonNav_: AdaptonNav_ = Node<AdaptonNav>;
 
 AdaptonNav: AdaptonNav = {
-    "goto" <d:AdaptonNavDim_> <e:ExpNullary_<Ob>> => AdaptonNav::Goto(d, e),
-    "within" <d:AdaptonNavDim_> <e:ExpNullary_<Ob>> => AdaptonNav::Within(d, e),
+    "goto" <d:IdPos_> <e:ExpNullary_<Ob>> => AdaptonNav::Goto(into_adapton_nav_dim(d), e),
+    "within" <d:IdPos_> <e:ExpNullary_<Ob>> => AdaptonNav::Within(into_adapton_nav_dim(d), e),
 }
 
 #[inline]

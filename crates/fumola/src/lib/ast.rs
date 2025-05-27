@@ -629,8 +629,8 @@ pub type AdaptonNavDim_ = Node<AdaptonNavDim>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum AdaptonNav {
-    Goto(AdaptonNavDim_, Exp_),
-    Within(AdaptonNavDim_, Exp_),
+    Goto(Option<AdaptonNavDim_>, Exp_),
+    Within(Option<AdaptonNavDim_>, Exp_),
 }
 pub type AdaptonNav_ = Node<AdaptonNav>;
 
@@ -786,6 +786,17 @@ pub enum UnOp {
     Pos,
     Neg,
     Not,
+}
+
+// time and space are not keywords, which means we can still use
+// them as identifiers in Motoko modules that we use.
+// this hack makes that flexibility possible.
+pub fn into_adapton_nav_dim(id: IdPos_) -> Option<AdaptonNavDim_> {
+    match id.0.id.0.string.as_str() {
+        "time" => Some(NodeData::new(AdaptonNavDim::Time, id.1.clone()).into()),
+        "space" => Some(NodeData::new(AdaptonNavDim::Space, id.1.clone()).into()),
+        _ => None,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd)]
