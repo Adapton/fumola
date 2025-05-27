@@ -240,6 +240,18 @@ impl serde::Serializer for Serializer {
     }
 }
 
+impl<T: Serialize> Serialize for crate::ast::NodeData<T> {
+    fn serialize<S: serde::ser::Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
+        self.0.serialize(s)
+    }
+}
+
+impl<T: Serialize + Clone> Serialize for crate::ast::Delim<T> {
+    fn serialize<S: serde::ser::Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
+        self.vec.serialize(s)
+    }
+}
+
 pub struct SerializeVec {
     vec: Vector<Value_>,
 }
@@ -280,7 +292,8 @@ impl serde::ser::SerializeSeq for SerializeVec {
     }
 
     fn end(self) -> Result<Value> {
-        Ok(Value::Array(Mut::Var, self.vec)) // Mutable by default
+        //Ok(Value::Array(Mut::Var, self.vec)) // Mutable by default
+        Ok(Value::Array(Mut::Const, self.vec)) // Immutable by default
     }
 }
 
@@ -379,7 +392,8 @@ impl serde::ser::SerializeStruct for SerializeStruct {
         self.map.insert(
             key.to_id(),
             FieldValue {
-                mut_: Mut::Var, // Mutable by default
+                // mut_: Mut::Var, // Mutable by default
+                mut_: Mut::Const, // Immutable by default
                 val: value.serialize(Serializer)?.share(),
             },
         );
@@ -402,7 +416,8 @@ impl serde::ser::SerializeStructVariant for SerializeStructVariant {
         self.map.insert(
             key.to_id(),
             FieldValue {
-                mut_: Mut::Var, // Mutable by default
+                // mut_: Mut::Var, // Mutable by default
+                mut_: Mut::Const, // Immutable by default
                 val: value.serialize(Serializer)?.share(),
             },
         );

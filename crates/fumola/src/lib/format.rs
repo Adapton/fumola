@@ -1,16 +1,22 @@
 // Reference: https://github.com/dfinity/candid/blob/master/rust/candid/src/bindings/candid.rs
 
+use crate::adapton::{Space, Time};
 use crate::ast::{
-    BinOp, BindSort, Case, Dec, DecField, Dec_, Delim, Exp, ExpField, Id, Literal, Loc, Mut,
-    NodeData, ObjSort, Pat, PrimType, RelOp, Stab, Type, TypeBind, TypeField, UnOp, Vis,
+    AdaptonNav, AdaptonNavDim, BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_,
+    Delim, Exp, ExpField, Exp_, Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat,
+    PrimType, QuotedAst, RelOp, Stab, Type, TypeBind, TypeField, TypeTag, TypeTag_, UnOp, Unquote,
+    Vis,
 };
 use crate::format_utils::*;
 use crate::lexer::is_keyword;
 use crate::lexer_types::{GroupType, Token, TokenTree};
 use crate::shared::Shared;
+use crate::value::{Closed, FieldValue, Pointer, Symbol, Value, Value_};
+use crate::vm_types::def::Module;
+use crate::vm_types::{def::CtxId, Env, LocalPointer, ScheduleChoice};
 use pretty::RcDoc;
 
-fn format_(doc: RcDoc, width: usize) -> String {
+pub fn format_(doc: RcDoc, width: usize) -> String {
     let mut w = Vec::new();
     doc.render(width, &mut w).unwrap();
     String::from_utf8(w).unwrap()
@@ -34,6 +40,36 @@ pub trait ToDoc {
 //     }
 // }
 
+fn object<'a>(m: &'a im_rc::HashMap<Id, FieldValue>) -> RcDoc<'a> {
+    let mut out: Vec<_> = m.iter().collect();
+    out.sort_by(|a, b| a.0.cmp(b.0));
+    strict_concat(
+        out.iter().map(|(fi, fv)| match fv.mut_ {
+            Mut::Const => fi.doc().append(" = ").append(fv.val.doc()),
+            Mut::Var => str("var ")
+                .append(fi.doc())
+                .append(" = ")
+                .append(fv.val.doc()),
+        }),
+        ";",
+    )
+}
+
+fn hashmap<'a>(m: &'a im_rc::HashMap<Value_, Value_>) -> RcDoc<'a> {
+    let data = m.iter().collect::<Vec<_>>();
+    // to do -- sort general values (but only handle common cases for now)
+    // data.sort_by(|a, b| a.0.cmp(&b.0));
+    enclose(
+        "[",
+        strict_concat(
+            data.iter()
+                .map(|(fk, fv)| enclose("(", fk.doc().append(", ").append(fv.doc()), ")")),
+            ";",
+        ),
+        "]",
+    )
+}
+
 // optional delimiter on the right
 fn delim<'a, T: ToDoc + Clone>(d: &'a Delim<T>, sep: &'a str) -> RcDoc<'a> {
     let doc = strict_concat(d.vec.iter().map(|x| x.doc()), sep);
@@ -53,6 +89,25 @@ fn delim_left<'a, T: ToDoc + Clone>(d: &'a Delim<T>, sep: &'a str) -> RcDoc<'a> 
     } else {
         doc
     }
+}
+
+fn optional_paren<'a, T: ToDoc + Clone>(o: &'a Option<T>) -> RcDoc<'a> {
+    match o {
+        None => RcDoc::nil(),
+        Some(value) => enclose("(", value.doc(), ")"),
+    }
+}
+
+fn vector<'a, T: ToDoc + Clone>(v: &'a im_rc::Vector<T>, sep: &'a str) -> RcDoc<'a> {
+    strict_concat(v.iter().map(|x| x.doc()), sep)
+}
+
+fn variant_vector<'a>(v: &'a im_rc::Vector<TypeTag_>) -> RcDoc<'a> {
+    strict_concat(v.iter().map(|x| str("#").append(x.doc())), ";")
+}
+
+fn vector_tuple<'a, T: ToDoc + Clone>(v: &'a im_rc::Vector<T>) -> RcDoc<'a> {
+    enclose("(", vector(v, ","), ")")
 }
 
 fn block<'a, T: ToDoc + Clone>(d: &'a Delim<T>) -> RcDoc<'a> {
@@ -86,12 +141,6 @@ fn bin_op<'a, E: ToDoc + Clone>(e1: &'a E, b: RcDoc<'a>, e2: &'a E) -> RcDoc<'a>
         .append(RcDoc::space())
         .append(e2.doc())
 }
-
-// impl<'a> ToDoc for RcDoc<'a> {
-//     fn doc(&'a self) -> RcDoc<'a> {
-//         self // TODO no clone
-//     }
-// }
 
 impl ToDoc for String {
     fn doc(&self) -> RcDoc {
@@ -129,6 +178,206 @@ impl<T: ToDoc + Clone> ToDoc for Option<T> {
         match self {
             None => RcDoc::nil(),
             Some(value) => value.doc(),
+        }
+    }
+}
+
+impl ToDoc for Symbol {
+    fn doc(&self) -> RcDoc {
+        match self {
+            Symbol::UnOp(u, s) => u.doc().append(s.doc()),
+            Symbol::Call(s1, s2) => s1.doc().append(enclose("(", s2.doc(), ")")),
+            Symbol::Nat(n) => RcDoc::text(n.to_string()),
+            Symbol::Int(i) => RcDoc::text(i.to_string()),
+            Symbol::QuotedAst(q) => q.doc(),
+            Symbol::BinOp(l, b, r) => l.doc().append(b.doc().append(r.doc())),
+        }
+    }
+}
+
+impl ToDoc for Closed<Exp_> {
+    fn doc(&self) -> RcDoc {
+        RcDoc::text("<TODO-Closed<Exp>>")
+    }
+}
+
+impl ToDoc for Space {
+    fn doc(&self) -> RcDoc {
+        match self {
+            Space::Here => RcDoc::text("@here"),
+            Space::Exp_(None, c) => c.doc(),
+            Space::Exp_(Some(s), c) => s.doc().append(enclose("(", c.doc(), ")")),
+            Space::Symbol(s) => s.doc(),
+        }
+    }
+}
+
+impl ToDoc for Time {
+    fn doc(&self) -> RcDoc {
+        match self {
+            Time::Now => RcDoc::text("@now"),
+            Time::Symbol(s) => s.doc(),
+        }
+    }
+}
+
+impl ToDoc for CtxId {
+    fn doc(&self) -> RcDoc {
+        RcDoc::text(format!("{}", self.0))
+    }
+}
+
+impl ToDoc for Env {
+    fn doc(&self) -> RcDoc {
+        let data = self.iter().collect::<Vec<_>>();
+        // to do -- sort general values (but only handle common cases for now)
+        // data.sort_by(|a, b| a.0.cmp(&b.0));
+        enclose(
+            "[",
+            strict_concat(
+                data.iter()
+                    .map(|(fk, fv)| enclose("(", fk.doc().append(", ").append(fv.doc()), ")")),
+                ";",
+            ),
+            "]",
+        )
+    }
+}
+
+impl ToDoc for ScheduleChoice {
+    fn doc(&self) -> RcDoc {
+        match self {
+            ScheduleChoice::Agent => RcDoc::text("#agent"),
+            ScheduleChoice::Actor(actor_id) => RcDoc::text(format!("#actor({:?})", actor_id)),
+        }
+    }
+}
+
+impl ToDoc for LocalPointer {
+    fn doc(&self) -> RcDoc {
+        match self {
+            LocalPointer::Numeric(numeric_pointer) => {
+                RcDoc::text(format!("{:?}", numeric_pointer.0))
+            }
+            LocalPointer::Named(named_pointer) => RcDoc::text(format!("{:?}", named_pointer.0)),
+        }
+    }
+}
+
+impl ToDoc for Pointer {
+    fn doc(&self) -> RcDoc {
+        kwd("pointer").append(enclose(
+            "(",
+            self.local
+                .doc()
+                .append(RcDoc::text(","))
+                .append(self.owner.doc()),
+            ")",
+        ))
+    }
+}
+
+impl ToDoc for Module {
+    fn doc(&self) -> RcDoc {
+        kwd("module").append(enclose(
+            "(",
+            self.context
+                .doc()
+                .append(RcDoc::text(","))
+                .append(self.fields.doc()),
+            ")",
+        ))
+    }
+}
+
+impl ToDoc for Value {
+    fn doc(&self) -> RcDoc {
+        match self {
+            Value::Null => str("null"),
+            Value::Bool(b) => RcDoc::text(b.to_string()),
+            Value::Unit => str("()"),
+            Value::Nat(n) => RcDoc::text(n.to_string()),
+            Value::Int(i) => RcDoc::text(i.to_string()),
+            Value::Float(_) => todo!(),
+            Value::Char(_) => todo!(),
+            Value::Text(t) => RcDoc::text(format!("{:?}", t.to_string())),
+            Value::Blob(_) => todo!(),
+            Value::Array(Mut::Const, vs) => enclose("[", vector(vs, ","), "]"),
+            Value::Array(Mut::Var, vs) => enclose("[var ", vector(vs, ","), "]"),
+            Value::Tuple(vs) => vector_tuple(vs),
+            Value::Object(fs) => enclose("{", object(fs), "}"),
+            Value::Option(v) => str("?").append(v.doc()),
+            Value::Variant(n, v) => {
+                // Can we skip using a paren around optional value?
+                if v.as_ref().is_some_and(|v| match &**v {
+                    Value::Unit => true,
+                    Value::Tuple(_) => true,
+                    Value::Object(_) => true,
+                    _ => false,
+                }) {
+                    str("#").append(n.doc()).append(v.doc())
+                } else {
+                    str("#").append(n.doc()).append(optional_paren(v))
+                }
+            }
+            Value::Module(m) => m.doc(),
+            Value::AdaptonPointer(p) => p.doc(),
+            Value::Thunk(c) => kwd("@thunk").append(enclose(
+                "(",
+                c.ctx
+                    .doc()
+                    .append(RcDoc::text(","))
+                    .append(c.env.doc())
+                    .append(RcDoc::text(","))
+                    .append(c.content.doc()),
+                ")",
+            )),
+            Value::Pointer(p) => p.doc(),
+            Value::Symbol(s) => s.doc(),
+            Value::Opaque(_) => todo!(),
+            Value::Index(_, _) => todo!(),
+            Value::Function(f) => kwd("@func").append(enclose(
+                "(",
+                f.0.ctx
+                    .doc()
+                    .append(RcDoc::text(","))
+                    .append(f.0.env.doc().append(RcDoc::text(",")))
+                    .append(f.0.content.doc()),
+                ")",
+            )),
+            Value::PrimFunction(f) => kwd("prim").append(RcDoc::text(format!("\"{:?}\"", f))),
+            Value::Collection(c) => match c {
+                crate::value::Collection::HashMap(m) => hashmap(m),
+                crate::value::Collection::FastRandIter(_) => todo!(),
+            },
+            Value::Dynamic(_) => todo!(),
+            Value::Actor(_) => todo!(),
+            Value::ActorMethod(_) => todo!(),
+            Value::QuotedAst(q) => q.doc(),
+            Value::AdaptonTime(time) => kwd("@adaptonTime").append(enclose("(", time.doc(), ")")),
+            Value::AdaptonSpace(space) => {
+                kwd("@adaptonSpace").append(enclose("(", space.doc(), ")"))
+            }
+        }
+    }
+}
+
+impl ToDoc for QuotedAst {
+    fn doc(&self) -> RcDoc {
+        match self {
+            QuotedAst::Id_(i) => str("`").append(i.doc()),
+            QuotedAst::Id(i) => str("`").append(i.doc()),
+            QuotedAst::Literal(l) => str("`").append(l.doc()),
+            QuotedAst::Empty => str("`()"),
+            QuotedAst::Decs(ds) => str("`do ").append(block(ds)),
+            QuotedAst::TupleExps(es) => str("`").append(tuple(es)),
+            QuotedAst::RecordExps((None, Some(fs))) => str("`").append(block(fs)),
+            QuotedAst::Types(ts) => str("`").append("type").append(space()).append(enclose(
+                "(",
+                vector(&ts.vec, ","),
+                ")",
+            )),
+            _ => todo!(),
         }
     }
 }
@@ -211,6 +460,53 @@ impl ToDoc for Id {
     }
 }
 
+impl ToDoc for IdPos {
+    fn doc(&self) -> RcDoc {
+        self.id.doc()
+    }
+}
+
+impl ToDoc for CasesPos {
+    fn doc(&self) -> RcDoc {
+        match self {
+            CasesPos::Cases(cs) => enclose_space("{", delim(cs, ";"), "}"),
+            CasesPos::Unquote(uq) => uq.doc(),
+        }
+    }
+}
+
+impl ToDoc for DecFieldsPos {
+    fn doc(&self) -> RcDoc {
+        match self {
+            DecFieldsPos::DecFields(dfs) => block(dfs),
+            DecFieldsPos::Unquote(uq) => uq.doc(),
+        }
+    }
+}
+impl ToDoc for Unquote {
+    fn doc(&self) -> RcDoc {
+        str("~").append(self.id.doc())
+    }
+}
+
+impl ToDoc for AdaptonNav {
+    fn doc(&self) -> RcDoc {
+        match self {
+            AdaptonNav::Goto(d, e) => kwd("goto").append(d.doc()).append(e.doc()),
+            AdaptonNav::Within(d, e) => kwd("within").append(d.doc()).append(e.doc()),
+        }
+    }
+}
+
+impl ToDoc for AdaptonNavDim {
+    fn doc(&self) -> RcDoc {
+        match self {
+            AdaptonNavDim::Space => kwd("space"),
+            AdaptonNavDim::Time => kwd("time"),
+        }
+    }
+}
+
 impl ToDoc for Exp {
     fn doc(&self) -> RcDoc {
         use Exp::*;
@@ -232,7 +528,7 @@ impl ToDoc for Exp {
             Opt(e) => str("?").append(e.doc()),
             DoOpt(e) => kwd("do ?").append(e.doc()),
             Bang(e) => e.doc().append("!"),
-            ObjectBlock(s, fs) => s.doc().append(RcDoc::space()).append(block(fs)),
+            ObjectBlock(s, d) => s.doc().append(RcDoc::space()).append(d.doc()),
             //            Object(fs) => block(fs),
             Variant(id, e) => str("#").append(id.doc()).append(match e {
                 None => RcDoc::nil(),
@@ -244,13 +540,14 @@ impl ToDoc for Exp {
             BinAssign(_from, _, _to) => todo!(),
             Array(m, es) => array(m, es),
             Index(e, idx) => e.doc().append("[").append(idx.doc()).append("]"),
-            Function(_) => todo!(),
+            Function(f) => f.doc(),
             Call(e, b, a) => e
                 .doc()
                 .append(b.as_ref().map(bind).unwrap_or(RcDoc::nil()))
                 .append(enclose("(", a.doc(), ")")),
             Block(decs) => block(decs),
             Do(e) => kwd("do").append(e.doc()),
+            DoAdaptonNav(nav, e) => kwd("do").append(vector(nav, " ")).append(e.doc()),
             Not(e) => kwd("not").append(e.doc()),
             And(e1, e2) => bin_op(e1, str("and"), e2),
             Or(e1, e2) => bin_op(e1, str("or"), e2),
@@ -265,7 +562,7 @@ impl ToDoc for Exp {
             Switch(e, cs) => kwd("switch")
                 .append(e.doc())
                 .append(RcDoc::space())
-                .append(enclose_space("{", delim(cs, ";"), "}")),
+                .append(cs.doc()),
             While(c, e) => kwd("while")
                 .append(c.doc())
                 .append(RcDoc::space())
@@ -315,7 +612,19 @@ impl ToDoc for Exp {
             }
             Ignore(e) => kwd("ignore").append(e.doc()),
             Paren(e) => enclose("(", e.doc(), ")"),
-            _ => todo!(),
+            Value_(_) => todo!(),
+            Proj(_, _) => todo!(),
+            Object(_) => todo!(),
+            DebugShow(_) => todo!(),
+            Async(_) => todo!(),
+            AsyncStar(_) => todo!(),
+            AwaitStar(_) => todo!(),
+            Annot(_, _, _) => todo!(),
+            QuotedAst(q) => q.doc(),
+            Unquote(e) => kwd("~").append(e.doc()),
+            Thunk(e) => kwd("thunk").append(e.doc()),
+            Force(e) => kwd("force").append(e.doc()),
+            GetAdaptonPointer(e) => kwd("@").append(e.doc()),
         }
         // _ => text("Display-TODO={:?}", self),
     }
@@ -327,19 +636,43 @@ impl ToDoc for Delim<Dec_> {
     }
 }
 
+fn exp_is_block(e: &Exp) -> bool {
+    match e {
+        Exp::Block(_) => true,
+        _ => false,
+    }
+}
+
+impl ToDoc for Function {
+    fn doc(&self) -> RcDoc {
+        // todo -- check self.sugar, and print the sugared form.
+        kwd("func")
+            .append(self.name.doc())
+            .append(self.input.doc())
+            .append(if exp_is_block(&self.exp.0) {
+                self.exp.doc()
+            } else {
+                enclose("{", self.exp.doc(), "}")
+            })
+    }
+}
+
 impl ToDoc for Dec {
     fn doc(&self) -> RcDoc {
         use Dec::*;
         match self {
+            Attrs(_a, _d) => todo!(),
             Exp(e) => e.doc(),
             Let(p, e) => kwd("let")
                 .append(p.doc())
                 .append(str(" = "))
                 .append(e.doc()),
-            LetModule(_, _, _) => todo!(),
-            LetActor(..) => todo!(),
-            LetImport(..) => todo!(),
-            Func(_) => todo!(),
+            LetModule(_id, _, _dec) => kwd("let-module-TODO"),
+            LetActor(_id, _, _dec) => kwd("let-actor-TODO"),
+            LetImport(pat, _, import_string) => {
+                kwd("import").append(pat.doc()).append(str(import_string))
+            }
+            Func(f) => f.doc(),
             Var(p, e) => kwd("var")
                 .append(p.doc())
                 .append(str(" = "))
@@ -356,16 +689,40 @@ impl ToDoc for Dec {
     }
 }
 
+impl ToDoc for TypeTag {
+    fn doc(&self) -> RcDoc {
+        let tail = if self.typ.is_some() {
+            space()
+                .append(str(":"))
+                .append(space())
+                .append(self.typ.doc())
+        } else {
+            nil()
+        };
+        self.id.doc().append(tail)
+    }
+}
+
 impl ToDoc for Type {
     fn doc(&self) -> RcDoc {
         use Type::*;
         match self {
             Prim(p) => p.doc(),
             Object(s, fs) => s.doc().append(RcDoc::space()).append(field_block(fs)),
-            Array(_m, _t) => todo!(),
+            Array(m, t) => enclose("[", m.doc().append(t.doc()), "]"),
             Optional(t) => str("?").append(t.doc()),
             Tuple(d) => tuple(d),
-            Function(_, _, _, _) => todo!(),
+            Function(_s, args, src, tgt) => {
+                let args = args.as_ref().map(|t| vector(&t.vec, ","));
+                let args = match args {
+                    None => nil(),
+                    Some(a) => a.clone(),
+                };
+                args.append(src.doc())
+                    .append(space())
+                    .append(str("->"))
+                    .append(space().append(tgt.doc()))
+            }
             Async(t) => kwd("async").append(t.doc()),
             //Async(_, _) => unimplemented!(), // scope?
             And(e1, e2) => bin_op(e1, str("and"), e2),
@@ -374,8 +731,13 @@ impl ToDoc for Type {
             Unknown(id) => id.doc(),
             Known(id, t) => id.doc().append(" : ").append(t.doc()),
             Path(..) => todo!(),
-            Item(..) => todo!(),
-            Variant(..) => todo!(),
+            Item(i, t) => i
+                .doc()
+                .append(space())
+                .append(str(":"))
+                .append(space())
+                .append(t.doc()),
+            Variant(ts) => enclose("{", variant_vector(&ts.vec), "}"),
         }
     }
 }
@@ -425,7 +787,7 @@ impl ToDoc for Pat {
             Wild => str("_"),
             Var(s) => s.doc(),
             UnOpLiteral(_u, _l) => todo!(),
-            Literal(_l) => todo!(),
+            Literal(l) => l.doc(),
             Tuple(ps) => tuple(ps),
             Object(_) => todo!(),
             Optional(p) => str("?").append(p.doc()),
@@ -436,7 +798,9 @@ impl ToDoc for Pat {
             Annot(_t) => todo!(),
             AnnotPat(_p, _t) => todo!(),
             Paren(p) => enclose("(", p.doc(), ")"),
-            _ => unimplemented!(),
+            Or(_, _) => todo!(),
+            Unquote(_) => todo!(),
+            TempVar(_) => todo!(),
         }
     }
 }

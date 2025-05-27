@@ -2,12 +2,12 @@
 //use std::collections::HashMap;
 // use crate::ast_utils::Syntax;
 use crate::parser_utils::{dec_node_into_exp, get_one};
-use crate::ast::{BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, NodeData, Source, SourceKnown, Id, Id_, ToId, Pat, Pat_, PatField, PatField_, Exp, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, Cases, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFields, ProjIndex};
+use crate::ast::{into_adapton_nav_dim, Attr_, Attr, Attrs, BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, AdaptonNav, AdaptonNav_, NodeData, Source, SourceKnown, Id, Id_, IdPos, IdPos_, Unquote, Unquote_, ToId, Pat, Pat_, PatField, PatField_, Exp, ExpObjectBody, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, CasesPos, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFieldsPos, ProjIndex, QuotedAst};
 use crate::value::PrimFunction;
 // use crate::lexer_types::Token;
 use line_col::LineColLookup;
 use im_rc::vector;
-use crate::shared::{Share};
+use crate::shared::Share;
 use std::rc::Rc;
 
 grammar(lookup: &LineColLookup<'input>);
@@ -55,7 +55,7 @@ Bl : Exp = {
 }
 
 Ob : Exp = {
-    ExpObj
+    ExpObj => Exp::Object(<>)
 }
 
 // --- Terminals --- //
@@ -75,22 +75,48 @@ Id: Id = {
 #[inline]
 Id_: Id_ = Node<Id>;
 
+// "Id Position" grammar:
+//   Introduces the unquote-Id form here ("~ Id"),
+//   when one wishes to use a quoted Id value as the
+//   effective Id for this position in the AST.
+IdPos: IdPos = {
+    Id_ => IdPos{ unquote: false, id:<> },
+    "~" <id:Id_> => IdPos{ unquote: true, id },
+}
+
+#[inline]
+IdPos_: IdPos_ = Node<IdPos>;
+
+Unquote: Unquote = {
+    "~" <id:Id_> => Unquote{ id },
+}
+
+#[inline]
+Unquote_: Unquote_ = Node<Unquote>;
+
 // --- Literals --- //
 
 #[inline]
 Literal_: Node<Literal> = Node<Literal>;
 
 pub Literal: Literal = {
-    "null" => Literal::Null,
-    "true" => Literal::Bool(true),
-    "false" => Literal::Bool(false),
     "(" ")" => Literal::Unit,
+    LiteralNonUnit
+}
+
+#[inline]
+LiteralNonUnit_: Node<Literal> = Node<LiteralNonUnit>;
+
+pub LiteralNonUnit: Literal = {
     r"[+-]?[0-9]([0-9_]*[0-9])?[Ee][0-9]([0-9_]*[0-9])?" => Literal::Float(<>.to_string()), // exponential without decimal
     r"[+-]?[0-9]([0-9_]*[0-9])?\.([0-9]([0-9_]*[0-9])?)?([Ee][0-9]([0-9_]*[0-9])?)?" => Literal::Float(<>.to_string()), // exponential with decimal
     r"0x[0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?" => Literal::Nat(<>.to_string()), // hexadecimal
     r"[0-9]([0-9_]*[0-9])?" => Literal::Nat(<>.to_string()),
     r"'(?:[^\\'\s]|\\.)*'|' '" => Literal::Char(<>.to_string()), // TODO: more test cases
     <s:StringLiteral> => Literal::Text(s),
+    "null" => Literal::Null,
+    "true" => Literal::Bool(true),
+    "false" => Literal::Bool(false),
 }
 
 StringLiteral: String = {
@@ -107,6 +133,13 @@ PatPlain: Pat = {
     Id_ => Pat::Var(<>),
     Literal => Pat::Literal(<>),
     "(" <ps:Delim1<PatBin_, ",">> ")" => get_one(ps).map(Pat::Paren).unwrap_or_else(Pat::Tuple),
+
+    // Pattern-Unquote parser design: We need this "~~" token (vs
+    //   using "~") to disambiguate a lot of cases of
+    //   pattern-unquoting in other productions, as when patterns can
+    //   appear optionally in front of other unquoted ASTs (function
+    //   declarations).  The doubling happens to match the quote-pattern syntax "``" too.
+    "~~" <id:Id_> => Pat::Unquote(Unquote{id})
 }
 
 #[inline]
@@ -131,8 +164,8 @@ PatUn_: Pat_ = Node<PatUn>;
 
 PatUn: Pat = {
     PatNullary,
-    "#" <s:Id_> => Pat::Variant(s, None),
-    "#" <s:Id_> <p:PatNullary_> => Pat::Variant(s, Some(p)),
+    "#" <s:IdPos_> => Pat::Variant(s, None),
+    "#" <s:IdPos_> <p:PatNullary_> => Pat::Variant(s, Some(p)),
     "?" <p:PatUn_> => Pat::Optional(p),
     <u:UnOp_> <l:Literal_> => Pat::UnOpLiteral(u, l),
 
@@ -149,10 +182,10 @@ pub Pat: Pat = {
 PatField_: PatField_ = Node<PatField>;
 
 PatField: PatField = {
-    <id:Id_> => PatField{ id, pat:None },
-    <id:Id_> ":" <t:Type_> => PatField{ id:id.clone(), pat:Some(Pat::Annot(t)) },
-    <id:Id_> "=" <pat:Pat> => PatField{ id, pat:Some(pat) },
-    <id:Id_> ":" <t:Type_> "=" <pat:Pat_> => PatField{ id, pat:Some(Pat::AnnotPat(pat, t ))}
+    <id:IdPos_> => PatField{ id, pat:None },
+    <id:IdPos_> ":" <t:Type_> => PatField{ id:id.clone(), pat:Some(Pat::Annot(t)) },
+    <id:IdPos_> "=" <pat:Pat> => PatField{ id, pat:Some(pat) },
+    <id:IdPos_> ":" <t:Type_> "=" <pat:Pat_> => PatField{ id, pat:Some(Pat::AnnotPat(pat, t ))},
 }
 
 PatOpt: Pat = {
@@ -326,22 +359,33 @@ ExpNonDec<B>: Exp = {
     "if" <e1:ExpNullary_<Ob>> <e2:ExpNest_> "else" <e3:ExpNest_> => Exp::If(e1, e2, Some(e3)),
     "return" <e:Exp_<B>?> => Exp::Return(e),
     "async" <e:ExpNest_> => Exp::Async(e),
-    "async*" <e:Block_> => Exp::AsyncStar(e),
+    "async*" <e:BlockPos_> => Exp::AsyncStar(e),
     "await" <e:ExpNest_> => Exp::Async(e),
     "await*" <e:ExpNest_> => Exp::AsyncStar(e),
-    "switch" <e:ExpNullary_<Ob>> "{" <cs:Cases> "}" => Exp::Switch(e, cs),
+    "switch" <e:ExpNullary_<Ob>> <c:Cases> => Exp::Switch(e, c),
     "loop" <e:ExpNest_> => Exp::Loop(e, None),
     "while"  <e1:ExpNullary_<Ob>> <e2:ExpNest_> => Exp::While(e1, e2),
     "for" "(" <p:Pat_> "in" <e1:Exp_<Ob>> ")" <e2:ExpNest_> => Exp::For(p, e1, e2),
     "ignore" <e:ExpNest_> => Exp::Ignore(e),
-    "do" <e:Block_> => Exp::Do(e),
-    "do" "?" <e:Block_> => Exp::DoOpt(e),
+    "do" <e:BlockPos_> => Exp::Do(e),
+    "do" "?" <e:BlockPos_> => Exp::DoOpt(e),
+    "do" <an:AdaptonNav_> <e:BlockPos_> => Exp::DoAdaptonNav(vector!(an), e),
     "assert" <e:ExpNest_> => Exp::Assert(e),
     "label" <id:Id_> <t:(":" <Type_>)?> <e:ExpNest_> => Exp::Label(id, t, e),
     "debug" <e:ExpNest_> => Exp::Debug(e),
     "import" <txt:StringLiteral> => Exp::Import(txt),
     "try" <e1:ExpNest_> <c:Catch_> => Exp::Try(e1, c),
+    "thunk" <e:Block_> => Exp::Thunk(e),
+    "force" <e:ExpNullary_<Ob>> => Exp::Force(e),
+    "@" <e:ExpNullary_<Ob>> => Exp::GetAdaptonPointer(e),
+}
 
+#[inline]
+AdaptonNav_: AdaptonNav_ = Node<AdaptonNav>;
+
+AdaptonNav: AdaptonNav = {
+    "goto" <d:IdPos_> <e:ExpNullary_<Ob>> => AdaptonNav::Goto(into_adapton_nav_dim(d), e),
+    "within" <d:IdPos_> <e:ExpNullary_<Ob>> => AdaptonNav::Within(into_adapton_nav_dim(d), e),
 }
 
 #[inline]
@@ -357,7 +401,7 @@ ExpNullary_<B>: Exp_ = Node<ExpNullary<B>>;
 ExpNullary<B>: Exp = {
     B,
     ExpPlain,
-    Id => Exp::Var(<>),
+    Id_ => Exp::id_var(<>),
     "prim" <t:StringLiteral> => Exp::Prim(PrimFunction::resolve(t)),
 }
 
@@ -367,6 +411,36 @@ ExpPlain_: Exp_ = Node<ExpPlain>;
 ExpPlain: Exp = {
     Literal => Exp::Literal(<>),
     "(" <es:Delim1<ExpIfNoElse_<Exp<Ob>>, ",">> ")" => get_one(es).map(Exp::Paren).unwrap_or_else(Exp::Tuple),
+    QuotedAst => Exp::QuotedAst(<>),
+}
+
+QuotedAst: QuotedAst = {
+    // Empty collections of quoted ASTs, in various concrete syntax.
+    "`" "{" "}" => QuotedAst::Empty,
+    "`" "(" ")" => QuotedAst::Empty,
+    "``" "{" "}" => QuotedAst::Empty,
+    "``" "(" ")" => QuotedAst::Empty,
+
+    // Raw Id (used to create Var nodes in and Exp and Pat productions.)
+    // Binary composition appends two Ids (promoting second from number literal to Id, if necessary).
+    "`" <id:Id_> => QuotedAst::Id_(id),
+
+    "`" <lit:LiteralNonUnit_> => QuotedAst::Literal(lit),
+
+    // Collections of expressions (that are either tuple or record components):
+    "`" "(" <es:Delim1<ExpIfNoElse_<Exp<Ob>>, ",">> ")" => QuotedAst::TupleExps(es),
+    "`" "{" <ob:ExpObjectBody> "}" => QuotedAst::RecordExps(ob),
+
+    // Declarations (and imperative code):
+    "`" "do" "{" <ds:Decs> "}" => QuotedAst::Decs(ds),
+
+    // Switch cases
+    "`" "{" <cs:Delim1<Node<Case>, ";">> "}" => QuotedAst::Cases(cs),
+
+    // Collections of patterns (matching either tuple or record components):
+    "``" "(" <ps:Delim1<Pat_, ",">> ")" => QuotedAst::TuplePats(ps),
+    "``" "{" <ps:Delim1<PatField_, ";">> "}" => QuotedAst::RecordPats(ps),
+    "`" "type" "("  <types:Delim0<TypeItem_, ",">> ")" => QuotedAst::Types(types),
 }
 
 #[inline]
@@ -381,8 +455,17 @@ ExpNest: Exp = {
 Block_: Exp_ = Node<Block>;
 
 Block: Exp = {
-    "{" <ds:Decs> "}" => Exp::Block(ds)
+    "{" <ds:Decs> "}" => Exp::Block(ds),
 }
+
+#[inline]
+BlockPos_: Exp_ = Node<BlockPos>;
+
+BlockPos: Exp = {
+    "~" <e:ExpNullary_<Bl>> => Exp::Unquote(e),
+    "{" <ds:Decs> "}" => Exp::Block(ds),
+}
+
 
 #[inline]
 ExpPost_<B>: Exp_ = Node<ExpPost<B>>;
@@ -393,7 +476,7 @@ ExpPost<B>: Exp = {
     <e1:ExpPost_<B>> "[" <e2:Exp_<Ob>> "]" => Exp::Index(e1, e2),
     <e1:ExpPost_<B>> "." <i:NatIndex> => Exp::Proj(e1, ProjIndex::Usize(i)),
     <e1:ExpPost_<B>> "." <f:FloatIndex> => Exp::Proj(e1, ProjIndex::FloatLike(f)),
-    <e1:ExpPost_<B>> "." <i:Id_> => Exp::Dot(e1, i),
+    <e1:ExpPost_<B>> "." <i:IdPos_> => Exp::Dot(e1, i),
     <e1:ExpPost_<B>> "<" <inst:Delim0<Type_, ",">> ">" <e2:ExpNullary_<Ob>> => Exp::Call(e1, Some(inst), e2),
     <e1:ExpPost_<B>> <e2:ExpNullary_<Ob>> => Exp::Call(e1, None, e2),
     <e:ExpPost_<B>> "!" => Exp::Bang(e),
@@ -409,7 +492,7 @@ ExpUn_<B>: Exp_ = Node<ExpUn<B>>;
 
 ExpUn<B>: Exp = {
     ExpPost<B>,
-    "#" <x:Id_> <e:(ExpNullary_<B>)?> => Exp::Variant(x, e),
+    "#" <x:IdPos_> <e:(ExpNullary_<B>)?> => Exp::Variant(x, e),
     "?" <e:ExpUn_<Ob>> => Exp::Opt(e),
     "actor" <e:ExpPlain_> => Exp::ActorUrl(e),
     <u:UnOp> <e:ExpUn_<B>> => Exp::Un(u, e),
@@ -417,10 +500,16 @@ ExpUn<B>: Exp = {
     "debug_show" <e:ExpUn_<B>> => Exp::DebugShow(e),
     "to_candid" "(" <d:Delim1<Exp_<Ob>, ",">> ")" => Exp::ToCandid(d),
     "from_candid" <e:ExpUn_<B>> => Exp::FromCandid(e),
+    "~" <e:ExpUn_<B>> => Exp::Unquote(e),
 }
 
-ExpObj: Exp = {
-    // Object syntax.
+ExpObj: ExpObjectBody = {
+    "{" "}" => (None, None),
+    "{" <e:ExpObjectBody> "}" => e,
+}
+
+ExpObjectBody: ExpObjectBody = {
+    // Object body syntax.
     //
     // We want to use this concise rule, like in the Menhir version of
     // the Motoko parser:
@@ -435,26 +524,25 @@ ExpObj: Exp = {
     // LR(1) language of menhir.  To bridge this gap, we parse the
     // first field in a more case-by-case way.
     //
-    "{" "}" => Exp::Object(None, None),
-    "{" <field1:ExpFieldNoBareId_> <fields:(";" <Delim0<ExpField_, ";">>)?> "}" => Exp::obj_field_fields(field1, fields),
-    "{" <id:Id_> ";" <fields:Delim1<ExpField_, ";">> "}" => Exp::obj_id_fields(id, fields),
-    "{" <base1:ExpPost_<Ob>> <bases:("and" <Delim1<ExpPost_<Ob>, "and">>)?> <efs:("with" <Delim1<ExpField_, ";">>)?> "}" => Exp::obj_base_bases(base1, bases, efs),
+    <field1:ExpFieldNoBareId_> <fields:(";" <Delim0<ExpField_, ";">>)?> => Exp::obj_field_fields(field1, fields).object_body(),
+    <id:IdPos_> ";" <fields:Delim1<ExpField_, ";">> => Exp::obj_id_fields(id, fields).object_body(),
+    <base1:ExpPost_<Ob>> <bases:("and" <Delim1<ExpPost_<Ob>, "and">>)?> <efs:("with" <Delim1<ExpField_, ";">>)?> => Exp::obj_base_bases(base1, bases, efs).object_body(),
 }
 
 #[inline]
 ExpField_: Node<ExpField> = Node<ExpField>;
 
 ExpField: ExpField = {
-    <mut_:VarOpt> <id:Id_> <typ:(":" <Type_>)?> <exp:("=" <ExpIfNoElse_<Exp<Ob>>>)?> => ExpField{ mut_, id, exp, typ }
+    <mut_:VarOpt> <id:IdPos_> <typ:(":" <Type_>)?> <exp:("=" <ExpIfNoElse_<Exp<Ob>>>)?> => ExpField{ mut_, id, exp, typ }
 }
 
 #[inline]
 ExpFieldNoBareId_: Node<ExpField> = Node<ExpFieldNoBareId>;
 
 ExpFieldNoBareId: ExpField = { // like ExpField, except that a "bare" Id is not permitted.  Helps disambiguate the parse tree.
-    "var" <id:Id_> <typ:(":" <TypeNoBin_>)?> "=" <exp:ExpIfNoElse_<Exp<Ob>>> => ExpField{ mut_:Mut::Var, id, exp:Some(exp), typ },
-    <id:Id_> ":" <typ:TypeNoBin_> <exp:("=" <ExpIfNoElse_<Exp<Ob>>>)?> => ExpField{ mut_:Mut::Const, id, exp, typ:Some(typ) },
-    <id:Id_> "=" <exp:ExpIfNoElse_<Exp<Ob>>> => ExpField{ mut_:Mut::Const, id, exp:Some(exp), typ:None },
+    "var" <id:IdPos_> <typ:(":" <TypeNoBin_>)?> "=" <exp:ExpIfNoElse_<Exp<Ob>>> => ExpField{ mut_:Mut::Var, id, exp:Some(exp), typ },
+    <id:IdPos_> ":" <typ:TypeNoBin_> <exp:("=" <ExpIfNoElse_<Exp<Ob>>>)?> => ExpField{ mut_:Mut::Const, id, exp, typ:Some(typ) },
+    <id:IdPos_> "=" <exp:ExpIfNoElse_<Exp<Ob>>> => ExpField{ mut_:Mut::Const, id, exp:Some(exp), typ:None },
 }
 
 #[inline]
@@ -577,8 +665,9 @@ ExpBin9<B>: Exp = {
     ExpUn<B>,
 }
 
-Cases: Cases = {
-    Delim0<Node<Case>, ";">
+Cases: CasesPos = {
+    Unquote_ => CasesPos::Unquote(<>),
+    "{" <cs:Delim0<Node<Case>, ";">> "}" => CasesPos::Cases(cs),
 }
 
 Case: Case = {
@@ -589,10 +678,14 @@ Decs: Decs = {
     Delim0<Dec_, ";">
 }
 
-#[inline]
-Dec_: Dec_ = Node<Dec>;
+Dec_: Dec_ = {
+    <a:Node<("#" AttrDec)?>> <dec:DecRaw_> => Dec::with_attrs(a, dec), 
+}
 
-Dec: Dec = {
+#[inline]
+DecRaw_: Dec_ = Node<DecRaw>;
+
+DecRaw: Dec = {
     DecVar,
     DecNonVar,
     ExpNonDec0_<Ob> => Dec::Exp(<>),
@@ -615,15 +708,16 @@ DecNonVar: Dec = {
         name: id2,
         fields: b
     }),
-    "module" <i:(Id_)?> <s:"="?> <ob:ObjBody> => Dec::LetModule(i, Sugar(s.is_some()), ob),
-    "actor" <i:(Id_)?> <s:"="?> <ob:ObjBody> => Dec::LetActor(i, Sugar(s.is_some()), ob),
-    "object" <i:(Id_)?> <s:"="?> <ob:ObjBody> => Dec::LetObject(i, Sugar(s.is_some()), ob),
-    <sp:SharedPatOpt> "func" <i:(Id_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> <b:Block_> => Dec::Func(Function {
+    "module" <i:(IdPos_)?> <s:"="?> <ob:ObjBody> => Dec::LetModule(i, Sugar(s.is_some()), ob),
+    "actor" <i:(IdPos_)?> <s:"="?> <ob:ObjBody> => Dec::LetActor(i, Sugar(s.is_some()), ob),
+    "object" <i:(IdPos_)?> <s:"="?> <ob:ObjBody> => Dec::LetObject(i, Sugar(s.is_some()), ob),
+    <sp:SharedPatOpt> "func" <i:(IdPos_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> <b:BlockPos_> => Dec::Func(Function {
         name: i, shared: sp, binds: tpo, input: p, output: t.map(|t|{t.1}), sugar: Sugar(false), exp: b,
     }),
-    <sp:SharedPatOpt> "func" <i:(Id_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> "=" <e:Exp_<Ob>> => Dec::Func(Function {
+    <sp:SharedPatOpt> "func" <i:(IdPos_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" Type_)?> "=" <e:Exp_<Ob>> => Dec::Func(Function {
         name: i, shared: sp, binds: tpo, input: p, output: t.map(|t|{t.1}), sugar: Sugar(true), exp: e,
     }),
+    // to do -- IdPos instead of Id
     <sp:SharedPatOpt> "class" <oso:ObjSortOpt> <id:(Id_)?> <tpo:TypeParamsOpt> <p:PatPlain_> <t:(":" <Type_>)?> <b:ObjBody> => Dec::Class(Class {
         shared: sp,
         sort: oso,
@@ -694,8 +788,9 @@ BinOp: BinOp = {
     "#" => BinOp::Cat,
 }
 
-ObjBody: DecFields = {
-    "{" <dfs:Delim0<DecField_, ";">> "}" => dfs
+ObjBody: DecFieldsPos = {
+    Unquote_ => DecFieldsPos::Unquote(<>),
+    "{" <dfs:Delim0<DecField_, ";">> "}" => DecFieldsPos::DecFields(dfs),
 }
 
 #[inline]
@@ -718,5 +813,19 @@ Stab: Stab = {
 DecField_: DecField_ = Node<DecField>;
 
 DecField: DecField = {
-    <vis:(Vis_)?> <stab:(Stab_)?> <dec:Dec_> => DecField{ vis, stab, dec }
+    <attrs:( AttrDec )?>
+    <vis:(Vis_)?> <stab:(Stab_)?> <dec:Dec_> => DecField{ attrs, vis, stab, dec }
+}
+
+AttrDec: Attrs = {
+    "#" "[" <d:Delim0<Attr_, ",">> "]" => d
+}
+
+#[inline]
+Attr_: Attr_ = Node<Attr>;
+
+Attr: Attr = {
+    <i:Id_> => Attr::Id(i),
+    <i:Id_> "=" <a:Attr_> => Attr::Field(i, a),
+    <i:Id_> "(" <d:Delim0<Attr_, ",">> ")" => Attr::Call(i, d),
 }

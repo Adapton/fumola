@@ -173,11 +173,11 @@ pub fn module_project(
             for f in pat_fields.vec.iter() {
                 match f.0.pat.clone() {
                     None => {
-                        let fd = resolve_def(defs, &m.fields, true, &f.0.id.0)?;
-                        r.push((f.0.id.clone(), fd.def.clone()))
+                        let fd = resolve_def(defs, &m.fields, true, f.0.id.0.id_ref())?;
+                        r.push((f.0.id.0.id_(), fd.def.clone()))
                     }
                     Some(Pat::Var(x)) => {
-                        let fd = resolve_def(defs, &m.fields, true, &f.0.id.0)?;
+                        let fd = resolve_def(defs, &m.fields, true, f.0.id.0.id_ref())?;
                         r.push((x.clone(), fd.def.clone()))
                     }
                     p => return nyi!(line!(), "module_project object-field pattern {:?}", p),
@@ -228,7 +228,7 @@ pub mod def {
             None => return Err(Interruption::ModuleFileNotFound(path)),
             Some(ModuleFileState::Defined(mf)) => mf,
             Some(ModuleFileState::Init(init)) => {
-                // if a module imports itself, directly or indirectly, we we diverge without cycle detection.
+                // if a module imports itself, directly or indirectly, cycle detection prevents .
                 // so, detect a cycle by tracking import paths.
                 let contains_this_path = active.module_files().import_stack.contains(&path);
                 if contains_this_path {
@@ -244,6 +244,7 @@ pub mod def {
                 for dec in init.outer_decs.iter() {
                     let dec = dec.clone();
                     let df = crate::ast::DecField {
+                        attrs: None,
                         vis: None,
                         stab: None,
                         dec,
@@ -315,6 +316,9 @@ pub mod def {
     ) -> Result<(), Interruption> {
         //println!("{:?} -- {:?} ", source, df);
         match &df.dec.0 {
+            Dec::Attrs(_attrs, _dec) => {
+                nyi!(line!())
+            }
             Dec::LetModule(id, _, dfs) => {
                 let v = module(
                     active,
@@ -322,17 +326,17 @@ pub mod def {
                         package_name: None,
                         local_path: format!("<anonymous@{}>", &df.dec.1),
                     },
-                    id,
+                    &id.clone().map(|i| i.0.id_()),
                     df.dec.1.clone(),
                     df.vis.clone(),
                     df.stab.clone(),
-                    dfs,
+                    dfs.dec_fields(),
                     None,
                 )?;
                 if let Some(id) = id {
                     if let Value::Module(m) = &*v {
                         active.defs().insert_field(
-                            &id.0,
+                            id.0.id_ref(),
                             source.clone(),
                             df.vis.clone(),
                             df.stab.clone(),
@@ -357,7 +361,7 @@ pub mod def {
                         .share(),
                     };
                     active.defs().insert_field(
-                        &name.0,
+                        name.0.id_ref(),
                         source.clone(),
                         df.vis.clone(),
                         df.stab.clone(),
@@ -466,7 +470,7 @@ pub mod def {
                         .share(),
                     };
                     active.defs().insert_field(
-                        &name.0,
+                        name.0.id_ref(),
                         source.clone(),
                         df.vis.clone(),
                         df.stab.clone(),
@@ -658,13 +662,15 @@ fn delim_is_static(d: &crate::ast::Delim<Exp_>) -> bool {
 fn exp_is_static(e: &Exp) -> bool {
     match e {
         Exp::ActorUrl(_) => true,
-        Exp::Object(_, efs) => {
+        Exp::Object((_, efs)) => {
             if let Some(efs) = efs {
                 object_is_static(efs)
             } else {
                 true
             }
         }
+        Exp::QuotedAst(_a) => true,
+        Exp::Thunk(_) => true,
         Exp::Literal(_) => true,
         Exp::Function(_) => true,
         Exp::Block(decs) => {

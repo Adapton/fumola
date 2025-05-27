@@ -2,9 +2,13 @@ use std::fmt::Display;
 use std::num::Wrapping;
 use std::rc::Rc;
 
-use crate::ast::{Dec, Decs, Exp, Function, Id, Literal, Mut, ToId};
+use crate::adapton::{Pointer as AdaptonPointer, Space as AdaptonSpace, Time as AdaptonTime};
+use crate::ast::{
+    BinOp, Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, QuotedAst, ToId, UnOp,
+};
 use crate::dynamic::Dynamic;
 use crate::shared::{FastClone, Share, Shared};
+use crate::type_mismatch;
 use crate::vm_types::{def::Actor as ActorDef, def::CtxId, def::Module as ModuleDef, Env};
 use crate::Interruption;
 
@@ -21,27 +25,24 @@ pub type Result<T = Value, E = ValueError> = std::result::Result<T, E>;
 
 /// Permit sharing and fast concats.
 #[derive(Clone, Debug)]
-pub enum Text {
-    String(Box<String>),
-    Concat(Vector<String>),
-}
+pub struct Text(Vector<Rc<String>>);
 
 impl Text {
     #[allow(dead_code)]
     fn into_string(self) -> String {
-        match self {
-            Text::String(s) => *s,
-            Text::Concat(v) => v.into_iter().collect(),
-        }
+        self.0.into_iter().map(|s| s.as_ref().clone()).collect()
+    }
+
+    pub fn append(&self, other: &Text) -> Text {
+        let mut out = self.0.clone();
+        out.append(other.0.clone());
+        Text(out)
     }
 }
 
 impl PartialEq for Text {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Text::String(a), Text::String(b)) => a == b,
-            _ => self.to_string() == other.to_string(), // TODO: possibly optimize
-        }
+        self.to_string() == other.to_string()
     }
 }
 impl Eq for Text {}
@@ -54,16 +55,14 @@ impl std::hash::Hash for Text {
 
 impl ToString for Text {
     fn to_string(&self) -> String {
-        match self {
-            Text::String(s) => s.to_string(),
-            Text::Concat(v) => v.iter().cloned().collect(),
-        }
+        self.clone().into_string()
     }
 }
 
 impl<S: Into<String>> From<S> for Text {
     fn from(value: S) -> Self {
-        Text::String(Box::new(value.into()))
+        use im_rc::vector;
+        Text(vector!(Rc::new(value.into())))
     }
 }
 
@@ -94,6 +93,18 @@ pub struct FieldValue {
     pub val: Value_,
 }
 
+pub type Symbol_ = Shared<Symbol>;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum Symbol {
+    Nat(#[serde(with = "crate::serde_utils::biguint")] BigUint),
+    Int(#[serde(with = "crate::serde_utils::bigint")] BigInt),
+    QuotedAst(QuotedAst),
+    UnOp(UnOp, Symbol_),
+    BinOp(Symbol_, BinOp, Symbol_),
+    Call(Symbol_, Symbol_),
+}
+
 pub type Value_ = Shared<Value>;
 
 pub type Pointer = crate::vm_types::Pointer;
@@ -102,6 +113,18 @@ pub type Pointer = crate::vm_types::Pointer;
 pub struct ClosedFunction(pub Closed<Function>);
 
 pub type Float = OrderedFloat<f64>;
+
+impl PartialOrd for Id {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.string.partial_cmp(&other.string)
+    }
+}
+
+impl Ord for Id {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.string.cmp(&other.string)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Value {
@@ -132,7 +155,15 @@ pub enum Value {
     Actor(Actor),
     ActorMethod(ActorMethod),
     Module(ModuleDef),
+    QuotedAst(QuotedAst),
+    Symbol(Symbol_),
+    AdaptonPointer(AdaptonPointer),
+    AdaptonTime(AdaptonTime),
+    AdaptonSpace(AdaptonSpace),
+    Thunk(ThunkBody),
 }
+
+pub type ThunkBody = Closed<Exp_>;
 
 /// Actor value.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -263,6 +294,10 @@ impl FastRandIter {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum PrimFunction {
+    AdaptonNow,
+    AdaptonHere,
+    AdaptonSpace,
+    AdaptonTime,
     AtSignVar(String),
     DebugPrint,
     NatToText,
@@ -284,6 +319,10 @@ impl PrimFunction {
         use CollectionFunction::*;
         use PrimFunction::*;
         Ok(match name.as_str() {
+            "\"adaptonNow\"" => AdaptonNow,
+            "\"adaptonHere\"" => AdaptonHere,
+            "\"adaptonTime\"" => AdaptonTime,
+            "\"adaptonSpace\"" => AdaptonSpace,
             "\"print\"" => DebugPrint,
             "\"natToText\"" => NatToText,
             "\"hashMapNew\"" => Collection(HashMap(HashMapFunction::New)),
@@ -336,6 +375,57 @@ pub struct Closed<X> {
 }
 
 impl Value {
+    pub fn is_quoted_ast(&self) -> bool {
+        match self {
+            Value::QuotedAst(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_quoted_id(&self) -> bool {
+        match self {
+            Value::QuotedAst(a) => match a {
+                QuotedAst::Id_(_) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
+    pub fn unquote_ast(&self) -> Result<QuotedAst, Interruption> {
+        match self {
+            Value::QuotedAst(q) => Ok(q.clone()),
+            _ => type_mismatch!(file!(), line!()),
+        }
+    }
+
+    pub fn unquote_pat(&self) -> Result<Pat_, Interruption> {
+        match self {
+            Value::QuotedAst(QuotedAst::TuplePats(ps)) => match ps.vec.len() {
+                1 => Ok(ps.vec[0].clone()),
+                _ => panic!(),
+            },
+            _ => type_mismatch!(file!(), line!()),
+        }
+    }
+
+    pub fn unquote_exp(&self) -> Result<Exp_, Interruption> {
+        match self {
+            Value::QuotedAst(QuotedAst::TupleExps(es)) => match es.vec.len() {
+                1 => Ok(es.vec[0].clone()),
+                _ => panic!(),
+            },
+            _ => type_mismatch!(file!(), line!()),
+        }
+    }
+
+    pub fn unquote_id(&self) -> Result<Id_, Interruption> {
+        match self {
+            Value::QuotedAst(QuotedAst::Id_(i)) => Ok(i.clone()),
+            _ => type_mismatch!(file!(), line!()),
+        }
+    }
+
     pub fn from_dec(dec: &Dec) -> Result {
         match dec {
             Dec::Exp(e) => Value::from_exp(e.as_ref().data_ref()),
@@ -390,6 +480,31 @@ impl Value {
             Literal::Text(s) => Text(crate::value::Text::from(s[1..s.len() - 1].to_string())),
             Literal::Blob(v) => Blob(v.clone()),
         })
+    }
+
+    pub fn into_time_or<E>(&self, err: E) -> Result<AdaptonTime, E> {
+        match self {
+            Value::AdaptonTime(t) => Ok(t.clone()),
+            _ => {
+                let symbol = self.into_sym_or(err)?;
+                Ok(AdaptonTime::Symbol(symbol))
+            }
+        }
+    }
+
+    pub fn into_sym_or<E>(&self, err: E) -> Result<Symbol_, E> {
+        match self {
+            Value::Symbol(s) => Ok(s.clone()),
+            Value::Nat(n) => Ok(Shared::new(Symbol::Nat(n.clone()))),
+            Value::Int(i) => Ok(Shared::new(Symbol::Int(i.clone()))),
+            Value::QuotedAst(QuotedAst::Id_(i)) => {
+                // in this very common case, we strip away the position information.
+                // unlike more general quoted ASTs, the Ids are meant to reappear without being distinguished by their occurances.
+                Ok(Shared::new(Symbol::QuotedAst(QuotedAst::Id(i.0.clone()))))
+            }
+            Value::QuotedAst(q) => Ok(Shared::new(Symbol::QuotedAst(q.clone()))),
+            _ => Err(err),
+        }
     }
 }
 
@@ -500,6 +615,10 @@ impl Value {
                 );
                 Object(map)
             }
+            Value::QuotedAst(_) => Err(ValueError::ToRust("QuotedAst".to_string()))?,
+            Value::Symbol(_) => Err(ValueError::ToRust("Symbol".to_string()))?,
+            Value::AdaptonPointer(_) => Err(ValueError::ToRust("NamedPointer".to_string()))?,
+            Value::Thunk(_) => Err(ValueError::ToRust("Thunk".to_string()))?,
             Value::Pointer(_) => Err(ValueError::ToRust("Pointer".to_string()))?,
             Value::Actor(_) => Err(ValueError::ToRust("Actor".to_string()))?,
             Value::ActorMethod(_) => Err(ValueError::ToRust("ActorMethod".to_string()))?,
@@ -528,6 +647,8 @@ impl Value {
             Value::Dynamic(d) => {
                 serde_json::to_value(d).map_err(|e| ValueError::ToRust(e.to_string()))?
             }
+            Value::AdaptonTime(_time) => todo!(),
+            Value::AdaptonSpace(_space) => todo!(),
         })
     }
 
@@ -638,7 +759,7 @@ impl Value {
 pub trait ToMotoko {
     fn to_motoko(self) -> Result;
 
-    fn to_shared(self) -> Result<Value_>
+    fn to_motoko_shared(self) -> Result<Value_>
     where
         Self: Sized,
     {

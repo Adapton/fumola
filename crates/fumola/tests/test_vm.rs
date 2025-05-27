@@ -1,7 +1,7 @@
-use motoko::check::assert_vm_eval as assert_;
-use motoko::check::assert_vm_interruption as assert_x;
-use motoko::type_mismatch_;
-use motoko::vm_types::Interruption;
+use fumola::check::assert_vm_eval as assert_;
+use fumola::check::assert_vm_interruption as assert_x;
+use fumola::type_mismatch_;
+use fumola::vm_types::Interruption;
 
 use test_log::test; // enable logging output for tests by default.
 
@@ -85,7 +85,7 @@ fn vm_vars() {
     assert_("var x = 1", "()");
     assert_("var x = 1; x", "1");
     assert_("var x = 1; x := 2; x", "2");
-    assert_x("1 := 1", &type_mismatch_!());
+    assert_x("() := 1", &type_mismatch_!());
     assert_("var x : Nat = 1", "()");
     assert_("var (x : Nat) = 1", "()");
 }
@@ -310,7 +310,7 @@ fn prim_reflect_value() {
 
 #[test]
 #[cfg(feature = "to-motoko")]
-#[cfg(feature = "agent-reflection")]
+#[cfg(feature = "value-reflection")]
 fn prim_reify_agent() {
     // assert_("let x = 0; prim \"hashMapGet\" ((prim \"reifyAgent\" ()).env, \"x\")", "?#Nat(0)");
     assert_(
@@ -320,7 +320,7 @@ fn prim_reify_agent() {
 }
 
 #[test]
-#[cfg(feature = "agent-reflection")]
+#[cfg(feature = "value-reflection")]
 fn prim_reflect_agent() {
     // assert_("var x = 0; let agent = prim \"reifyAgent\" (); x := 1; prim \"reflectAgent\" (agent); x", "0");
     assert_(
@@ -459,12 +459,12 @@ f()
 
 #[test]
 fn test_core_eval() {
-    let mut core = motoko::vm_types::Core::empty();
+    let mut core = fumola::vm_types::Core::empty();
     core.eval("var x = 1").expect("oops");
     core.eval("var y = x + 1").expect("oops");
     let y = core.eval("y").expect("oops");
     assert_eq!(
         &*y,
-        &motoko::value::Value::Nat(num_bigint::BigUint::from(2_u32))
+        &fumola::value::Value::Nat(num_bigint::BigUint::from(2_u32))
     )
 }

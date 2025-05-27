@@ -1,17 +1,17 @@
-use im_rc::{HashMap, Vector};
-use num_traits::ToPrimitive;
-use serde::{Deserialize, Serialize};
-
+use crate::adapton;
 use crate::ast::{Inst, Mut};
 #[cfg(feature = "parser")]
 use crate::parser_types::SyntaxError as SyntaxErrorCode;
 use crate::shared::FastClone;
 use crate::value::{ActorId, ActorMethod, ValueError};
-use crate::{
+pub use crate::{
     ast::{Dec_, Exp_, Id, Id_, PrimType, Source, Span},
     value::Value_,
 };
 use crate::{Share, Value};
+use im_rc::{HashMap, Vector};
+use num_traits::ToPrimitive;
+use serde::{Deserialize, Serialize};
 
 pub type Result<T = Value_, E = Interruption> = std::result::Result<T, E>;
 
@@ -25,10 +25,10 @@ pub struct SyntaxError {
 #[macro_export]
 macro_rules! type_mismatch_ {
     () => {
-        Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(None))
+        $crate::Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(None))
     };
     ($file:expr, $line:expr) => {
-        Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(Some(
+        $crate::Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(Some(
             $crate::vm_types::CoreSource {
                 name: None,
                 description: None,
@@ -38,7 +38,7 @@ macro_rules! type_mismatch_ {
         )))
     };
     ($file:expr, $line:expr, $name:expr) => {
-        Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(Some(
+        $crate::Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(Some(
             $crate::vm_types::CoreSource {
                 name: Some($name.to_string()),
                 description: None,
@@ -48,7 +48,7 @@ macro_rules! type_mismatch_ {
         )))
     };
     ($file:expr, $line:expr, $name:expr, $description:expr) => {
-        Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(Some(
+        $crate::Interruption::TypeMismatch($crate::vm_types::OptionCoreSource(Some(
             $crate::vm_types::CoreSource {
                 name: Some($name.to_string()),
                 description: Some($description.to_string()),
@@ -194,19 +194,19 @@ impl<'a> crate::shared::FastClone<Pointer> for &'a Pointer {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "cont_type", content = "value")]
 pub enum Cont {
-    Taken,
     Decs(Vector<Dec_>),
     Exp_(Exp_, Vector<Dec_>),
     // Value(Value_),
     Value_(Value_),
     LetVarRet(Source, Option<Id_>),
+    Frame(Value_, Box<stack::FrameCont>),
 }
 
 pub fn source_from_cont(cont: &Cont) -> Source {
     use Cont::*;
     match cont {
-        Taken => {
-            unreachable!("no source for Taken continuation. This signals a VM bug.  Please report.")
+        Frame(_, _) => {
+            unreachable!("no source for Frame continuation. This signals a VM bug.  Please report.")
         }
         Decs(decs) => crate::ast::source_from_decs(decs),
         Exp_(exp_, decs) => {
@@ -223,9 +223,10 @@ pub fn source_from_cont(cont: &Cont) -> Source {
 
 pub mod stack {
     use super::{def::CtxId, Cont, Env, Pointer, RespTarget, Vector};
+    pub use crate::adapton::Navigation as AdaptonNav;
     use crate::ast::{
-        BinOp, Cases, Dec_, ExpField_, Exp_, Id_, Inst, Mut, Pat_, PrimType, ProjIndex, RelOp,
-        Source, Type_, UnOp,
+        AdaptonNav_, BinOp, Cases, Dec_, ExpField_, Exp_, Id_, Inst, Mut, Pat_, PrimType,
+        ProjIndex, RelOp, Source, Type_, UnOp,
     };
     use crate::value::{Value, Value_};
     use serde::{Deserialize, Serialize};
@@ -245,6 +246,17 @@ pub mod stack {
         Variant(Id_),
         Switch(Cases),
         Do,
+        DoAdaptonNav1(
+            Vector<(AdaptonNav, Value_)>,
+            AdaptonNav,
+            Vector<AdaptonNav_>,
+            Exp_,
+        ),
+        DoAdaptonNav2(usize),
+        GetAdaptonPointer,
+        Force1,
+        ForceAdaptonPointer,
+        ForceThunk,
         Assert,
         Ignore,
         Debug,
@@ -286,6 +298,7 @@ pub mod stack {
         Call3,
         Return,
         Respond(RespTarget),
+        Unquote,
     }
     impl FrameCont {
         pub fn formal(&self) -> Option<FormalFrameCont> {
@@ -475,6 +488,7 @@ pub struct Counts {
 ///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Agent {
+    pub adapton_state: adapton::State,
     pub store: Store,
     pub counts: Counts,
     pub active: Activation,
@@ -526,6 +540,7 @@ pub struct Actor {
     pub def: def::Actor,
     pub env: Env,
     pub store: Store,
+    pub adapton_state: adapton::State,
     pub counts: Counts,
     pub active: Option<Activation>,
     pub awaiting: HashMap<RespId, Activation>,
@@ -659,7 +674,7 @@ pub trait Active: ActiveBorrow {
     fn package<'a>(&'a mut self) -> &'a mut Option<String>;
     fn debug_print_out<'a>(&'a mut self) -> &'a mut Vector<DebugPrintLine>;
     fn counts<'a>(&'a mut self) -> &'a mut Counts;
-
+    fn adapton<'a>(&'a mut self) -> &'a mut adapton::State;
     fn alloc(&mut self, value: impl Into<Value_>) -> Pointer {
         self.store().alloc(value)
     }
@@ -808,7 +823,15 @@ pub enum Interruption {
     NotYetImplemented(CoreSource, Option<String>),
     Unknown,
     Impossible,
+    AdaptonError(crate::adapton::Error),
     Other(String),
+}
+
+impl From<crate::adapton::Error> for Interruption {
+    // try to avoid this conversion, except in temp code.
+    fn from(e: crate::adapton::Error) -> Interruption {
+        Interruption::AdaptonError(e)
+    }
 }
 
 impl From<()> for Interruption {

@@ -1,8 +1,8 @@
-use motoko::ast::ToId;
-use motoko::check::assert_vm_eval as assert_;
-use motoko::check::assert_vm_interruption as assert_x;
-use motoko::value::ActorId;
-use motoko::vm_types::{Interruption, LocalPointer, NumericPointer, Pointer, ScheduleChoice};
+use fumola::ast::ToId;
+use fumola::check::assert_vm_eval as assert_;
+use fumola::check::assert_vm_interruption as assert_x;
+use fumola::value::ActorId;
+use fumola::vm_types::{Interruption, LocalPointer, NumericPointer, Pointer, ScheduleChoice};
 
 use test_log::test; // enable logging output for tests by default.
 

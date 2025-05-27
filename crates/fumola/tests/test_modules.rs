@@ -1,5 +1,5 @@
-use motoko::check::assert_vm_eval as assert_;
-//use motoko::check::assert_vm_interruption as assert_x;
+use fumola::check::assert_vm_eval as assert_;
+//use fumola::check::assert_vm_interruption as assert_x;
 
 use test_log::test; // enable logging output for tests by default.
 

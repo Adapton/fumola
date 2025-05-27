@@ -42,6 +42,9 @@ impl<T: Clone> Shared<T> {
     pub fn get(&self) -> T {
         self.rc.deref().clone()
     }
+    pub fn as_ref<'a>(&'a self) -> &'a T {
+        self.rc.deref()
+    }
 }
 
 impl<T> Deref for Shared<T> {
@@ -88,6 +91,24 @@ pub trait Share {
 //         Shared::new(self)
 //     }
 // }
+
+impl<T> PartialOrd for Shared<T>
+where
+    T: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.rc.partial_cmp(&other.rc)
+    }
+}
+
+impl<T> Ord for Shared<T>
+where
+    T: Ord,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.rc.cmp(&other.rc)
+    }
+}
 
 impl<T: Share> From<T> for Shared<T> {
     fn from(value: T) -> Self {

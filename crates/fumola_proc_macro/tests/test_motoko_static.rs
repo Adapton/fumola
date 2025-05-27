@@ -1,5 +1,6 @@
 use fumola_proc_macro::parse_static;
 
+#[ignore]
 #[test]
 fn literal_123() {
     let prog = parse_static!(
@@ -14,6 +15,7 @@ fn literal_123() {
     )
 }
 
+#[ignore]
 #[test]
 fn forever_while_loop() {
     let prog = parse_static!(

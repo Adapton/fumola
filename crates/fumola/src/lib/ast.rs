@@ -1,5 +1,7 @@
 use crate::shared::{Share, Shared};
 use crate::value::{PrimFunction, Value_};
+// use crate::ToMotoko;
+use im_rc::Vector;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -18,7 +20,7 @@ impl<X: std::fmt::Debug> std::fmt::Debug for Loc<X> {
 
 pub type Node<X> = Shared<NodeData<X>>;
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Clone, PartialEq, Eq, Deserialize, Hash)]
 pub struct NodeData<X>(pub X, pub Source);
 
 impl<X: std::fmt::Debug> std::fmt::Debug for NodeData<X> {
@@ -146,9 +148,9 @@ impl std::default::Default for Source {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Hash)]
 pub struct Delim<X: Clone> {
-    pub vec: im_rc::Vector<X>,
+    pub vec: Vector<X>,
     pub has_trailing: bool,
 }
 
@@ -157,6 +159,14 @@ impl<X: Clone> Delim<X> {
         Delim {
             vec: im_rc::vector![],
             has_trailing: false,
+        }
+    }
+    pub fn append(&self, other: &Self) -> Self {
+        let mut vec = self.vec.clone();
+        vec.append(other.vec.clone());
+        Delim {
+            vec,
+            has_trailing: other.has_trailing,
         }
     }
     pub fn one(x: X) -> Self {
@@ -205,6 +215,31 @@ pub type TypId = Id;
 pub type TypId_ = Node<TypId>;
 
 pub type Decs = Delim<Dec_>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum CasesPos {
+    Cases(Cases),
+    Unquote(Unquote_),
+}
+
+impl CasesPos {
+    pub fn cases<'a>(&'a self) -> &'a Cases {
+        match self {
+            CasesPos::Cases(c) => c,
+            CasesPos::Unquote(_) => panic!(),
+        }
+    }
+}
+
+impl DecFieldsPos {
+    pub fn dec_fields<'a>(&'a self) -> &'a DecFields {
+        match self {
+            DecFieldsPos::DecFields(dfs) => dfs,
+            DecFieldsPos::Unquote(_) => panic!(),
+        }
+    }
+}
+
 pub type Cases = Delim<Case_>;
 
 pub type Prog = Decs;
@@ -213,16 +248,26 @@ pub type Dec_ = Node<Dec>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Dec {
+    Attrs(Attrs, Dec_),
     Exp(Exp_),
     Let(Pat_, Exp_),
     LetImport(Pat_, Sugar, String),
-    LetModule(Option<Id_>, Sugar, DecFields),
-    LetActor(Option<Id_>, Sugar, DecFields),
-    LetObject(Option<Id_>, Sugar, DecFields),
+    LetModule(Option<IdPos_>, Sugar, DecFieldsPos),
+    LetActor(Option<IdPos_>, Sugar, DecFieldsPos),
+    LetObject(Option<IdPos_>, Sugar, DecFieldsPos),
     Func(Function),
     Var(Pat_, Exp_),
     Type(TypId_, Option<TypeBinds>, Type_),
     Class(Class),
+}
+
+impl Dec {
+    pub fn with_attrs(attrs: Node<Option<(&str, Attrs)>>, dec: Dec_) -> Dec_ {
+        match &attrs.0 {
+            None => dec,
+            Some(a) => NodeData(Dec::Attrs(a.1.clone(), dec), attrs.1.clone()).into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -234,7 +279,7 @@ pub struct Class {
     pub input: Pat_,
     pub typ: Option<Type_>,
     pub name: Option<Id_>,
-    pub fields: DecFields,
+    pub fields: DecFieldsPos,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -272,8 +317,15 @@ pub enum Mut {
     Var,
 }
 
-pub type TypeBinds = Delim<TypeBind_>;
 pub type DecFields = Delim<DecField_>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum DecFieldsPos {
+    DecFields(DecFields),
+    Unquote(Unquote_),
+}
+
+pub type TypeBinds = Delim<TypeBind_>;
 pub type ExpFields = Delim<ExpField_>;
 pub type PatFields = Delim<PatField_>;
 pub type TypeFields = Delim<TypeField_>;
@@ -291,7 +343,7 @@ pub type ExpField_ = Node<ExpField>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct ExpField {
     pub mut_: Mut,
-    pub id: Id_,
+    pub id: IdPos_,
     pub typ: Option<Type_>,
     pub exp: Option<Exp_>,
 }
@@ -300,7 +352,7 @@ impl ExpField {
     pub fn exp_(&self) -> Exp_ {
         match self.exp.clone() {
             Some(e) => e,
-            None => NodeData(Exp::Var(self.id.0.clone()), self.id.1.clone()).share(),
+            None => NodeData(Exp::Var(self.id.clone()), self.id.1.clone()).share(),
         }
     }
 }
@@ -309,6 +361,7 @@ pub type DecField_ = Node<DecField>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct DecField {
+    pub attrs: Option<Attrs>,
     pub dec: Dec_,
     pub vis: Option<Vis_>,
     pub stab: Option<Stab_>,
@@ -318,7 +371,7 @@ pub type PatField_ = Node<PatField>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct PatField {
-    pub id: Id_,
+    pub id: IdPos_,
     pub pat: Option<Pat>,
 }
 
@@ -343,6 +396,17 @@ pub type TypeTag_ = Node<TypeTag>;
 pub struct TypeTag {
     pub id: Id_,
     pub typ: Option<Type_>,
+}
+
+pub type Attrs = Delim<Attr_>;
+
+pub type Attr_ = Node<Attr>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum Attr {
+    Id(Id_),
+    Call(Id_, Delim<Attr_>),
+    Field(Id_, Attr_),
 }
 
 pub type Vis_ = Node<Vis>;
@@ -489,7 +553,7 @@ pub type Exp_ = Node<Exp>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct Function {
-    pub name: Option<Id_>,
+    pub name: Option<IdPos_>,
     pub shared: Option<SortPat>,
     pub binds: Option<TypeBinds>,
     pub input: Pat_,
@@ -507,11 +571,77 @@ pub enum ProjIndex {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum QuotedAst {
+    Empty,
+    Id(Id),
+    Id_(Id_),
+    Literal(Literal_),
+    TupleExps(Delim<Exp_>),
+    TuplePats(Delim<Pat_>),
+    RecordExps(ExpObjectBody),
+    RecordPats(PatFields),
+    Cases(Cases),
+    Decs(Decs),
+    DecFields(DecFields),
+    Types(Delim<Type_>),
+    Attrs(Attrs),
+}
+
+impl QuotedAst {
+    pub fn append(&self, other: &Self) -> Result<Self, crate::vm_types::Interruption> {
+        use QuotedAst::*;
+        match (self, other) {
+            (Empty, _) => Ok(other.clone()),
+            (_, Empty) => Ok(self.clone()),
+            (TupleExps(es1), TupleExps(es2)) => Ok(TupleExps(es1.append(es2))),
+            (RecordExps((None, None)), RecordExps((es1, es2))) => {
+                Ok(RecordExps((es1.clone(), es2.clone())))
+            }
+            (RecordExps((es1, None)), RecordExps((None, Some(es3)))) => {
+                Ok(RecordExps((es1.clone(), Some(es3.clone()))))
+            }
+            (RecordExps((es1, es2)), RecordExps((None, es3))) => Ok(match (es2, es3) {
+                (Some(es2), None) => RecordExps((es1.clone(), Some(es2.clone()))),
+                (None, es3) => RecordExps((es1.clone(), es3.clone())),
+                (Some(es2), Some(es3)) => RecordExps((es1.clone(), Some(es2.append(es3)))),
+            }),
+            (Cases(cs1), Cases(cs2)) => Ok(Cases(cs1.append(cs2))),
+            (Id_(i1), Id_(i2)) => Ok(Id_(NodeData(
+                crate::ast::Id::new(format!("{}{}", i1.0.as_str(), i2.0.as_str())),
+                Source::Evaluation,
+            )
+            .share())),
+            (Decs(ds1), Decs(ds2)) => Ok(Decs(ds1.append(ds2))),
+            (TuplePats(_), TuplePats(_)) => todo!(),
+            (RecordPats(_), RecordPats(_)) => todo!(),
+            (DecFields(_), DecFields(_)) => todo!(),
+            (_, _) => crate::type_mismatch!(file!(), line!()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum AdaptonNavDim {
+    Space,
+    Time,
+}
+pub type AdaptonNavDim_ = Node<AdaptonNavDim>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum AdaptonNav {
+    Goto(Option<AdaptonNavDim_>, Exp_),
+    Within(Option<AdaptonNavDim_>, Exp_),
+}
+pub type AdaptonNav_ = Node<AdaptonNav>;
+
+pub type ExpObjectBody = (Option<Delim<Exp_>>, Option<ExpFields>);
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Exp {
     Value_(Value_),
     Hole,
     Prim(Result<PrimFunction, String>),
-    Var(Id),
+    Var(IdPos_),
     Literal(Literal),
     ActorUrl(Exp_),
     Un(UnOp, Exp_),
@@ -524,24 +654,25 @@ pub enum Exp {
     Proj(Exp_, ProjIndex),
     Opt(Exp_),
     DoOpt(Exp_),
+    DoAdaptonNav(Vector<AdaptonNav_>, Exp_),
     Bang(Exp_),
-    ObjectBlock(ObjSort, DecFields),
-    Object(Option<Delim<Exp_>>, Option<ExpFields>),
-    Variant(Id_, Option<Exp_>),
-    Dot(Exp_, Id_),
+    ObjectBlock(ObjSort, DecFieldsPos),
+    Object(ExpObjectBody),
+    Variant(IdPos_, Option<Exp_>),
+    Dot(Exp_, IdPos_),
     Assign(Exp_, Exp_),
     BinAssign(Exp_, BinOp, Exp_),
     Array(Mut, Delim<Exp_>),
     Index(Exp_, Exp_),
     Function(Function),
     Call(Exp_, Option<Inst>, Exp_),
-    Block(Delim<Dec_>),
+    Block(Decs),
     Do(Exp_),
     Not(Exp_),
     And(Exp_, Exp_),
     Or(Exp_, Exp_),
     If(Exp_, Exp_, Option<Exp_>),
-    Switch(Exp_, Cases),
+    Switch(Exp_, CasesPos),
     While(Exp_, Exp_),
     Loop(Exp_, Option<Exp_>),
     For(Pat_, Exp_, Exp_),
@@ -563,21 +694,38 @@ pub enum Exp {
     Try(Exp_, Case_),
     Ignore(Exp_),
     Paren(Exp_),
+    QuotedAst(QuotedAst),
+    Unquote(Exp_),
+    Force(Exp_),
+    Thunk(Exp_),
+    GetAdaptonPointer(Exp_),
 }
 
 impl Exp {
+    pub fn id_var(id: Id_) -> Exp {
+        let source = id.1.clone();
+        Exp::Var(NodeData(IdPos { id, unquote: false }, source).share())
+    }
+
+    pub fn object_body(&self) -> ExpObjectBody {
+        match self {
+            Exp::Object(body) => body.clone(),
+            _ => panic!(),
+        }
+    }
+
     pub fn obj_field_fields(f1: ExpField_, fs: Option<ExpFields>) -> Exp {
         match fs {
-            None => Exp::Object(None, Some(Delim::one(f1))),
+            None => Exp::Object((None, Some(Delim::one(f1)))),
             Some(mut fs) => {
                 fs.vec.push_front(f1);
-                Exp::Object(None, Some(fs))
+                Exp::Object((None, Some(fs)))
             }
         }
     }
-    pub fn obj_id_fields(id: Id_, fields: ExpFields) -> Exp {
+    pub fn obj_id_fields(id: IdPos_, fields: ExpFields) -> Exp {
         let field1_source = id.1.clone();
-        let exp = Some(NodeData(Exp::Var(id.0.clone()), id.1.clone()).share());
+        let exp = Some(NodeData(Exp::Var(id.clone()), id.1.clone()).share());
         let field1 = NodeData(
             ExpField {
                 mut_: Mut::Const,
@@ -590,21 +738,18 @@ impl Exp {
         .share();
         let mut fields = fields;
         fields.vec.push_front(field1);
-        Exp::Object(None, Some(fields))
+        Exp::Object((None, Some(fields)))
     }
     pub fn obj_base_bases(base1: Exp_, bases: Option<Delim<Exp_>>, efs: Option<ExpFields>) -> Exp {
         match (bases, efs) {
             (None, None) => match &base1.0 {
-                Exp::Var(x) => {
-                    let x = NodeData(x.clone(), base1.1.clone()).share();
-                    Exp::obj_id_fields(x, Delim::new())
-                }
+                Exp::Var(x) => Exp::obj_id_fields(x.clone(), Delim::new()),
                 _ => unimplemented!("parse error"),
             },
-            (None, efs) => Exp::Object(Some(Delim::one(base1)), efs),
+            (None, efs) => Exp::Object((Some(Delim::one(base1)), efs)),
             (Some(mut bs), efs) => {
                 bs.vec.push_front(base1);
-                Exp::Object(Some(bs), efs)
+                Exp::Object((Some(bs), efs))
             }
         }
     }
@@ -624,25 +769,37 @@ pub enum Pat {
     Tuple(Delim<Pat_>),
     Object(PatFields),
     Optional(Pat_),
-    Variant(Id_, Option<Pat_>),
+    Variant(IdPos_, Option<Pat_>),
     Or(Pat_, Pat_),
     AnnotPat(Pat_, Type_),
     Annot(Type_),
     Paren(Pat_),
+    Unquote(Unquote),
     // used by the VM to pattern-match values.
     TempVar(u16),
 }
 
 pub type UnOp_ = Node<UnOp>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd)]
 pub enum UnOp {
     Pos,
     Neg,
     Not,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+// time and space are not keywords, which means we can still use
+// them as identifiers in Motoko modules that we use.
+// this hack makes that flexibility possible.
+pub fn into_adapton_nav_dim(id: IdPos_) -> Option<AdaptonNavDim_> {
+    match id.0.id.0.string.as_str() {
+        "time" => Some(NodeData::new(AdaptonNavDim::Time, id.1.clone()).into()),
+        "space" => Some(NodeData::new(AdaptonNavDim::Space, id.1.clone()).into()),
+        _ => None,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd)]
 pub enum BinOp {
     Add,
     Sub,
@@ -676,6 +833,40 @@ pub enum RelOp {
     Ge,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub struct Unquote {
+    pub id: Id_,
+}
+
+pub type Unquote_ = Node<Unquote>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub struct IdPos {
+    pub unquote: bool,
+    pub id: Id_,
+}
+
+impl IdPos {
+    pub fn from_id(i: &Id_) -> Self {
+        IdPos {
+            unquote: false,
+            id: i.clone(),
+        }
+    }
+    pub fn id_(&self) -> Id_ {
+        assert_eq!(self.unquote, false);
+        self.id.clone()
+    }
+    pub fn id(&self) -> Id {
+        self.id_().0.clone()
+    }
+    pub fn id_ref<'a>(&'a self) -> &'a Id {
+        &self.id.as_ref().0
+    }
+}
+
+pub type IdPos_ = Node<IdPos>;
+
 #[derive(Clone)]
 pub struct Id {
     pub string: Shared<String>,
@@ -704,6 +895,9 @@ impl Id {
     }
     pub fn to_string(&self) -> String {
         self.string.to_string()
+    }
+    pub fn share(self) -> Shared<Self> {
+        crate::shared::Shared::new(self)
     }
 }
 

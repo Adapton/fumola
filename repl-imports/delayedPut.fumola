@@ -1,0 +1,22 @@
+//
+// 2025-05-26 -- test code for delayed puts 
+// that required some interaction in REPL to debug.
+//
+module {
+public func go() {
+
+let start = (prim "adaptonNow") ();
+let cell = 0 := null;
+while ((@ cell) == null) { 
+  do within time `t { 
+    assert ((prim "adaptonNow" ()) == (prim "adaptonTime" `t));
+    assert ((@ cell) == null);
+    (cell, start) := ?1;
+    assert ((@ cell) == null)
+  };
+  assert ((prim "adaptonNow" ()) == start);
+};
+assert ((@ cell) == ?1)
+
+}
+}

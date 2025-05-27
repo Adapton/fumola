@@ -3,12 +3,12 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use motoko::value::ToMotoko;
+use fumola::value::ToMotoko;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 fn assert<T: Debug + Eq + Serialize + DeserializeOwned>(input: &str, value: T, debug_str: &str) {
     println!("Evaluating: {}", input);
-    let result: T = motoko::vm::eval_into(input).unwrap();
+    let result: T = fumola::vm::eval_into(input).unwrap();
     assert_eq!(result, value);
     assert_eq!(format!("{:?}", result.to_motoko().unwrap()), debug_str);
 }
@@ -29,7 +29,7 @@ fn convert_struct() {
         d: vec![1, 2, 3],
     };
     let item: Item =
-        motoko::vm::eval_into(r#"{ a = 5; b = ("abc", null); c = { x = 0 }; d = [var 1, 2, 3] }"#)
+        fumola::vm::eval_into(r#"{ a = 5; b = ("abc", null); c = { x = 0 }; d = [1, 2, 3] }"#)
             .unwrap();
     assert_eq!(expected, item);
 }
@@ -59,12 +59,12 @@ fn roundtrip_struct_enum() {
         Enum::C {
             c: Box::new(Enum::A),
         },
-        "Variant(\"C\", Some(Object({\"c\": FieldValue { mut_: Var, val: Variant(\"A\", None) }})))",
+        "Variant(\"C\", Some(Object({\"c\": FieldValue { mut_: Const, val: Variant(\"A\", None) }})))",
     );
     assert(
         "{ e = #A }",
         Struct { e: Enum::A },
-        "Object({\"e\": FieldValue { mut_: Var, val: Variant(\"A\", None) }})",
+        "Object({\"e\": FieldValue { mut_: Const, val: Variant(\"A\", None) }})",
     );
 }
 
@@ -104,18 +104,18 @@ fn roundtrip_value() {
     assert(
         "#Text(\"abc\")",
         "abc".to_motoko().unwrap(),
-        "Variant(\"Text\", Some(Text(String(\"abc\"))))",
+        "Variant(\"Text\", Some(Text(Text([\"abc\"]))))",
     );
     // TODO: Blob
     assert(
-        "#Array(#Var, [])",
+        "#Array(#Const, [])",
         Vec::<()>::new().to_motoko().unwrap(),
-        "Variant(\"Array\", Some(Tuple([Variant(\"Var\", None), Array(Var, [])])))",
+        "Variant(\"Array\", Some(Tuple([Variant(\"Const\", None), Array(Const, [])])))",
     );
     assert(
         "#Tuple([#Nat 123, #Text \"abc\"])",
         (123_usize, "abc").to_motoko().unwrap(),
-        "Variant(\"Tuple\", Some(Array(Var, [Variant(\"Nat\", Some(Nat(123))), Variant(\"Text\", Some(Text(String(\"abc\"))))])))",
+        "Variant(\"Tuple\", Some(Array(Const, [Variant(\"Nat\", Some(Nat(123))), Variant(\"Text\", Some(Text(Text([\"abc\"]))))])))",
     );
     assert(
         // "#Object { x = { mut = #Var; val = #Int(0) } }",
@@ -150,7 +150,7 @@ fn roundtrip_value() {
         }
         .to_motoko()
         .unwrap(),
-        "Variant(\"Variant\", Some(Tuple([Text(String(\"Abc\")), Null])))",
+        "Variant(\"Variant\", Some(Tuple([Text(Text([\"Abc\"])), Null])))",
     );
     // assert(
     //     "#Pointer(123)",

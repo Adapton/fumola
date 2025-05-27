@@ -1,14 +1,14 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use motoko::{vm_types::Core, vm_types::Limits, Share, Value};
+use fumola::{vm_types::Core, vm_types::Limits, Share, Value};
 
 fn bench_example(c: &mut Criterion) {
     let mut group = c.benchmark_group("Examples");
 
     // TODO: load examples from a directory
     group.bench_function("Basic example", |b| {
-        let prog = motoko::check::parse(
+        let prog = fumola::check::parse(
             r#"
-                let Debug = { print = prim "debugPrint"};
+                let Debug = { print = prim "print"};
                 var x = 0;
                 let Iter = { range = func(end){
                 { next = func() {

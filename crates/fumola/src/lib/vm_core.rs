@@ -1,3 +1,4 @@
+use crate::adapton::AdaptonState;
 use crate::ast::PrimType;
 use crate::ast::{Dec, DecField, Dec_, Exp_, Id, Id_, Inst, Prog, Source, ToId};
 use crate::shared::{FastClone, Share};
@@ -26,6 +27,7 @@ fn agent_init(prog: Prog) -> Agent {
     let mut a = Agent {
         store: Store::new(ScheduleChoice::Agent),
         //debug_print_out: Vector::new(),
+        adapton_state: crate::adapton::State::new(),
         counts: Counts::default(),
         active: Activation::new(),
     };
@@ -166,6 +168,14 @@ impl Active for Core {
         }
     }
 
+    fn adapton<'a>(&'a mut self) -> &'a mut crate::adapton::State {
+        use ScheduleChoice::*;
+        match &self.schedule_choice {
+            Agent => &mut self.agent.adapton_state,
+            Actor(ref n) => &mut self.actors.map.get_mut(n).unwrap().adapton_state,
+        }
+    }
+
     fn create(
         &mut self,
         path: String,
@@ -177,6 +187,7 @@ impl Active for Core {
             id: name.clone(),
         });
         //let def = self.defs().map.get(&CtxId(0)).unwrap().fields.get(name).unwrap().def.clone();
+        let adapton_state = crate::adapton::State::new();
         let mut store = Store::new(ScheduleChoice::Actor(name.clone()));
         let mut env = self.env().clone();
         let ctx = self.defs().map.get(&def.fields).unwrap();
@@ -205,6 +216,7 @@ impl Active for Core {
             def,
             env,
             store,
+            adapton_state,
             counts: Counts::default(),
             active: None,
             awaiting: HashMap::new(),
@@ -228,6 +240,7 @@ impl Active for Core {
         });
         let mut env = HashMap::new();
         let mut store = self.actors.map.get(&name).unwrap().store.clone();
+        let adapton_state = crate::adapton::State::new();
         let counts = self.actors.map.get(&name).unwrap().counts.clone();
         let ctx = self.defs().map.get(&def.fields).unwrap();
         for (i, field) in ctx.fields.iter() {
@@ -262,6 +275,7 @@ impl Active for Core {
             def,
             env,
             store,
+            adapton_state,
             counts,
             active: None,
             awaiting: HashMap::new(),
@@ -490,7 +504,9 @@ impl Core {
         let last = vec.pop_back();
         match last {
             Some(d) => match &d.0 {
-                Dec::LetActor(id, _, dfs) => Ok((vec, id.clone(), dfs.clone())),
+                Dec::LetActor(id, _, dfs) => {
+                    Ok((vec, id.clone().map(|i| i.0.id_()), dfs.dec_fields().clone()))
+                }
                 _ => Err(Interruption::NotAnActorDefinition),
             },
             None => unreachable!(),
@@ -530,8 +546,8 @@ impl Core {
                 Dec::LetModule(id, _, dfs) => Ok(ModuleFileInit {
                     file_content: s.to_string(),
                     outer_decs: vec,
-                    id: id.clone(),
-                    fields: dfs.clone(),
+                    id: id.clone().map(|i| i.0.id_()),
+                    fields: dfs.dec_fields().clone(),
                 }),
                 _ => Err(Interruption::NotAModuleDefinition),
             },
@@ -572,6 +588,7 @@ impl Core {
             for dec in init.outer_decs.iter() {
                 let dec = dec.clone();
                 let df = DecField {
+                    attrs: None,
                     vis: None,
                     stab: None,
                     dec,
@@ -640,6 +657,7 @@ impl Core {
         for dec in decs.iter() {
             let dec = dec.clone();
             let df = crate::ast::DecField {
+                attrs: None,
                 vis: None,
                 stab: None,
                 dec,
@@ -668,6 +686,7 @@ impl Core {
         for dec in decs.iter() {
             let dec = dec.clone();
             let df = crate::ast::DecField {
+                attrs: None,
                 vis: None,
                 stab: None,
                 dec,
@@ -820,9 +839,32 @@ impl Core {
         self.run(&Limits::none())
     }
 
+    /// Evaluate a new program fragment, NOT assuming agent is idle.
+    /// generally, self.agent.active.stack is non-empty, and we are trying to return something to it that got stuck earlier.
+    #[cfg(feature = "parser")]
+    pub fn resume(&mut self, new_prog_frag: &str) -> Result<Value_, Interruption> {
+        let local_path = "<anonymous>".to_string();
+        let package_name = None;
+        let p = crate::check::parse(new_prog_frag).map_err(|code| {
+            Interruption::SyntaxError(SyntaxError {
+                code,
+                local_path,
+                package_name,
+            })
+        })?;
+        self.agent.active.cont = Cont::Decs(p.vec);
+        self.run(&Limits::none())
+    }
+
     pub fn eval_str(&mut self, input: &str) -> Result<Value_, Interruption> {
         let prog = crate::check::parse(input)?;
         self.eval_prog(prog)
+    }
+
+    pub fn clear_cont(&mut self) {
+        *self.cont() = Cont::Value_(Value::Unit.share());
+
+        *self.stack() = Vector::new()
     }
 
     /// Evaluate a new program fragment, assuming agent is idle.
@@ -871,17 +913,24 @@ impl Core {
         self.store().dealloc(&pointer.local)
     }
 
-    // to do -- rename this to "define" or "bind" ("assign" connotes mutation).
     #[inline]
-    pub fn assign(&mut self, id: impl ToId, value: impl Into<Value_>) {
+    pub fn define(&mut self, id: impl ToId, value: impl Into<Value_>) {
         let value = value.into();
         self.env().insert(id.to_id(), value);
     }
 
     #[inline]
+    pub fn get_var(&mut self, id: impl ToId) -> Option<Value_> {
+        match self.env().get(&id.to_id()) {
+            None => None,
+            Some(v) => Some(v.clone()),
+        }
+    }
+
+    #[inline]
     pub fn assign_alloc(&mut self, id: impl ToId, value: impl Into<Value_>) -> Pointer {
         let pointer = self.alloc(value);
-        self.assign(id, Value::Pointer(pointer.fast_clone()).share());
+        self.define(id, Value::Pointer(pointer.fast_clone()).share());
         pointer
     }
 }

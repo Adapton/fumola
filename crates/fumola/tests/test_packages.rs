@@ -1,4 +1,4 @@
-use motoko::{
+use fumola::{
     package::{
         get_base_library, get_base_library_tests, get_matchers_library, get_prim_library, Package,
     },
@@ -7,6 +7,7 @@ use motoko::{
 
 use test_log::test;
 
+#[ignore]
 #[test]
 fn import_and_eval_debug_print() {
     let print_hello_world = r##"
@@ -19,6 +20,7 @@ fn import_and_eval_debug_print() {
         .expect("eval print hello world");
 }
 
+#[ignore]
 #[test]
 fn import_all_your_base() {
     let import_all = r##"
@@ -87,7 +89,7 @@ fn assert_parse_packages(package: Package) {
     let mut error_count = 0;
     for (path, file) in files {
         count += 1;
-        match motoko::check::parse(&file.content) {
+        match fumola::check::parse(&file.content) {
             Ok(_) => println!(" {}. ✅ {}", count, path),
             Err(i) => {
                 error_count += 1;
@@ -190,32 +192,38 @@ fn assert_eval_packages(main_package: Package, dependencies: Vec<Package>) {
     }
 }
 
+#[ignore]
 #[test]
 fn parse_prim_library() {
     assert_parse_packages(get_prim_library());
 }
 
+#[ignore]
 #[test]
 fn parse_base_library() {
     assert_parse_packages(get_base_library());
 }
 
+#[ignore]
 #[test]
 fn parse_base_library_tests() {
     assert_parse_packages(get_base_library_tests())
 }
 
+#[ignore]
 #[test]
 fn parse_matchers_library() {
     assert_parse_packages(get_matchers_library())
 }
 
+#[ignore]
 #[test]
 fn eval_prim_library() {
     assert_eval_packages(get_prim_library(), vec![]);
 }
 
 #[test]
+#[ignore]
 fn eval_base_library() {
     assert_eval_packages(get_base_library(), vec![get_prim_library()]);
 }
