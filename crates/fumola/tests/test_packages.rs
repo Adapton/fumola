@@ -192,19 +192,16 @@ fn assert_eval_packages(main_package: Package, dependencies: Vec<Package>) {
     }
 }
 
-#[ignore]
 #[test]
 fn parse_prim_library() {
     assert_parse_packages(get_prim_library());
 }
 
-#[ignore]
 #[test]
 fn parse_base_library() {
     assert_parse_packages(get_base_library());
 }
 
-#[ignore]
 #[test]
 fn parse_base_library_tests() {
     assert_parse_packages(get_base_library_tests())
