@@ -4,14 +4,14 @@ use crate::adapton::{Space, Time};
 use crate::ast::{
     AdaptonNav, AdaptonNavDim, BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_,
     Delim, Exp, ExpField, Exp_, Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat,
-    PrimType, QuotedAst, RelOp, Stab, Type, TypeBind, TypeField, TypeTag, TypeTag_, UnOp, Unquote,
-    Vis,
+    PrimType, QuotedAst, RelOp, Stab, Type, TypeBind, TypeField, TypePath, TypeTag, TypeTag_, UnOp,
+    Unquote, Vis,
 };
 use crate::format_utils::*;
 use crate::lexer::is_keyword;
 use crate::lexer_types::{GroupType, Token, TokenTree};
 use crate::shared::Shared;
-use crate::value::{Closed, FieldValue, Pointer, Symbol, Value, Value_};
+use crate::value::{Closed, FieldValue, Pointer, PrimFunction, Symbol, Value, Value_};
 use crate::vm_types::def::Module;
 use crate::vm_types::{def::CtxId, Env, LocalPointer, ScheduleChoice};
 use pretty::RcDoc;
@@ -290,6 +290,25 @@ impl ToDoc for Module {
     }
 }
 
+impl ToDoc for PrimFunction {
+    fn doc(&self) -> RcDoc {
+        match self {
+            PrimFunction::AdaptonNow => str("\"adaptonNow\""),
+            PrimFunction::AdaptonHere => str("\"adaptonHere\""),
+            PrimFunction::AdaptonSpace => str("\"adaptonSpace\""),
+            PrimFunction::AdaptonTime => str("\"adaptonTime\""),
+            PrimFunction::AtSignVar(s) => kwd("@").append(str(s.as_str())),
+            PrimFunction::DebugPrint => str("\"debugPrint\""),
+            PrimFunction::NatToText => str("\"natToText\""),
+            #[cfg(feature = "value-reflection")]
+            PrimFunction::ReflectValue => str("\"reifyValue\""),
+            #[cfg(feature = "value-reflection")]
+            PrimFunction::ReifyValue => str("\"reifyValue\""),
+            PrimFunction::Collection(_collection_function) => todo!(),
+        }
+    }
+}
+
 impl ToDoc for Value {
     fn doc(&self) -> RcDoc {
         match self {
@@ -345,12 +364,12 @@ impl ToDoc for Value {
                     .append(f.0.content.doc()),
                 ")",
             )),
-            Value::PrimFunction(f) => kwd("prim").append(RcDoc::text(format!("\"{:?}\"", f))),
+            Value::PrimFunction(f) => kwd("prim").append(f.doc()),
             Value::Collection(c) => match c {
                 crate::value::Collection::HashMap(m) => hashmap(m),
                 crate::value::Collection::FastRandIter(_) => todo!(),
             },
-            Value::Dynamic(_) => todo!(),
+            Value::Dynamic(d) => kwd("@dynamic").append(RcDoc::text(format!("{:?}", d))),
             Value::Actor(_) => todo!(),
             Value::ActorMethod(_) => todo!(),
             Value::QuotedAst(q) => q.doc(),
@@ -377,6 +396,7 @@ impl ToDoc for QuotedAst {
                 vector(&ts.vec, ","),
                 ")",
             )),
+            QuotedAst::Cases(cases) => str("`").append(enclose("{", delim(cases, ";"), "}")),
             _ => todo!(),
         }
     }
@@ -703,6 +723,16 @@ impl ToDoc for TypeTag {
     }
 }
 
+impl ToDoc for TypePath {
+    fn doc(&self) -> RcDoc {
+        use TypePath::*;
+        match self {
+            Id(id) => id.doc(),
+            Dot(tp, id) => tp.doc().append(str(".")).append(id.doc()),
+        }
+    }
+}
+
 impl ToDoc for Type {
     fn doc(&self) -> RcDoc {
         use Type::*;
@@ -730,7 +760,8 @@ impl ToDoc for Type {
             Paren(e) => enclose("(", e.doc(), ")"),
             Unknown(id) => id.doc(),
             Known(id, t) => id.doc().append(" : ").append(t.doc()),
-            Path(..) => todo!(),
+            Path(p, None) => p.doc(),
+            Path(_p, Some(_)) => todo!(),
             Item(i, t) => i
                 .doc()
                 .append(space())

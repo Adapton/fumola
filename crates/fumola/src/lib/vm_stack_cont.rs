@@ -4,16 +4,17 @@ use crate::adapton::{self, AdaptonState};
 use crate::ast::{Cases, Exp_, Inst, Literal, Mut, Pat, Pat_, ProjIndex, QuotedAst};
 use crate::shared::{FastClone, Share};
 use crate::value::{
-    ActorMethod, ClosedFunction, CollectionFunction, FastRandIter, FastRandIterFunction,
-    HashMapFunction, PrimFunction, Symbol, Value, Value_,
+    ActorMethod, ArrayIterator, ArrayIteratorFunc, ClosedFunction, CollectionFunction,
+    DynamicValue, FastRandIter, FastRandIterFunction, HashMapFunction, PrimFunction, Symbol, Value,
+    Value_,
 };
-use crate::vm_types::OptionCoreSource;
 use crate::vm_types::{
     def::Function as FunctionDef,
     stack::{FieldContext, FieldValue, Frame, FrameCont},
     Active, Cont, DebugPrintLine, Env, Interruption, Pointer, Response, Step,
 };
-use crate::{nyi, type_mismatch_, vm_step, Shared};
+use crate::vm_types::{OptionCoreSource, Store};
+use crate::{nyi, type_mismatch_, vm_step, Dynamic, Shared};
 use im_rc::{HashMap, Vector};
 
 use crate::vm_step::{
@@ -57,6 +58,44 @@ pub fn stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Interrup
     } else {
         // common cases: need to pop top stack frame, then pattern-match it.
         nonempty_stack_cont(active, v)
+    }
+}
+
+impl Dynamic for crate::value::ArrayIteratorFunc {
+    fn call(
+        &mut self,
+        _store: &mut Store,
+        _inst: &Option<Inst>,
+        args: Value_,
+    ) -> crate::dynamic::Result {
+        if let Value::Unit = args.as_ref() {
+            let position = self.position;
+            let array = self.array.clone();
+            Ok(Value::Dynamic(DynamicValue::new(ArrayIterator { position, array })).into())
+        } else {
+            type_mismatch!(file!(), line!())
+        }
+    }
+}
+
+impl Dynamic for crate::value::ArrayIterator {
+    fn into_value(self) -> Value
+    where
+        Self: 'static + Sized,
+    {
+        Value::Dynamic(DynamicValue(std::rc::Rc::new(std::cell::RefCell::new(
+            self,
+        ))))
+    }
+
+    fn iter_next(&mut self, _store: &mut crate::vm_types::Store) -> crate::dynamic::Result {
+        if self.position < self.array.len() {
+            let elm = self.array.get(self.position);
+            self.position += 1;
+            Ok(Value::Option(elm.unwrap().clone()).into())
+        } else {
+            Ok(Value::Null.into())
+        }
     }
 }
 
@@ -353,6 +392,21 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             _ => type_mismatch!(file!(), line!()),
         },
         Dot(f) => match &*v {
+            Value::Array(_mut, array) => {
+                if f.0.string.as_str() == "vals" {
+                    let array = array.clone();
+                    *active.cont() = Cont::Value_(
+                        Value::Dynamic(DynamicValue::new(ArrayIteratorFunc { array, position: 0 }))
+                            .into(),
+                    );
+                    Ok(Step {})
+                } else if f.0.string.as_str() == "size" {
+                    *active.cont() = Cont::Value_(Value::Nat(array.len().into()).into());
+                    Ok(Step {})
+                } else {
+                    type_mismatch!(file!(), line!())
+                }
+            }
             Value::Object(fs) => {
                 if let Some(f) = fs.get(&f.0) {
                     *active.cont() = Cont::Value_(f.val.fast_clone());

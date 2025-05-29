@@ -190,12 +190,27 @@ pub struct ActorMethod {
     pub method: Id,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct ArrayIterator {
+    pub array: Vector<Value_>,
+    pub position: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct ArrayIteratorFunc {
+    pub array: Vector<Value_>,
+    pub position: usize,
+}
+
 // #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 // pub struct DynamicValue(); // to do --
 
 pub struct DynamicValue(pub Rc<std::cell::RefCell<dyn Dynamic>>);
 
 impl DynamicValue {
+    pub fn new<X: Dynamic + Sized + 'static>(x: X) -> Self {
+        Self(Rc::new(std::cell::RefCell::new(x)))
+    }
     pub fn dynamic(&self) -> std::cell::Ref<dyn Dynamic> {
         self.0.borrow()
     }

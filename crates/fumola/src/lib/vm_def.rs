@@ -191,7 +191,11 @@ pub fn module_project(
 
 pub mod def {
     use super::*;
-    use crate::ast::{DecField, DecFields};
+    use crate::{
+        ast::{DecField, DecFields},
+        format::format_one_line,
+        ToMotoko,
+    };
 
     pub fn import<A: Active>(active: &mut A, path: &str) -> Result<ModuleDef, Interruption> {
         let path0 = path; // for log.
@@ -434,7 +438,16 @@ pub mod def {
                 }
                 Ok(())
             }
-            Dec::Type(_id, _typ_binds, _typ) => Ok(()),
+            Dec::Type(_id, _typ_binds, _typ) => {
+                if let Some(ref attrs) = df.attrs {
+                    if attrs.vec.len() > 0 {
+                        println!("{:?}", df);
+                        println!("{}", format_one_line(&df.to_motoko().unwrap()));
+                        return nyi!(line!());
+                    }
+                };
+                Ok(())
+            }
             Dec::LetActor(_i, _, _dfs) => {
                 nyi!(line!())
             }

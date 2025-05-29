@@ -165,6 +165,14 @@ fn vm_array() {
 }
 
 #[test]
+fn vm_array_vals() {
+    assert_(
+        "let iter = [1, 2, 3].vals(); var sum = 0; for (y in iter) { sum += y }; sum",
+        "6",
+    )
+}
+
+#[test]
 fn vm_records() {
     assert_("{ x = 3; y = 5; z = 8 }", "{ x = 3; y = 5; z = 8 }");
     assert_("{ x = 3; y = 5; z = 8 }", "{ z = 8; y = 5; x = 3 }");
