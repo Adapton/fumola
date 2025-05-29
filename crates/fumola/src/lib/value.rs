@@ -190,6 +190,25 @@ pub struct ActorMethod {
     pub method: Id,
 }
 
+/*
+    Consider the term: [1,2,3].vals().next()
+
+    [1,2,3].vals        <--- ArrayIteratorFunc
+    [1,2,3].vals()      <--- ArrayIterator
+    [1,3,3].vals().next <--- ArrayIteratorNextFunc
+
+    But, when doing `for (x in [1,2,3].vals()) {...}`
+
+    ArrayIterator is used directly, avoiding the creation of a
+    ArrayIteratorNextFunc for each iteration.
+*/
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct ArrayIteratorFunc {
+    pub array: Vector<Value_>,
+    pub position: usize,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct ArrayIterator {
     pub array: Vector<Value_>,
@@ -197,7 +216,7 @@ pub struct ArrayIterator {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
-pub struct ArrayIteratorFunc {
+pub struct ArrayIteratorNextFunc {
     pub array: Vector<Value_>,
     pub position: usize,
 }

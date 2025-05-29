@@ -12,7 +12,6 @@ use crate::vm_types::{
     ModuleFileState, ModulePath, NamedPointer, Pointer, ScheduleChoice,
 };
 use im_rc::{HashMap, Vector};
-use serde::ser::Impossible;
 use std::vec::Vec;
 
 use crate::nyi;

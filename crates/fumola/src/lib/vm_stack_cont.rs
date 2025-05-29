@@ -4,9 +4,9 @@ use crate::adapton::{self, AdaptonState};
 use crate::ast::{Cases, Exp_, Inst, Literal, Mut, Pat, Pat_, ProjIndex, QuotedAst};
 use crate::shared::{FastClone, Share};
 use crate::value::{
-    ActorMethod, ArrayIterator, ArrayIteratorFunc, ArraySizeFunc, ClosedFunction,
-    CollectionFunction, DynamicValue, FastRandIter, FastRandIterFunction, HashMapFunction,
-    PrimFunction, Symbol, Value, Value_,
+    ActorMethod, ArrayIterator, ArrayIteratorFunc, ArrayIteratorNextFunc, ArraySizeFunc,
+    ClosedFunction, CollectionFunction, DynamicValue, FastRandIter, FastRandIterFunction,
+    HashMapFunction, PrimFunction, Symbol, Value, Value_,
 };
 use crate::vm_types::{
     def::Function as FunctionDef,
@@ -93,6 +93,27 @@ impl Dynamic for crate::value::ArraySizeFunc {
     }
 }
 
+impl Dynamic for crate::value::ArrayIteratorNextFunc {
+    fn call(
+        &mut self,
+        _store: &mut Store,
+        _inst: &Option<Inst>,
+        args: Value_,
+    ) -> crate::dynamic::Result {
+        if let Value::Unit = args.as_ref() {
+            if self.position < self.array.len() {
+                let elm = self.array.get(self.position);
+                self.position += 1;
+                Ok(Value::Option(elm.unwrap().clone()).into())
+            } else {
+                Ok(Value::Null.into())
+            }
+        } else {
+            type_mismatch!(file!(), line!())
+        }
+    }
+}
+
 impl Dynamic for crate::value::ArrayIterator {
     fn into_value(self) -> Value
     where
@@ -101,6 +122,22 @@ impl Dynamic for crate::value::ArrayIterator {
         Value::Dynamic(DynamicValue(std::rc::Rc::new(std::cell::RefCell::new(
             self,
         ))))
+    }
+
+    fn get_field(&self, _store: &Store, name: &str) -> crate::dynamic::Result {
+        if name == "next" {
+            Ok(
+                Value::Dynamic(DynamicValue(std::rc::Rc::new(std::cell::RefCell::new(
+                    ArrayIteratorNextFunc {
+                        array: self.array.clone(),
+                        position: self.position,
+                    },
+                ))))
+                .into(),
+            )
+        } else {
+            type_mismatch!(file!(), line!())
+        }
     }
 
     fn iter_next(&mut self, _store: &mut crate::vm_types::Store) -> crate::dynamic::Result {

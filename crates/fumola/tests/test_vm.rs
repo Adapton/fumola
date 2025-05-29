@@ -173,6 +173,11 @@ fn vm_array_vals() {
 }
 
 #[test]
+fn vm_array_vals_dot_next() {
+    assert_("let next = [1, 2, 3].vals().next; next()", "?1")
+}
+
+#[test]
 fn vm_array_size() {
     assert_("[1, 2, 3].size()", "3")
 }
