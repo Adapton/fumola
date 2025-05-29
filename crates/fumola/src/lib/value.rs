@@ -202,6 +202,11 @@ pub struct ArrayIteratorFunc {
     pub position: usize,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct ArraySizeFunc {
+    pub array_size: usize,
+}
+
 // #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 // pub struct DynamicValue(); // to do --
 

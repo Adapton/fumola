@@ -173,6 +173,11 @@ fn vm_array_vals() {
 }
 
 #[test]
+fn vm_array_size() {
+    assert_("[1, 2, 3].size()", "3")
+}
+
+#[test]
 fn vm_records() {
     assert_("{ x = 3; y = 5; z = 8 }", "{ x = 3; y = 5; z = 8 }");
     assert_("{ x = 3; y = 5; z = 8 }", "{ z = 8; y = 5; x = 3 }");

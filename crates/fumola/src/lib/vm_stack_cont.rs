@@ -4,9 +4,9 @@ use crate::adapton::{self, AdaptonState};
 use crate::ast::{Cases, Exp_, Inst, Literal, Mut, Pat, Pat_, ProjIndex, QuotedAst};
 use crate::shared::{FastClone, Share};
 use crate::value::{
-    ActorMethod, ArrayIterator, ArrayIteratorFunc, ClosedFunction, CollectionFunction,
-    DynamicValue, FastRandIter, FastRandIterFunction, HashMapFunction, PrimFunction, Symbol, Value,
-    Value_,
+    ActorMethod, ArrayIterator, ArrayIteratorFunc, ArraySizeFunc, ClosedFunction,
+    CollectionFunction, DynamicValue, FastRandIter, FastRandIterFunction, HashMapFunction,
+    PrimFunction, Symbol, Value, Value_,
 };
 use crate::vm_types::{
     def::Function as FunctionDef,
@@ -72,6 +72,21 @@ impl Dynamic for crate::value::ArrayIteratorFunc {
             let position = self.position;
             let array = self.array.clone();
             Ok(Value::Dynamic(DynamicValue::new(ArrayIterator { position, array })).into())
+        } else {
+            type_mismatch!(file!(), line!())
+        }
+    }
+}
+
+impl Dynamic for crate::value::ArraySizeFunc {
+    fn call(
+        &mut self,
+        _store: &mut Store,
+        _inst: &Option<Inst>,
+        args: Value_,
+    ) -> crate::dynamic::Result {
+        if let Value::Unit = args.as_ref() {
+            Ok(Value::Nat(self.array_size.into()).into())
         } else {
             type_mismatch!(file!(), line!())
         }
@@ -401,7 +416,12 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                     );
                     Ok(Step {})
                 } else if f.0.string.as_str() == "size" {
-                    *active.cont() = Cont::Value_(Value::Nat(array.len().into()).into());
+                    *active.cont() = Cont::Value_(
+                        Value::Dynamic(DynamicValue::new(ArraySizeFunc {
+                            array_size: array.len(),
+                        }))
+                        .into(),
+                    );
                     Ok(Step {})
                 } else {
                     type_mismatch!(file!(), line!())
