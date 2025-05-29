@@ -1,0 +1,13 @@
+import Seq "SeqTree";
+module {
+    public let inputArray = [
+        (`1, 2),
+        (`2, 7),
+        (`3, 3),
+        (`3-`1, 5),
+        (`4, 6),
+        (`5, 4),
+    ];
+    public func inputSeq () = Seq.fromArray(inputArray);
+    public func output () = Seq.mergeSort(inputSeq);
+}

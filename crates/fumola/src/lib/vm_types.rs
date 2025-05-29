@@ -103,6 +103,7 @@ pub mod def {
         pub map: HashMap<CtxId, Ctx>,
         pub active_ctx: CtxId,
         pub next_ctx_id: usize,
+        pub active_path: Option<String>,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
