@@ -47,14 +47,11 @@ module {
          let level = prim "symbolLevel" symbol;
          if (levelLte(level, parentLevel)) {
            let rightLeft = symbol-`element := #element {symbol; element};
-           
-           // let right = do @ symbol-`rec1 { fromIterRec(iter, rightLeft, ?level) };
-           let right = fromIterRec(iter, rightLeft, ?level);
-           
+           let right = do @ (symbol-`rec1) { fromIterRec(iter, rightLeft, ?level) };
+           // let right = fromIterRec(iter, rightLeft, ?level);
            let left = symbol-`binary := #binary {symbol; level; left; right};
-       
-           // do @ symbol-`rec2 { fromIterRec(iter, left, parentLevel) }
-           fromIterRec(iter, left, parentLevel)
+           do @ (symbol-`rec2) { fromIterRec(iter, left, parentLevel) }
+           // fromIterRec(iter, left, parentLevel)
        
          } else {
            left
