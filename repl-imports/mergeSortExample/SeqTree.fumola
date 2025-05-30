@@ -33,14 +33,20 @@ module {
          } else {
            left
          }
-      }
+      };
+      case otherwise {
+         (prim "print") otherwise;
+         error
+      };
     }
   };
 
   public func fromIter<X>(iter : Iter<(Symbol, X)>) : ?Pointer<SeqTree<X>> {
     do ? {
       let (symbol, element) = iter.next() ! ;
+      (prim "print") symbol;
       let level = prim "symbolLevel" symbol;
+      (prim "print") level;
       fromIterRec(iter, symbol-`element := #element {symbol; element}, level)
     }
   };

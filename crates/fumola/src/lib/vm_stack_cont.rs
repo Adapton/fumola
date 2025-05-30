@@ -1,5 +1,8 @@
 //use crate::{ast::{Mut, ProjIndex}, shared::FastClone, type_mismatch, vm_types::{stack::{FieldContext, FieldValue, Frame, FrameCont}, Active, Cont, Step}, Interruption, Value, Value_};
 
+use std::collections::hash_map;
+use std::hash::{Hash, Hasher};
+
 use crate::adapton::{self, AdaptonState};
 use crate::ast::{Cases, Exp_, Inst, Literal, Mut, Pat, Pat_, ProjIndex, QuotedAst};
 use crate::shared::{FastClone, Share};
@@ -949,7 +952,15 @@ fn call_prim_function<A: Active>(
     use PrimFunction::*;
     match pf {
         SymbolLevel => {
-            todo!()
+            if let Ok(symbol) = args.as_ref().into_sym_or(()) {
+                let mut hasher = hash_map::DefaultHasher::new();
+                symbol.as_ref().hash(&mut hasher);
+                let hash = hasher.finish();
+                *active.cont() = Cont::Value_(Value::Nat(hash.into()).into());
+                Ok(Step {})
+            } else {
+                type_mismatch!(file!(), line!())
+            }
         }
         AtSignVar(v) => nyi!(line!(), "call_prim_function({})", v),
         DebugPrint => match &*args {
