@@ -574,9 +574,16 @@ impl Core {
     pub fn set_module(
         &mut self,
         package_name: Option<String>,
-        local_path: String,
+        mut local_path: String,
         file_content: &str,
     ) -> Result<(), Interruption> {
+        let local_path_ends_with_fumola = local_path.ends_with(".fumola");
+        let local_path_ends_with_mo = !local_path_ends_with_fumola && local_path.ends_with(".mo");
+        if local_path_ends_with_fumola {
+            local_path = format!("{}", &local_path[0..local_path.len() - 7]);
+        } else if local_path_ends_with_mo {
+            local_path = format!("{}", &local_path[0..local_path.len() - 3]);
+        }
         let path = crate::vm_types::ModulePath {
             package_name,
             local_path,

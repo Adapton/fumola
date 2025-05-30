@@ -655,6 +655,7 @@ pub enum Exp {
     Opt(Exp_),
     DoOpt(Exp_),
     DoAdaptonNav(Vector<AdaptonNav_>, Exp_),
+    DoAdaptonPutForceThunk(Exp_, Exp_),
     Bang(Exp_),
     ObjectBlock(ObjSort, DecFieldsPos),
     Object(ExpObjectBody),

@@ -1,0 +1,85 @@
+//
+// 2025-05-26 -- Playing with some ideas for a collections library.
+// This code's status is still "sketch", not something nailed down. 
+//
+module { 
+  public type Binary<X> = {
+    symbol : Symbol;
+    level : Nat;
+    left : Pointer<SeqTree<X>>;
+    right : Pointer<SeqTree<X>>;
+  };
+
+  public type Element<X> = {
+    element : X;
+    symbol : Symbol;
+  };
+
+  public type SeqTree<X> = {
+    #empty;
+    #element : Element<X>;
+    #binary : Binary<X>;
+  };
+
+  public func fromArray<X>(array : [(Symbol, X)]) : ?Pointer<SeqTree<X>> {
+    fromIter(array.vals())
+  };
+
+  public func fromIter<X>(iter : Iter<(Symbol, X)>) : ?Pointer<SeqTree<X>> {
+    do ? {
+      let (symbol, element) = iter.next() ! ;
+      let level = prim "symbolLevel" symbol;
+      fromIterRec(iter, symbol-`element := #element {symbol; element}, null)
+    }
+  };
+
+  func levelLte(level : Nat, parentLevel : ?Nat) : bool {
+    switch parentLevel {
+      case null true;
+      case (?p) level <= p;
+    }
+  };
+
+  func fromIterRec<X>(iter : Iter<(Symbol, X)>, left : Pointer<SeqTree<X>>, parentLevel : ?Nat) : Pointer<SeqTree<X>> {
+    switch (iter.next()) {
+      case null left;
+      case (?(symbol, element)) {
+         let level = prim "symbolLevel" symbol;
+         if (levelLte(level, parentLevel)) {
+           let rightLeft = symbol-`element := #element {symbol; element};
+           
+           // let right = do @ symbol-`rec1 { fromIterRec(iter, rightLeft, ?level) };
+           let right = fromIterRec(iter, rightLeft, ?level);
+           
+           let left = symbol-`binary := #binary {symbol; level; left; right};
+       
+           // do @ symbol-`rec2 { fromIterRec(iter, left, parentLevel) }
+           fromIterRec(iter, left, parentLevel)
+       
+         } else {
+           left
+         }
+      };
+    }
+  };
+
+  func max(a, b) {
+    if (a > b) { a } else { b }
+  };
+
+  public func metrics<X>(tree : Pointer<SeqTree<X>>) {
+    switch (@ tree) {
+      case (#empty) { { depth=0; size=0 } };
+      case (#element(e)) { { depth=1; size=1 } };
+      case (#binary(b)) {
+        let ml = metrics(b.left);
+        let mr = metrics(b.right);
+        { 
+          depth = max(ml.depth, mr.depth) + 1; 
+          size = ml.size + mr.size 
+        }
+      };
+    }
+  }
+
+};

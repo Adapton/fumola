@@ -41,6 +41,7 @@ impl Defs {
             map,
             active_ctx: CtxId(0),
             next_ctx_id: 1,
+            active_path: None,
         }
     }
     pub fn active_context(&self) -> CtxId {
@@ -189,9 +190,33 @@ pub fn module_project(
     }
 }
 
+fn path_base(path: &String) -> String {
+    let mut output = String::from("");
+    let split = path.split("/");
+    let parts = split.clone().count(); // probably a better way someday.
+    let mut count = 0;
+    for part in split {
+        if count > 0 && count < parts - 1 {
+            output = format!("{}/{}", output, part);
+            count += 1;
+        } else if count == 0 && count < parts - 1 {
+            output = format!("{}", part);
+            count += 1;
+        } else {
+            assert_eq!(count, parts - 1)
+            // skip end of path, after all '/'
+        }
+    }
+    output
+}
+
 pub mod def {
     use super::*;
-    use crate::ast::{DecField, DecFields};
+    use crate::{
+        ast::{DecField, DecFields},
+        format::format_one_line,
+        ToMotoko,
+    };
 
     pub fn import<A: Active>(active: &mut A, path: &str) -> Result<ModuleDef, Interruption> {
         let path0 = path; // for log.
@@ -212,11 +237,27 @@ pub mod def {
                 return nyi!(line!(), "import {}", path);
             }
         } else {
+            let path = match active.defs().active_path.as_ref() {
+                // we are "active" at some other path that's relative to this one.
+                // we need to account for that.
+                // e.g., if active_local_path = "foo/bar/baz/"
+                // and if path = "foo.fumola"
+                // then the local_path is "foo/bar/baz/foo.fumola"
+                None => path,
+                Some(prefix) => {
+                    let mut prefix = prefix.clone();
+                    if prefix.len() > 0 {
+                        prefix.push_str("/");
+                    };
+                    prefix.push_str(path.as_str());
+                    prefix
+                }
+            };
             (active.package().clone(), path)
         };
         let path = crate::vm_types::ModulePath {
             package_name: package_name.clone(),
-            local_path,
+            local_path: local_path.clone(),
         };
         log::debug!(
             "`import {}` resolves as `import {:?}`.  Attemping to import...",
@@ -236,6 +277,7 @@ pub mod def {
                     stack.push_back(path.clone());
                     return Err(Interruption::ImportCycle(stack));
                 } else {
+                    active.defs().active_path = Some(path_base(&local_path));
                     active.module_files().import_stack.push_back(path.clone());
                 };
                 let importing_package = active.package().clone();
@@ -285,6 +327,12 @@ pub mod def {
                 active.defs().leave_context(saved, &ctxid);
                 *active.package() = importing_package;
                 if let Some(top_path) = active.module_files().import_stack.pop_back() {
+                    match active.module_files().import_stack.head() {
+                        Some(active_module_path) => {
+                            active.defs().active_path = Some(active_module_path.local_path.clone())
+                        }
+                        None => active.defs().active_path = None,
+                    };
                     assert_eq!(top_path, path)
                 } else {
                     unreachable!()
@@ -434,7 +482,16 @@ pub mod def {
                 }
                 Ok(())
             }
-            Dec::Type(_id, _typ_binds, _typ) => Ok(()),
+            Dec::Type(_id, _typ_binds, _typ) => {
+                if let Some(ref attrs) = df.attrs {
+                    if attrs.vec.len() > 0 {
+                        println!("{:?}", df);
+                        println!("{}", format_one_line(&df.to_motoko().unwrap()));
+                        return nyi!(line!());
+                    }
+                };
+                Ok(())
+            }
             Dec::LetActor(_i, _, _dfs) => {
                 nyi!(line!())
             }

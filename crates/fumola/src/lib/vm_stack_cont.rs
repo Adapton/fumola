@@ -1,19 +1,23 @@
 //use crate::{ast::{Mut, ProjIndex}, shared::FastClone, type_mismatch, vm_types::{stack::{FieldContext, FieldValue, Frame, FrameCont}, Active, Cont, Step}, Interruption, Value, Value_};
 
+use std::collections::hash_map;
+use std::hash::{Hash, Hasher};
+
 use crate::adapton::{self, AdaptonState};
 use crate::ast::{Cases, Exp_, Inst, Literal, Mut, Pat, Pat_, ProjIndex, QuotedAst};
 use crate::shared::{FastClone, Share};
 use crate::value::{
-    ActorMethod, ClosedFunction, CollectionFunction, FastRandIter, FastRandIterFunction,
+    ActorMethod, ArrayIterator, ArrayIteratorFunc, ArrayIteratorNextFunc, ArraySizeFunc,
+    ClosedFunction, CollectionFunction, DynamicValue, FastRandIter, FastRandIterFunction,
     HashMapFunction, PrimFunction, Symbol, Value, Value_,
 };
-use crate::vm_types::OptionCoreSource;
 use crate::vm_types::{
     def::Function as FunctionDef,
     stack::{FieldContext, FieldValue, Frame, FrameCont},
     Active, Cont, DebugPrintLine, Env, Interruption, Pointer, Response, Step,
 };
-use crate::{nyi, type_mismatch_, vm_step, Shared};
+use crate::vm_types::{OptionCoreSource, Store};
+use crate::{nyi, type_mismatch_, vm_step, Dynamic, Shared};
 use im_rc::{HashMap, Vector};
 
 use crate::vm_step::{
@@ -57,6 +61,87 @@ pub fn stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Interrup
     } else {
         // common cases: need to pop top stack frame, then pattern-match it.
         nonempty_stack_cont(active, v)
+    }
+}
+
+impl Dynamic for crate::value::ArrayIteratorFunc {
+    fn call(
+        &mut self,
+        _store: &mut Store,
+        _inst: &Option<Inst>,
+        args: Value_,
+    ) -> crate::dynamic::Result {
+        if let Value::Unit = args.as_ref() {
+            let position = self.position.clone();
+            let array = self.array.clone();
+            Ok(Value::Dynamic(DynamicValue::new(ArrayIterator { position, array })).into())
+        } else {
+            type_mismatch!(file!(), line!())
+        }
+    }
+}
+
+impl Dynamic for crate::value::ArraySizeFunc {
+    fn call(
+        &mut self,
+        _store: &mut Store,
+        _inst: &Option<Inst>,
+        args: Value_,
+    ) -> crate::dynamic::Result {
+        if let Value::Unit = args.as_ref() {
+            Ok(Value::Nat(self.array_size.into()).into())
+        } else {
+            type_mismatch!(file!(), line!())
+        }
+    }
+}
+
+impl Dynamic for crate::value::ArrayIteratorNextFunc {
+    fn call(
+        &mut self,
+        store: &mut Store,
+        _inst: &Option<Inst>,
+        args: Value_,
+    ) -> crate::dynamic::Result {
+        if let Value::Unit = args.as_ref() {
+            let position = store.array_iter_next(&self.position);
+            if position < self.array.len() {
+                let elm = self.array.get(position);
+                Ok(Value::Option(elm.unwrap().clone()).into())
+            } else {
+                Ok(Value::Null.into())
+            }
+        } else {
+            type_mismatch!(file!(), line!())
+        }
+    }
+}
+
+impl Dynamic for crate::value::ArrayIterator {
+    fn get_field(&self, _store: &Store, name: &str) -> crate::dynamic::Result {
+        if name == "next" {
+            Ok(
+                Value::Dynamic(DynamicValue(std::rc::Rc::new(std::cell::RefCell::new(
+                    ArrayIteratorNextFunc {
+                        array: self.array.clone(),
+                        position: self.position.clone(),
+                    },
+                ))))
+                .into(),
+            )
+        } else {
+            type_mismatch!(file!(), line!())
+        }
+    }
+
+    fn iter_next(&mut self, store: &mut crate::vm_types::Store) -> crate::dynamic::Result {
+        let position = store.array_iter_next(&self.position);
+        if position < self.array.len() {
+            let elm = self.array.get(position);
+            Ok(Value::Option(elm.unwrap().clone()).into())
+        } else {
+            Ok(Value::Null.into())
+        }
     }
 }
 
@@ -353,6 +438,27 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             _ => type_mismatch!(file!(), line!()),
         },
         Dot(f) => match &*v {
+            Value::Array(_mut, array) => {
+                if f.0.string.as_str() == "vals" {
+                    let array = array.clone();
+                    let position = active.store().alloc_array_iter_position().local;
+                    *active.cont() = Cont::Value_(
+                        Value::Dynamic(DynamicValue::new(ArrayIteratorFunc { array, position }))
+                            .into(),
+                    );
+                    Ok(Step {})
+                } else if f.0.string.as_str() == "size" {
+                    *active.cont() = Cont::Value_(
+                        Value::Dynamic(DynamicValue::new(ArraySizeFunc {
+                            array_size: array.len(),
+                        }))
+                        .into(),
+                    );
+                    Ok(Step {})
+                } else {
+                    type_mismatch!(file!(), line!())
+                }
+            }
             Value::Object(fs) => {
                 if let Some(f) = fs.get(&f.0) {
                     *active.cont() = Cont::Value_(f.val.fast_clone());
@@ -837,6 +943,17 @@ fn call_prim_function<A: Active>(
 ) -> Result<Step, Interruption> {
     use PrimFunction::*;
     match pf {
+        SymbolLevel => {
+            if let Ok(symbol) = args.as_ref().into_sym_or(()) {
+                let mut hasher = hash_map::DefaultHasher::new();
+                symbol.as_ref().hash(&mut hasher);
+                let hash = hasher.finish();
+                *active.cont() = Cont::Value_(Value::Nat(hash.into()).into());
+                Ok(Step {})
+            } else {
+                type_mismatch!(file!(), line!())
+            }
+        }
         AtSignVar(v) => nyi!(line!(), "call_prim_function({})", v),
         DebugPrint => match &*args {
             Value::Text(s) => {
