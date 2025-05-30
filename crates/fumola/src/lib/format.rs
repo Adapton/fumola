@@ -305,6 +305,7 @@ impl ToDoc for PrimFunction {
             #[cfg(feature = "value-reflection")]
             PrimFunction::ReifyValue => str("\"reifyValue\""),
             PrimFunction::Collection(_collection_function) => todo!(),
+            PrimFunction::SymbolLevel => str("\"symbolLevel\""),
         }
     }
 }

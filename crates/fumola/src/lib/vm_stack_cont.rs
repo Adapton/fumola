@@ -948,6 +948,9 @@ fn call_prim_function<A: Active>(
 ) -> Result<Step, Interruption> {
     use PrimFunction::*;
     match pf {
+        SymbolLevel => {
+            todo!()
+        }
         AtSignVar(v) => nyi!(line!(), "call_prim_function({})", v),
         DebugPrint => match &*args {
             Value::Text(s) => {

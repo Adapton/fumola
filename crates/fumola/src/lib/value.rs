@@ -198,7 +198,6 @@ pub struct ActorMethod {
     [1,3,3].vals().next <--- ArrayIteratorNextFunc
 
     But, when doing `for (x in [1,2,3].vals()) {...}`
-
     ArrayIterator is used directly, avoiding the creation of a
     ArrayIteratorNextFunc for each iteration.
 */
@@ -340,6 +339,7 @@ pub enum PrimFunction {
     AtSignVar(String),
     DebugPrint,
     NatToText,
+    SymbolLevel,
     #[cfg(feature = "to-motoko")]
     #[cfg(feature = "value-reflection")]
     ReifyValue,
@@ -364,6 +364,7 @@ impl PrimFunction {
             "\"adaptonSpace\"" => AdaptonSpace,
             "\"print\"" => DebugPrint,
             "\"natToText\"" => NatToText,
+            "\"symbolLevel\"" => SymbolLevel,
             "\"hashMapNew\"" => Collection(HashMap(HashMapFunction::New)),
             "\"hashMapPut\"" => Collection(HashMap(HashMapFunction::Put)),
             "\"hashMapGet\"" => Collection(HashMap(HashMapFunction::Get)),

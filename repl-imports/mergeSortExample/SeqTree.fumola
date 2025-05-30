@@ -20,14 +20,16 @@ module {
     #binary : Binary<X>;
   };
 
-  func fromIterRec<X>(iter : Iter<(Symbol, X)>, left : SeqTree<X>, parentLevel : Nat) : SeqTree<X> {
+  func fromIterRec<X>(iter : Iter<(Symbol, X)>, left : Pointer<SeqTree<X>>, parentLevel : Nat) : Pointer<SeqTree<X>> {
     switch (iter.next()) {
       case null left;
       case (?(symbol, element)) {
          let level = prim "symbolLevel" symbol;
          if (level <= parentLevel) {
-           let right = fromIter(iter, #element({symbol;element}), level);
-           fromIter(iter, #binary({symbol;left;right}), parentLevel)
+           let rightLeft = symbol-`element := #element {symbol; element};
+           let right = fromIterRec(iter, rightLeft, level);
+           let left = symbol-`binary := #binary {symbol; left; right};
+           fromIterRec(iter, left, parentLevel)
          } else {
            left
          }
@@ -35,11 +37,15 @@ module {
     }
   };
 
-  public func fromIter<X>(iter : Iter<(Symbol, X)>) : SeqTree<X> {
-    fromIterRec(iter, #empty, 0)
+  public func fromIter<X>(iter : Iter<(Symbol, X)>) : ?Pointer<SeqTree<X>> {
+    do ? {
+      let (symbol, element) = iter.next() ! ;
+      let level = prim "symbolLevel" symbol;
+      fromIterRec(iter, symbol-`element := #element {symbol; element}, level)
+    }
   };
 
-  public func fromArray<X>(array : [(Symbol, X)]) : SeqTree<X> {
-    fromIter(array.iter())
+  public func fromArray<X>(array : [(Symbol, X)]) : ?Pointer<SeqTree<X>> {
+    fromIter(array.vals())
   };
 };
