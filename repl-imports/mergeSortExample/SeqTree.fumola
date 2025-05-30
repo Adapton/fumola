@@ -57,4 +57,23 @@ module {
     }
   };
 
+  func max(a, b) {
+    if (a > b) { a } else { b }
+  };
+
+  public func metrics<X>(tree : Pointer<SeqTree<X>>) {
+    switch (@ tree) {
+      case (#empty) { { depth=0; size=0 } };
+      case (#element(e)) { { depth=1; size=1 } };
+      case (#binary(b)) {
+        let ml = metrics(b.left);
+        let mr = metrics(b.right);
+        { 
+          depth = max(ml.depth, mr.depth) + 1; 
+          size = ml.size + mr.size 
+        }
+      };
+    }
+  }
+
 };
