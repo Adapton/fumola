@@ -7,6 +7,10 @@ module {
         (`3-`1, 5),
         (`4, 6),
         (`5, 4),
+        (`6, 13),
+        (`7, 8),
+        (`8, 1),
+        (`9, 9),
     ];
     public func inputSeq () = Seq.fromArray(inputArray);
     public func output () = Seq.mergeSort(inputSeq);
