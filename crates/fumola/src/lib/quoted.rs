@@ -226,6 +226,7 @@ impl QuotedClose for Exp {
             Exp::Opt(_) => todo!(),
             Exp::DoOpt(_) => todo!(),
             Exp::DoAdaptonNav(_, _) => todo!(),
+            Exp::DoAdaptonPutForceThunk(_, _) => todo!(),
             Exp::Bang(_) => todo!(),
             Exp::ObjectBlock(_, _) => todo!(),
             Exp::Object(_) => todo!(),

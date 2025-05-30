@@ -569,6 +569,7 @@ impl ToDoc for Exp {
             Block(decs) => block(decs),
             Do(e) => kwd("do").append(e.doc()),
             DoAdaptonNav(nav, e) => kwd("do").append(vector(nav, " ")).append(e.doc()),
+            DoAdaptonPutForceThunk(e1, e2) => kwd("do @").append(e1.doc()).append(e2.doc()),
             Not(e) => kwd("not").append(e.doc()),
             And(e1, e2) => bin_op(e1, str("and"), e2),
             Or(e1, e2) => bin_op(e1, str("or"), e2),

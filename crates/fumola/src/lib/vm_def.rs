@@ -246,7 +246,9 @@ pub mod def {
                 None => path,
                 Some(prefix) => {
                     let mut prefix = prefix.clone();
-                    prefix.push_str("/");
+                    if prefix.len() > 0 {
+                        prefix.push_str("/");
+                    };
                     prefix.push_str(path.as_str());
                     prefix
                 }

@@ -254,21 +254,18 @@ pub fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interrupti
             Ok(Step {})
         }
         Hole => nyi!(line!(), "Hole"),
-
         Force(e) => exp_conts(active, FrameCont::Force1, e),
         GetAdaptonPointer(e) => exp_conts(active, FrameCont::GetAdaptonPointer, e),
         DoAdaptonNav(nav, e) => step_adapton_nav(active, vector!(), nav.clone(), e),
+        DoAdaptonPutForceThunk(_, _) => nyi!(line!(), "step case: do-@"),
         Import(path) => {
             let m = crate::vm_def::def::import(active, &path)?;
             *active.cont() = cont_value(Value::Module(m));
             Ok(Step {})
         }
-
         Loop(_e1, _e2) => nyi!(line!(), "step case: Loop"),
-
         Label(_label, _type, _e) => nyi!(line!(), "step case: Label"),
         Break(_label, _e) => nyi!(line!(), "step case: Break"),
-
         ActorUrl(_e) => nyi!(line!(), "step case: ActorUrl"),
         Show(_e) => nyi!(line!(), "step case: Show"),
         ToCandid(_e) => nyi!(line!(), "step case: ToCandid"),
