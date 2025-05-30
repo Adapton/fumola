@@ -362,14 +362,33 @@ pub struct Store {
     #[serde(with = "crate::serde_utils::im_rc_hashmap")]
     map: HashMap<LocalPointer, Value_>,
     next_pointer: usize,
+    #[serde(with = "crate::serde_utils::im_rc_hashmap")]
+    array_iter_positions: HashMap<LocalPointer, usize>,
 }
 impl Store {
     pub fn new(owner: ScheduleChoice) -> Self {
         Store {
             owner,
             map: HashMap::new(),
+            array_iter_positions: HashMap::new(),
             next_pointer: 0,
         }
+    }
+
+    pub fn alloc_array_iter_position(&mut self) -> Pointer {
+        let ptr = LocalPointer::Numeric(NumericPointer(self.next_pointer));
+        self.next_pointer = self.next_pointer.checked_add(1).expect("Out of pointers");
+        self.array_iter_positions.insert(ptr.clone(), 0);
+        Pointer {
+            owner: self.owner.clone(),
+            local: ptr,
+        }
+    }
+
+    pub fn array_iter_next(&mut self, p: &LocalPointer) -> usize {
+        let x = self.array_iter_positions.get(p).unwrap().clone();
+        self.array_iter_positions.insert(p.clone(), x + 1);
+        x
     }
 
     fn alloc(&mut self, value: impl Into<Value_>) -> Pointer {

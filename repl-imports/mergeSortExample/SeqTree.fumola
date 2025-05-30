@@ -5,6 +5,7 @@
 module { 
   public type Binary<X> = {
     symbol : Symbol;
+    level : Nat;
     left : Pointer<SeqTree<X>>;
     right : Pointer<SeqTree<X>>;
   };
@@ -20,38 +21,40 @@ module {
     #binary : Binary<X>;
   };
 
-  func fromIterRec<X>(iter : Iter<(Symbol, X)>, left : Pointer<SeqTree<X>>, parentLevel : Nat) : Pointer<SeqTree<X>> {
-    switch (iter.next()) {
-      case null left;
-      case (?(symbol, element)) {
-         let level = prim "symbolLevel" symbol;
-         if (level <= parentLevel) {
-           let rightLeft = symbol-`element := #element {symbol; element};
-           let right = fromIterRec(iter, rightLeft, level);
-           let left = symbol-`binary := #binary {symbol; left; right};
-           fromIterRec(iter, left, parentLevel)
-         } else {
-           left
-         }
-      };
-      case otherwise {
-         (prim "print") otherwise;
-         error
-      };
-    }
+  public func fromArray<X>(array : [(Symbol, X)]) : ?Pointer<SeqTree<X>> {
+    fromIter(array.vals())
   };
 
   public func fromIter<X>(iter : Iter<(Symbol, X)>) : ?Pointer<SeqTree<X>> {
     do ? {
       let (symbol, element) = iter.next() ! ;
-      (prim "print") symbol;
       let level = prim "symbolLevel" symbol;
-      (prim "print") level;
-      fromIterRec(iter, symbol-`element := #element {symbol; element}, level)
+      fromIterRec(iter, symbol-`element := #element {symbol; element}, null)
     }
   };
 
-  public func fromArray<X>(array : [(Symbol, X)]) : ?Pointer<SeqTree<X>> {
-    fromIter(array.vals())
+  func levelLte(level : Nat, parentLevel : ?Nat) : bool {
+    switch parentLevel {
+      case null true;
+      case (?p) level <= p;
+    }
   };
+
+  func fromIterRec<X>(iter : Iter<(Symbol, X)>, left : Pointer<SeqTree<X>>, parentLevel : ?Nat) : Pointer<SeqTree<X>> {
+    switch (iter.next()) {
+      case null left;
+      case (?(symbol, element)) {
+         let level = prim "symbolLevel" symbol;
+         if (levelLte(level, parentLevel)) {
+           let rightLeft = symbol-`element := #element {symbol; element};
+           let right = fromIterRec(iter, rightLeft, ?level);
+           let left = symbol-`binary := #binary {symbol; level; left; right};
+           fromIterRec(iter, left, parentLevel)
+         } else {
+           left
+         }
+      };
+    }
+  };
+
 };

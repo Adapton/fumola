@@ -72,7 +72,7 @@ impl Dynamic for crate::value::ArrayIteratorFunc {
         args: Value_,
     ) -> crate::dynamic::Result {
         if let Value::Unit = args.as_ref() {
-            let position = self.position;
+            let position = self.position.clone();
             let array = self.array.clone();
             Ok(Value::Dynamic(DynamicValue::new(ArrayIterator { position, array })).into())
         } else {
@@ -99,14 +99,14 @@ impl Dynamic for crate::value::ArraySizeFunc {
 impl Dynamic for crate::value::ArrayIteratorNextFunc {
     fn call(
         &mut self,
-        _store: &mut Store,
+        store: &mut Store,
         _inst: &Option<Inst>,
         args: Value_,
     ) -> crate::dynamic::Result {
         if let Value::Unit = args.as_ref() {
-            if self.position < self.array.len() {
-                let elm = self.array.get(self.position);
-                self.position += 1;
+            let position = store.array_iter_next(&self.position);
+            if position < self.array.len() {
+                let elm = self.array.get(position);
                 Ok(Value::Option(elm.unwrap().clone()).into())
             } else {
                 Ok(Value::Null.into())
@@ -118,22 +118,13 @@ impl Dynamic for crate::value::ArrayIteratorNextFunc {
 }
 
 impl Dynamic for crate::value::ArrayIterator {
-    fn into_value(self) -> Value
-    where
-        Self: 'static + Sized,
-    {
-        Value::Dynamic(DynamicValue(std::rc::Rc::new(std::cell::RefCell::new(
-            self,
-        ))))
-    }
-
     fn get_field(&self, _store: &Store, name: &str) -> crate::dynamic::Result {
         if name == "next" {
             Ok(
                 Value::Dynamic(DynamicValue(std::rc::Rc::new(std::cell::RefCell::new(
                     ArrayIteratorNextFunc {
                         array: self.array.clone(),
-                        position: self.position,
+                        position: self.position.clone(),
                     },
                 ))))
                 .into(),
@@ -143,10 +134,10 @@ impl Dynamic for crate::value::ArrayIterator {
         }
     }
 
-    fn iter_next(&mut self, _store: &mut crate::vm_types::Store) -> crate::dynamic::Result {
-        if self.position < self.array.len() {
-            let elm = self.array.get(self.position);
-            self.position += 1;
+    fn iter_next(&mut self, store: &mut crate::vm_types::Store) -> crate::dynamic::Result {
+        let position = store.array_iter_next(&self.position);
+        if position < self.array.len() {
+            let elm = self.array.get(position);
             Ok(Value::Option(elm.unwrap().clone()).into())
         } else {
             Ok(Value::Null.into())
@@ -450,8 +441,9 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             Value::Array(_mut, array) => {
                 if f.0.string.as_str() == "vals" {
                     let array = array.clone();
+                    let position = active.store().alloc_array_iter_position().local;
                     *active.cont() = Cont::Value_(
-                        Value::Dynamic(DynamicValue::new(ArrayIteratorFunc { array, position: 0 }))
+                        Value::Dynamic(DynamicValue::new(ArrayIteratorFunc { array, position }))
                             .into(),
                     );
                     Ok(Step {})

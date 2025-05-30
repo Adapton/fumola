@@ -9,6 +9,7 @@ use crate::ast::{
 use crate::dynamic::Dynamic;
 use crate::shared::{FastClone, Share, Shared};
 use crate::type_mismatch;
+use crate::vm_types::LocalPointer;
 use crate::vm_types::{def::Actor as ActorDef, def::CtxId, def::Module as ModuleDef, Env};
 use crate::Interruption;
 
@@ -205,19 +206,19 @@ pub struct ActorMethod {
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct ArrayIteratorFunc {
     pub array: Vector<Value_>,
-    pub position: usize,
+    pub position: LocalPointer,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct ArrayIterator {
     pub array: Vector<Value_>,
-    pub position: usize,
+    pub position: LocalPointer,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct ArrayIteratorNextFunc {
     pub array: Vector<Value_>,
-    pub position: usize,
+    pub position: LocalPointer,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
