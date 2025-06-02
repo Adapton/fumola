@@ -74,14 +74,14 @@ module {
   };
 
   public func tikzText<X>(tree : Pointer<SeqTree<X>>, indent : Nat) : Text {
-    switch (@ tree) {
+    indentText(indent) # (switch (@ tree) {
       case (#empty) { "emptyNode\n" };
       case (#element(e)) { "elementNode { }\n" };
       case (#binary(b)) { "binaryNode {\n" 
-        # indentText(indent) # tikzText(b.left, indent + 1)
-        # indentText(indent) # tikzText(b.right, indent + 1)
-        # "}\n" };
-    }
+        # tikzText(b.left, indent + 1)
+        # tikzText(b.right, indent + 1)
+        # indentText(indent) # "}\n" };
+    })
   };
 
   public func writeTikzText<X>(path : Symbol, tree : ?Pointer<SeqTree<X>>) {
