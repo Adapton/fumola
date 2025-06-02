@@ -202,13 +202,13 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             Value::Tuple(vs) => match (vs.get(0), vs.get(1)) {
                 (Some(v11), Some(v12)) => {
                     let time = v12.into_time_or(Interruption::TypeMismatch(OptionCoreSource(
-                        Some(crate::vm_types::CoreSource {
-                            name: Some("adapton put, delayed".to_owned()),
-                            description: Some("Expected a symbol or time value in second component of assigned pair.".to_owned()),
-                            file: file!().to_string(),
-                            line: line!(),
-                        }),
-                    )))?;
+                            Some(crate::vm_types::CoreSource {
+                                name: Some("adapton put, delayed".to_owned()),
+                                description: Some("Expected a symbol or time value in second component of assigned pair.".to_owned()),
+                                file: file!().to_string(),
+                                line: line!(),
+                            }),
+                        )))?;
                     if let Value::AdaptonPointer(ref pointer) = &**v11 {
                         active
                             .adapton()
@@ -735,6 +735,9 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             *active.cont() = Cont::Value_(v);
             Ok(Step {})
         }
+        DoAdaptonPutForceThunk1(_) => todo!(),
+        DoAdaptonPutForceThunk2(_) => todo!(),
+        DoAdaptonPutForceThunk3 => todo!(),
     }
 }
 
@@ -954,6 +957,25 @@ fn call_prim_function<A: Active>(
                 type_mismatch!(file!(), line!())
             }
         }
+        WriteFile => match &*args {
+            Value::Tuple(vs) => {
+                if vs.len() != 2 {
+                    type_mismatch!(file!(), line!())
+                } else {
+                    if let Ok(symbol) = vs[0].into_sym_or(()) {
+                        if let Ok(text) = vs[1].into_text_or(()) {
+                            active.output_files().insert(symbol.as_ref().clone(), text);
+                            unit_step(active)
+                        } else {
+                            type_mismatch!(file!(), line!())
+                        }
+                    } else {
+                        type_mismatch!(file!(), line!())
+                    }
+                }
+            }
+            _ => type_mismatch!(file!(), line!()),
+        },
         AtSignVar(v) => nyi!(line!(), "call_prim_function({})", v),
         DebugPrint => match &*args {
             Value::Text(s) => {

@@ -257,11 +257,12 @@ impl std::fmt::Debug for DynamicValue {
 }
 
 impl Serialize for DynamicValue {
-    fn serialize<S>(&self, _ser: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        todo!()
+        // to do -- 2025-05-31.
+        ser.serialize_str("@DynamicValue(...)")
     }
 }
 
@@ -341,6 +342,7 @@ pub enum PrimFunction {
     DebugPrint,
     NatToText,
     SymbolLevel,
+    WriteFile,
     #[cfg(feature = "to-motoko")]
     #[cfg(feature = "value-reflection")]
     ReifyValue,
@@ -372,6 +374,7 @@ impl PrimFunction {
             "\"hashMapRemove\"" => Collection(HashMap(HashMapFunction::Remove)),
             "\"fastRandIterNew\"" => Collection(FastRandIter(FastRandIterFunction::New)),
             "\"fastRandIterNext\"" => Collection(FastRandIter(FastRandIterFunction::Next)),
+            "\"writeFile\"" => WriteFile,
             #[cfg(feature = "to-motoko")]
             #[cfg(feature = "value-reflection")]
             "\"reifyValue\"" => ReifyValue,
@@ -530,6 +533,13 @@ impl Value {
                 let symbol = self.into_sym_or(err)?;
                 Ok(AdaptonTime::Symbol(symbol))
             }
+        }
+    }
+
+    pub fn into_text_or<E>(&self, err: E) -> Result<Text, E> {
+        match self {
+            Value::Text(t) => Ok(t.clone()),
+            _ => Err(err),
         }
     }
 

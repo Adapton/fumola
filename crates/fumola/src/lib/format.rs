@@ -306,6 +306,7 @@ impl ToDoc for PrimFunction {
             PrimFunction::ReifyValue => str("\"reifyValue\""),
             PrimFunction::Collection(_collection_function) => todo!(),
             PrimFunction::SymbolLevel => str("\"symbolLevel\""),
+            PrimFunction::WriteFile => str("\"writeFile\""),
         }
     }
 }

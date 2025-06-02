@@ -3,6 +3,14 @@
 // This code's status is still "sketch", not something nailed down. 
 //
 module { 
+  #[listing]
+  public type SeqTree<X> = {
+    #empty;
+    #element : Element<X>;
+    #binary : Binary<X>;
+  };
+
+  #[listing]
   public type Binary<X> = {
     symbol : Symbol;
     level : Nat;
@@ -10,21 +18,17 @@ module {
     right : Pointer<SeqTree<X>>;
   };
 
+  #[listing]
   public type Element<X> = {
     element : X;
     symbol : Symbol;
-  };
-
-  public type SeqTree<X> = {
-    #empty;
-    #element : Element<X>;
-    #binary : Binary<X>;
   };
 
   public func fromArray<X>(array : [(Symbol, X)]) : ?Pointer<SeqTree<X>> {
     fromIter(array.vals())
   };
 
+  #[listing]
   public func fromIter<X>(iter : Iter<(Symbol, X)>) : ?Pointer<SeqTree<X>> {
     do ? {
       let (symbol, element) = iter.next() ! ;
@@ -33,6 +37,7 @@ module {
     }
   };
 
+  #[listing]
   func levelLte(level : Nat, parentLevel : ?Nat) : bool {
     switch parentLevel {
       case null true;
@@ -40,6 +45,7 @@ module {
     }
   };
 
+  #[listing]
   func fromIterRec<X>(iter : Iter<(Symbol, X)>, left : Pointer<SeqTree<X>>, parentLevel : ?Nat) : Pointer<SeqTree<X>> {
     switch (iter.next()) {
       case null left;
@@ -47,12 +53,9 @@ module {
          let level = prim "symbolLevel" symbol;
          if (levelLte(level, parentLevel)) {
            let rightLeft = symbol-`element := #element {symbol; element};
-           let right = do @ (symbol-`rec1) { fromIterRec(iter, rightLeft, ?level) };
-           // let right = fromIterRec(iter, rightLeft, ?level);
+           let right = force (symbol-`rec1 := thunk { fromIterRec(iter, rightLeft, ?level) });
            let left = symbol-`binary := #binary {symbol; level; left; right};
-           do @ (symbol-`rec2) { fromIterRec(iter, left, parentLevel) }
-           // fromIterRec(iter, left, parentLevel)
-       
+           force ( symbol-`rec2 := thunk { fromIterRec(iter, left, parentLevel) } );
          } else {
            left
          }
@@ -64,6 +67,7 @@ module {
     if (a > b) { a } else { b }
   };
 
+  #[listing]
   public func metrics<X>(tree : Pointer<SeqTree<X>>) {
     switch (@ tree) {
       case (#empty) { { depth=0; size=0 } };

@@ -617,6 +617,9 @@ fn stack_cont_has_redex<A: ActiveBorrow>(active: &A, v: &Value) -> Result<bool, 
             Force1 => true,
             ForceAdaptonPointer => true,
             ForceThunk => true,
+            DoAdaptonPutForceThunk1(_) => true,
+            DoAdaptonPutForceThunk2(_) => true,
+            DoAdaptonPutForceThunk3 => true,
         };
         Ok(r)
     }

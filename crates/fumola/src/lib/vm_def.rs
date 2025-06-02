@@ -211,12 +211,10 @@ fn path_base(path: &String) -> String {
 }
 
 pub mod def {
+    use log::warn;
+
     use super::*;
-    use crate::{
-        ast::{DecField, DecFields},
-        format::format_one_line,
-        ToMotoko,
-    };
+    use crate::ast::{DecField, DecFields};
 
     pub fn import<A: Active>(active: &mut A, path: &str) -> Result<ModuleDef, Interruption> {
         let path0 = path; // for log.
@@ -357,11 +355,43 @@ pub mod def {
         Ok(mf.def())
     }
 
+    // temporary code quality, for now.
+    // the idea is to give a human readable warning about each attribute that we
+    // notice but do not yet handle correctly.
+    // for now, that's every attribute.
+    //
+    // the first attribute that we want to implement, somehow, is "listing".
+    // the idea is to create a separate file with just that dec field pretty-printed into it.
+    // the name of the file will be based on the current module path
+    //
+    fn dec_field_kind_and_id(df: &DecField) -> (String, String) {
+        match &df.dec.0 {
+            Dec::Type(id, _, _) => ("type".to_string(), id.0.to_string()),
+            Dec::Func(f) => {
+                let f = f
+                    .name
+                    .clone()
+                    .map(|id| id.0.id.0.to_string())
+                    .unwrap_or("".to_string());
+                ("func".to_string(), f)
+            }
+            _ => todo!(),
+        }
+    }
+
     pub fn insert_static_field<A: Active>(
         active: &mut A,
         source: &Source,
         df: &DecField,
     ) -> Result<(), Interruption> {
+        if let Some(ref attrs) = df.attrs {
+            if attrs.vec.len() > 0 {
+                let (kind, id) = dec_field_kind_and_id(df);
+                warn!("Ignoring attributes on {} {}: {:?}", kind, id, &df.attrs);
+                // warn!("{}", format_one_line(&df.to_motoko().unwrap()));
+                // return nyi!(line!());
+            }
+        };
         //println!("{:?} -- {:?} ", source, df);
         match &df.dec.0 {
             Dec::Attrs(_attrs, _dec) => {
@@ -485,9 +515,9 @@ pub mod def {
             Dec::Type(_id, _typ_binds, _typ) => {
                 if let Some(ref attrs) = df.attrs {
                     if attrs.vec.len() > 0 {
-                        println!("{:?}", df);
-                        println!("{}", format_one_line(&df.to_motoko().unwrap()));
-                        return nyi!(line!());
+                        // warn!("Ignoring type attributes: {:?}", df.attrs);
+                        // warn!("{}", format_one_line(&df.to_motoko().unwrap()));
+                        // return nyi!(line!());
                     }
                 };
                 Ok(())

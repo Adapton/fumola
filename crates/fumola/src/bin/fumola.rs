@@ -167,6 +167,11 @@ fn repl(core: &mut Core) {
                     println!("{}", line.text.to_string())
                 }
                 core.debug_print_out = im_rc::vector::Vector::new();
+                for (path, content) in core.output_files.iter() {
+                    let path_string = format_one_line(path);
+                    println!("writeFile: {} => {:?}", path_string, content.to_string())
+                }
+                core.output_files = im_rc::hashmap::HashMap::new();
                 rl.add_history_entry(line.as_str());
                 inspect_result(core, v, 0)
             }
