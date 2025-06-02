@@ -67,12 +67,27 @@ module {
     if (a > b) { a } else { b }
   };
 
-  public func tikzText<X>(tree : Pointer<SeqTree<X>>) : Text {
-    "to do"
+  func indentText(n : Nat) : Text {
+    if (n == 0) { "" } else {
+      "  " # (indentText(n - 1))
+    }
   };
 
-  public func writeTikzText<X>(path : Symbol, tree : Pointer<SeqTree<X>>) {
-    prim "writeFile" (path, tikzText(tree))
+  public func tikzText<X>(tree : Pointer<SeqTree<X>>, indent : Nat) : Text {
+    switch (@ tree) {
+      case (#empty) { "emptyNode" };
+      case (#element(e)) { "elementNode { }" };
+      case (#binary(b)) { "binaryNode {\n" 
+        # indentText(indent) # tikzText(b.left, indent + 1) # "\n"
+        # indentText(indent) # tikzText(b.right, indent + 1) # "\n"
+        # "}\n" };
+    }
+  };
+
+  public func writeTikzText<X>(path : Symbol, tree : ?Pointer<SeqTree<X>>) {
+    let ?() = do ? {
+      prim "writeFile" (path, tikzText(tree!, 0))
+    };
   };
 
   #[listing]
