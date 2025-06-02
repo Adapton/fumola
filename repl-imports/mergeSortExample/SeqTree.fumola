@@ -67,6 +67,14 @@ module {
     if (a > b) { a } else { b }
   };
 
+  public func tikzText<X>(tree : Pointer<SeqTree<X>>) : Text {
+    "to do"
+  };
+
+  public func writeTikzText<X>(path : Symbol, tree : Pointer<SeqTree<X>>) {
+    prim "writeFile" (path, tikzText(tree))
+  };
+
   #[listing]
   public func metrics<X>(tree : Pointer<SeqTree<X>>) {
     switch (@ tree) {

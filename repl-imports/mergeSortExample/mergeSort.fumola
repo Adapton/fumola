@@ -12,6 +12,12 @@ module {
         (`8, 1),
         (`9, 9),
     ];
-    public func inputSeq () = Seq.fromArray(inputArray);
-    public func output () = Seq.mergeSort(inputSeq);
+    
+    public func inputSeq () {
+        let s = Seq.fromArray(inputArray);
+        Seq.writeTikzText(`mergeSort-`inputSeq, s);
+        s
+    };
+
+    public func output () = Seq.mergeSort(inputSeq());
 }
