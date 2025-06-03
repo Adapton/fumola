@@ -13,8 +13,8 @@ use crate::vm_types::LocalPointer;
 use crate::vm_types::{def::Actor as ActorDef, def::CtxId, def::Module as ModuleDef, Env};
 use crate::Interruption;
 
-use im_rc::HashMap;
 use im_rc::Vector;
+use im_rc::{vector, HashMap};
 use num_bigint::{BigInt, BigUint};
 use num_traits::ToPrimitive;
 use ordered_float::OrderedFloat;
@@ -29,6 +29,10 @@ pub type Result<T = Value, E = ValueError> = std::result::Result<T, E>;
 pub struct Text(Vector<Rc<String>>);
 
 impl Text {
+    pub fn new(s: String) -> Text {
+        Self(vector!(Rc::new(s)))
+    }
+
     #[allow(dead_code)]
     fn into_string(self) -> String {
         self.0.into_iter().map(|s| s.as_ref().clone()).collect()

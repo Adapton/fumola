@@ -76,7 +76,7 @@ module {
   public func tikzText<X>(tree : Pointer<SeqTree<X>>, indent : Nat) : Text {
     indentText(indent) # (switch (@ tree) {
       case (#empty) { "emptyNode\n" };
-      case (#element(e)) { "elementNode { }\n" };
+      case (#element(e)) { "elementNode { " # (prim "debugShow" e.symbol) # "}\n" };
       case (#binary(b)) { "binaryNode {\n" 
         # tikzText(b.left, indent + 1)
         # tikzText(b.right, indent + 1)

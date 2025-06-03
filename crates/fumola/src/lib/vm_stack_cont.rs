@@ -5,11 +5,12 @@ use std::hash::{Hash, Hasher};
 
 use crate::adapton::{self, AdaptonState};
 use crate::ast::{Cases, Exp_, Inst, Literal, Mut, Pat, Pat_, ProjIndex, QuotedAst};
+use crate::format::{format_one_line, ToDoc};
 use crate::shared::{FastClone, Share};
 use crate::value::{
     ActorMethod, ArrayIterator, ArrayIteratorFunc, ArrayIteratorNextFunc, ArraySizeFunc,
     ClosedFunction, CollectionFunction, DynamicValue, FastRandIter, FastRandIterFunction,
-    HashMapFunction, PrimFunction, Symbol, Value, Value_,
+    HashMapFunction, PrimFunction, Symbol, Text, Value, Value_,
 };
 use crate::vm_types::{
     def::Function as FunctionDef,
@@ -202,13 +203,13 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             Value::Tuple(vs) => match (vs.get(0), vs.get(1)) {
                 (Some(v11), Some(v12)) => {
                     let time = v12.into_time_or(Interruption::TypeMismatch(OptionCoreSource(
-                            Some(crate::vm_types::CoreSource {
-                                name: Some("adapton put, delayed".to_owned()),
-                                description: Some("Expected a symbol or time value in second component of assigned pair.".to_owned()),
-                                file: file!().to_string(),
-                                line: line!(),
-                            }),
-                        )))?;
+                                Some(crate::vm_types::CoreSource {
+                                    name: Some("adapton put, delayed".to_owned()),
+                                    description: Some("Expected a symbol or time value in second component of assigned pair.".to_owned()),
+                                    file: file!().to_string(),
+                                    line: line!(),
+                                }),
+                            )))?;
                     if let Value::AdaptonPointer(ref pointer) = &**v11 {
                         active
                             .adapton()
@@ -738,6 +739,11 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
         DoAdaptonPutForceThunk1(_) => todo!(),
         DoAdaptonPutForceThunk2(_) => todo!(),
         DoAdaptonPutForceThunk3 => todo!(),
+        DebugShow => {
+            let shown = format_one_line(v.as_ref());
+            *active.cont() = Cont::Value_(Value::Text(Text::new(shown)).into());
+            Ok(Step {})
+        }
     }
 }
 
