@@ -113,7 +113,8 @@ module {
         indentText(n) # "}\n" 
       };
       case (#binary(b)) { 
-        indentText(n) # "node[binary node] { \matrix {\n" #
+        indentText(n) # "node[binary node] {\n" #
+        indentText(n + 1) # "\\matrix {\n" #
         indentText(n + 2) # "\\node[symbol field] {" # (debug_show b.symbol) # "}; \\\\\n" #
         indentText(n + 2) # "\\node[level field] {" # (debug_show b.level) # "}; \\\\\n" #
         indentText(n + 1) # "};\n" #
