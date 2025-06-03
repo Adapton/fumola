@@ -830,7 +830,7 @@ impl ToDoc for Pat {
                 .append(p.as_ref().map(|p| p.doc()).unwrap_or(RcDoc::nil())),
             //            Alt(d) => delim_left(d, " |"),
             Annot(_t) => todo!(),
-            AnnotPat(_p, _t) => todo!(),
+            AnnotPat(p, t) => p.doc().append(kwd(":")).append(t.doc()),
             Paren(p) => enclose("(", p.doc(), ")"),
             Or(_, _) => todo!(),
             Unquote(_) => todo!(),

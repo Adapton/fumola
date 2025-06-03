@@ -5,7 +5,7 @@ use std::hash::{Hash, Hasher};
 
 use crate::adapton::{self, AdaptonState};
 use crate::ast::{Cases, Exp_, Inst, Literal, Mut, Pat, Pat_, ProjIndex, QuotedAst};
-use crate::format::{format_one_line, ToDoc};
+use crate::format::format_one_line;
 use crate::shared::{FastClone, Share};
 use crate::value::{
     ActorMethod, ArrayIterator, ArrayIteratorFunc, ArrayIteratorNextFunc, ArraySizeFunc,

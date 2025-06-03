@@ -1,7 +1,3 @@
-//
-// 2025-05-26 -- Playing with some ideas for a collections library.
-// This code's status is still "sketch", not something nailed down. 
-//
 module { 
   #[listing]
   public type SeqTree<X> = {
@@ -9,13 +5,15 @@ module {
     #element : Element<X>;
     #binary : Binary<X>;
   };
+  #[listing]
+  public type SeqTree_<X> = Pointer<SeqTree<X>>;
 
   #[listing]
   public type Binary<X> = {
     symbol : Symbol;
     level : Nat;
-    left : Pointer<SeqTree<X>>;
-    right : Pointer<SeqTree<X>>;
+    left : SeqTree_<X>;
+    right : SeqTree_<X>;
   };
 
   #[listing]
@@ -24,16 +22,45 @@ module {
     symbol : Symbol;
   };
 
-  public func fromArray<X>(array : [(Symbol, X)]) : ?Pointer<SeqTree<X>> {
-    fromIter(array.vals())
+  #[listing]
+  public type List<X> = ?{
+    element : X;
+    symbol : Symbol;
+    next : Pointer<List<X>>;
+  };
+
+  public func listFromIter(iter : Iter<(Symbol, X)>) : List<X> {
+    switch (iter.next()) {
+      case null null;
+      case (?(symbol, element)) {
+        ?{symbol; element; next=listFromIter(iter)}
+      }
+    } 
+  };
+
+  public func listFromIterTest() {
+    let list = listFromIter([(1,1), (2,2), (3,3)].vals());
+    assert (list!.symbol == 1);
+    assert (list!.element == 1);
+    assert (list!.next!.symbol == 2);
+    assert (list!.next!.element == 2);
+    assert (list!.next!.next!.symbol == 3);
+    assert (list!.next!.next!.element == 3);
+    assert (list!.next!.next!.next == null);
+  };
+
+  public func fromArray<X>(array : [(Symbol, X)]) : ?SeqTree_<X> {
+    fromList(listFromIter(array.vals()))
   };
 
   #[listing]
-  public func fromIter<X>(iter : Iter<(Symbol, X)>) : ?Pointer<SeqTree<X>> {
+  public func fromList<X>(list : List<X>) : ?SeqTree_<X> {
     do ? {
-      let (symbol, element) = iter.next() ! ;
+      let {symbol; element; next} = list!;
       let level = prim "symbolLevel" symbol;
-      fromIterRec(iter, symbol-`element := #element {symbol; element}, null)
+      let (tree, nil) = fromListRec(next, symbol-`element := #element {symbol; element}, null);
+      assert (nil == null);
+      tree
     }
   };
 
@@ -46,19 +73,19 @@ module {
   };
 
   #[listing]
-  func fromIterRec<X>(iter : Iter<(Symbol, X)>, left : Pointer<SeqTree<X>>, parentLevel : ?Nat) : Pointer<SeqTree<X>> {
-    switch (iter.next()) {
-      case null left;
-      case (?(symbol, element)) {
-         let level = prim "symbolLevel" symbol;
-         if (levelLte(level, parentLevel)) {
-           let rightLeft = symbol-`element := #element {symbol; element};
-           let right = force (symbol-`rec1 := thunk { fromIterRec(iter, rightLeft, ?level) });
-           let left = symbol-`binary := #binary {symbol; level; left; right};
-           force ( symbol-`rec2 := thunk { fromIterRec(iter, left, parentLevel) } );
-         } else {
-           left
-         }
+  func fromListRec<X>(list : List<X>, left : SeqTree_<X>, parentLevel : ?Nat) : (SeqTree_<X>, List<X>) {
+    switch list {
+      case null (left, null);
+      case (?{symbol; element; next}) {
+        let level = prim "symbolLevel" symbol;
+        if (levelLte(level, parentLevel)) {
+          let rightLeft = symbol-`element := #element {symbol; element};
+          let (right, next) = force (symbol-`rec1 := thunk { fromIterRec(next, rightLeft, ?level) });
+          let left = symbol-`binary := #binary {symbol; level; left; right};
+          force ( symbol-`rec2 := thunk { fromIterRec(next, left, parentLevel) } );
+        } else {
+          (left, list)
+        }
       };
     }
   };
@@ -73,11 +100,12 @@ module {
     }
   };
 
+  // WIP -- this syntax for tikz is approximate for now.
   public func tikzText<X>(tree : Pointer<SeqTree<X>>, indent : Nat) : Text {
     indentText(indent) # (switch (@ tree) {
       case (#empty) { "emptyNode\n" };
-      case (#element(e)) { "elementNode { " # (prim "debugShow" e.symbol) # "}\n" };
-      case (#binary(b)) { "binaryNode {\n" 
+      case (#element(e)) { "elementNode { " # (debug_show e.symbol) # "}\n" };
+      case (#binary(b)) { "binaryNode { [" # (debug_show b.symbol) # "]\n" 
         # tikzText(b.left, indent + 1)
         # tikzText(b.right, indent + 1)
         # indentText(indent) # "}\n" };

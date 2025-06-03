@@ -185,8 +185,8 @@ pub fn pattern_matches(env: Env, pat: &Pat, v: Value_) -> Option<Env> {
             }
         }
         (Pat::Object(x), Value::Object(y)) => {
-            let x2 = x;
-            let x3 = y;
+            let _x2 = x;
+            let _x3 = y;
             todo!();
         }
         _ => None,

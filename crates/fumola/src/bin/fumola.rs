@@ -172,7 +172,7 @@ fn repl(core: &mut Core) {
                     let path_string = format_one_line(path).replace("`", "");
                     let content = content.to_string();
                     info!(
-                        "writing file {} with \"{}\"",
+                        "writing file `{}` with \"{}\"",
                         path_string,
                         truncate_with_ellipsis(content.as_str(), 69)
                     );
