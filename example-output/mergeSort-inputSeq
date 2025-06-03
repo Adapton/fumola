@@ -1,0 +1,28 @@
+binaryNode { [`2]
+  elementNode { `1}
+  binaryNode { [`6]
+    binaryNode { [`3-`1]
+      binaryNode { [`3]
+        elementNode { `2}
+        elementNode { `3}
+      }
+      binaryNode { [`5]
+        binaryNode { [`4]
+          elementNode { `3-`1}
+          elementNode { `4}
+        }
+        elementNode { `5}
+      }
+    }
+    binaryNode { [`8]
+      binaryNode { [`7]
+        elementNode { `6}
+        elementNode { `7}
+      }
+      binaryNode { [`9]
+        elementNode { `8}
+        elementNode { `9}
+      }
+    }
+  }
+}

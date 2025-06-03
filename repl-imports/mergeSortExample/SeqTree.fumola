@@ -80,9 +80,9 @@ module {
         let level = prim "symbolLevel" symbol;
         if (levelLte(level, parentLevel)) {
           let rightLeft = symbol-`element := #element {symbol; element};
-          let (right, next) = force (symbol-`rec1 := thunk { fromIterRec(next, rightLeft, ?level) });
+          let (right, next) = force (symbol-`rec1 := thunk { fromListRec(next, rightLeft, ?level) });
           let left = symbol-`binary := #binary {symbol; level; left; right};
-          force ( symbol-`rec2 := thunk { fromIterRec(next, left, parentLevel) } );
+          force ( symbol-`rec2 := thunk { fromListRec(next, left, parentLevel) } );
         } else {
           (left, list)
         }
