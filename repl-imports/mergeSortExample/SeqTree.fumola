@@ -65,14 +65,6 @@ module {
   };
 
   #[listing]
-  func levelLte(level : Nat, parentLevel : ?Nat) : bool {
-    switch parentLevel {
-      case null true;
-      case (?p) level <= p;
-    }
-  };
-
-  #[listing]
   func fromListRec<X>(list : List<X>, left : SeqTree_<X>, parentLevel : ?Nat) : (SeqTree_<X>, List<X>) {
     switch list {
       case null (left, null);
@@ -90,6 +82,14 @@ module {
     }
   };
 
+  #[listing]
+  func levelLte(level : Nat, parentLevel : ?Nat) : bool {
+    switch parentLevel {
+      case null true;
+      case (?p) level <= p;
+    }
+  };
+
   func max(a, b) {
     if (a > b) { a } else { b }
   };
@@ -101,37 +101,32 @@ module {
   };
 
   // WIP -- this syntax for tikz is approximate for now.
-  public func tikzText<X>(tree : Pointer<SeqTree<X>>, n : Nat) : Text {
+  public func tikzText<X>(tree : SeqTree_<X>, n : Nat) : Text {
     switch (@ tree) {
       case (#empty) { "emptyNode\n" };
       case (#element(e)) {
-        indentText(n) # "node[element node] {\n" #
-        indentText(n + 1) # "\\matrix {\n" #
-        indentText(n + 2) # "\\node[symbol field] {" # (debug_show e.symbol) # "}; \\\\\n" #
-        indentText(n + 2) # "\\node[element field] {" # (debug_show e.element) # "}; \\\\\n" #
-        indentText(n + 1) # "};\n" #
-        indentText(n) # "}\n" 
+        indentText(n) # "[{\\SeqTreeElement" #
+        "{" # (debug_show e.symbol) # "}" #
+        "{" # (debug_show e.element) # "}}]\n"
       };
-      case (#binary(b)) { 
-        indentText(n) # "node[binary node] {\n" #
-        indentText(n + 1) # "\\matrix {\n" #
-        indentText(n + 2) # "\\node[symbol field] {" # (debug_show b.symbol) # "}; \\\\\n" #
-        indentText(n + 2) # "\\node[level field] {" # (debug_show b.level) # "}; \\\\\n" #
-        indentText(n + 1) # "};\n" #
-        indentText(n + 1) # "child {\n" #
-        tikzText(b.left, n + 2) # 
-        indentText(n + 1) # "}\n" #
-        indentText(n + 1) # "child {\n" #
-        tikzText(b.right, n + 2) #
-        indentText(n + 1) # "}\n" #
-        indentText(n) # "}\n" 
+      case (#binary(b)) {
+        indentText(n) # "[\n" #
+        indentText(n + 1) # "{\\SeqTreeBinaryNode" #
+        "{" # (debug_show b.symbol) # "}" #
+        "{" # (debug_show b.level) # "}" #
+        "}\n" #
+        tikzText(b.left, n + 1) #
+        tikzText(b.right, n + 1) #
+        indentText(n) # "]\n"
       };
     }
   };
 
   public func writeTikzText<X>(path : Symbol, tree : ?Pointer<SeqTree<X>>) {
     let ?() = do ? {
-      prim "writeFile" (path, tikzText(tree!, 0))
+      let firstPart = "\\begin{forest}\n";
+      let lastPart = "\\end{forest}\n";
+      prim "writeFile" (path, firstPart # tikzText(tree!, 0) # lastPart)
     };
   };
 
