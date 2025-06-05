@@ -1,11 +1,13 @@
 // Reference: https://github.com/dfinity/candid/blob/master/rust/candid/src/bindings/candid.rs
 
+use std::sync::mpsc::RecvTimeoutError;
+
 use crate::adapton::{Space, Time};
 use crate::ast::{
     AdaptonNav, AdaptonNavDim, BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_,
     Delim, Exp, ExpField, Exp_, Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat,
-    PrimType, QuotedAst, RelOp, Stab, Type, TypeBind, TypeField, TypePath, TypeTag, TypeTag_, UnOp,
-    Unquote, Vis,
+    PatField, PrimType, QuotedAst, RelOp, Stab, Type, TypeBind, TypeField, TypePath, TypeTag,
+    TypeTag_, UnOp, Unquote, Vis,
 };
 use crate::format_utils::*;
 use crate::lexer::is_keyword;
@@ -539,7 +541,10 @@ impl ToDoc for Exp {
             Un(u, e2) => u.doc().append(e2.doc()),
             Bin(e1, b, e2) => bin_op(e1, b.doc(), e2),
             Tuple(es) => tuple(es),
-            Prim(_) => unimplemented!(),
+            Prim(name) => match name {
+                Ok(pf) => kwd("prim").append(RcDoc::text(format!("{:?}", pf))),
+                Err(s) => kwd("prim").append(format!("{:?}", s)),
+            },
             Var(id) => id.doc(),
             ActorUrl(_) => todo!(),
             Rel(e1, r, e2) => bin_op(e1, r.doc(), e2),
@@ -637,7 +642,7 @@ impl ToDoc for Exp {
             Paren(e) => enclose("(", e.doc(), ")"),
             Value_(_) => todo!(),
             Proj(_, _) => todo!(),
-            Object(_) => todo!(),
+            Object(x) => RcDoc::text("Object(...)"),
             DebugShow(_) => todo!(),
             Async(_) => todo!(),
             AsyncStar(_) => todo!(),
@@ -764,7 +769,7 @@ impl ToDoc for Type {
             Unknown(id) => id.doc(),
             Known(id, t) => id.doc().append(" : ").append(t.doc()),
             Path(p, None) => p.doc(),
-            Path(_p, Some(_)) => todo!(),
+            Path(p, Some(args)) => p.doc().append(enclose("<", vector(&args.vec, ","), ">")),
             Item(i, t) => i
                 .doc()
                 .append(space())
@@ -814,6 +819,15 @@ impl ToDoc for TypeBind {
     }
 }
 
+impl ToDoc for PatField {
+    fn doc(&self) -> RcDoc {
+        match &self.pat {
+            Some(p) => self.id.doc().append(str("=")).append(p.doc()),
+            None => self.id.doc(),
+        }
+    }
+}
+
 impl ToDoc for Pat {
     fn doc(&self) -> RcDoc {
         use Pat::*;
@@ -823,7 +837,7 @@ impl ToDoc for Pat {
             UnOpLiteral(_u, _l) => todo!(),
             Literal(l) => l.doc(),
             Tuple(ps) => tuple(ps),
-            Object(_) => todo!(),
+            Object(fields) => enclose("{", vector(&fields.vec, ";"), "}"),
             Optional(p) => str("?").append(p.doc()),
             Variant(s, p) => str("#")
                 .append(s.doc())
