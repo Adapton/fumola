@@ -542,7 +542,7 @@ impl ToDoc for Exp {
             Bin(e1, b, e2) => bin_op(e1, b.doc(), e2),
             Tuple(es) => tuple(es),
             Prim(name) => match name {
-                Ok(pf) => kwd("prim").append(RcDoc::text(format!("{:?}", pf))),
+                Ok(pf) => kwd("prim").append(pf.doc()),
                 Err(s) => kwd("prim").append(format!("{:?}", s)),
             },
             Var(id) => id.doc(),
@@ -642,7 +642,16 @@ impl ToDoc for Exp {
             Paren(e) => enclose("(", e.doc(), ")"),
             Value_(_) => todo!(),
             Proj(_, _) => todo!(),
-            Object(x) => RcDoc::text("Object(...)"),
+            Object((bases, fields)) => enclose(
+                "{",
+                match (bases, fields) {
+                    (None, None) => RcDoc::nil(),
+                    (None, Some(fields)) => vector(&fields.vec, ";"),
+                    (Some(_), None) => todo!(),
+                    (Some(_), Some(_)) => todo!(),
+                },
+                "}",
+            ),
             DebugShow(_) => todo!(),
             Async(_) => todo!(),
             AsyncStar(_) => todo!(),
@@ -895,8 +904,10 @@ impl ToDoc for ExpField {
                 None => RcDoc::nil(),
                 Some(typ) => str(" : ").append(typ.doc()),
             })
-            .append(" = ")
-            .append(self.exp.doc())
+            .append(match self.exp {
+                Some(_) => str("=").append(self.exp.doc()),
+                None => RcDoc::nil(),
+            })
     }
 }
 

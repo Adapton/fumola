@@ -211,7 +211,7 @@ fn path_base(path: &String) -> String {
 }
 
 pub mod def {
-    use log::warn;
+    use log::{debug, info, warn};
 
     use super::*;
     use crate::{
@@ -390,10 +390,15 @@ pub mod def {
         if let Some(ref attrs) = df.attrs {
             if attrs.vec.len() > 0 {
                 let (kind, id) = dec_field_kind_and_id(df);
-                warn!("Ignoring attributes on {}-{} {:?}", kind, id, &df.attrs);
-                println!("{}", format_pretty(&df.dec, 80))
-                // warn!("{}", format_one_line(&df.to_motoko().unwrap()));
-                // return nyi!(line!());
+                debug!("Attributes on {}-{} {:?}", kind, id, &df.attrs);
+            }
+            // to do -- introduce better semantic logic for attributes.
+            if let Some(attr) = attrs.vec.iter().find(|attr| match &attr.0 {
+                crate::ast::Attr::Id(id) => id.0.as_str() == "listing",
+                crate::ast::Attr::Call(id, _) => id.0.as_str() == "listing",
+                crate::ast::Attr::Field(_, _) => false,
+            }) {
+                info!("Listing: {:?}\n{}", &attr.1, format_pretty(&df.dec, 80))
             }
         };
         //println!("{:?} -- {:?} ", source, df);
