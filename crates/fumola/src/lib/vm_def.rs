@@ -398,7 +398,17 @@ pub mod def {
                 crate::ast::Attr::Call(id, _) => id.0.as_str() == "listing",
                 crate::ast::Attr::Field(_, _) => false,
             }) {
-                info!("Listing: {:?}\n{}", &attr.1, format_pretty(&df.dec, 80))
+                let file = active
+                    .module_files()
+                    .import_stack
+                    .back()
+                    .map(|m| m.local_path.clone());
+                info!(
+                    "Listing: {}: {:?}\n{}",
+                    file.unwrap_or("(no file)".to_string()),
+                    &attr.1,
+                    format_pretty(&df.dec, 80)
+                )
             }
         };
         //println!("{:?} -- {:?} ", source, df);
