@@ -193,6 +193,8 @@ impl ToDoc for Symbol {
             Symbol::Int(i) => RcDoc::text(i.to_string()),
             Symbol::QuotedAst(q) => q.doc(),
             Symbol::BinOp(l, b, r) => l.doc().append(b.doc().append(r.doc())),
+            Symbol::Id(id) => id.doc(),
+            Symbol::Dot(s1, s2) => s1.doc().append(str(".")).append(s2.doc()),
         }
     }
 }

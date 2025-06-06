@@ -217,6 +217,8 @@ pub mod def {
     use crate::{
         ast::{DecField, DecFields},
         format::format_pretty,
+        value::{Symbol, Text},
+        Shared,
     };
 
     pub fn import<A: Active>(active: &mut A, path: &str) -> Result<ModuleDef, Interruption> {
@@ -403,12 +405,25 @@ pub mod def {
                     .import_stack
                     .back()
                     .map(|m| m.local_path.clone());
+                let (_kind, id) = dec_field_kind_and_id(df);
                 info!(
                     "Listing: {}: {:?}\n{}",
-                    file.unwrap_or("(no file)".to_string()),
+                    file.clone().unwrap_or("(no file)".to_string()),
                     &attr.1,
                     format_pretty(&df.dec, 80)
-                )
+                );
+                let id_symbol = Symbol::Id(Id::new(id));
+                let symbol = match file {
+                    None => id_symbol,
+                    Some(file) => {
+                        let file_symbol = Shared::new(Symbol::Id(Id::new(file)));
+                        Symbol::Dot(file_symbol, Shared::new(id_symbol))
+                    }
+                };
+                active.output_files().insert(
+                    symbol,
+                    Text::new(format_pretty(&df.dec, 80)).append(&Text::new("\n".to_string())),
+                );
             }
         };
         //println!("{:?} -- {:?} ", source, df);

@@ -108,6 +108,8 @@ pub enum Symbol {
     UnOp(UnOp, Symbol_),
     BinOp(Symbol_, BinOp, Symbol_),
     Call(Symbol_, Symbol_),
+    Id(Id),
+    Dot(Symbol_, Symbol_),
 }
 
 pub type Value_ = Shared<Value>;
