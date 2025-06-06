@@ -121,7 +121,7 @@ fn tuple<'a, T: ToDoc + Clone>(d: &'a Delim<T>) -> RcDoc<'a> {
 }
 
 fn field_block<'a, T: ToDoc + Clone>(d: &'a Delim<T>) -> RcDoc<'a> {
-    enclose("{", delim(d, ","), "}")
+    enclose("{", delim(d, ";"), "}")
 }
 
 fn array<'a, T: ToDoc + Clone>(m: &'a Mut, d: &'a Delim<T>) -> RcDoc<'a> {
@@ -757,7 +757,12 @@ impl ToDoc for Type {
         use Type::*;
         match self {
             Prim(p) => p.doc(),
-            Object(s, fs) => s.doc().append(RcDoc::space()).append(field_block(fs)),
+            Object(s, fs) => match s {
+                ObjSort::Object => RcDoc::nil(),
+                _ => s.doc(),
+            }
+            .append(RcDoc::space())
+            .append(field_block(fs)),
             Array(m, t) => enclose("[", m.doc().append(t.doc()), "]"),
             Optional(t) => str("?").append(t.doc()),
             Tuple(d) => tuple(d),
