@@ -370,6 +370,7 @@ ExpNonDec<B>: Exp = {
     "do" <e:BlockPos_> => Exp::Do(e),
     "do" "?" <e:BlockPos_> => Exp::DoOpt(e),
     "do" <an:AdaptonNav_> <e:BlockPos_> => Exp::DoAdaptonNav(vector!(an), e),
+    "do" "@" <e1:ExpNullary_<Ob>> <e2:ExpNest_> => Exp::DoAdaptonPutForceThunk(e1,e2),
     "assert" <e:ExpNest_> => Exp::Assert(e),
     "label" <id:Id_> <t:(":" <Type_>)?> <e:ExpNest_> => Exp::Label(id, t, e),
     "debug" <e:ExpNest_> => Exp::Debug(e),

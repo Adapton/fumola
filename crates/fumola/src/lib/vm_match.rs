@@ -143,6 +143,8 @@ pub fn pattern_matches(env: Env, pat: &Pat, v: Value_) -> Option<Env> {
     match (pat, &*v) {
         (Pat::Wild, _) => Some(env),
         (Pat::Literal(Literal::Unit), Value::Unit) => Some(env),
+        (Pat::Literal(Literal::Null), Value::Null) => Some(env),
+        (Pat::Optional(p), Value::Option(v)) => pattern_matches(env, &p.0, v.fast_clone()),
         (Pat::Paren(p), _) => pattern_matches(env, &p.0, v),
         (Pat::Annot(_), _) => Some(env),
         (Pat::AnnotPat(p, _), _) => pattern_matches(env, &p.0, v),
@@ -181,6 +183,29 @@ pub fn pattern_matches(env: Env, pat: &Pat, v: Value_) -> Option<Env> {
                 }
                 Some(env)
             }
+        }
+        (Pat::Object(x), Value::Object(y)) => {
+            let mut env = env;
+            for pf in x.vec.iter() {
+                let id = &pf.0.id.0.id.0;
+                if let Some(val) = y.get(id) {
+                    match &pf.0.pat {
+                        None => {
+                            let _ = env.insert(id.clone(), val.val.clone());
+                        }
+                        Some(pat) => {
+                            if let Some(env_) = pattern_matches(env, pat, val.val.clone()) {
+                                env = env_;
+                            } else {
+                                return None;
+                            }
+                        }
+                    }
+                } else {
+                    return None;
+                }
+            }
+            Some(env)
         }
         _ => None,
     }
