@@ -405,7 +405,7 @@ pub mod def {
                     .import_stack
                     .back()
                     .map(|m| m.local_path.clone());
-                let (_kind, id) = dec_field_kind_and_id(df);
+                let (kind, id) = dec_field_kind_and_id(df);
                 info!(
                     "Listing: {}: {:?}\n{}",
                     file.clone().unwrap_or("(no file)".to_string()),
@@ -413,6 +413,10 @@ pub mod def {
                     format_pretty(&df.dec, 80)
                 );
                 let id_symbol = Symbol::Id(Id::new(id));
+                let id_symbol = Symbol::Dot(
+                    Shared::new(id_symbol),
+                    Shared::new(Symbol::Id(Id::new(format!("fumola-{}-listing", kind)))),
+                );
                 let symbol = match file {
                     None => id_symbol,
                     Some(file) => {
