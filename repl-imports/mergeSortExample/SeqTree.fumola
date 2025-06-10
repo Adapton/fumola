@@ -67,10 +67,8 @@ module {
   {
     let res = 
     switch t {
-      case (#empty) { assert false};
-      case (#element(e)) {
-        force (e.symbol := thunk { element(e.symbol, e.element) })
-      };
+      case (#empty) empty;
+      case (#element(e)) element(e.symbol, e.element);
       case (#binary(b)) {
         force (b.symbol := thunk {
           binary(b.symbol,
@@ -83,12 +81,15 @@ module {
     res
   };
 
+  let nullThunk = thunk { null };
+
   #[listing]
   public func lazyMergeSort<X>(t : SeqTree<X>) : LazyList<X> {
+    do within space `lazyMergeSort {
     reduceUp(t,
           null,
           func(symbol:Symbol, element:X) : LazyList<X> {
-             symbol := thunk { ?{ symbol; element; next = `null := thunk { null } } } 
+             symbol := thunk { ?{ symbol; element; next = `null := nullThunk } }
           },
           func(symbol:Symbol, xs:LazyList<X>, ys:LazyList<X>) : LazyList<X> {
             do within space (`merge-symbol) {
@@ -96,7 +97,7 @@ module {
             }
           },
         )
-  };
+  }};
 
   #[listing]
   public func listFromIter(iter : Iter<(Symbol, X)>) : List<X> {
@@ -135,13 +136,13 @@ module {
 
   #[listing]
   public func fromList<X>(list : List<X>) : ?SeqTree_<X> {
-    do ? {
+    do ? { do within space `SeqTreeFromList {
       let {symbol; element; next} = list!;
       let level = prim "symbolLevel" symbol;
       let (tree, nil) = fromListRec(next, symbol-`element := #element {symbol; element}, null);
       assert (nil == null);
       tree
-    }
+    } }
   };
 
   #[listing]

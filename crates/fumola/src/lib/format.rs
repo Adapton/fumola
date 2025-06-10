@@ -351,9 +351,9 @@ impl ToDoc for Value {
                 c.ctx
                     .doc()
                     .append(RcDoc::text(","))
-                    .append(c.env.doc())
-                    .append(RcDoc::text(","))
-                    .append(c.content.doc()),
+                    .append(c.content.doc())
+                    .append(RcDoc::text(", env="))
+                    .append(c.env.doc()),
                 ")",
             )),
             Value::Pointer(p) => p.doc(),
