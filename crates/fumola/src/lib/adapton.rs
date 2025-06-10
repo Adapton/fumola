@@ -450,6 +450,7 @@ impl AdaptonState for SimpleState {
         if let Cell::Thunk(tc) = cell {
             self.push_stack();
             self.thunk_pointer = Some(pointer);
+            self.space = tc.space.clone();
             Ok(tc.body.clone())
         } else {
             Err(Error::TypeMismatch(line!()))

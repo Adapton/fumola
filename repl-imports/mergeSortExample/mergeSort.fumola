@@ -52,7 +52,7 @@ module {
         (`25, 41),
         (`26, 13),
         (`27, 81),
-        (`28, 11),
+        (`28, 12),
         (`29, 91),
         (`31, 21),
         (`32, 71),
@@ -60,7 +60,7 @@ module {
         (`33-`1, 15),
         (`34, 61),
         (`35, 41),
-        (`36, 13),
+        (`36, 137),
         (`37, 18),
         (`38, 111),
         (`39, 19),
@@ -74,7 +74,6 @@ module {
         Seq.writeTikzText(`mergeSort-`inputSeq, s);
         s
     };
-
     public func output () {
         Seq.takeAll(Seq.lazyMergeSort(@(inputSeq()!)))
     };
@@ -85,17 +84,16 @@ module {
         Seq.writeTikzText(`mergeSort-`tinyInputSeq, s);
         s
     };
-    
     public func tinyOutput () {
         Seq.takeAll(Seq.lazyMergeSort(@(tinyInputSeq()!)))
     };
+
 
     public func inputSeqBig () {
         let s = Seq.fromArray(inputArrayBig);
         Seq.writeTikzText(`mergeSort-`inputSeqBig, s);
         s
-    };
-    
+    };    
     public func bigOutput () {
         Seq.takeAll(Seq.lazyMergeSort(@(inputSeqBig()!)))
     };
