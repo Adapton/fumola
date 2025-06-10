@@ -3,7 +3,7 @@ module {
   public type SeqTree<X> = {
     #empty;
     #element : Element<X>;
-    #binary : Binary<X>;
+    #binary : Binary<X>
   };
   #[listing]
   public type SeqTree_<X> = Pointer<SeqTree<X>>;
@@ -13,22 +13,92 @@ module {
     symbol : Symbol;
     level : Nat;
     left : SeqTree_<X>;
-    right : SeqTree_<X>;
+    right : SeqTree_<X>
   };
 
   #[listing]
   public type Element<X> = {
     element : X;
-    symbol : Symbol;
+    symbol : Symbol
   };
 
   #[listing]
   public type List<X> = ?{
     element : X;
     symbol : Symbol;
-    next : Pointer<List<X>>;
+    next : Pointer<List<X>>
   };
 
+  #[listing]
+  public type LazyListCell<X> = {
+    element : X;
+    symbol : Symbol;
+    next : LazyList<X>;
+  };
+  
+  #[listing]
+  public type LazyList<X> = Pointer<Thunk<LazyList_<X>>>;
+
+  #[listing]
+  public type LazyList_<X> = ?LazyListCell<X>;
+
+  #[listing(50)]
+  public func merge(xs : LazyList<X>, ys : LazyList<X>) : LazyList<X> {
+    switch (force xs, force ys) {
+      case (_, null) xs;
+      case (null, _) ys;
+      case (?xc, ?yc) {
+        if (xc.element <= yc.element) {
+// to do -- support this "with-style" semantics -->>> xc.symbol := thunk{ ?{ xc with next = merge(xc.next, ys) }}
+          xc.symbol := thunk{ ?{ element=xc.element; symbol=xc.symbol; next = merge(xc.next, ys) }}
+        } else {
+          yc.symbol := thunk{ ?{ element=yc.element; symbol=yc.symbol; next = merge(xs, yc.next) }}
+        }
+      };
+    }
+  };
+
+  #[listing]
+  public func reduceUp<X,Y>(
+        t : SeqTree<X>, 
+        empty : Y,
+        element : (Symbol, X) -> Y,
+        binary : (Symbol, Y, Y) -> Y) : Y 
+  {
+    let res = 
+    switch t {
+      case (#empty) { assert false};
+      case (#element(e)) {
+        force (e.symbol := thunk { element(e.symbol, e.element) })
+      };
+      case (#binary(b)) {
+        force (b.symbol := thunk {
+          binary(b.symbol,
+            reduceUp(@(b.left),  empty, element, binary), 
+            reduceUp(@(b.right), empty, element, binary)
+          )
+        })
+      };
+    };
+    res
+  };
+
+  #[listing]
+  public func lazyMergeSort<X>(t : SeqTree<X>) : LazyList<X> {
+    reduceUp(t,
+          null,
+          func(symbol:Symbol, element:X) : LazyList<X> {
+             symbol := thunk { ?{ symbol; element; next = `null := thunk { null } } } 
+          },
+          func(symbol:Symbol, xs:LazyList<X>, ys:LazyList<X>) : LazyList<X> {
+            do within space (`merge-symbol) {
+              merge(xs, ys)
+            }
+          },
+        )
+  };
+
+  #[listing]
   public func listFromIter(iter : Iter<(Symbol, X)>) : List<X> {
     switch (iter.next()) {
       case null null;
@@ -36,6 +106,16 @@ module {
         ?{symbol; element; next=listFromIter(iter)}
       }
     } 
+  };
+
+  #[listing]
+  public func takeAll(l : LazyList<X>) : [(Symbol, X)] {
+    switch (force l) {
+      case null [];
+      case (?lc) {
+        [(lc.symbol, lc.element)] # takeAll(lc.next)
+      }
+    }
   };
 
   public func listFromIterTest() {
@@ -100,7 +180,6 @@ module {
     }
   };
 
-  // WIP -- this syntax for tikz is approximate for now.
   public func tikzText<X>(tree : SeqTree_<X>, n : Nat) : Text {
     switch (@ tree) {
       case (#empty) { "emptyNode\n" };
@@ -130,17 +209,46 @@ module {
     };
   };
 
+  func abs(x : Int) : Nat {
+    if (x < 0) -x else x
+  };
+
+  func maxChoice3(xdiff : Nat, x : ?(Nat, Nat), ydiff : Nat, y : ?(Nat, Nat), zdiff : Nat, z : ?(Nat, Nat)) : ?(Nat, Nat) {
+    if (xdiff >= ydiff and xdiff >= zdiff) { x }
+    else if (ydiff >= xdiff and ydiff >= zdiff) { y }
+    else z 
+  };
+
+  func maxChoice2(xdiff : Nat, x : ?(Nat, Nat), ydiff : Nat, y : ?(Nat, Nat)) : ?(Nat, Nat) {
+    if (xdiff >= ydiff) x else y 
+  };
+
+  func leastBalance(x : ?(Nat, Nat), y : ?(Nat, Nat), z : ?(Nat, Nat)) : ?(Nat, Nat) {
+    switch (x, y, z) {
+      case (null, null, z) z;
+      case (null, y, null) y;
+      case (x, null, null) x;
+      case (?(x1, x2), ?(y1, y2), null) { maxChoice2(abs(x1 - x2), x, abs(y1 - y2), y) };
+      case (?(x1, x2), null, ?(y1, y2)) { maxChoice2(abs(x1 - x2), x, abs(y1 - y2), y) };
+      case (?(x1, x2), null, ?(y1, y2)) { maxChoice2(abs(x1 - x2), x, abs(y1 - y2), y) };
+      case (?(x1, x2), ?(y1, y2), ?(z1, z2)) {
+        maxChoice3(abs(x1 - x2), x, abs(y1 - y2), y, abs(z1 - z2), z)
+      }
+    }
+  };  
+
   #[listing]
   public func metrics<X>(tree : Pointer<SeqTree<X>>) {
     switch (@ tree) {
-      case (#empty) { { depth=0; size=0 } };
-      case (#element(e)) { { depth=1; size=1 } };
+      case (#empty) { { depth=0; size=0; leastBalance=null } };
+      case (#element(e)) { { depth=1; size=1; leastBalance=null } };
       case (#binary(b)) {
         let ml = metrics(b.left);
         let mr = metrics(b.right);
         { 
           depth = max(ml.depth, mr.depth) + 1; 
-          size = ml.size + mr.size 
+          size = ml.size + mr.size;
+          leastBalance = leastBalance(ml.leastBalance, mr.leastBalance, ?(ml.size, mr.size))
         }
       };
     }

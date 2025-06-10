@@ -1076,6 +1076,10 @@ fn call_prim_function<A: Active>(
                 type_mismatch!(file!(), line!())
             }
         }
+        RustDebugText => {
+            *active.cont() = cont_value(Value::Text(Text::new(format!("{:?}", args))));
+            Ok(Step {})
+        }
     }
 }
 

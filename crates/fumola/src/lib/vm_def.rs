@@ -211,11 +211,11 @@ fn path_base(path: &String) -> String {
 }
 
 pub mod def {
-    use log::{debug, info, warn};
+    use log::{debug, info};
 
     use super::*;
     use crate::{
-        ast::{DecField, DecFields},
+        ast::{DecField, DecFields, Literal},
         format::format_pretty,
         value::{Symbol, Text},
         Shared,
@@ -395,10 +395,23 @@ pub mod def {
                 debug!("Attributes on {}-{} {:?}", kind, id, &df.attrs);
             }
             // to do -- introduce better semantic logic for attributes.
-            if let Some(attr) = attrs.vec.iter().find(|attr| match &attr.0 {
-                crate::ast::Attr::Id(id) => id.0.as_str() == "listing",
-                crate::ast::Attr::Call(id, _) => id.0.as_str() == "listing",
-                crate::ast::Attr::Field(_, _) => false,
+            if let Some((attr, width_arg)) = attrs.vec.iter().find_map(|attr| match &attr.0 {
+                crate::ast::Attr::Id(id) => {
+                    if id.0.as_str() == "listing" {
+                        Some((attr, None))
+                    } else {
+                        None
+                    }
+                }
+                crate::ast::Attr::Call(id, width_arg) => {
+                    if id.0.as_str() == "listing" {
+                        Some((attr, Some(width_arg)))
+                    } else {
+                        None
+                    }
+                }
+                crate::ast::Attr::Field(_, _) => None,
+                crate::ast::Attr::Literal(_) => None,
             }) {
                 let file = active
                     .module_files()
@@ -406,11 +419,30 @@ pub mod def {
                     .back()
                     .map(|m| m.local_path.clone());
                 let (kind, id) = dec_field_kind_and_id(df);
+                let default_width = 77 as usize;
+                let width = match width_arg {
+                    None => default_width,
+                    Some(args) => {
+                        if args.vec.len() == 1 {
+                            if let crate::ast::Attr::Literal(l) = &args.vec[0].0 {
+                                if let Literal::Nat(ref width) = l.0 {
+                                    width.parse().unwrap_or(default_width)
+                                } else {
+                                    default_width
+                                }
+                            } else {
+                                default_width
+                            }
+                        } else {
+                            default_width
+                        }
+                    }
+                };
                 info!(
                     "Listing: {}: {:?}\n{}",
                     file.clone().unwrap_or("(no file)".to_string()),
                     &attr.1,
-                    format_pretty(&df.dec, 80)
+                    format_pretty(&df.dec, width)
                 );
                 let id_symbol = Symbol::Id(Id::new(id));
                 let id_symbol = Symbol::Dot(

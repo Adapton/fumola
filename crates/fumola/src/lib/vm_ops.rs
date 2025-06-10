@@ -11,6 +11,7 @@ use crate::{nyi, type_mismatch};
 pub fn unop(un: UnOp, v: Value_) -> Result<Value, Interruption> {
     match (&un, &*v) {
         (UnOp::Neg, Value::Nat(n)) => Ok(Value::Int(-n.to_bigint().unwrap())),
+        (UnOp::Neg, Value::Int(i)) => Ok(Value::Int(-i)),
         (unop, v) => {
             if let Ok(symbol) = v.into_sym_or(()) {
                 Ok(Value::Symbol(Shared::new(Symbol::UnOp(
@@ -100,6 +101,11 @@ pub fn binop(
         Cat => match (cont_prim_type, &*v1, &*v2) {
             (_, Value::Text(t1), Value::Text(t2)) => Ok(Value::Text(t1.append(t2))),
             (_, Value::QuotedAst(q1), Value::QuotedAst(q2)) => Ok(Value::QuotedAst(q1.append(q2)?)),
+            (_, Value::Array(xm, xs), Value::Array(_ym, ys)) => {
+                let mut xs = xs.clone();
+                xs.append(ys.clone());
+                Ok(Value::Array(xm.clone(), xs))
+            }
             (_, v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
 
@@ -137,6 +143,8 @@ pub fn relop(
             (Unit, Unit) => false,
             (Nat(n1), Nat(n2)) => n1 < n2,
             (Int(i1), Int(i2)) => i1 < i2,
+            (Int(i), Nat(n)) => i.lt(&n.to_bigint().unwrap()),
+            (Nat(n), Int(i)) => n.to_bigint().unwrap().lt(i),
             (Symbol(s1), Symbol(s2)) => s1.partial_cmp(s2) == Some(Ordering::Less),
             _ => nyi!(line!(), "{:?} < {:?}", v1, v2)?,
         },

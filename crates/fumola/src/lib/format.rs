@@ -1,7 +1,5 @@
 // Reference: https://github.com/dfinity/candid/blob/master/rust/candid/src/bindings/candid.rs
 
-use std::sync::mpsc::RecvTimeoutError;
-
 use crate::adapton::{Space, Time};
 use crate::ast::{
     AdaptonNav, AdaptonNavDim, BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_,
@@ -311,6 +309,7 @@ impl ToDoc for PrimFunction {
             PrimFunction::Collection(_collection_function) => todo!(),
             PrimFunction::SymbolLevel => str("\"symbolLevel\""),
             PrimFunction::WriteFile => str("\"writeFile\""),
+            PrimFunction::RustDebugText => str("\"rustDebugText\""),
         }
     }
 }
@@ -650,7 +649,9 @@ impl ToDoc for Exp {
                     (None, None) => RcDoc::nil(),
                     (None, Some(fields)) => vector(&fields.vec, ";"),
                     (Some(_), None) => todo!(),
-                    (Some(_), Some(_)) => todo!(),
+                    (Some(bases), Some(fields)) => vector(&bases.vec, "and")
+                        .append(kwd(" with"))
+                        .append(vector(&fields.vec, ";")),
                 },
                 "}",
             ),

@@ -349,6 +349,7 @@ pub enum PrimFunction {
     NatToText,
     SymbolLevel,
     WriteFile,
+    RustDebugText,
     #[cfg(feature = "to-motoko")]
     #[cfg(feature = "value-reflection")]
     ReifyValue,
@@ -381,6 +382,7 @@ impl PrimFunction {
             "\"fastRandIterNew\"" => Collection(FastRandIter(FastRandIterFunction::New)),
             "\"fastRandIterNext\"" => Collection(FastRandIter(FastRandIterFunction::Next)),
             "\"writeFile\"" => WriteFile,
+            "\"rustDebugText\"" => RustDebugText,
             #[cfg(feature = "to-motoko")]
             #[cfg(feature = "value-reflection")]
             "\"reifyValue\"" => ReifyValue,

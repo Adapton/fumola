@@ -74,6 +74,8 @@ pub fn object_step<A: Active>(
     fields: &Option<Delim<ExpField_>>,
 ) -> Result<Step, Interruption> {
     if let Some(_bases) = bases {
+        // to do --
+
         return nyi!(line!());
     };
     if let Some(fields) = fields {

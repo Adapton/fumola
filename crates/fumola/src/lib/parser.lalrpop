@@ -826,6 +826,7 @@ AttrDec: Attrs = {
 Attr_: Attr_ = Node<Attr>;
 
 Attr: Attr = {
+    <l:Literal_> => Attr::Literal(l),
     <i:Id_> => Attr::Id(i),
     <i:Id_> "=" <a:Attr_> => Attr::Field(i, a),
     <i:Id_> "(" <d:Delim0<Attr_, ",">> ")" => Attr::Call(i, d),

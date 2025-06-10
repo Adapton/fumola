@@ -407,6 +407,7 @@ pub enum Attr {
     Id(Id_),
     Call(Id_, Delim<Attr_>),
     Field(Id_, Attr_),
+    Literal(Literal_),
 }
 
 pub type Vis_ = Node<Vis>;
