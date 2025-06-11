@@ -310,6 +310,9 @@ impl ToDoc for PrimFunction {
             PrimFunction::SymbolLevel => str("\"symbolLevel\""),
             PrimFunction::WriteFile => str("\"writeFile\""),
             PrimFunction::RustDebugText => str("\"rustDebugText\""),
+            PrimFunction::AdaptonPointer => str("\"adaptonPointer\""),
+            PrimFunction::AdaptonPeek => str("\"adaptonPeek\""),
+            PrimFunction::AdaptonPoke => str("\"adaptonPoke\""),
         }
     }
 }
@@ -572,7 +575,8 @@ impl ToDoc for Exp {
             Call(e, b, a) => e
                 .doc()
                 .append(b.as_ref().map(bind).unwrap_or(RcDoc::nil()))
-                .append(enclose("(", a.doc(), ")")),
+                //.append(enclose("(", a.doc(), ")"))
+                .append(a.doc()),
             Block(decs) => block(decs),
             Do(e) => kwd("do").append(e.doc()),
             DoAdaptonNav(nav, e) => kwd("do").append(vector(nav, " ")).append(e.doc()),

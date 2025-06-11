@@ -1,5 +1,5 @@
 use crate::ast::Exp_;
-use crate::format::{format_one_line, ToDoc};
+use crate::format::format_one_line;
 use crate::value::{Closed, Symbol, Symbol_, ThunkBody, Value, Value_};
 use crate::Shared;
 use im_rc::{HashMap, Vector};

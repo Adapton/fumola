@@ -1080,6 +1080,9 @@ fn call_prim_function<A: Active>(
             *active.cont() = cont_value(Value::Text(Text::new(format!("{:?}", args))));
             Ok(Step {})
         }
+        AdaptonPointer => todo!(),
+        AdaptonPeek => todo!(),
+        AdaptonPoke => todo!(),
     }
 }
 

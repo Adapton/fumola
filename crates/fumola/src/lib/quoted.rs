@@ -236,7 +236,7 @@ impl QuotedClose for Exp {
             Exp::BinAssign(_, _, _) => todo!(),
             Exp::Array(_, _) => todo!(),
             Exp::Index(_, _) => todo!(),
-            Exp::Function(_) => todo!(),
+            Exp::Function(f) => Ok(Exp::Function(f.clone())), // to do -- fix me
             Exp::Call(_, _, _) => todo!(),
             Exp::Block(b) => Ok(Block(b.quoted_close(env)?)),
             Exp::Do(e) => Ok(Do(e.quoted_close(env)?)),

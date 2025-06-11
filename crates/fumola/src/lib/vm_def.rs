@@ -439,7 +439,8 @@ pub mod def {
                     }
                 };
                 info!(
-                    "Listing: {}: {:?}\n{}",
+                    "Listing, width={}: {}: {:?}\n{}",
+                    width,
                     file.clone().unwrap_or("(no file)".to_string()),
                     &attr.1,
                     format_pretty(&df.dec, width)
@@ -458,7 +459,7 @@ pub mod def {
                 };
                 active.output_files().insert(
                     symbol,
-                    Text::new(format_pretty(&df.dec, 80)).append(&Text::new("\n".to_string())),
+                    Text::new(format_pretty(&df.dec, width)).append(&Text::new("\n".to_string())),
                 );
             }
         };
