@@ -4,7 +4,7 @@ module {
       let p = prim "adaptonPointer" (`SeqTree-`Counters-symbol); 
       switch (prim "adaptonPointerPeek" p) {
         case null {
-	   prim "adaptonPointerPoke" (p, 0);
+	          prim "adaptonPointerPoke" (p, 0);
         };
         case (?n) {
            prim "adaptonPointerPoke" (p, n + 1);
@@ -13,7 +13,7 @@ module {
     };
   };
 
-  #[listing]
+  #[listing(30)]
   public type SeqTree<X> = {
     #empty;
     #element : Element<X>;
@@ -22,7 +22,7 @@ module {
   #[listing]
   public type SeqTree_<X> = Pointer<SeqTree<X>>;
 
-  #[listing]
+  #[listing(30)]
   public type Binary<X> = {
     symbol : Symbol;
     level : Nat;
@@ -30,20 +30,20 @@ module {
     right : SeqTree_<X>
   };
 
-  #[listing]
+  #[listing(23)]
   public type Element<X> = {
     element : X;
     symbol : Symbol
   };
 
-  #[listing]
+  #[listing(33)]
   public type List<X> = ?{
     element : X;
     symbol : Symbol;
     next : Pointer<List<X>>
   };
 
-  #[listing]
+  #[listing(23)]
   public type LazyListCell<X> = {
     element : X;
     symbol : Symbol;
@@ -64,7 +64,7 @@ module {
       case (?xc, ?yc) {
         // Counters.inc `merge;
         if (xc.element <= yc.element) {
-// to do -- support this "with-style" semantics -->>> xc.symbol := thunk{ ?{ xc with next = merge(xc.next, ys) }}
+          // to do -- support this "with-style" semantics -->>> xc.symbol := thunk{ ?{ xc with next = merge(xc.next, ys) }}
           xc.symbol := thunk{ ?{ element=xc.element; symbol=xc.symbol; next = merge(xc.next, ys) }}
         } else {
           yc.symbol := thunk{ ?{ element=yc.element; symbol=yc.symbol; next = merge(xs, yc.next) }}
@@ -98,7 +98,6 @@ module {
         element : (Symbol, X) -> Y,
         binary : (Symbol, Y, Y) -> Y) : Y 
   {
-    let res = 
     switch t {
       case (#empty) empty;
       case (#element(e)) element(e.symbol, e.element);
@@ -110,13 +109,12 @@ module {
           )
         })
       };
-    };
-    res
+    }
   };
 
   let nullThunk = thunk { null };
 
-  #[listing]
+  #[listing(61)]
   public func lazyMergeSort<X>(t : SeqTree<X>) : LazyList<X> {
     do within space `lazyMergeSort {
     reduceUp(t,
@@ -132,7 +130,7 @@ module {
         )
   }};
 
-  #[listing]
+  #[listing(62)]
   public func lazyMergeSort_<X>(t : SeqTree<X>) : LazyList_<X> {
     do within space `lazyMergeSort_ { `result := thunk {
     reduceUp(t,

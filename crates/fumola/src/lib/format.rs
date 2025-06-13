@@ -693,11 +693,11 @@ impl ToDoc for Function {
         kwd("func")
             .append(self.name.doc())
             .append(self.input.doc())
-            .append(if exp_is_block(&self.exp.0) {
-                self.exp.doc()
-            } else {
-                enclose("{", self.exp.doc(), "}")
+            .append(match self.output {
+                None => RcDoc::nil(),
+                Some(ref t) => space().append(kwd(":")).append(t.doc()).append(space()),
             })
+            .append(self.exp.doc())
     }
 }
 
