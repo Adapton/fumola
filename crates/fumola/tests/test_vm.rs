@@ -60,6 +60,10 @@ fn vm_switch() {
 }
 
 #[test]
+fn vm_switch_option() {
+    assert_("switch (?(1,2)) { case (?(x,y)) {1}; case _ 2 }", "1")
+}
+#[test]
 fn vm_tuples() {
     assert_("(1, 2, 3)", "(1, 2, 3)");
     assert_("(1 + 1, 2 + 2, 3 + 3)", "(2, 4, 6)");
@@ -162,6 +166,26 @@ fn vm_array() {
         "let x = [var 0, 1, 2]; x[3] := 3",
         &Interruption::IndexOutOfBounds,
     );
+    assert_("[] # []", "[]");
+    assert_("[1] # [2]", "[1,2]");
+}
+
+#[test]
+fn vm_array_vals() {
+    assert_(
+        "let iter = [1, 2, 3].vals(); var sum = 0; for (y in iter) { sum += y }; sum",
+        "6",
+    )
+}
+
+#[test]
+fn vm_array_vals_dot_next() {
+    assert_("let next = [1, 2, 3].vals().next; next()", "?1")
+}
+
+#[test]
+fn vm_array_size() {
+    assert_("[1, 2, 3].size()", "3")
 }
 
 #[test]

@@ -41,6 +41,7 @@ impl Defs {
             map,
             active_ctx: CtxId(0),
             next_ctx_id: 1,
+            active_path: None,
         }
     }
     pub fn active_context(&self) -> CtxId {
@@ -189,9 +190,36 @@ pub fn module_project(
     }
 }
 
+fn path_base(path: &String) -> String {
+    let mut output = String::from("");
+    let split = path.split("/");
+    let parts = split.clone().count(); // probably a better way someday.
+    let mut count = 0;
+    for part in split {
+        if count > 0 && count < parts - 1 {
+            output = format!("{}/{}", output, part);
+            count += 1;
+        } else if count == 0 && count < parts - 1 {
+            output = format!("{}", part);
+            count += 1;
+        } else {
+            assert_eq!(count, parts - 1)
+            // skip end of path, after all '/'
+        }
+    }
+    output
+}
+
 pub mod def {
+    use log::{debug, info};
+
     use super::*;
-    use crate::ast::{DecField, DecFields};
+    use crate::{
+        ast::{DecField, DecFields, Literal},
+        format::format_pretty,
+        value::{Symbol, Text},
+        Shared,
+    };
 
     pub fn import<A: Active>(active: &mut A, path: &str) -> Result<ModuleDef, Interruption> {
         let path0 = path; // for log.
@@ -212,11 +240,27 @@ pub mod def {
                 return nyi!(line!(), "import {}", path);
             }
         } else {
+            let path = match active.defs().active_path.as_ref() {
+                // we are "active" at some other path that's relative to this one.
+                // we need to account for that.
+                // e.g., if active_local_path = "foo/bar/baz/"
+                // and if path = "foo.fumola"
+                // then the local_path is "foo/bar/baz/foo.fumola"
+                None => path,
+                Some(prefix) => {
+                    let mut prefix = prefix.clone();
+                    if prefix.len() > 0 {
+                        prefix.push_str("/");
+                    };
+                    prefix.push_str(path.as_str());
+                    prefix
+                }
+            };
             (active.package().clone(), path)
         };
         let path = crate::vm_types::ModulePath {
             package_name: package_name.clone(),
-            local_path,
+            local_path: local_path.clone(),
         };
         log::debug!(
             "`import {}` resolves as `import {:?}`.  Attemping to import...",
@@ -236,6 +280,7 @@ pub mod def {
                     stack.push_back(path.clone());
                     return Err(Interruption::ImportCycle(stack));
                 } else {
+                    active.defs().active_path = Some(path_base(&local_path));
                     active.module_files().import_stack.push_back(path.clone());
                 };
                 let importing_package = active.package().clone();
@@ -285,6 +330,12 @@ pub mod def {
                 active.defs().leave_context(saved, &ctxid);
                 *active.package() = importing_package;
                 if let Some(top_path) = active.module_files().import_stack.pop_back() {
+                    match active.module_files().import_stack.head() {
+                        Some(active_module_path) => {
+                            active.defs().active_path = Some(active_module_path.local_path.clone())
+                        }
+                        None => active.defs().active_path = None,
+                    };
                     assert_eq!(top_path, path)
                 } else {
                     unreachable!()
@@ -309,11 +360,109 @@ pub mod def {
         Ok(mf.def())
     }
 
+    // temporary code quality, for now.
+    // the idea is to give a human readable warning about each attribute that we
+    // notice but do not yet handle correctly.
+    // for now, that's every attribute.
+    //
+    // the first attribute that we want to implement, somehow, is "listing".
+    // the idea is to create a separate file with just that dec field pretty-printed into it.
+    // the name of the file will be based on the current module path
+    //
+    fn dec_field_kind_and_id(df: &DecField) -> (String, String) {
+        match &df.dec.0 {
+            Dec::Type(id, _, _) => ("type".to_string(), id.0.to_string()),
+            Dec::Func(f) => {
+                let f = f
+                    .name
+                    .clone()
+                    .map(|id| id.0.id.0.to_string())
+                    .unwrap_or("".to_string());
+                ("func".to_string(), f)
+            }
+            _ => todo!(),
+        }
+    }
+
     pub fn insert_static_field<A: Active>(
         active: &mut A,
         source: &Source,
         df: &DecField,
     ) -> Result<(), Interruption> {
+        if let Some(ref attrs) = df.attrs {
+            if attrs.vec.len() > 0 {
+                let (kind, id) = dec_field_kind_and_id(df);
+                debug!("Attributes on {}-{} {:?}", kind, id, &df.attrs);
+            }
+            // to do -- introduce better semantic logic for attributes.
+            if let Some((attr, width_arg)) = attrs.vec.iter().find_map(|attr| match &attr.0 {
+                crate::ast::Attr::Id(id) => {
+                    if id.0.as_str() == "listing" {
+                        Some((attr, None))
+                    } else {
+                        None
+                    }
+                }
+                crate::ast::Attr::Call(id, width_arg) => {
+                    if id.0.as_str() == "listing" {
+                        Some((attr, Some(width_arg)))
+                    } else {
+                        None
+                    }
+                }
+                crate::ast::Attr::Field(_, _) => None,
+                crate::ast::Attr::Literal(_) => None,
+            }) {
+                let file = active
+                    .module_files()
+                    .import_stack
+                    .back()
+                    .map(|m| m.local_path.clone());
+                let (kind, id) = dec_field_kind_and_id(df);
+                let default_width = 77 as usize;
+                let width = match width_arg {
+                    None => default_width,
+                    Some(args) => {
+                        if args.vec.len() == 1 {
+                            if let crate::ast::Attr::Literal(l) = &args.vec[0].0 {
+                                if let Literal::Nat(ref width) = l.0 {
+                                    width.parse().unwrap_or(default_width)
+                                } else {
+                                    default_width
+                                }
+                            } else {
+                                default_width
+                            }
+                        } else {
+                            default_width
+                        }
+                    }
+                };
+                info!(
+                    "Listing, width={}: {}: {:?}\n{}",
+                    width,
+                    file.clone().unwrap_or("(no file)".to_string()),
+                    &attr.1,
+                    format_pretty(&df.dec, width)
+                );
+                let id_symbol = Symbol::Id(Id::new(id));
+                let id_symbol = Symbol::Dot(
+                    Shared::new(id_symbol),
+                    Shared::new(Symbol::Id(Id::new(format!("fumola-{}-listing", kind)))),
+                );
+                let symbol = match file {
+                    None => id_symbol,
+                    Some(file) => {
+                        let file_symbol = Shared::new(Symbol::Id(Id::new(file)));
+                        Symbol::Dot(file_symbol, Shared::new(id_symbol))
+                    }
+                };
+                active.output_files().insert(
+                    symbol,
+                    Text::new(format_pretty(&df.dec, width)).append(&Text::new("\n".to_string())),
+                );
+            }
+        };
         //println!("{:?} -- {:?} ", source, df);
         match &df.dec.0 {
             Dec::Attrs(_attrs, _dec) => {
@@ -434,7 +583,16 @@ pub mod def {
                 }
                 Ok(())
             }
-            Dec::Type(_id, _typ_binds, _typ) => Ok(()),
+            Dec::Type(_id, _typ_binds, _typ) => {
+                if let Some(ref attrs) = df.attrs {
+                    if attrs.vec.len() > 0 {
+                        // warn!("Ignoring type attributes: {:?}", df.attrs);
+                        // warn!("{}", format_one_line(&df.to_motoko().unwrap()));
+                        // return nyi!(line!());
+                    }
+                };
+                Ok(())
+            }
             Dec::LetActor(_i, _, _dfs) => {
                 nyi!(line!())
             }

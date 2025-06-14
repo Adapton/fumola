@@ -12,6 +12,14 @@ fn get_put() {
 }
 
 #[test]
+fn thunk_saves_space() {
+    assert_(
+        "let t = do goto space `space { `t := thunk{ prim \"adaptonHere\" () } }; force(t)",
+        "prim \"adaptonSpace\" `space",
+    )
+}
+
+#[test]
 fn do_within_time() {
     assert_(
         "do goto time 1 { prim \"adaptonNow\" () }",

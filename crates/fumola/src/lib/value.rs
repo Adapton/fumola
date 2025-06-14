@@ -9,11 +9,12 @@ use crate::ast::{
 use crate::dynamic::Dynamic;
 use crate::shared::{FastClone, Share, Shared};
 use crate::type_mismatch;
+use crate::vm_types::LocalPointer;
 use crate::vm_types::{def::Actor as ActorDef, def::CtxId, def::Module as ModuleDef, Env};
 use crate::Interruption;
 
-use im_rc::HashMap;
 use im_rc::Vector;
+use im_rc::{vector, HashMap};
 use num_bigint::{BigInt, BigUint};
 use num_traits::ToPrimitive;
 use ordered_float::OrderedFloat;
@@ -28,6 +29,10 @@ pub type Result<T = Value, E = ValueError> = std::result::Result<T, E>;
 pub struct Text(Vector<Rc<String>>);
 
 impl Text {
+    pub fn new(s: String) -> Text {
+        Self(vector!(Rc::new(s)))
+    }
+
     #[allow(dead_code)]
     fn into_string(self) -> String {
         self.0.into_iter().map(|s| s.as_ref().clone()).collect()
@@ -103,6 +108,8 @@ pub enum Symbol {
     UnOp(UnOp, Symbol_),
     BinOp(Symbol_, BinOp, Symbol_),
     Call(Symbol_, Symbol_),
+    Id(Id),
+    Dot(Symbol_, Symbol_),
 }
 
 pub type Value_ = Shared<Value>;
@@ -190,12 +197,50 @@ pub struct ActorMethod {
     pub method: Id,
 }
 
+/*
+    Consider the term: [1,2,3].vals().next()
+
+    [1,2,3].vals        <--- ArrayIteratorFunc
+    [1,2,3].vals()      <--- ArrayIterator
+    [1,3,3].vals().next <--- ArrayIteratorNextFunc
+
+    But, when doing `for (x in [1,2,3].vals()) {...}`
+    ArrayIterator is used directly, avoiding the creation of a
+    ArrayIteratorNextFunc for each iteration.
+*/
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct ArrayIteratorFunc {
+    pub array: Vector<Value_>,
+    pub position: LocalPointer,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct ArrayIterator {
+    pub array: Vector<Value_>,
+    pub position: LocalPointer,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct ArrayIteratorNextFunc {
+    pub array: Vector<Value_>,
+    pub position: LocalPointer,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct ArraySizeFunc {
+    pub array_size: usize,
+}
+
 // #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 // pub struct DynamicValue(); // to do --
 
 pub struct DynamicValue(pub Rc<std::cell::RefCell<dyn Dynamic>>);
 
 impl DynamicValue {
+    pub fn new<X: Dynamic + Sized + 'static>(x: X) -> Self {
+        Self(Rc::new(std::cell::RefCell::new(x)))
+    }
     pub fn dynamic(&self) -> std::cell::Ref<dyn Dynamic> {
         self.0.borrow()
     }
@@ -218,11 +263,12 @@ impl std::fmt::Debug for DynamicValue {
 }
 
 impl Serialize for DynamicValue {
-    fn serialize<S>(&self, _ser: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        todo!()
+        // to do -- 2025-05-31.
+        ser.serialize_str("@DynamicValue(...)")
     }
 }
 
@@ -298,9 +344,15 @@ pub enum PrimFunction {
     AdaptonHere,
     AdaptonSpace,
     AdaptonTime,
+    AdaptonPointer,
+    AdaptonPeek,
+    AdaptonPoke,
     AtSignVar(String),
     DebugPrint,
     NatToText,
+    SymbolLevel,
+    WriteFile,
+    RustDebugText,
     #[cfg(feature = "to-motoko")]
     #[cfg(feature = "value-reflection")]
     ReifyValue,
@@ -323,14 +375,20 @@ impl PrimFunction {
             "\"adaptonHere\"" => AdaptonHere,
             "\"adaptonTime\"" => AdaptonTime,
             "\"adaptonSpace\"" => AdaptonSpace,
+            "\"adaptonPointer\"" => AdaptonPointer,
+            "\"adaptonPeek\"" => AdaptonPeek,
+            "\"adaptonPoke\"" => AdaptonPoke,
             "\"print\"" => DebugPrint,
             "\"natToText\"" => NatToText,
+            "\"symbolLevel\"" => SymbolLevel,
             "\"hashMapNew\"" => Collection(HashMap(HashMapFunction::New)),
             "\"hashMapPut\"" => Collection(HashMap(HashMapFunction::Put)),
             "\"hashMapGet\"" => Collection(HashMap(HashMapFunction::Get)),
             "\"hashMapRemove\"" => Collection(HashMap(HashMapFunction::Remove)),
             "\"fastRandIterNew\"" => Collection(FastRandIter(FastRandIterFunction::New)),
             "\"fastRandIterNext\"" => Collection(FastRandIter(FastRandIterFunction::Next)),
+            "\"writeFile\"" => WriteFile,
+            "\"rustDebugText\"" => RustDebugText,
             #[cfg(feature = "to-motoko")]
             #[cfg(feature = "value-reflection")]
             "\"reifyValue\"" => ReifyValue,
@@ -489,6 +547,13 @@ impl Value {
                 let symbol = self.into_sym_or(err)?;
                 Ok(AdaptonTime::Symbol(symbol))
             }
+        }
+    }
+
+    pub fn into_text_or<E>(&self, err: E) -> Result<Text, E> {
+        match self {
+            Value::Text(t) => Ok(t.clone()),
+            _ => Err(err),
         }
     }
 

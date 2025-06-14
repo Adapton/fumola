@@ -370,6 +370,7 @@ ExpNonDec<B>: Exp = {
     "do" <e:BlockPos_> => Exp::Do(e),
     "do" "?" <e:BlockPos_> => Exp::DoOpt(e),
     "do" <an:AdaptonNav_> <e:BlockPos_> => Exp::DoAdaptonNav(vector!(an), e),
+    "do" "@" <e1:ExpNullary_<Ob>> <e2:ExpNest_> => Exp::DoAdaptonPutForceThunk(e1,e2),
     "assert" <e:ExpNest_> => Exp::Assert(e),
     "label" <id:Id_> <t:(":" <Type_>)?> <e:ExpNest_> => Exp::Label(id, t, e),
     "debug" <e:ExpNest_> => Exp::Debug(e),
@@ -825,6 +826,7 @@ AttrDec: Attrs = {
 Attr_: Attr_ = Node<Attr>;
 
 Attr: Attr = {
+    <l:Literal_> => Attr::Literal(l),
     <i:Id_> => Attr::Id(i),
     <i:Id_> "=" <a:Attr_> => Attr::Field(i, a),
     <i:Id_> "(" <d:Delim0<Attr_, ",">> ")" => Attr::Call(i, d),

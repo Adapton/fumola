@@ -5,7 +5,6 @@ use crate::shared::{FastClone, Share};
 use crate::value::{ActorId, ActorMethod, Value, Value_};
 use crate::vm_def::def;
 use crate::vm_types::def::CtxId;
-use crate::vm_types::ActiveBorrow;
 use crate::vm_types::Actor;
 use crate::vm_types::DebugPrintLine;
 use crate::vm_types::Env;
@@ -17,6 +16,7 @@ use crate::vm_types::{
     Activation, Active, Actors, Agent, Cont, Core, Counts, Interruption, Limits, ModuleFileState,
     ModuleFiles, ModulePath, Pointer, Response, ScheduleChoice, Step, SyntaxError,
 };
+use crate::vm_types::{ActiveBorrow, OutputFiles};
 use crate::vm_types::{EvalInitError, Store};
 use crate::vm_types::{LocalPointer, NamedPointer};
 use crate::{nyi, type_mismatch};
@@ -44,6 +44,9 @@ impl Active for Core {
     }
     fn module_files<'a>(&'a mut self) -> &'a mut ModuleFiles {
         &mut self.module_files
+    }
+    fn output_files<'a>(&'a mut self) -> &'a mut OutputFiles {
+        &mut self.output_files
     }
     //fn schedule_choice<'a>(&'a self) -> &'a ScheduleChoice {
     //&self.schedule_choice
@@ -449,6 +452,7 @@ impl Core {
             },
             next_resp_id: 0,
             debug_print_out: Vector::new(),
+            output_files: HashMap::new(),
         }
     }
 
@@ -574,9 +578,16 @@ impl Core {
     pub fn set_module(
         &mut self,
         package_name: Option<String>,
-        local_path: String,
+        mut local_path: String,
         file_content: &str,
     ) -> Result<(), Interruption> {
+        let local_path_ends_with_fumola = local_path.ends_with(".fumola");
+        let local_path_ends_with_mo = !local_path_ends_with_fumola && local_path.ends_with(".mo");
+        if local_path_ends_with_fumola {
+            local_path = format!("{}", &local_path[0..local_path.len() - 7]);
+        } else if local_path_ends_with_mo {
+            local_path = format!("{}", &local_path[0..local_path.len() - 3]);
+        }
         let path = crate::vm_types::ModulePath {
             package_name,
             local_path,
