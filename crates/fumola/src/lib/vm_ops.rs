@@ -108,8 +108,13 @@ pub fn binop(
             }
             (_, v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
-
-        Mod | Pow | And | Or | Xor | ShL | ShR | RotL | RotR | WSub | WMul | WPow | BitOr
+        Mod => match (&*v1, &*v2) {
+            (Nat(n1), Nat(n2)) => Ok(Nat(n1 % n2)),
+            (Int(i1), Int(i2)) => Ok(Int(i1 % i2)),
+            (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
+        },
+        
+        | Pow | And | Or | Xor | ShL | ShR | RotL | RotR | WSub | WMul | WPow | BitOr
         | BitAnd => try_symbolic_binop(&binop, &*v1, &*v2).ok_or(type_mismatch_!()),
     }
 }
