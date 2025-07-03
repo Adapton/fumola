@@ -87,10 +87,6 @@ module {
     public func tinyOutput () {
         Seq.takeAll(Seq.lazyMergeSort(@(tinyInputSeq()!)))
     };
-    public func tinyOutput_ () {
-        Seq.takeAll(Seq.lazyMergeSort_(@(tinyInputSeq()!)))
-    };
-
 
     public func inputSeqBig () {
         let s = Seq.fromArray(inputArrayBig);
@@ -100,9 +96,6 @@ module {
     public func bigOutput () {
         Seq.takeAll(Seq.lazyMergeSort(@(inputSeqBig()!)))
     };
-    public func bigOutput_ () {
-        Seq.takeAll(Seq.lazyMergeSort_(@(inputSeqBig()!)))
-    };
-
+   
  
 }

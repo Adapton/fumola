@@ -88,7 +88,9 @@ impl QuotedClose for Pat {
             }
             Pat::Object(_) => Ok(self.clone()), // to do -- FIX ME!
             Pat::Optional(p) => Ok(Pat::Optional(p.quoted_close(env)?)),
-            Pat::Variant(_, _) => todo!(),
+            Pat::Variant(id, pat) => {
+                Ok(Pat::Variant(id.quoted_close(env)?, pat.quoted_close(env)?))
+            }
             Pat::Or(_, _) => todo!(),
             Pat::AnnotPat(_, _) => todo!(),
             Pat::Annot(_) => todo!(),
