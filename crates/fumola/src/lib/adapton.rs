@@ -1,10 +1,14 @@
 use crate::ast::Exp_;
+use crate::format::format_one_line;
+use crate::shared::FastClone;
 use crate::value::{Closed, Symbol, Symbol_, ThunkBody, Value, Value_};
 use crate::Shared;
 use im_rc::{HashMap, Vector};
+use log::info;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::sync::Arc;
 
 pub trait AdaptonState {
     fn new() -> Self
@@ -21,6 +25,8 @@ pub trait AdaptonState {
     fn force_end(&mut self, _value: Value_) -> Res<()>;
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()>;
     fn navigate_end(&mut self) -> Res<()>;
+    fn peek(&mut self, pointer: Pointer) -> Res<Value_>;
+    fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()>;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -235,6 +241,20 @@ impl AdaptonState for State {
             Self::Graphical(g) => g.put_symbol_delay(symbol, time, value),
         }
     }
+
+    fn peek(&mut self, pointer: Pointer) -> Res<Value_> {
+        match self {
+            Self::Simple(s) => s.peek(pointer),
+            Self::Graphical(g) => g.peek(pointer),
+        }
+    }
+
+    fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()> {
+        match self {
+            Self::Simple(s) => s.poke(pointer, time, value),
+            Self::Graphical(g) => g.poke(pointer, time, value),
+        }
+    }
 }
 
 // --------------------------------------------------------------------
@@ -393,6 +413,18 @@ impl SimpleState {
     }
 }
 
+fn truncate_with_ellipsis(s: &str, max_len: usize) -> String {
+    if s.chars().count() <= max_len {
+        s.to_string()
+    } else if max_len <= 3 {
+        // Not enough space for even one character plus ellipsis
+        ".".repeat(max_len)
+    } else {
+        let truncated: String = s.chars().take(max_len - 3).collect();
+        format!("{}...", truncated)
+    }
+}
+
 impl AdaptonState for SimpleState {
     fn new() -> Self {
         SimpleState {
@@ -412,6 +444,16 @@ impl AdaptonState for SimpleState {
     fn put_pointer(&mut self, pointer: Pointer, value: Value_) -> Res<()> {
         let time = self.time.clone();
         let space = self.space.clone();
+        if false {
+            // to do -- introduce a flag to check.
+            let indent = "| ".repeat(self.stack.len());
+            info!(
+                "{}{} := {}",
+                indent,
+                format_one_line(&pointer),
+                truncate_with_ellipsis(format_one_line(&value).as_str(), 77)
+            );
+        }
         let updated = self
             .get_cell_by_time(&pointer)
             .update(time, Self::new_cell(space, value));
@@ -447,15 +489,26 @@ impl AdaptonState for SimpleState {
     }
     fn force_begin(&mut self, pointer: Pointer) -> Res<ThunkBody> {
         let cell = self.get_cell(&pointer)?.clone();
+        if false {
+            // to do -- introduce a flag to check.
+            let indent = "| ".repeat(self.stack.len());
+            info!("{}BEGIN: force {}", indent, format_one_line(&pointer));
+        }
         if let Cell::Thunk(tc) = cell {
             self.push_stack();
             self.thunk_pointer = Some(pointer);
+            self.space = tc.space.clone();
             Ok(tc.body.clone())
         } else {
             Err(Error::TypeMismatch(line!()))
         }
     }
-    fn force_end(&mut self, _value: Value_) -> Res<()> {
+    fn force_end(&mut self, value: Value_) -> Res<()> {
+        if false {
+            // to do -- introduce a flag to check.
+            let indent = "| ".repeat(self.stack.len() - 1);
+            info!("{}END: force returns {}", indent, format_one_line(&value));
+        }
         // to do -- save _value
         self.pop_stack()
     }
@@ -481,6 +534,18 @@ impl AdaptonState for SimpleState {
         let pointer = self.space.apply(symbol);
         self.put_pointer_delay(pointer.clone(), time, value)?;
         Ok(pointer)
+    }
+
+    fn peek(&mut self, pointer: Pointer) -> Res<Value_> {
+        let cell = self.get_cell(&pointer)?;
+        cell.get_value()
+    }
+
+    fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()> {
+        match time {
+            None => self.put_pointer(pointer, value),
+            Some(time) => self.put_pointer_delay(pointer, time, value),
+        }
     }
 }
 
@@ -602,6 +667,13 @@ impl AdaptonState for GraphicalState {
     }
 
     fn put_symbol_delay(&mut self, _symbol: Symbol_, _time: Time, _value: Value_) -> Res<Pointer> {
+        todo!()
+    }
+
+    fn poke(&mut self, _pointer: Pointer, _time: Option<Time>, _value: Value_) -> Res<()> {
+        todo!()
+    }
+    fn peek(&mut self, _pointer: Pointer) -> Res<Value_> {
         todo!()
     }
 }

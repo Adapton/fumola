@@ -407,6 +407,7 @@ pub enum Attr {
     Id(Id_),
     Call(Id_, Delim<Attr_>),
     Field(Id_, Attr_),
+    Literal(Literal_),
 }
 
 pub type Vis_ = Node<Vis>;
@@ -655,6 +656,7 @@ pub enum Exp {
     Opt(Exp_),
     DoOpt(Exp_),
     DoAdaptonNav(Vector<AdaptonNav_>, Exp_),
+    DoAdaptonPutForceThunk(Exp_, Exp_),
     Bang(Exp_),
     ObjectBlock(ObjSort, DecFieldsPos),
     Object(ExpObjectBody),

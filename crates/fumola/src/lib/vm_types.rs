@@ -3,7 +3,7 @@ use crate::ast::{Inst, Mut};
 #[cfg(feature = "parser")]
 use crate::parser_types::SyntaxError as SyntaxErrorCode;
 use crate::shared::FastClone;
-use crate::value::{ActorId, ActorMethod, ValueError};
+use crate::value::{ActorId, ActorMethod, Symbol, Text, ValueError};
 pub use crate::{
     ast::{Dec_, Exp_, Id, Id_, PrimType, Source, Span},
     value::Value_,
@@ -103,6 +103,7 @@ pub mod def {
         pub map: HashMap<CtxId, Ctx>,
         pub active_ctx: CtxId,
         pub next_ctx_id: usize,
+        pub active_path: Option<String>,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -253,6 +254,9 @@ pub mod stack {
             Exp_,
         ),
         DoAdaptonNav2(usize),
+        DoAdaptonPutForceThunk1(Exp_),
+        DoAdaptonPutForceThunk2(crate::adapton::Pointer),
+        DoAdaptonPutForceThunk3,
         GetAdaptonPointer,
         Force1,
         ForceAdaptonPointer,
@@ -260,6 +264,7 @@ pub mod stack {
         Assert,
         Ignore,
         Debug,
+        DebugShow,
         Block,
         Decs(Vector<Dec_>),
         Tuple(Vector<Value_>, Vector<Exp_>),
@@ -361,14 +366,33 @@ pub struct Store {
     #[serde(with = "crate::serde_utils::im_rc_hashmap")]
     map: HashMap<LocalPointer, Value_>,
     next_pointer: usize,
+    #[serde(with = "crate::serde_utils::im_rc_hashmap")]
+    array_iter_positions: HashMap<LocalPointer, usize>,
 }
 impl Store {
     pub fn new(owner: ScheduleChoice) -> Self {
         Store {
             owner,
             map: HashMap::new(),
+            array_iter_positions: HashMap::new(),
             next_pointer: 0,
         }
+    }
+
+    pub fn alloc_array_iter_position(&mut self) -> Pointer {
+        let ptr = LocalPointer::Numeric(NumericPointer(self.next_pointer));
+        self.next_pointer = self.next_pointer.checked_add(1).expect("Out of pointers");
+        self.array_iter_positions.insert(ptr.clone(), 0);
+        Pointer {
+            owner: self.owner.clone(),
+            local: ptr,
+        }
+    }
+
+    pub fn array_iter_next(&mut self, p: &LocalPointer) -> usize {
+        let x = self.array_iter_positions.get(p).unwrap().clone();
+        self.array_iter_positions.insert(p.clone(), x + 1);
+        x
     }
 
     fn alloc(&mut self, value: impl Into<Value_>) -> Pointer {
@@ -568,7 +592,10 @@ pub struct Core {
     pub next_resp_id: usize,
     pub debug_print_out: Vector<DebugPrintLine>,
     pub module_files: ModuleFiles,
+    pub output_files: OutputFiles,
 }
+
+pub type OutputFiles = HashMap<Symbol, Text>;
 
 /// The current/last/next schedule choice, depending on context.
 #[derive(Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
@@ -663,6 +690,7 @@ pub struct DebugPrintLine {
 pub trait Active: ActiveBorrow {
     fn defs<'a>(&'a mut self) -> &'a mut def::Defs;
     fn module_files<'a>(&'a mut self) -> &'a mut ModuleFiles;
+    fn output_files<'a>(&'a mut self) -> &'a mut OutputFiles;
     fn ctx_id<'a>(&'a mut self) -> &'a mut def::CtxId;
     //fn schedule_choice<'a>(&'a self) -> &'a ScheduleChoice;
     fn cont<'a>(&'a mut self) -> &'a mut Cont;

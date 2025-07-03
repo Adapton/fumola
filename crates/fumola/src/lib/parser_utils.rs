@@ -11,7 +11,9 @@ pub fn get_one<T: Clone>(d: Delim<T>) -> Result<T, Delim<T>> {
 pub fn dec_node_into_exp(d: Dec_) -> Exp {
     match &d.0 {
         Dec::Exp(e) => e.as_ref().data_clone(),
+        Dec::Func(f) => Exp::Function(f.clone()),
         _ => Exp::Block(Delim {
+            // todo -- is it possible to eliminate this case?
             vec: vec![d].into(),
             has_trailing: false,
         }),

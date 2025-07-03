@@ -86,9 +86,11 @@ impl QuotedClose for Pat {
                 // to do -- Ok(Pat::Tuple(ps.map(|x| x.quoted_close(env))))
                 Ok(Pat::Tuple(ps.clone()))
             }
-            Pat::Object(_) => todo!(),
-            Pat::Optional(_) => todo!(),
-            Pat::Variant(_, _) => todo!(),
+            Pat::Object(_) => Ok(self.clone()), // to do -- FIX ME!
+            Pat::Optional(p) => Ok(Pat::Optional(p.quoted_close(env)?)),
+            Pat::Variant(id, pat) => {
+                Ok(Pat::Variant(id.quoted_close(env)?, pat.quoted_close(env)?))
+            }
             Pat::Or(_, _) => todo!(),
             Pat::AnnotPat(_, _) => todo!(),
             Pat::Annot(_) => todo!(),
@@ -226,6 +228,7 @@ impl QuotedClose for Exp {
             Exp::Opt(_) => todo!(),
             Exp::DoOpt(_) => todo!(),
             Exp::DoAdaptonNav(_, _) => todo!(),
+            Exp::DoAdaptonPutForceThunk(_, _) => todo!(),
             Exp::Bang(_) => todo!(),
             Exp::ObjectBlock(_, _) => todo!(),
             Exp::Object(_) => todo!(),
@@ -235,7 +238,7 @@ impl QuotedClose for Exp {
             Exp::BinAssign(_, _, _) => todo!(),
             Exp::Array(_, _) => todo!(),
             Exp::Index(_, _) => todo!(),
-            Exp::Function(_) => todo!(),
+            Exp::Function(f) => Ok(Exp::Function(f.clone())), // to do -- fix me
             Exp::Call(_, _, _) => todo!(),
             Exp::Block(b) => Ok(Block(b.quoted_close(env)?)),
             Exp::Do(e) => Ok(Do(e.quoted_close(env)?)),
