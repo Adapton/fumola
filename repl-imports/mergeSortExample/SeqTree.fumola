@@ -2,12 +2,12 @@ module {
   public module Counters {
     public func inc (symbol:Symbol) {
       let p = prim "adaptonPointer" (`SeqTree-`Counters-symbol); 
-      switch (prim "adaptonPointerPeek" p) {
+      switch (prim "adaptonPeek" p) {
         case null {
-	          prim "adaptonPointerPoke" (p, 0);
+	          prim "adaptonPoke" (p, 0);
         };
         case (?n) {
-           prim "adaptonPointerPoke" (p, n + 1);
+           prim "adaptonPoke" (p, n + 1);
         };
       }
     };
@@ -47,45 +47,28 @@ module {
   public type LazyListCell<X> = {
     element : X;
     symbol : Symbol;
-    next : LazyList<X>;
+    next : LazyList_<X>;
   };
-  
-  #[listing]
-  public type LazyList<X> = Pointer<Thunk<LazyList_<X>>>;
 
   #[listing]
-  public type LazyList_<X> = ?LazyListCell<X>;
+  public type LazyList<X> = ?LazyListCell<X>;
+  
+  #[listing]
+  public type LazyList_<X> = Pointer<Thunk<LazyList<X>>>;
 
   #[listing(69)]
   public func merge(xs : LazyList<X>, ys : LazyList<X>) : LazyList<X> {
-    switch (force xs, force ys) {
+    switch (xs, ys) {
       case (_, null) xs;
       case (null, _) ys;
       case (?xc, ?yc) {
         // Counters.inc `merge;
         if (xc.element <= yc.element) {
-          // to do -- support this "with-style" semantics -->>> xc.symbol := thunk{ ?{ xc with next = merge(xc.next, ys) }}
-          xc.symbol := thunk{ ?{ element=xc.element; symbol=xc.symbol; next = merge(xc.next, ys) }}
-        } else {
-          yc.symbol := thunk{ ?{ element=yc.element; symbol=yc.symbol; next = merge(xs, yc.next) }}
-        }
-      };
-    }
-  };
-
-  #[listing(69)]
-  public func merge_(xs : LazyList_<X>, ys : LazyList_<X>) : LazyList_<X> {
-    switch (xs, ys) {
-      case (_, null) xs;
-      case (null, _) ys;
-      case (?xc, ?yc) {
-        // Counters.inc `merge_;
-        if (xc.element <= yc.element) {
           let xc_next = force(xc.next);
-          ?{ element=xc.element; symbol=xc.symbol; next = xc.symbol := thunk { merge_(xc_next, ?yc) } }
+          ?{ element=xc.element; symbol=xc.symbol; next = xc.symbol := thunk { merge(xc_next, ?yc) } }
         } else {
           let yc_next = force(yc.next);
-          ?{ element=yc.element; symbol=yc.symbol; next = yc.symbol := thunk { merge_(?xc, yc_next) } }
+          ?{ element=yc.element; symbol=yc.symbol; next = yc.symbol := thunk { merge(?xc, yc_next) } }
         }
       };
     }
@@ -114,33 +97,17 @@ module {
 
   let nullThunk = thunk { null };
 
-  #[listing(61)]
-  public func lazyMergeSort<X>(t : SeqTree<X>) : LazyList<X> {
-    do within space `lazyMergeSort {
+  #[listing(62)]
+  public func lazyMergeSort<X>(t : SeqTree<X>) : LazyList_<X> {
+    do within space `lazyMergeSort { `result := thunk {
     reduceUp(t,
           null,
           func(symbol:Symbol, element:X) : LazyList<X> {
-             symbol := thunk { ?{ symbol; element; next = `null := nullThunk } }
+             ?{ symbol; element; next = `null := nullThunk }
           },
           func(symbol:Symbol, xs:LazyList<X>, ys:LazyList<X>) : LazyList<X> {
             do within space (`merge-symbol) {
               merge(xs, ys)
-            }
-          },
-        )
-  }};
-
-  #[listing(62)]
-  public func lazyMergeSort_<X>(t : SeqTree<X>) : LazyList_<X> {
-    do within space `lazyMergeSort_ { `result := thunk {
-    reduceUp(t,
-          null,
-          func(symbol:Symbol, element:X) : LazyList_<X> {
-             ?{ symbol; element; next = `null := nullThunk }
-          },
-          func(symbol:Symbol, xs:LazyList_<X>, ys:LazyList_<X>) : LazyList_<X> {
-            do within space (`merge_-symbol) {
-              merge_(xs, ys)
             }
           },
         )

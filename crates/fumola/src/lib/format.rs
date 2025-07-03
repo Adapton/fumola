@@ -680,6 +680,7 @@ impl ToDoc for Delim<Dec_> {
     }
 }
 
+#[allow(dead_code)]
 fn exp_is_block(e: &Exp) -> bool {
     match e {
         Exp::Block(_) => true,
