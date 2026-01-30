@@ -12,6 +12,19 @@ fn get_put() {
 }
 
 #[test]
+fn peek_put() {
+    assert_("prim \"adaptonPeek\" (1 := 1)", "1")
+}
+
+#[test]
+fn get_poke() {
+    assert_(
+        "@(prim \"adaptonPoke\" (prim \"adaptonPointer\" 1, 1))",
+        "1",
+    )
+}
+
+#[test]
 fn thunk_saves_space() {
     assert_(
         "let t = do goto space `space { `t := thunk{ prim \"adaptonHere\" () } }; force(t)",
@@ -98,6 +111,11 @@ fn symbol_identity() {
     assert_("1(`x) == 1(`x)", "true");
     assert_("-(`x) == -(`x)", "true");
     assert_("+(`x) == +(`x)", "true");
+}
+
+#[test]
+fn pointer_identity() {
+    assert_("`x := ()", "prim \"adaptonPointer\" `x");
 }
 
 #[test]

@@ -2,11 +2,11 @@ use fumola::{Interruption, ToMotoko, Value_};
 
 use log::{error, info, trace};
 
-use fumola::format::{format_one_line, format_pretty, ToDoc};
+use fumola::format::{ToDoc, format_one_line, format_pretty};
 use fumola::vm_types::{Core, Limits};
 
-use rustyline::error::ReadlineError;
 use rustyline::Editor;
+use rustyline::error::ReadlineError;
 
 use std::fs::{self, File};
 use std::io::Write;
@@ -241,7 +241,9 @@ fn inspect_result(core: &mut Core, result: Result<Value_, Interruption>, depth: 
 fn report_error(core: &mut Core, error: Interruption) {
     error!("Error: {:?}", error);
     info!("  Hint: Inspect lastError for details.");
-    info!("  For example, lastError.core.agent.active.cont, if lastError.core.scedule_choice == #Agent");
+    info!(
+        "  For example, lastError.core.agent.active.cont, if lastError.core.scedule_choice == #Agent"
+    );
     /* dump core, without chaining with any prior core dump. */
     if let Some(_) = core.get_var("lastInterruption") {
         core.define("lastInterruptionCore", fumola::Value::Unit);

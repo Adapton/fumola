@@ -1,11 +1,11 @@
 use fumola::ast::ToId;
 use im_rc::vector;
 //use motoko::check::assert_vm_eval as assert_;
+use fumola::ToMotoko;
 use fumola::eval;
 use fumola::shared::Share;
 use fumola::value::ActorId;
 use fumola::vm_types::{Core, Interruption, Limits, ModulePath};
-use fumola::ToMotoko;
 use test_log::test; // enable logging output for tests by default.
 
 #[test]

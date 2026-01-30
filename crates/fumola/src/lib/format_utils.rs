@@ -76,7 +76,7 @@ pub fn kwd<U: std::fmt::Display + ?Sized>(str: &U) -> RcDoc {
     RcDoc::as_string(str).append(RcDoc::space())
 }
 
-pub fn str(str: &str) -> RcDoc {
+pub fn str(str: &'_ str) -> RcDoc<'_> {
     RcDoc::text(str)
 }
 

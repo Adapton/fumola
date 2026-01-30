@@ -1,17 +1,13 @@
 use crate::adapton::AdaptonState;
-use crate::{adapton, nyi};
-use crate::value::{
-    CollectionFunction, FastRandIter, FastRandIterFunction,
-    HashMapFunction, PrimFunction, Text, Value, Value_,
-};
-use crate::vm_types::{
-    Active, Cont, DebugPrintLine, Interruption, Step,
-};
 use crate::ast::{Inst, Literal, Pat};
-
-use crate::vm_step::{
-    cont_value, type_mismatch, unit_step,
+use crate::value::{
+    CollectionFunction, FastRandIter, FastRandIterFunction, HashMapFunction, PrimFunction, Text,
+    Value, Value_,
 };
+use crate::vm_types::{Active, Cont, DebugPrintLine, Interruption, Step};
+use crate::{adapton, nyi, type_mismatch_};
+
+use crate::vm_step::{cont_value, cont_value_, type_mismatch, unit_step};
 
 use im_rc::HashMap;
 use std::collections::hash_map;
@@ -153,9 +149,40 @@ pub fn call_prim_function<A: Active>(
             *active.cont() = cont_value(Value::Text(Text::new(format!("{:?}", args))));
             Ok(Step {})
         }
-        AdaptonPointer => todo!(),
-        AdaptonPeek => todo!(),
-        AdaptonPoke => todo!(),
+        AdaptonPointer => {
+            if let Ok(symbol) = args.into_sym_or(()) {
+                *active.cont() =
+                    cont_value(Value::AdaptonPointer(adapton::Pointer::Symbol(symbol)));
+                Ok(Step {})
+            } else {
+                type_mismatch!(file!(), line!())
+            }
+        }
+        AdaptonPeek => {
+            if let Ok(p) = args.into_adapton_pointer_or(()) {
+                let v = active.adapton().peek(p)?;
+                *active.cont() = cont_value_(v);
+                Ok(Step {})
+            } else {
+                type_mismatch!(file!(), line!())
+            }
+        }
+        AdaptonPoke => {
+            if let Ok(args) = args.into_tuple_or(()) {
+                if args.len() == 2 {
+                    let p = args[0].into_adapton_pointer_or(type_mismatch_!(file!(), line!()))?;
+                    active.adapton().poke(p, None, args[1].clone())?;
+                    *active.cont() = cont_value_(args[0].clone());
+                    Ok(Step {})
+                } else if args.len() == 3 {
+                    todo!()
+                } else {
+                    type_mismatch!(file!(), line!())
+                }
+            } else {
+                type_mismatch!(file!(), line!())
+            }
+        }
     }
 }
 
@@ -199,7 +226,6 @@ fn call_hashmap_function<A: Active>(
         Remove => collection::hashmap::remove(active, args),
     }
 }
-
 
 mod collection {
     pub mod fastranditer {
@@ -248,7 +274,7 @@ mod collection {
 
     pub mod hashmap {
         use super::super::*;
-        use crate::{Share, shared::FastClone, value::Collection};
+        use crate::{shared::FastClone, value::Collection, Share};
         use im_rc::vector;
 
         pub fn new<A: Active>(active: &mut A, v: Value_) -> Result<Step, Interruption> {
@@ -335,4 +361,3 @@ mod collection {
         }
     }
 }
-

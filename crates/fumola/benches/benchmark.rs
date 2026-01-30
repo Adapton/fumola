@@ -1,5 +1,5 @@
-use criterion::{criterion_group, criterion_main, Criterion};
-use fumola::{vm_types::Core, vm_types::Limits, Share, Value};
+use criterion::{Criterion, criterion_group, criterion_main};
+use fumola::{Share, Value, vm_types::Core, vm_types::Limits};
 
 fn bench_example(c: &mut Criterion) {
     let mut group = c.benchmark_group("Examples");

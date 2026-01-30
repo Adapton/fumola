@@ -540,6 +540,13 @@ impl Value {
         })
     }
 
+    pub fn into_tuple_or<E>(&self, err: E) -> Result<Vector<Value_>, E> {
+        match self {
+            Value::Tuple(vs) => Ok(vs.clone()),
+            _ => Err(err),
+        }
+    }
+
     pub fn into_time_or<E>(&self, err: E) -> Result<AdaptonTime, E> {
         match self {
             Value::AdaptonTime(t) => Ok(t.clone()),
@@ -547,6 +554,13 @@ impl Value {
                 let symbol = self.into_sym_or(err)?;
                 Ok(AdaptonTime::Symbol(symbol))
             }
+        }
+    }
+
+    pub fn into_adapton_pointer_or<E>(&self, err: E) -> Result<AdaptonPointer, E> {
+        match self {
+            Value::AdaptonPointer(p) => Ok(p.clone()),
+            _ => Err(err),
         }
     }
 
