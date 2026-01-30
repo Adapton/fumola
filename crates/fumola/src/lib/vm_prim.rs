@@ -1,20 +1,16 @@
 use crate::adapton::AdaptonState;
-use crate::{Dynamic, Shared, adapton, nyi, type_mismatch_, vm_step};
+use crate::{adapton, nyi};
 use crate::value::{
-    ActorMethod, ArrayIterator, ArrayIteratorFunc, ArrayIteratorNextFunc, ArraySizeFunc,
-    ClosedFunction, CollectionFunction, DynamicValue, FastRandIter, FastRandIterFunction,
-    HashMapFunction, PrimFunction, Symbol, Text, Value, Value_,
+    CollectionFunction, FastRandIter, FastRandIterFunction,
+    HashMapFunction, PrimFunction, Text, Value, Value_,
 };
 use crate::vm_types::{
-    def::Function as FunctionDef,
-    stack::{FieldContext, FieldValue, Frame, FrameCont},
-    Active, Cont, DebugPrintLine, Env, Interruption, Pointer, Response, Step,
+    Active, Cont, DebugPrintLine, Interruption, Step,
 };
-use crate::ast::{Cases, Exp_, Inst, Literal, Mut, Pat, Pat_, ProjIndex, QuotedAst};
+use crate::ast::{Inst, Literal, Pat};
 
 use crate::vm_step::{
-    cont_value, decs_step, exp_cont, exp_conts, exp_step, literal_step, object_step, return_,
-    return_step, tuple_step, type_mismatch, unit_step, var_step,
+    cont_value, type_mismatch, unit_step,
 };
 
 use im_rc::HashMap;

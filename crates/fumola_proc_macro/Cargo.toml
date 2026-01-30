@@ -2,7 +2,7 @@
 name = "fumola_proc_macro"
 version = "0.0.29"
 authors = ["Matthew Hammer", "Ryan Vandersmith"]
-edition = "2018"
+edition = "2024"
 license = "Apache-2.0"
 description = "Procedural macros for compile-time Fumola expressions in Rust."
 readme = "README.md"

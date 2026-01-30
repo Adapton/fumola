@@ -1,21 +1,17 @@
 //use crate::{ast::{Mut, ProjIndex}, shared::FastClone, type_mismatch, vm_types::{stack::{FieldContext, FieldValue, Frame, FrameCont}, Active, Cont, Step}, Interruption, Value, Value_};
 
-use std::collections::hash_map;
-use std::hash::{Hash, Hasher};
-
-use crate::adapton::{self, AdaptonState};
-use crate::ast::{Cases, Exp_, Inst, Literal, Mut, Pat, Pat_, ProjIndex, QuotedAst};
+use crate::adapton::AdaptonState;
+use crate::ast::{Cases, Exp_, Inst, Mut, Pat_, ProjIndex, QuotedAst};
 use crate::format::format_one_line;
 use crate::shared::{FastClone, Share};
 use crate::value::{
     ActorMethod, ArrayIterator, ArrayIteratorFunc, ArrayIteratorNextFunc, ArraySizeFunc,
-    ClosedFunction, CollectionFunction, DynamicValue, FastRandIter, FastRandIterFunction,
-    HashMapFunction, PrimFunction, Symbol, Text, Value, Value_,
+    ClosedFunction, DynamicValue, Symbol, Text, Value, Value_,
 };
 use crate::vm_types::{
     def::Function as FunctionDef,
     stack::{FieldContext, FieldValue, Frame, FrameCont},
-    Active, Cont, DebugPrintLine, Env, Interruption, Pointer, Response, Step,
+    Active, Cont, Env, Interruption, Pointer, Response, Step,
 };
 use crate::vm_types::{OptionCoreSource, Store};
 use crate::{nyi, type_mismatch_, vm_step, Dynamic, Shared};
