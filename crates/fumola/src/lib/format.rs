@@ -31,7 +31,7 @@ pub fn format_one_line(to_doc: &dyn ToDoc) -> String {
 }
 
 pub trait ToDoc {
-    fn doc(&self) -> RcDoc;
+    fn doc(&'_ self) -> RcDoc<'_>;
 }
 
 // impl fmt::Display for dyn ToDoc {
@@ -143,38 +143,42 @@ fn bin_op<'a, E: ToDoc + Clone>(e1: &'a E, b: RcDoc<'a>, e2: &'a E) -> RcDoc<'a>
 }
 
 impl ToDoc for String {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
         str(self)
     }
 }
 
 impl<T: ToDoc + Clone> ToDoc for Loc<T> {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
         let Loc(t, _) = self;
         t.doc()
     }
 }
 
 impl<T: ToDoc + Clone> ToDoc for Box<T> {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         self.as_ref().doc()
     }
 }
 
 impl<T: ToDoc + Clone> ToDoc for Shared<T> {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         self.as_ref().doc()
     }
 }
 
 impl<T: ToDoc + Clone> ToDoc for NodeData<T> {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         self.0.doc()
     }
 }
 
 impl<T: ToDoc + Clone> ToDoc for Option<T> {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match self {
             None => RcDoc::nil(),
             Some(value) => value.doc(),
@@ -183,7 +187,8 @@ impl<T: ToDoc + Clone> ToDoc for Option<T> {
 }
 
 impl ToDoc for Symbol {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match self {
             Symbol::UnOp(u, s) => u.doc().append(s.doc()),
             Symbol::Call(s1, s2) => s1.doc().append(enclose("(", s2.doc(), ")")),
@@ -198,13 +203,15 @@ impl ToDoc for Symbol {
 }
 
 impl ToDoc for Closed<Exp_> {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         RcDoc::text("<TODO-Closed<Exp>>")
     }
 }
 
 impl ToDoc for Space {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match self {
             Space::Here => RcDoc::text("@here"),
             Space::Exp_(None, c) => c.doc(),
@@ -215,7 +222,8 @@ impl ToDoc for Space {
 }
 
 impl ToDoc for Time {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match self {
             Time::Now => RcDoc::text("@now"),
             Time::Symbol(s) => s.doc(),
@@ -224,13 +232,15 @@ impl ToDoc for Time {
 }
 
 impl ToDoc for CtxId {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         RcDoc::text(format!("{}", self.0))
     }
 }
 
 impl ToDoc for Env {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         let data = self.iter().collect::<Vec<_>>();
         // to do -- sort general values (but only handle common cases for now)
         // data.sort_by(|a, b| a.0.cmp(&b.0));
@@ -247,7 +257,8 @@ impl ToDoc for Env {
 }
 
 impl ToDoc for ScheduleChoice {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match self {
             ScheduleChoice::Agent => RcDoc::text("#agent"),
             ScheduleChoice::Actor(actor_id) => RcDoc::text(format!("#actor({:?})", actor_id)),
@@ -256,7 +267,8 @@ impl ToDoc for ScheduleChoice {
 }
 
 impl ToDoc for LocalPointer {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match self {
             LocalPointer::Numeric(numeric_pointer) => {
                 RcDoc::text(format!("{:?}", numeric_pointer.0))
@@ -267,7 +279,8 @@ impl ToDoc for LocalPointer {
 }
 
 impl ToDoc for Pointer {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         kwd("pointer").append(enclose(
             "(",
             self.local
@@ -280,7 +293,8 @@ impl ToDoc for Pointer {
 }
 
 impl ToDoc for Module {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         kwd("module").append(enclose(
             "(",
             self.context
@@ -293,7 +307,8 @@ impl ToDoc for Module {
 }
 
 impl ToDoc for PrimFunction {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match self {
             PrimFunction::AdaptonNow => str("\"adaptonNow\""),
             PrimFunction::AdaptonHere => str("\"adaptonHere\""),
@@ -318,7 +333,8 @@ impl ToDoc for PrimFunction {
 }
 
 impl ToDoc for Value {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match self {
             Value::Null => str("null"),
             Value::Bool(b) => RcDoc::text(b.to_string()),
@@ -390,7 +406,8 @@ impl ToDoc for Value {
 }
 
 impl ToDoc for QuotedAst {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match self {
             QuotedAst::Id_(i) => str("`").append(i.doc()),
             QuotedAst::Id(i) => str("`").append(i.doc()),
@@ -411,7 +428,8 @@ impl ToDoc for QuotedAst {
 }
 
 impl ToDoc for Literal {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use Literal::*;
         str(match self {
             Null => "null",
@@ -430,7 +448,8 @@ impl ToDoc for Literal {
 }
 
 impl ToDoc for UnOp {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use UnOp::*;
         str(match self {
             Pos => "+",
@@ -441,7 +460,8 @@ impl ToDoc for UnOp {
 }
 
 impl ToDoc for BinOp {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use BinOp::*;
         str(match self {
             Add => "+",
@@ -469,7 +489,8 @@ impl ToDoc for BinOp {
 }
 
 impl ToDoc for RelOp {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use RelOp::*;
         str(match self {
             Eq => "==",
@@ -483,19 +504,22 @@ impl ToDoc for RelOp {
 }
 
 impl ToDoc for Id {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         str(&self.string)
     }
 }
 
 impl ToDoc for IdPos {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         self.id.doc()
     }
 }
 
 impl ToDoc for CasesPos {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match self {
             CasesPos::Cases(cs) => enclose_space("{", delim(cs, ";"), "}"),
             CasesPos::Unquote(uq) => uq.doc(),
@@ -504,7 +528,8 @@ impl ToDoc for CasesPos {
 }
 
 impl ToDoc for DecFieldsPos {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match self {
             DecFieldsPos::DecFields(dfs) => block(dfs),
             DecFieldsPos::Unquote(uq) => uq.doc(),
@@ -512,13 +537,15 @@ impl ToDoc for DecFieldsPos {
     }
 }
 impl ToDoc for Unquote {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         str("~").append(self.id.doc())
     }
 }
 
 impl ToDoc for AdaptonNav {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match self {
             AdaptonNav::Goto(d, e) => kwd("goto").append(d.doc()).append(e.doc()),
             AdaptonNav::Within(d, e) => kwd("within").append(d.doc()).append(e.doc()),
@@ -527,7 +554,8 @@ impl ToDoc for AdaptonNav {
 }
 
 impl ToDoc for AdaptonNavDim {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match self {
             AdaptonNavDim::Space => kwd("space"),
             AdaptonNavDim::Time => kwd("time"),
@@ -536,7 +564,8 @@ impl ToDoc for AdaptonNavDim {
 }
 
 impl ToDoc for Exp {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use Exp::*;
         match self {
             Hole => str("_?_"),
@@ -675,7 +704,8 @@ impl ToDoc for Exp {
 }
 
 impl ToDoc for Delim<Dec_> {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         delim(self, ";")
     }
 }
@@ -689,7 +719,8 @@ fn exp_is_block(e: &Exp) -> bool {
 }
 
 impl ToDoc for Function {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         // todo -- check self.sugar, and print the sugared form.
         kwd("func")
             .append(self.name.doc())
@@ -703,7 +734,8 @@ impl ToDoc for Function {
 }
 
 impl ToDoc for Dec {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use Dec::*;
         match self {
             Attrs(_a, _d) => todo!(),
@@ -735,7 +767,8 @@ impl ToDoc for Dec {
 }
 
 impl ToDoc for TypeTag {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         let tail = if self.typ.is_some() {
             space()
                 .append(str(":"))
@@ -749,7 +782,8 @@ impl ToDoc for TypeTag {
 }
 
 impl ToDoc for TypePath {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use TypePath::*;
         match self {
             Id(id) => id.doc(),
@@ -759,7 +793,8 @@ impl ToDoc for TypePath {
 }
 
 impl ToDoc for Type {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use Type::*;
         match self {
             Prim(p) => p.doc(),
@@ -804,7 +839,8 @@ impl ToDoc for Type {
 }
 
 impl ToDoc for PrimType {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use PrimType::*;
         str(match self {
             Null => "Null",
@@ -829,7 +865,8 @@ impl ToDoc for PrimType {
 }
 
 impl ToDoc for TypeBind {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use BindSort::*;
         match self.sort {
             Scope => str("$"), // ?
@@ -842,7 +879,8 @@ impl ToDoc for TypeBind {
 }
 
 impl ToDoc for PatField {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match &self.pat {
             Some(p) => self.id.doc().append(str("=")).append(p.doc()),
             None => self.id.doc(),
@@ -851,7 +889,8 @@ impl ToDoc for PatField {
 }
 
 impl ToDoc for Pat {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use Pat::*;
         match self {
             Wild => str("_"),
@@ -876,7 +915,8 @@ impl ToDoc for Pat {
 }
 
 impl ToDoc for Case {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         kwd("case")
             .append(self.pat.doc())
             .append(RcDoc::line())
@@ -886,7 +926,8 @@ impl ToDoc for Case {
 }
 
 impl ToDoc for TypeField {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match self {
             TypeField::Val(vtf) => vtf.id.doc().append(" : ").append(vtf.typ.doc()),
             _ => todo!(),
@@ -895,7 +936,8 @@ impl ToDoc for TypeField {
 }
 
 impl ToDoc for DecField {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         match &self.vis {
             None => RcDoc::nil(),
             Some(v) => v.doc().append(RcDoc::space()),
@@ -909,7 +951,8 @@ impl ToDoc for DecField {
 }
 
 impl ToDoc for ExpField {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         self.mut_
             .doc()
             .append(self.id.doc())
@@ -925,7 +968,8 @@ impl ToDoc for ExpField {
 }
 
 impl ToDoc for Vis {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use Vis::*;
         match self {
             Public(Some(_)) => todo!(), // ??
@@ -937,7 +981,8 @@ impl ToDoc for Vis {
 }
 
 impl ToDoc for Stab {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use Stab::*;
         str(match self {
             Stable => "stable",
@@ -947,7 +992,8 @@ impl ToDoc for Stab {
 }
 
 impl ToDoc for Mut {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use Mut::*;
         match self {
             Var => kwd("var"), // includes space after keyword
@@ -957,7 +1003,8 @@ impl ToDoc for Mut {
 }
 
 impl ToDoc for ObjSort {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         str(match self {
             ObjSort::Object => "object",
             ObjSort::Actor => "actor",
@@ -1022,7 +1069,8 @@ fn get_space_between<'a>(a: &'a TokenTree, b: &'a TokenTree) -> RcDoc<'a> {
 }
 
 impl ToDoc for TokenTree {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use GroupType::*;
         use TokenTree::*;
         match self {
@@ -1058,7 +1106,8 @@ impl ToDoc for TokenTree {
 }
 
 impl ToDoc for Token {
-    fn doc(&self) -> RcDoc {
+    fn doc(&'_ self) -> RcDoc<'_> {
+
         use Token::*;
         match self {
             &Line(_) => RcDoc::hardline(),

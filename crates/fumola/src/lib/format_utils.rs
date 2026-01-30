@@ -72,7 +72,7 @@ where
     RcDoc::concat(docs.map(|doc| doc.append(RcDoc::hardline())))
 }
 
-pub fn kwd<U: std::fmt::Display + ?Sized>(str: &U) -> RcDoc {
+pub fn kwd<U: std::fmt::Display + ?Sized>(str: &'_ U) -> RcDoc<'_> {
     RcDoc::as_string(str).append(RcDoc::space())
 }
 
@@ -80,11 +80,11 @@ pub fn str(str: &'_ str) -> RcDoc<'_> {
     RcDoc::text(str)
 }
 
-pub fn ident(id: &str) -> RcDoc {
+pub fn ident<'a>(id: &'a str) -> RcDoc<'a> {
     kwd(id)
 }
 
-pub fn quote_ident(id: &str) -> RcDoc {
+pub fn quote_ident(id: &'_ str) -> RcDoc<'_> {
     str("'")
         .append(format!("{}", id.escape_debug()))
         .append("'")

@@ -241,11 +241,11 @@ impl DynamicValue {
     pub fn new<X: Dynamic + Sized + 'static>(x: X) -> Self {
         Self(Rc::new(std::cell::RefCell::new(x)))
     }
-    pub fn dynamic(&self) -> std::cell::Ref<dyn Dynamic> {
+    pub fn dynamic(&'_ self) -> std::cell::Ref<'_, dyn Dynamic> {
         self.0.borrow()
     }
 
-    pub fn dynamic_mut(&self) -> std::cell::RefMut<dyn Dynamic> {
+    pub fn dynamic_mut(&'_ self) -> std::cell::RefMut<'_, dyn Dynamic> {
         (*self.0).borrow_mut()
     }
 }
