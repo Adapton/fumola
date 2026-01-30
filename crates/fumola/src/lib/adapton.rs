@@ -1,6 +1,5 @@
 use crate::ast::Exp_;
 use crate::format::format_one_line;
-use crate::shared::FastClone;
 use crate::value::{Closed, Symbol, Symbol_, ThunkBody, Value, Value_};
 use crate::Shared;
 use im_rc::{HashMap, Vector};
@@ -8,7 +7,6 @@ use log::info;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::sync::Arc;
 
 pub trait AdaptonState {
     fn new() -> Self
