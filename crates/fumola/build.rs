@@ -1,9 +1,11 @@
 extern crate lalrpop;
 
 fn main() {
-    println!("hello");
+    println!("cargo:rerun-if-changed=src/lib/parser.lalrpop");
+    println!("cargo:rerun-if-changed=build.rs");
+
     lalrpop::Configuration::new()
-        .always_use_colors()
-        .process_file(&"src/lib/parser.lalrpop")
+        .set_out_dir(std::env::var("OUT_DIR").unwrap())
+        .process_file("src/lib/parser.lalrpop")
         .unwrap();
 }

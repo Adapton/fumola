@@ -1,5 +1,5 @@
 [workspace]
-resolver = "1"
+resolver = "2"
 members = [
     "crates/fumola",
     "crates/fumola_proc_macro"

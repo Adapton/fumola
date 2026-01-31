@@ -34,7 +34,7 @@ impl SyntaxError {
         use lalrpop_util::ParseError::*;
         match err {
             InvalidToken { location } => Self::InvalidToken { location },
-            UnrecognizedEOF { location, expected } => Self::UnrecognizedEOF { location, expected },
+            UnrecognizedEof { location, expected } => Self::UnrecognizedEOF { location, expected },
             UnrecognizedToken { token, expected } => Self::UnrecognizedToken {
                 token: token.1.to_string(),
                 start: token.0,

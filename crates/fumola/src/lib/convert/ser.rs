@@ -240,6 +240,7 @@ impl serde::Serializer for Serializer {
     }
 }
 
+/*
 impl<T: Serialize> Serialize for crate::ast::NodeData<T> {
     fn serialize<S: serde::ser::Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
         self.0.serialize(s)
@@ -251,6 +252,7 @@ impl<T: Serialize + Clone> Serialize for crate::ast::Delim<T> {
         self.vec.serialize(s)
     }
 }
+*/
 
 pub struct SerializeVec {
     vec: Vector<Value_>,
