@@ -206,7 +206,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                                     line: line!(),
                                 }),
                             )))?;
-                    if let Value::AdaptonPointer(ref pointer) = &**v11 {
+                    if let Value::AdaptonPointer(pointer) = &**v11 {
                         active
                             .adapton()
                             .put_pointer_delay(pointer.clone(), time, v)?;

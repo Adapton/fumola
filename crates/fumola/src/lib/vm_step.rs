@@ -645,7 +645,7 @@ fn check_for_breakpoint<A: ActiveBorrow>(active: &A, limits: &Limits) -> Option<
 
 fn check_for_redex<A: ActiveBorrow>(active: &A, limits: &Limits) -> Result<usize, Interruption> {
     let mut redex_bump = 0;
-    if let Cont::Value_(ref v) = active.cont() {
+    if let Cont::Value_(v) = active.cont() {
         if stack_cont_has_redex(active, v)? {
             redex_bump = 1;
             if let Some(redex_limit) = limits.redex {

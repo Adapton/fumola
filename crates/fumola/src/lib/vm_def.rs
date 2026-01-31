@@ -645,12 +645,12 @@ pub mod def {
                     _ => return Err(Interruption::NonLiteralInit(e.1.clone())),
                 };
                 let mut pat = &p.0;
-                if let Pat::AnnotPat(ref p, _) = pat {
+                if let Pat::AnnotPat(p, _) = pat {
                     // Temporary
                     pat = &p.0;
                 }
                 match pat {
-                    Pat::Var(ref x) => {
+                    Pat::Var(x) => {
                         let var_def = Def::Var(VarDef {
                             owner: def_owner.clone(),
                             name: x.0.clone(),

@@ -2,7 +2,7 @@
 name = "fumola"
 version = "0.0.29"
 authors = ["Matthew Hammer", "Ryan Vandersmith"]
-edition = "2024"
+edition = "2021"
 build = "build.rs"
 license = "Apache-2.0"
 description = "A library for parsing and running Fumola in Rust"
@@ -12,6 +12,10 @@ repository = "https://github.com/Adapton/fumola.rs"
 categories = ["wasm"]
 keywords = ["internet-computer", "fumola", "wasm"]
 include = ["src", "build.rs", "Cargo.toml", "LICENSE", "README.md"]
+
+[profile.dev]
+incremental = true
+debug = true
 
 [dependencies]
 lalrpop-util = { version = "0.22.2", features = ["lexer"] }
@@ -43,6 +47,7 @@ criterion = "0.4.0"
 lalrpop = "0.22.2"
 
 [lib]
+edition = "2021"
 name = "fumola"
 path = "src/lib/mod.rs"
 test = true             # Is tested by default.
@@ -51,7 +56,6 @@ bench = true            # Is benchmarked by default.
 doc = true              # Is documented by default.
 plugin = false          # Used as a compiler plugin (deprecated).
 harness = true          # Use libtest harness.
-edition = "2018"        # The edition of the target.
 crate-type = ["lib"]    # The crate types to generate.
 required-features = []  # Features required to build this target (N/A for lib).
 

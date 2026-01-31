@@ -55,7 +55,7 @@ impl Active for Core {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &mut self.agent.active.cont,
-            Actor(ref n) => {
+            Actor(n) => {
                 &mut self
                     .actors
                     .map
@@ -72,7 +72,7 @@ impl Active for Core {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &mut self.agent.active.package,
-            Actor(ref n) => {
+            Actor(n) => {
                 &mut self
                     .actors
                     .map
@@ -89,7 +89,7 @@ impl Active for Core {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &mut self.agent.active.cont_source,
-            Actor(ref n) => {
+            Actor(n) => {
                 &mut self
                     .actors
                     .map
@@ -106,7 +106,7 @@ impl Active for Core {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &mut self.agent.active.cont_prim_type,
-            Actor(ref n) => {
+            Actor(n) => {
                 &mut self
                     .actors
                     .map
@@ -123,7 +123,7 @@ impl Active for Core {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &mut self.agent.active.env,
-            Actor(ref n) => {
+            Actor(n) => {
                 &mut self
                     .actors
                     .map
@@ -140,7 +140,7 @@ impl Active for Core {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &mut self.agent.active.stack,
-            Actor(ref n) => {
+            Actor(n) => {
                 &mut self
                     .actors
                     .map
@@ -157,7 +157,7 @@ impl Active for Core {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &mut self.agent.store,
-            Actor(ref n) => &mut self.actors.map.get_mut(n).unwrap().store,
+            Actor(n) => &mut self.actors.map.get_mut(n).unwrap().store,
         }
     }
     fn debug_print_out<'a>(&'a mut self) -> &'a mut Vector<DebugPrintLine> {
@@ -167,7 +167,7 @@ impl Active for Core {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &mut self.agent.counts,
-            Actor(ref n) => &mut self.actors.map.get_mut(n).unwrap().counts,
+            Actor(n) => &mut self.actors.map.get_mut(n).unwrap().counts,
         }
     }
 
@@ -175,7 +175,7 @@ impl Active for Core {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &mut self.agent.adapton_state,
-            Actor(ref n) => &mut self.actors.map.get_mut(n).unwrap().adapton_state,
+            Actor(n) => &mut self.actors.map.get_mut(n).unwrap().adapton_state,
         }
     }
 
@@ -320,7 +320,7 @@ impl ActiveBorrow for Core {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &self.agent.active.cont,
-            Actor(ref n) => {
+            Actor(n) => {
                 &self
                     .actors
                     .map
@@ -337,7 +337,7 @@ impl ActiveBorrow for Core {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &self.agent.active.cont_source,
-            Actor(ref n) => {
+            Actor(n) => {
                 &self
                     .actors
                     .map
@@ -354,7 +354,7 @@ impl ActiveBorrow for Core {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &self.agent.active.cont_prim_type,
-            Actor(ref n) => {
+            Actor(n) => {
                 &self
                     .actors
                     .map
@@ -371,14 +371,14 @@ impl ActiveBorrow for Core {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &self.agent.active.env,
-            Actor(ref n) => &self.actors.map.get(n).unwrap().active.as_ref().unwrap().env,
+            Actor(n) => &self.actors.map.get(n).unwrap().active.as_ref().unwrap().env,
         }
     }
     fn stack<'a>(&'a self) -> &'a Stack {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &self.agent.active.stack,
-            Actor(ref n) => {
+            Actor(n) => {
                 &self
                     .actors
                     .map
@@ -395,7 +395,7 @@ impl ActiveBorrow for Core {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &self.agent.store,
-            Actor(ref n) => &self.actors.map.get(n).unwrap().store,
+            Actor(n) => &self.actors.map.get(n).unwrap().store,
         }
     }
     fn debug_print_out<'a>(&'a self) -> &'a Vector<DebugPrintLine> {
@@ -405,7 +405,7 @@ impl ActiveBorrow for Core {
         use ScheduleChoice::*;
         match &self.schedule_choice {
             Agent => &self.agent.counts,
-            Actor(ref n) => &self.actors.map.get(n).unwrap().counts,
+            Actor(n) => &self.actors.map.get(n).unwrap().counts,
         }
     }
 }

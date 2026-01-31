@@ -19,7 +19,9 @@ pub mod lexer_types;
 pub mod package;
 #[allow(clippy::all)]
 #[cfg(feature = "parser")]
-pub mod parser;
+pub mod parser {
+    include!(concat!(env!("OUT_DIR"), "/src/lib/parser.rs"));
+}
 #[cfg(feature = "parser")]
 pub mod parser_types;
 #[cfg(feature = "parser")]
