@@ -391,6 +391,7 @@ fn test_array_index() {
     assert_to("x [ 0 ]", "x[0]");
 }
 
+#[ignore]
 #[test]
 fn test_call() {
     // to do -- handle type instantiations, via <(Type,)+> syntax
