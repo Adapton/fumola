@@ -13,7 +13,7 @@ fn get_put() {
 
 #[test]
 fn peek_put() {
-    assert_("prim \"adaptonPeek\" (1 := 1)", "1")
+    assert_("prim \"adaptonPeek\" (1 := 1)", "?1")
 }
 
 #[test]

@@ -1,10 +1,16 @@
 module { 
   public module Counters {
+    public func ptr (symbol:Symbol) {
+      prim "adaptonPointer" (`SeqTree-`Counter-symbol);
+    };
+    public func get (symbol:Symbol) {
+      (prim "adaptonPeek" (ptr symbol))
+    };
     public func inc (symbol:Symbol) {
-      let p = prim "adaptonPointer" (`SeqTree-`Counters-symbol); 
+      let p = ptr(symbol); 
       switch (prim "adaptonPeek" p) {
         case null {
-	          prim "adaptonPoke" (p, 0);
+	          prim "adaptonPoke" (p, 1);
         };
         case (?n) {
            prim "adaptonPoke" (p, n + 1);
@@ -62,7 +68,7 @@ module {
       case (_, null) xs;
       case (null, _) ys;
       case (?xc, ?yc) {
-        // Counters.inc `merge;
+        Counters.inc `merge;
         if (xc.element <= yc.element) {
           let xc_next = force(xc.next);
           ?{ element=xc.element; symbol=xc.symbol; next = xc.symbol := thunk { merge(xc_next, ?yc) } }

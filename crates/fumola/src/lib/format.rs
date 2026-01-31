@@ -341,7 +341,7 @@ impl ToDoc for Value {
             Value::Unit => str("()"),
             Value::Nat(n) => RcDoc::text(n.to_string()),
             Value::Int(i) => RcDoc::text(i.to_string()),
-            Value::Float(_) => todo!(),
+            Value::Float(f) => RcDoc::text(f.to_string()),
             Value::Char(_) => todo!(),
             Value::Text(t) => RcDoc::text(format!("{:?}", t.to_string())),
             Value::Blob(_) => todo!(),

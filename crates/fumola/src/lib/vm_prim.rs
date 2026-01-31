@@ -160,8 +160,12 @@ pub fn call_prim_function<A: Active>(
         }
         AdaptonPeek => {
             if let Ok(p) = args.into_adapton_pointer_or(()) {
-                let v = active.adapton().peek(p)?;
-                *active.cont() = cont_value_(v);
+                let ov = active.adapton().peek(p)?;
+                let v = match ov {
+                    None => Value::Null,
+                    Some(v) => Value::Option(v)
+                };
+                *active.cont() = cont_value(v);
                 Ok(Step {})
             } else {
                 type_mismatch!(file!(), line!())

@@ -23,7 +23,7 @@ pub trait AdaptonState {
     fn force_end(&mut self, _value: Value_) -> Res<()>;
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()>;
     fn navigate_end(&mut self) -> Res<()>;
-    fn peek(&mut self, pointer: Pointer) -> Res<Value_>;
+    fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>>;
     fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()>;
 }
 
@@ -240,7 +240,7 @@ impl AdaptonState for State {
         }
     }
 
-    fn peek(&mut self, pointer: Pointer) -> Res<Value_> {
+    fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>> {
         match self {
             Self::Simple(s) => s.peek(pointer),
             Self::Graphical(g) => g.peek(pointer),
@@ -534,9 +534,11 @@ impl AdaptonState for SimpleState {
         Ok(pointer)
     }
 
-    fn peek(&mut self, pointer: Pointer) -> Res<Value_> {
-        let cell = self.get_cell(&pointer)?;
-        cell.get_value()
+    fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>> {
+        match self.get_cell(&pointer) {
+            Ok(c) => Ok(Some(c.get_value()?)),
+            Err(_) => Ok(None),
+        }
     }
 
     fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()> {
@@ -671,7 +673,7 @@ impl AdaptonState for GraphicalState {
     fn poke(&mut self, _pointer: Pointer, _time: Option<Time>, _value: Value_) -> Res<()> {
         todo!()
     }
-    fn peek(&mut self, _pointer: Pointer) -> Res<Value_> {
+    fn peek(&mut self, _pointer: Pointer) -> Res<Option<Value_>> {
         todo!()
     }
 }
