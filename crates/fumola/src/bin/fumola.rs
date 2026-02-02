@@ -2,11 +2,11 @@ use fumola::{Interruption, ToMotoko, Value_};
 
 use log::{error, info, trace};
 
-use fumola::format::{ToDoc, format_one_line, format_pretty};
+use fumola::format::{format_one_line, format_pretty, ToDoc};
 use fumola::vm_types::{Core, Limits};
 
-use rustyline::Editor;
 use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
 use std::fs::{self, File};
 use std::io::Write;

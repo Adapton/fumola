@@ -1,6 +1,6 @@
+use crate::{Error, SyntaxError};
 use fumola_semantics::value::Value_;
 use fumola_semantics::vm_types::{Core, Limits};
-use crate::{Error, SyntaxError};
 
 /// Used for tests in check module.
 pub fn eval_limit(prog: &str, limits: &Limits) -> Result<Value_, Error> {
@@ -30,5 +30,5 @@ pub fn eval(prog: &str) -> Result<Value_, Error> {
 }
 
 pub fn eval_into<T: serde::de::DeserializeOwned>(prog: &str) -> Result<T, Error> {
-    eval(prog)?.to_rust().map_err(|_|Error::ValueError)
+    eval(prog)?.to_rust().map_err(|_| Error::ValueError)
 }

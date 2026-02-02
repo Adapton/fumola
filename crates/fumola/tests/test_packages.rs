@@ -1,6 +1,6 @@
 use fumola::{
     package::{
-        Package, get_base_library, get_base_library_tests, get_matchers_library, get_prim_library,
+        get_base_library, get_base_library_tests, get_matchers_library, get_prim_library, Package,
     },
     vm_types::Core,
 };

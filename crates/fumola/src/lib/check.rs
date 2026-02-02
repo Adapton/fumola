@@ -1,8 +1,8 @@
+use fumola_parser::parser_types::SyntaxError;
+use fumola_semantics::format::{format_one_line, format_pretty};
 use fumola_syntax::ast::{Loc, Prog, Source};
 use fumola_syntax::lexer::create_token_tree;
 use fumola_syntax::lexer_types::{GroupType, Token, TokenTree};
-use fumola_semantics::format::{format_one_line, format_pretty};
-use fumola_parser::parser_types::SyntaxError;
 use log::{debug, info};
 use regex::Regex;
 use structopt::lazy_static::lazy_static;
@@ -120,7 +120,7 @@ pub fn assert_vm_interruption(
     match crate::eval::eval(input_prog) {
         Err(crate::Error::ValueError) => panic!("value error"),
         Err(crate::Error::SyntaxError(e)) => panic!("syntax error: {:?}", e),
-        Err(crate::Error::Interruption( ref i)) => assert_eq!(i, expected_interruption),
+        Err(crate::Error::Interruption(ref i)) => assert_eq!(i, expected_interruption),
         Ok(ref v) => {
             unreachable!("expected Err({:?}), not Ok({:?})", expected_interruption, v)
         }

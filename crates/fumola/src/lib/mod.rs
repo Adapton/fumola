@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use fumola_semantics::vm_types::Interruption;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SyntaxError {
@@ -12,7 +12,7 @@ pub struct SyntaxError {
 pub enum Error {
     ValueError,
     Interruption(Interruption),
-    SyntaxError(SyntaxError)
+    SyntaxError(SyntaxError),
 }
 
 pub mod check;
