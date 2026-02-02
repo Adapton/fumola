@@ -3,12 +3,12 @@ resolver = "2"
 members = [
     "crates/fumola_syntax",
     "crates/fumola_semantics",
+    "crates/fumola_parser",
 ]
 # members = [
 #    "crates/fumola_syntax",
 #    "crates/fumola_semantics",
 #    "crates/fumola",
-#    "crates/fumola_parser",
 #    "crates/fumola_proc_macro",
 # ]
 
