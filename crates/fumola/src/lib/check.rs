@@ -1,7 +1,7 @@
 use fumola_syntax::ast::{Loc, Prog, Source};
 use fumola_syntax::lexer::create_token_tree;
 use fumola_syntax::lexer_types::{GroupType, Token, TokenTree};
-use fumola_semantics::format::{format_one_line, format_pretty, ToDoc};
+use fumola_semantics::format::{format_one_line, format_pretty};
 use fumola_parser::parser_types::SyntaxError;
 use log::{debug, info};
 use regex::Regex;
@@ -46,7 +46,7 @@ pub fn parse(input: &str) -> Result<Prog, SyntaxError> {
     let prepared_tt = prepare_token_tree(tt);
     let input = format!("{}", prepared_tt);
 
-    crate::parser::ProgParser::new()
+    fumola_parser::parser::ProgParser::new()
         // .parse(tokens.into_iter())
         .parse(&line_col::LineColLookup::new(&input), &input)
         .map_err(SyntaxError::from_parse_error)
@@ -93,8 +93,8 @@ pub fn assert_vm_eval(input_prog: &str, expected_result: &str) {
         input_prog,
         expected_result
     );
-    let v1 = crate::vm::eval(input_prog).unwrap();
-    let v2 = crate::vm::eval(expected_result).unwrap();
+    let v1 = crate::eval::eval(input_prog).unwrap();
+    let v2 = crate::eval::eval(expected_result).unwrap();
     assert_eq!(v1, v2)
 }
 
@@ -104,13 +104,13 @@ pub fn assert_vm_eval_result_line(input_prog: &str, expected_result: &str) {
         input_prog,
         expected_result
     );
-    let v1 = crate::vm::eval(input_prog).unwrap();
+    let v1 = crate::eval::eval(input_prog).unwrap();
     assert_eq!(format_one_line(&v1), expected_result)
 }
 
 pub fn assert_vm_interruption(
     input_prog: &str,
-    expected_interruption: &crate::vm_types::Interruption,
+    expected_interruption: &fumola_semantics::vm_types::Interruption,
 ) {
     log::info!(
         "\nassert_vm_interruption(\"{:?}\", \"{:?}\")",
@@ -118,7 +118,9 @@ pub fn assert_vm_interruption(
         expected_interruption
     );
     match crate::eval::eval(input_prog) {
-        Err(ref i) => assert_eq!(i, expected_interruption),
+        Err(crate::Error::ValueError) => panic!("value error"),
+        Err(crate::Error::SyntaxError(e)) => panic!("syntax error: {:?}", e),
+        Err(crate::Error::Interruption( ref i)) => assert_eq!(i, expected_interruption),
         Ok(ref v) => {
             unreachable!("expected Err({:?}), not Ok({:?})", expected_interruption, v)
         }

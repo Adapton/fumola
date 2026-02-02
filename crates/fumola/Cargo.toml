@@ -4,12 +4,12 @@ version = "0.0.29"
 authors = ["Matthew Hammer", "Ryan Vandersmith"]
 edition = "2021"
 license = "Apache-2.0"
-description = "A library for parsing and running Fumola in Rust"
+description = "Fumola Programming Language"
 readme = "README.md"
 documentation = "https://docs.rs/fumola"
 repository = "https://github.com/Adapton/fumola.rs"
 categories = ["wasm"]
-keywords = ["internet-computer", "fumola", "wasm"]
+keywords = ["wasm", "fumola", "adapton"]
 include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 
 [profile.dev]
@@ -20,6 +20,7 @@ debug = true
 fumola_syntax = { path = "../fumola_syntax" }
 fumola_semantics = { path = "../fumola_semantics" }
 fumola_parser = { path = "../fumola_parser" }
+lalrpop = { version = "0.22.2", features = ["lexer"] }
 lalrpop-util = { version = "0.22.2", features = ["lexer"] }
 regex = "1.6.0"
 env_logger = "0.10.0"
@@ -64,20 +65,6 @@ required-features = []  # Features required to build this target (N/A for lib).
 [[bin]]
 name = "fumola"
 path = "src/bin/fumola.rs"
-required-features = ["exe"]
-
-
-[features]
-default = ["parser", "to-motoko"]
-#default = []
-reflection = ["value-reflection", "core-reflection"]
-
-exe = ["rustyline"]
-serde-paths = ["serde_path_to_error"]
-parser = []
-to-motoko = []
-value-reflection = []
-core-reflection = []
 
 [[bench]]
 name = "benchmark"

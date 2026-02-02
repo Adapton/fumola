@@ -13,13 +13,6 @@ use serde::{Deserialize, Serialize};
 
 pub type Result<T = Value_, E = Interruption> = std::result::Result<T, E>;
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct SyntaxError {
-    pub package_name: Option<String>,
-    pub local_path: String,
-    //pub code: SyntaxErrorCode,
-}
-
 #[macro_export]
 macro_rules! type_mismatch_ {
     () => {
