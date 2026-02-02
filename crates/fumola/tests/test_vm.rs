@@ -60,6 +60,10 @@ fn vm_switch() {
 }
 
 #[test]
+fn vm_switch_option() {
+    assert_("switch (?(1,2)) { case (?(x,y)) {1}; case _ 2 }", "1")
+}
+#[test]
 fn vm_tuples() {
     assert_("(1, 2, 3)", "(1, 2, 3)");
     assert_("(1 + 1, 2 + 2, 3 + 3)", "(2, 4, 6)");
@@ -162,6 +166,26 @@ fn vm_array() {
         "let x = [var 0, 1, 2]; x[3] := 3",
         &Interruption::IndexOutOfBounds,
     );
+    assert_("[] # []", "[]");
+    assert_("[1] # [2]", "[1,2]");
+}
+
+#[test]
+fn vm_array_vals() {
+    assert_(
+        "let iter = [1, 2, 3].vals(); var sum = 0; for (y in iter) { sum += y }; sum",
+        "6",
+    )
+}
+
+#[test]
+fn vm_array_vals_dot_next() {
+    assert_("let next = [1, 2, 3].vals().next; next()", "?1")
+}
+
+#[test]
+fn vm_array_size() {
+    assert_("[1, 2, 3].size()", "3")
 }
 
 #[test]
@@ -273,7 +297,9 @@ fn for_() {
         "()",
     );
     assert_(
-        "var x = 13; var c = 0; let i = { next = func () { if (x == 0) { null } else { x := x - 1; c := c + 1; ?x } } }; for (j in i) { let _ = j; }; c", "13");
+        "var x = 13; var c = 0; let i = { next = func () { if (x == 0) { null } else { x := x - 1; c := c + 1; ?x } } }; for (j in i) { let _ = j; }; c",
+        "13",
+    );
 }
 
 #[test]
@@ -305,7 +331,10 @@ fn prim_reify_value() {
 #[cfg(feature = "value-reflection")]
 fn prim_reflect_value() {
     assert_("prim \"reflectValue\" (#Text \"hello\")", "\"hello\"");
-    assert_("prim \"reflectValue\" (#Function { env = (prim \"hashMapNew\" ()); content = { input = (#Wild, { source_type = \"Known\"; span = { start = 5; end = 6 }; line = 1; col = 6 }); exp = (#Literal(#Unit), { source_type = \"Known\"; span = { start = 9; end = 11 }; line = 1; col = 10 }); sugar = true } })", "func _ = ()");
+    assert_(
+        "prim \"reflectValue\" (#Function { env = (prim \"hashMapNew\" ()); content = { input = (#Wild, { source_type = \"Known\"; span = { start = 5; end = 6 }; line = 1; col = 6 }); exp = (#Literal(#Unit), { source_type = \"Known\"; span = { start = 9; end = 11 }; line = 1; col = 10 }); sugar = true } })",
+        "func _ = ()",
+    );
 }
 
 #[test]
@@ -352,13 +381,20 @@ fn prim_collection_hashmap() {
         "null",
     );
 
-    assert_("let (hm, _) = prim \"hashMapPut\" (prim \"hashMapNew\" (), 1, 2); prim \"hashMapGet\" (hm, 1)",
-           "?2");
+    assert_(
+        "let (hm, _) = prim \"hashMapPut\" (prim \"hashMapNew\" (), 1, 2); prim \"hashMapGet\" (hm, 1)",
+        "?2",
+    );
 
-    assert_("let (hm, _) = prim \"hashMapPut\" (prim \"hashMapNew\" (), 1, 2); (prim \"hashMapPut\" (hm, 1, 3)).1",
-           "?2");
+    assert_(
+        "let (hm, _) = prim \"hashMapPut\" (prim \"hashMapNew\" (), 1, 2); (prim \"hashMapPut\" (hm, 1, 3)).1",
+        "?2",
+    );
 
-    assert_("var _hm = (prim \"hashMapNew\") (); let hm = { put = func (k_, v_) { let (hm__, v) = prim \"hashMapPut\" (_hm, k_, v_);  _hm := hm__; };  get = func k { prim \"hashMapGet\" (_hm, k) } }; let _ = hm . put (1, 2) ; let _ = hm.get(1) ; let _ = hm.put(2, 3) ; (hm.get(1), hm.get(2))", "(?2, ?3)")
+    assert_(
+        "var _hm = (prim \"hashMapNew\") (); let hm = { put = func (k_, v_) { let (hm__, v) = prim \"hashMapPut\" (_hm, k_, v_);  _hm := hm__; };  get = func k { prim \"hashMapGet\" (_hm, k) } }; let _ = hm . put (1, 2) ; let _ = hm.get(1) ; let _ = hm.put(2, 3) ; (hm.get(1), hm.get(2))",
+        "(?2, ?3)",
+    )
 }
 
 #[test]

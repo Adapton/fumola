@@ -1,0 +1,281 @@
+module { 
+  public module Counters {
+    public func ptr (symbol:Symbol) {
+      prim "adaptonPointer" (`SeqTree-`Counter-symbol);
+    };
+    public func get (symbol:Symbol) {
+      (prim "adaptonPeek" (ptr symbol))
+    };
+    public func inc (symbol:Symbol) {
+      let p = ptr(symbol); 
+      switch (prim "adaptonPeek" p) {
+        case null {
+	          prim "adaptonPoke" (p, 1);
+        };
+        case (?n) {
+           prim "adaptonPoke" (p, n + 1);
+        };
+      }
+    };
+  };
+
+  #[listing(30)]
+  public type SeqTree<X> = {
+    #empty;
+    #element : Element<X>;
+    #binary : Binary<X>
+  };
+  #[listing]
+  public type SeqTree_<X> = Pointer<SeqTree<X>>;
+
+  #[listing(30)]
+  public type Binary<X> = {
+    symbol : Symbol;
+    level : Nat;
+    left : SeqTree_<X>;
+    right : SeqTree_<X>
+  };
+
+  #[listing(23)]
+  public type Element<X> = {
+    element : X;
+    symbol : Symbol
+  };
+
+  #[listing(33)]
+  public type List<X> = ?{
+    element : X;
+    symbol : Symbol;
+    next : Pointer<List<X>>
+  };
+
+  #[listing(23)]
+  public type LazyListCell<X> = {
+    element : X;
+    symbol : Symbol;
+    next : LazyList_<X>;
+  };
+
+  #[listing]
+  public type LazyList<X> = ?LazyListCell<X>;
+  
+  #[listing]
+  public type LazyList_<X> = Pointer<Thunk<LazyList<X>>>;
+
+  #[listing(69)]
+  public func merge(xs : LazyList<X>, ys : LazyList<X>) : LazyList<X> {
+    switch (xs, ys) {
+      case (_, null) xs;
+      case (null, _) ys;
+      case (?xc, ?yc) {
+        Counters.inc `merge;
+        if (xc.element <= yc.element) {
+          let xc_next = force(xc.next);
+          ?{ element=xc.element; symbol=xc.symbol; next = xc.symbol := thunk { merge(xc_next, ?yc) } }
+        } else {
+          let yc_next = force(yc.next);
+          ?{ element=yc.element; symbol=yc.symbol; next = yc.symbol := thunk { merge(?xc, yc_next) } }
+        }
+      };
+    }
+  };
+
+  #[listing]
+  public func reduceUp<X,Y>(
+        t : SeqTree<X>, 
+        empty : Y,
+        element : (Symbol, X) -> Y,
+        binary : (Symbol, Y, Y) -> Y) : Y 
+  {
+    switch t {
+      case (#empty) empty;
+      case (#element(e)) element(e.symbol, e.element);
+      case (#binary(b)) {
+        force (b.symbol := thunk {
+          binary(b.symbol,
+            reduceUp(@(b.left),  empty, element, binary), 
+            reduceUp(@(b.right), empty, element, binary)
+          )
+        })
+      };
+    }
+  };
+
+  let nullThunk = thunk { null };
+  func nullThunkPointer () = `nullThunk := nullThunk;
+
+  #[listing(62)]
+  public func lazyMergeSort<X>(t : SeqTree<X>) : LazyList_<X> {
+    do within space `lazyMergeSort { `result := thunk {
+    reduceUp(t,
+          null,
+          func(symbol:Symbol, element:X) : LazyList<X> {
+             ?{ symbol; element; next = nullThunkPointer() }
+          },
+          func(symbol:Symbol, xs:LazyList<X>, ys:LazyList<X>) : LazyList<X> {
+            do within space (`merge-symbol) {
+              merge(xs, ys)
+            }
+          },
+        )
+    }}};
+
+  #[listing]
+  public func listFromIter(iter : Iter<(Symbol, X)>) : List<X> {
+    switch (iter.next()) {
+      case null null;
+      case (?(symbol, element)) {
+        ?{symbol; element; next=listFromIter(iter)}
+      }
+    } 
+  };
+
+  #[listing]
+  public func takeAll(l : LazyList<X>) : [(Symbol, X)] {
+    prim "print" ("takeAll-l", l);
+    switch (force l) {
+      case null [];
+      case (?lc) {
+        prim "print" ("takeAll-lc", lc);
+        [(lc.symbol, lc.element)] # takeAll(lc.next)
+      }
+    }
+  };
+
+  public func listFromIterTest() {
+    let list = listFromIter([(1,1), (2,2), (3,3)].vals());
+    assert (list!.symbol == 1);
+    assert (list!.element == 1);
+    assert (list!.next!.symbol == 2);
+    assert (list!.next!.element == 2);
+    assert (list!.next!.next!.symbol == 3);
+    assert (list!.next!.next!.element == 3);
+    assert (list!.next!.next!.next == null);
+  };
+
+  public func fromArray<X>(array : [(Symbol, X)]) : ?SeqTree_<X> {
+    fromList(listFromIter(array.vals()))
+  };
+
+  #[listing]
+  public func fromList<X>(list : List<X>) : ?SeqTree_<X> {
+    do ? { do within space `SeqTreeFromList {
+      let {symbol; element; next} = list!;
+      let level = prim "symbolLevel" symbol;
+      let (tree, nil) = fromListRec(next, symbol-`element := #element {symbol; element}, null);
+      assert (nil == null);
+      tree
+    } }
+  };
+
+  #[listing]
+  func fromListRec<X>(list : List<X>, left : SeqTree_<X>, parentLevel : ?Nat) : (SeqTree_<X>, List<X>) {
+    switch list {
+      case null (left, null);
+      case (?{symbol; element; next}) {
+        let level = prim "symbolLevel" symbol;
+        if (levelLte(level, parentLevel)) {
+          let rightLeft = symbol-`element := #element {symbol; element};
+          let (right, next) = force (symbol-`rec1 := thunk { fromListRec(next, rightLeft, ?level) });
+          let left = symbol-`binary := #binary {symbol; level; left; right};
+          force ( symbol-`rec2 := thunk { fromListRec(next, left, parentLevel) } );
+        } else {
+          (left, list)
+        }
+      };
+    }
+  };
+
+  #[listing]
+  func levelLte(level : Nat, parentLevel : ?Nat) : bool {
+    switch parentLevel {
+      case null true;
+      case (?p) level <= p;
+    }
+  };
+
+  func max(a, b) {
+    if (a > b) { a } else { b }
+  };
+
+  func indentText(n : Nat) : Text {
+    if (n == 0) { "" } else {
+      "  " # (indentText(n - 1))
+    }
+  };
+
+  public func tikzText<X>(tree : SeqTree_<X>, n : Nat) : Text {
+    switch (@ tree) {
+      case (#empty) { "emptyNode\n" };
+      case (#element(e)) {
+        indentText(n) # "[{\\SeqTreeElement" #
+        "{" # (debug_show e.symbol) # "}" #
+        "{" # (debug_show e.element) # "}}]\n"
+      };
+      case (#binary(b)) {
+        indentText(n) # "[\n" #
+        indentText(n + 1) # "{\\SeqTreeBinaryNode" #
+        "{" # (debug_show b.symbol) # "}" #
+        "{" # (debug_show b.level) # "}" #
+        "}\n" #
+        tikzText(b.left, n + 1) #
+        tikzText(b.right, n + 1) #
+        indentText(n) # "]\n"
+      };
+    }
+  };
+
+  public func writeTikzText<X>(path : Symbol, tree : ?Pointer<SeqTree<X>>) {
+    let ?() = do ? {
+      let firstPart = "\\begin{forest}\n";
+      let lastPart = "\\end{forest}\n";
+      prim "writeFile" (path, firstPart # tikzText(tree!, 0) # lastPart)
+    };
+  };
+
+  func abs(x : Int) : Nat {
+    if (x < 0) -x else x
+  };
+
+  func maxChoice3(xdiff : Nat, x : ?(Nat, Nat), ydiff : Nat, y : ?(Nat, Nat), zdiff : Nat, z : ?(Nat, Nat)) : ?(Nat, Nat) {
+    if (xdiff >= ydiff and xdiff >= zdiff) { x }
+    else if (ydiff >= xdiff and ydiff >= zdiff) { y }
+    else z 
+  };
+
+  func maxChoice2(xdiff : Nat, x : ?(Nat, Nat), ydiff : Nat, y : ?(Nat, Nat)) : ?(Nat, Nat) {
+    if (xdiff >= ydiff) x else y 
+  };
+
+  func leastBalance(x : ?(Nat, Nat), y : ?(Nat, Nat), z : ?(Nat, Nat)) : ?(Nat, Nat) {
+    switch (x, y, z) {
+      case (null, null, z) z;
+      case (null, y, null) y;
+      case (x, null, null) x;
+      case (?(x1, x2), ?(y1, y2), null) { maxChoice2(abs(x1 - x2), x, abs(y1 - y2), y) };
+      case (?(x1, x2), null, ?(y1, y2)) { maxChoice2(abs(x1 - x2), x, abs(y1 - y2), y) };
+      case (?(x1, x2), null, ?(y1, y2)) { maxChoice2(abs(x1 - x2), x, abs(y1 - y2), y) };
+      case (?(x1, x2), ?(y1, y2), ?(z1, z2)) {
+        maxChoice3(abs(x1 - x2), x, abs(y1 - y2), y, abs(z1 - z2), z)
+      }
+    }
+  };  
+
+  #[listing]
+  public func metrics<X>(tree : Pointer<SeqTree<X>>) {
+    switch (@ tree) {
+      case (#empty) { { depth=0; size=0; leastBalance=null } };
+      case (#element(e)) { { depth=1; size=1; leastBalance=null } };
+      case (#binary(b)) {
+        let ml = metrics(b.left);
+        let mr = metrics(b.right);
+        { 
+          depth = max(ml.depth, mr.depth) + 1; 
+          size = ml.size + mr.size;
+          leastBalance = leastBalance(ml.leastBalance, mr.leastBalance, ?(ml.size, mr.size))
+        }
+      };
+    }
+  };
+
+};

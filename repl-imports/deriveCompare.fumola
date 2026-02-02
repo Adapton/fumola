@@ -1,0 +1,16 @@
+module {
+    #[derive(Compare)]
+    type myRecord = {
+        name : Text;
+        address : Address;
+        phone: Text;
+    };
+    #[derive(Compare)]
+    type Address = {
+        street : Text;
+        city : Text;
+        state : Text;
+        zip : Text;
+        country : ?Text;
+    };
+}

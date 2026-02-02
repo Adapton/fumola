@@ -2,13 +2,14 @@ use fumola::{Interruption, ToMotoko, Value_};
 
 use log::{error, info, trace};
 
-use fumola::format::{format_one_line, format_pretty, ToDoc};
+use fumola::format::{ToDoc, format_one_line, format_pretty};
 use fumola::vm_types::{Core, Limits};
 
-use rustyline::error::ReadlineError;
 use rustyline::Editor;
+use rustyline::error::ReadlineError;
 
-use std::fs;
+use std::fs::{self, File};
+use std::io::Write;
 use std::path::Path;
 
 use clap::{Parser, Subcommand};
@@ -167,6 +168,21 @@ fn repl(core: &mut Core) {
                     println!("{}", line.text.to_string())
                 }
                 core.debug_print_out = im_rc::vector::Vector::new();
+                for (path, content) in core.output_files.iter() {
+                    let path_string = format_one_line(path).replace("`", "");
+                    let content = content.to_string();
+                    info!(
+                        "writing file `{}` with \"{}\"",
+                        path_string,
+                        truncate_with_ellipsis(content.as_str(), 69)
+                    );
+                    let mut file = File::create(path_string).expect("opening output file");
+                    let content_to_write = expand_escapes(content.as_str());
+                    file.write_all(content_to_write.to_string().as_bytes())
+                        .expect("writing output file");
+                    file.flush().expect("flush output file")
+                }
+                core.output_files = im_rc::hashmap::HashMap::new();
                 rl.add_history_entry(line.as_str());
                 inspect_result(core, v, 0)
             }
@@ -225,7 +241,9 @@ fn inspect_result(core: &mut Core, result: Result<Value_, Interruption>, depth: 
 fn report_error(core: &mut Core, error: Interruption) {
     error!("Error: {:?}", error);
     info!("  Hint: Inspect lastError for details.");
-    info!("  For example, lastError.core.agent.active.cont, if lastError.core.scedule_choice == #Agent");
+    info!(
+        "  For example, lastError.core.agent.active.cont, if lastError.core.scedule_choice == #Agent"
+    );
     /* dump core, without chaining with any prior core dump. */
     if let Some(_) = core.get_var("lastInterruption") {
         core.define("lastInterruptionCore", fumola::Value::Unit);
@@ -250,4 +268,60 @@ fn read_file_if_exists(path: &str) -> Option<String> {
         trace!("...Module file not found.");
         None
     }
+}
+
+fn truncate_with_ellipsis(s: &str, max_len: usize) -> String {
+    if s.chars().count() <= max_len {
+        s.to_string()
+    } else if max_len <= 3 {
+        // Not enough space for even one character plus ellipsis
+        ".".repeat(max_len)
+    } else {
+        let truncated: String = s.chars().take(max_len - 3).collect();
+        format!("{}...", truncated)
+    }
+}
+
+fn expand_escapes(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.peek() {
+                Some('n') => {
+                    result.push('\n');
+                    chars.next();
+                }
+                Some('t') => {
+                    result.push('\t');
+                    chars.next();
+                }
+                Some('r') => {
+                    result.push('\r');
+                    chars.next();
+                }
+                Some('\\') => {
+                    result.push('\\');
+                    chars.next();
+                }
+                Some('"') => {
+                    result.push('"');
+                    chars.next();
+                }
+                Some('\'') => {
+                    result.push('\'');
+                    chars.next();
+                }
+                Some(other) => {
+                    result.push('\\');
+                    result.push(*other);
+                    chars.next();
+                }
+                None => result.push('\\'),
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
 }

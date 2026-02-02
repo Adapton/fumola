@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 
 use fumola::value::ToMotoko;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 fn assert<T: Debug + Eq + Serialize + DeserializeOwned>(input: &str, value: T, debug_str: &str) {
     println!("Evaluating: {}", input);

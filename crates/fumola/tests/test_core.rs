@@ -1,9 +1,9 @@
+use fumola::ToMotoko;
 use fumola::ast::ToId;
 use fumola::eval;
 use fumola::shared::Share;
 use fumola::value::ActorId;
 use fumola::vm_types::{Core, Interruption, Limits, ModulePath};
-use fumola::ToMotoko;
 
 use test_log::test; // enable logging output for tests by default.
 
