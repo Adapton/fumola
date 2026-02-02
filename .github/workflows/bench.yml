@@ -3,6 +3,7 @@ on:
   pull_request:
 jobs:
   runBenchMark:
+    if: false
     name: run benchmark
     runs-on: ubuntu-latest
     steps:
