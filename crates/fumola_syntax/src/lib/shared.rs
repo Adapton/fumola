@@ -127,23 +127,3 @@ impl Share for String {
         Shared::new(self)
     }
 }
-
-impl Share for crate::value::Value {
-    fn share(self) -> Shared<Self> {
-        use crate::value::Value;
-        std::thread_local! {
-            static UNIT: Shared<Value> = Shared::new(Value::Unit);
-            static NULL: Shared<Value> = Shared::new(Value::Null);
-            static TRUE: Shared<Value> = Shared::new(Value::Bool(true));
-            static FALSE: Shared<Value> = Shared::new(Value::Bool(false));
-            // TODO: common literals such as 0, 1, "", etc?
-        };
-        match self {
-            Value::Unit => UNIT.with(|s| s.fast_clone()),
-            Value::Null => NULL.with(|s| s.fast_clone()),
-            Value::Bool(true) => TRUE.with(|s| s.fast_clone()),
-            Value::Bool(false) => FALSE.with(|s| s.fast_clone()),
-            _ => Shared::new(self),
-        }
-    }
-}

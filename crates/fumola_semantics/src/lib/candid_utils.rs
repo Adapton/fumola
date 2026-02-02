@@ -2,7 +2,7 @@ use candid::parser::value::{IDLArgs, IDLValue, VariantValue};
 use candid::types::Label;
 use im_rc::HashMap;
 
-use crate::ast::{Id, Mut, ToId};
+use fumola_syntax::ast::{Id, Mut, ToId};
 use crate::value::{FieldValue, Result};
 use crate::{Share, Value, ValueError};
 

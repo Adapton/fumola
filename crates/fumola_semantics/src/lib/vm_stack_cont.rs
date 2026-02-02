@@ -1,9 +1,9 @@
 //use crate::{ast::{Mut, ProjIndex}, shared::FastClone, type_mismatch, vm_types::{stack::{FieldContext, FieldValue, Frame, FrameCont}, Active, Cont, Step}, Interruption, Value, Value_};
 
 use crate::adapton::AdaptonState;
-use crate::ast::{Cases, Exp_, Inst, Mut, Pat_, ProjIndex, QuotedAst};
+use fumola_syntax::ast::{Cases, Exp_, Inst, Mut, Pat_, ProjIndex, QuotedAst};
 use crate::format::format_one_line;
-use crate::shared::{FastClone, Share};
+use fumola_syntax::shared::{FastClone, Share};
 use crate::value::{
     ActorMethod, ArrayIterator, ArrayIteratorFunc, ArrayIteratorNextFunc, ArraySizeFunc,
     ClosedFunction, DynamicValue, Symbol, Text, Value, Value_,
@@ -16,10 +16,10 @@ use crate::vm_types::{
 use crate::vm_types::{OptionCoreSource, Store};
 use crate::{nyi, type_mismatch_, vm_step, Dynamic, Shared};
 use im_rc::{HashMap, Vector};
-
+use crate::type_mismatch;
 use crate::vm_step::{
     cont_value, decs_step, exp_cont, exp_conts, exp_step, literal_step, object_step, return_,
-    return_step, tuple_step, type_mismatch, unit_step, var_step,
+    return_step, tuple_step, unit_step, var_step,
 };
 
 // continue execution using the top-most stack frame, if any.
@@ -701,7 +701,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                     env,
                     cont: FrameCont::ForceAdaptonPointer,
                     cont_prim_type: None,
-                    source: crate::vm_types::Source::Evaluation,
+                    source: fumola_syntax::ast::Source::Evaluation,
                 });
                 *active.env() = thunk_body.env;
                 *active.ctx_id() = thunk_body.ctx;
@@ -714,7 +714,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                     env,
                     cont: FrameCont::ForceThunk,
                     cont_prim_type: None,
-                    source: crate::vm_types::Source::Evaluation,
+                    source: fumola_syntax::ast::Source::Evaluation,
                 });
                 *active.env() = thunk_body.env.fast_clone();
                 *active.ctx_id() = thunk_body.ctx.clone();

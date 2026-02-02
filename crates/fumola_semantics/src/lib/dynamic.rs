@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-use crate::ast::{Inst, ToId};
+use fumola_syntax::ast::{Inst, ToId};
 use crate::value::{DynamicValue, Value, Value_};
 use crate::vm_types::{Interruption, Store};
 

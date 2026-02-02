@@ -1,5 +1,5 @@
-use crate::ast::{Id_, Literal, Pat, Source};
-use crate::shared::{FastClone, Share};
+use fumola_syntax::ast::{Id_, Literal, Pat, Source};
+use fumola_syntax::shared::{FastClone, Share};
 use crate::value::{Value, Value_};
 use crate::vm_types::{Env, Interruption, Pointer};
 use std::vec::Vec;
@@ -9,7 +9,7 @@ use crate::type_mismatch;
 // to do -- simplify (elim this nested mod)
 pub mod pattern {
     use super::*;
-    use crate::ast::{Delim, NodeData};
+    use fumola_syntax::ast::{Delim, NodeData};
 
     pub fn temps(num: u16) -> Pat {
         let mut vars = vec![];

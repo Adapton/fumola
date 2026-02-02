@@ -1,17 +1,18 @@
 // Reference: https://github.com/dfinity/candid/blob/master/rust/candid/src/bindings/candid.rs
 
 use crate::adapton::{Space, Time};
-use crate::ast::{
+use fumola_syntax::ast::{
+    PrimFunction,
     AdaptonNav, AdaptonNavDim, BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_,
     Delim, Exp, ExpField, Exp_, Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat,
     PatField, PrimType, QuotedAst, RelOp, Stab, Type, TypeBind, TypeField, TypePath, TypeTag,
     TypeTag_, UnOp, Unquote, Vis,
 };
 use crate::format_utils::*;
-use crate::lexer::is_keyword;
-use crate::lexer_types::{GroupType, Token, TokenTree};
-use crate::shared::Shared;
-use crate::value::{Closed, FieldValue, Pointer, PrimFunction, Symbol, Value, Value_};
+use fumola_syntax::lexer::is_keyword;
+use fumola_syntax::lexer_types::{GroupType, Token, TokenTree};
+use fumola_syntax::shared::Shared;
+use crate::value::{Closed, FieldValue, Pointer, Symbol, Value, Value_};
 use crate::vm_types::def::Module;
 use crate::vm_types::{def::CtxId, Env, LocalPointer, ScheduleChoice};
 use pretty::RcDoc;
@@ -308,7 +309,6 @@ impl ToDoc for Module {
 
 impl ToDoc for PrimFunction {
     fn doc(&'_ self) -> RcDoc<'_> {
-
         match self {
             PrimFunction::AdaptonNow => str("\"adaptonNow\""),
             PrimFunction::AdaptonHere => str("\"adaptonHere\""),
@@ -317,9 +317,7 @@ impl ToDoc for PrimFunction {
             PrimFunction::AtSignVar(s) => kwd("@").append(str(s.as_str())),
             PrimFunction::DebugPrint => str("\"debugPrint\""),
             PrimFunction::NatToText => str("\"natToText\""),
-            #[cfg(feature = "value-reflection")]
             PrimFunction::ReflectValue => str("\"reifyValue\""),
-            #[cfg(feature = "value-reflection")]
             PrimFunction::ReifyValue => str("\"reifyValue\""),
             PrimFunction::Collection(_collection_function) => todo!(),
             PrimFunction::SymbolLevel => str("\"symbolLevel\""),
@@ -328,6 +326,8 @@ impl ToDoc for PrimFunction {
             PrimFunction::AdaptonPointer => str("\"adaptonPointer\""),
             PrimFunction::AdaptonPeek => str("\"adaptonPeek\""),
             PrimFunction::AdaptonPoke => str("\"adaptonPoke\""),
+            PrimFunction::ReifyCore => todo!(),
+            PrimFunction::ReflectCore => todo!(),
         }
     }
 }
@@ -674,7 +674,7 @@ impl ToDoc for Exp {
             }
             Ignore(e) => kwd("ignore").append(e.doc()),
             Paren(e) => enclose("(", e.doc(), ")"),
-            Value_(_) => todo!(),
+            // Value_(_) => todo!(),
             Proj(_, _) => todo!(),
             Object((bases, fields)) => enclose(
                 "{",
@@ -1038,7 +1038,7 @@ fn filter_whitespace_<'a>(trees: &'a [TokenTree], results: &mut Vec<&'a TokenTre
 }
 
 fn get_space_between<'a>(a: &'a TokenTree, b: &'a TokenTree) -> RcDoc<'a> {
-    use crate::lexer_types::Token::*;
+    use fumola_syntax::lexer_types::Token::*;
     use GroupType::*;
     use TokenTree::*;
     match (a, b) {

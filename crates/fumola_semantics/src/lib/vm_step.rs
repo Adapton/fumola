@@ -1,9 +1,9 @@
 use crate::adapton::Navigation as AdaptonNav;
-use crate::ast::{
+use fumola_syntax::ast::{
     AdaptonNav as AdaptonNavAst, AdaptonNavDim, AdaptonNav_, Dec, Dec_, Delim, Exp, ExpField_,
     Exp_, Id, IdPos_, Literal, Pat, Pat_, Source, Type,
 };
-use crate::shared::{FastClone, Share};
+use fumola_syntax::shared::{FastClone, Share};
 use crate::value::{ActorId, Closed, ClosedFunction, Value, Value_};
 use crate::vm_types::{
     def::{Def, Field as FieldDef},
@@ -41,7 +41,7 @@ pub fn var_step<A: Active>(active: &mut A, x: &Id) -> Result<Step, Interruption>
     match active.env().get(&x) {
         None => {
             if x.string.starts_with("@") {
-                let f = crate::value::PrimFunction::AtSignVar(x.to_string());
+                let f = fumola_syntax::ast::PrimFunction::AtSignVar(x.to_string());
                 let v = Value::PrimFunction(f).share();
                 *active.cont() = Cont::Value_(v);
                 Ok(Step {})
@@ -148,10 +148,10 @@ pub fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interrupti
     use Exp::*;
     let source = exp.1.clone();
     match &exp.0 {
-        Value_(v) => {
-            *active.cont() = cont_value((**v).clone());
-            Ok(Step {})
-        }
+      //  Value_(v) => {
+      //      *active.cont() = cont_value((**v).clone());
+      //      Ok(Step {})
+      //  }
         QuotedAst(q) => {
             use crate::quoted::QuotedClose;
             *active.cont() = cont_value(Value::QuotedAst(q.quoted_close(active.env())?));
@@ -296,7 +296,7 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
             if decs.is_empty() {
                 exp_step(active, e)
             } else {
-                let source = crate::ast::source_from_decs(&decs);
+                let source = fumola_syntax::ast::source_from_decs(&decs);
                 let env = active.env().fast_clone();
                 let context = active.defs().active_ctx.clone();
 

@@ -1,20 +1,17 @@
 use crate::adapton::AdaptonState;
-use crate::ast::PrimType;
-use crate::ast::{Dec, DecField, Dec_, Exp_, Id, Id_, Inst, Prog, Source, ToId};
-use crate::shared::{FastClone, Share};
+use fumola_syntax::ast::PrimType;
+use fumola_syntax::ast::{Exp_, Id, Inst, Prog, Source, ToId};
+use fumola_syntax::shared::{FastClone, Share};
 use crate::value::{ActorId, ActorMethod, Value, Value_};
-use crate::vm_def::def;
 use crate::vm_types::def::CtxId;
 use crate::vm_types::Actor;
 use crate::vm_types::DebugPrintLine;
 use crate::vm_types::Env;
-use crate::vm_types::ModuleFileInit;
 use crate::vm_types::Stack;
 use crate::vm_types::{
     def::{Actor as ActorDef, Def, Defs, Field as FieldDef, Module as ModuleDef},
     stack::{Frame, FrameCont},
-    Activation, Active, Actors, Agent, Cont, Core, Counts, Interruption, Limits, ModuleFileState,
-    ModuleFiles, ModulePath, Pointer, Response, ScheduleChoice, Step, SyntaxError,
+    Activation, Active, Actors, Agent, Cont, Core, Counts, Interruption, Limits, ModuleFiles, ModulePath, Pointer, Response, ScheduleChoice, Step,
 };
 use crate::vm_types::{ActiveBorrow, OutputFiles};
 use crate::vm_types::{EvalInitError, Store};
@@ -456,6 +453,7 @@ impl Core {
         }
     }
 
+    /*
     /// Load `base` library into an existing Core.
     pub fn load_base(&mut self) -> Result<(), Interruption> {
         use crate::package::{get_base_library, get_prim_library};
@@ -472,25 +470,20 @@ impl Core {
             self.set_module(Some("base".to_string()), path.clone(), &file.content)?
         }
         Ok(())
-    }
+    } */
 
     /// New VM without any program.
     pub fn empty() -> Self {
-        let mut c = Self::new(crate::ast::Delim::new());
+        let mut c = Self::new(fumola_syntax::ast::Delim::new());
         c.run(&Limits::none()).expect("empty");
         c
     }
 
-    /// New VM from a given program string, to be parsed as the Agent program.
-    #[cfg(feature = "parser")]
-    pub fn parse(s: &str) -> Result<Self, crate::parser_types::SyntaxError> {
-        Ok(Self::new(crate::check::parse(s)?))
-    }
-
+    /*
     fn assert_actor_def(
         local_path: String,
         s: &str,
-    ) -> Result<(Vector<Dec_>, Option<Id_>, crate::ast::DecFields), Interruption> {
+    ) -> Result<(Vector<Dec_>, Option<Id_>, fumola_syntax::ast::DecFields), Interruption> {
         let p = match crate::check::parse(s) {
             Err(code) => {
                 return Err(Interruption::SyntaxError(SyntaxError {
@@ -515,19 +508,20 @@ impl Core {
             },
             None => unreachable!(),
         }
-    }
+    } */
 
-    /// Test if the string is a syntatically-valid Motoko module.
-    #[cfg(feature = "parser")]
-    pub fn is_module_def(s: &str) -> bool {
-        // we ignore the syntax error messages, if any; so this path doesn't matter.
-        let path = ModulePath {
-            package_name: None,
-            local_path: "".to_string(),
-        };
-        Self::assert_module_def(path, s).is_ok()
-    }
+    // /// Test if the string is a syntatically-valid Motoko module.
+    // #[cfg(feature = "parser")]
+    // pub fn is_module_def(s: &str) -> bool {
+    //     // we ignore the syntax error messages, if any; so this path doesn't matter.
+    //     let path = ModulePath {
+    //         package_name: None,
+    //         local_path: "".to_string(),
+    //     };
+    //     Self::assert_module_def(path, s).is_ok()
+    // }
 
+    /* 
     /// path is only used to form SyntaxError Interruptions, if they are needed.
     fn assert_module_def(path: ModulePath, s: &str) -> Result<ModuleFileInit, Interruption> {
         let p = match crate::check::parse(s) {
@@ -557,8 +551,9 @@ impl Core {
             },
             None => unreachable!(),
         }
-    }
+    } */
 
+    /* 
     /// Set the actor `id` to the given `definition`, regardless of whether `id` is defined already or not.
     /// If not defined, this is the same as `create_actor`.
     /// Otherwise, it is the same as `update_actor`.
@@ -568,8 +563,9 @@ impl Core {
         } else {
             self.upgrade_actor(path, id, def)
         }
-    }
+    } */
 
+    /*
     /// Set the path's file content (initially), or re-set it, when it changes.
     ///
     /// Optionally, the file is part of a named package, and will be distinct from paths from other packages.
@@ -623,7 +619,7 @@ impl Core {
                 .insert(path.clone(), ModuleFileState::Init(init));
         };
         Ok(())
-    }
+    } */
 
     /// Call an actor method.
     pub fn call(
@@ -653,6 +649,7 @@ impl Core {
         self.run(limits)
     }
 
+    /* 
     /// Create a new actor with the given (unused) `id`, and the definition `def`.
     pub fn create_actor(
         &mut self,
@@ -667,7 +664,7 @@ impl Core {
         let (saved, new_root) = self.defs().enter_context(true);
         for dec in decs.iter() {
             let dec = dec.clone();
-            let df = crate::ast::DecField {
+            let df = fumola_syntax::ast::DecField {
                 attrs: None,
                 vis: None,
                 stab: None,
@@ -678,8 +675,9 @@ impl Core {
         def::actor(self, path, &id, Source::CoreCreateActor, None, None, &dfs)?;
         self.defs().leave_context(saved, &new_root);
         Ok(())
-    }
+    } */
 
+    /* 
     /// Upgrade an existing actor with the given `id`, with new definition `def`.
     pub fn upgrade_actor(
         &mut self,
@@ -696,7 +694,7 @@ impl Core {
         let (saved, ctxid, old_ctx) = self.defs().reenter_context(&old_def.context);
         for dec in decs.iter() {
             let dec = dec.clone();
-            let df = crate::ast::DecField {
+            let df = fumola_syntax::ast::DecField {
                 attrs: None,
                 vis: None,
                 stab: None,
@@ -716,7 +714,7 @@ impl Core {
         )?;
         self.defs().releave_context(saved, &ctxid, &old_ctx);
         Ok(())
-    }
+    } */
 
     /// Attempt a single-step of VM, under some limits.
     pub fn step(&mut self, limits: &Limits) -> Result<Step, Interruption> {
@@ -832,46 +830,47 @@ impl Core {
         Ok(())
     }
 
-    /// Evaluate a new program fragment, assuming agent is idle.
-    #[cfg(feature = "parser")]
-    pub fn eval(&mut self, new_prog_frag: &str) -> Result<Value_, Interruption> {
-        self.assert_idle_agent()
-            .map_err(Interruption::EvalInitError)?;
-        let local_path = "<anonymous>".to_string();
-        let package_name = None;
-        let p = crate::check::parse(new_prog_frag).map_err(|code| {
-            Interruption::SyntaxError(SyntaxError {
-                code,
-                local_path,
-                package_name,
-            })
-        })?;
-        self.agent.active.cont = Cont::Decs(p.vec);
-        self.run(&Limits::none())
-    }
+    // /// Evaluate a new program fragment, assuming agent is idle.
+    // #[cfg(feature = "parser")]
+    // pub fn eval(&mut self, new_prog_frag: &str) -> Result<Value_, Interruption> {
+    //     self.assert_idle_agent()
+    //         .map_err(Interruption::EvalInitError)?;
+    //     let local_path = "<anonymous>".to_string();
+    //     let package_name = None;
+    //     let p = crate::check::parse(new_prog_frag).map_err(|code| {
+    //         Interruption::SyntaxError(SyntaxError {
+    //             code,
+    //             local_path,
+    //             package_name,
+    //         })
+    //     })?;
+    //     self.agent.active.cont = Cont::Decs(p.vec);
+    //     self.run(&Limits::none())
+    // }
 
-    /// Evaluate a new program fragment, NOT assuming agent is idle.
-    /// generally, self.agent.active.stack is non-empty, and we are trying to return something to it that got stuck earlier.
-    #[cfg(feature = "parser")]
-    pub fn resume(&mut self, new_prog_frag: &str) -> Result<Value_, Interruption> {
-        let local_path = "<anonymous>".to_string();
-        let package_name = None;
-        let p = crate::check::parse(new_prog_frag).map_err(|code| {
-            Interruption::SyntaxError(SyntaxError {
-                code,
-                local_path,
-                package_name,
-            })
-        })?;
-        self.agent.active.cont = Cont::Decs(p.vec);
-        self.run(&Limits::none())
-    }
+    // /// Evaluate a new program fragment, NOT assuming agent is idle.
+    // /// generally, self.agent.active.stack is non-empty, and we are trying to return something to it that got stuck earlier.
+    // #[cfg(feature = "parser")]
+    // pub fn resume(&mut self, new_prog_frag: &str) -> Result<Value_, Interruption> {
+    //     let local_path = "<anonymous>".to_string();
+    //     let package_name = None;
+    //     let p = crate::check::parse(new_prog_frag).map_err(|code| {
+    //         Interruption::SyntaxError(SyntaxError {
+    //             code,
+    //             local_path,
+    //             package_name,
+    //         })
+    //     })?;
+    //     self.agent.active.cont = Cont::Decs(p.vec);
+    //     self.run(&Limits::none())
+    // }
 
+ /* 
     pub fn eval_str(&mut self, input: &str) -> Result<Value_, Interruption> {
         let prog = crate::check::parse(input)?;
         self.eval_prog(prog)
     }
-
+*/
     pub fn clear_cont(&mut self) {
         *self.cont() = Cont::Value_(Value::Unit.share());
 

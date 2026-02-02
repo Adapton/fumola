@@ -1,6 +1,17 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/fumola",
-    "crates/fumola_proc_macro"
+    "crates/fumola_syntax",
+    "crates/fumola_semantics",
 ]
+# members = [
+#    "crates/fumola_syntax",
+#    "crates/fumola_semantics",
+#    "crates/fumola",
+#    "crates/fumola_parser",
+#    "crates/fumola_proc_macro",
+# ]
+
+[profile.dev]
+incremental = true
+debug = true

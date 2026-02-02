@@ -1,8 +1,9 @@
 [package]
-name = "fumola"
+name = "fumola_parser"
 version = "0.0.29"
 authors = ["Matthew Hammer", "Ryan Vandersmith"]
 edition = "2021"
+build = "build.rs"
 license = "Apache-2.0"
 description = "A library for parsing and running Fumola in Rust"
 readme = "README.md"
@@ -10,7 +11,7 @@ documentation = "https://docs.rs/fumola"
 repository = "https://github.com/Adapton/fumola.rs"
 categories = ["wasm"]
 keywords = ["internet-computer", "fumola", "wasm"]
-include = ["src", "Cargo.toml", "LICENSE", "README.md"]
+include = ["src", "build.rs", "Cargo.toml", "LICENSE", "README.md"]
 
 [profile.dev]
 incremental = true
@@ -18,8 +19,7 @@ debug = true
 
 [dependencies]
 fumola_syntax = { path = "../fumola_syntax" }
-fumola_semantics = { path = "../fumola_semantics" }
-fumola_parser = { path = "../fumola_parser" }
+lalrpop = "0.22.2"
 lalrpop-util = { version = "0.22.2", features = ["lexer"] }
 regex = "1.6.0"
 env_logger = "0.10.0"
@@ -50,36 +50,13 @@ lalrpop = "0.22.2"
 
 [lib]
 edition = "2021"
-name = "fumola"
+name = "fumola_parser"
 path = "src/lib/mod.rs"
 test = true             # Is tested by default.
-doctest = false          # Documentation examples are tested by default.
+doctest = true          # Documentation examples are tested by default.
 bench = true            # Is benchmarked by default.
 doc = true              # Is documented by default.
 plugin = false          # Used as a compiler plugin (deprecated).
 harness = true          # Use libtest harness.
 crate-type = ["lib"]    # The crate types to generate.
 required-features = []  # Features required to build this target (N/A for lib).
-
-[[bin]]
-name = "fumola"
-path = "src/bin/fumola.rs"
-required-features = ["exe"]
-
-
-[features]
-default = ["parser", "to-motoko"]
-#default = []
-reflection = ["value-reflection", "core-reflection"]
-
-exe = ["rustyline"]
-serde-paths = ["serde_path_to_error"]
-parser = []
-to-motoko = []
-value-reflection = []
-core-reflection = []
-
-[[bench]]
-name = "benchmark"
-harness = false
-path = "benches/benchmark.rs"

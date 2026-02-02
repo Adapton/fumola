@@ -1,5 +1,5 @@
 [package]
-name = "fumola"
+name = "fumola_semantics"
 version = "0.0.29"
 authors = ["Matthew Hammer", "Ryan Vandersmith"]
 edition = "2021"
@@ -12,15 +12,8 @@ categories = ["wasm"]
 keywords = ["internet-computer", "fumola", "wasm"]
 include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 
-[profile.dev]
-incremental = true
-debug = true
-
 [dependencies]
 fumola_syntax = { path = "../fumola_syntax" }
-fumola_semantics = { path = "../fumola_semantics" }
-fumola_parser = { path = "../fumola_parser" }
-lalrpop-util = { version = "0.22.2", features = ["lexer"] }
 regex = "1.6.0"
 env_logger = "0.10.0"
 log = "0.4.17"
@@ -39,8 +32,6 @@ serde_path_to_error = { version = "0.1.8", optional = true }
 test-log = "0.2.11"
 dyn-clone = "1.0.9"
 candid = "0.8"
-rustyline = { version = "7.0.0", optional = true }
-clap = { version = "4", features = ["derive"] }
 
 [dev-dependencies]
 criterion = "0.4.0"
@@ -49,37 +40,12 @@ criterion = "0.4.0"
 lalrpop = "0.22.2"
 
 [lib]
-edition = "2021"
-name = "fumola"
+name = "fumola_semantics"
 path = "src/lib/mod.rs"
 test = true             # Is tested by default.
 doctest = false          # Documentation examples are tested by default.
 bench = true            # Is benchmarked by default.
 doc = true              # Is documented by default.
-plugin = false          # Used as a compiler plugin (deprecated).
 harness = true          # Use libtest harness.
 crate-type = ["lib"]    # The crate types to generate.
 required-features = []  # Features required to build this target (N/A for lib).
-
-[[bin]]
-name = "fumola"
-path = "src/bin/fumola.rs"
-required-features = ["exe"]
-
-
-[features]
-default = ["parser", "to-motoko"]
-#default = []
-reflection = ["value-reflection", "core-reflection"]
-
-exe = ["rustyline"]
-serde-paths = ["serde_path_to_error"]
-parser = []
-to-motoko = []
-value-reflection = []
-core-reflection = []
-
-[[bench]]
-name = "benchmark"
-harness = false
-path = "benches/benchmark.rs"

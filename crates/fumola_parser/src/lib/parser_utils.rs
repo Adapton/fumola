@@ -1,4 +1,4 @@
-use crate::ast::{Dec, Dec_, Delim, Exp};
+use fumola_syntax::ast::{Dec, Dec_, Delim, Exp};
 
 pub fn get_one<T: Clone>(d: Delim<T>) -> Result<T, Delim<T>> {
     if d.vec.len() == 1 && !d.has_trailing {

@@ -1,5 +1,4 @@
 use crate::shared::{Share, Shared};
-use crate::value::{PrimFunction, Value_};
 // use crate::ToMotoko;
 use im_rc::Vector;
 use serde::{Deserialize, Serialize};
@@ -11,6 +10,18 @@ use std::rc::Rc;
 /// A "located `X`" has a source location of type `Source`.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct Loc<X>(pub X, pub Source);
+
+impl PartialOrd for Id {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.string.partial_cmp(&other.string)
+    }
+}
+
+impl Ord for Id {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.string.cmp(&other.string)
+    }
+}
 
 impl<X: std::fmt::Debug> std::fmt::Debug for Loc<X> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -588,39 +599,6 @@ pub enum QuotedAst {
     Attrs(Attrs),
 }
 
-impl QuotedAst {
-    pub fn append(&self, other: &Self) -> Result<Self, crate::vm_types::Interruption> {
-        use QuotedAst::*;
-        match (self, other) {
-            (Empty, _) => Ok(other.clone()),
-            (_, Empty) => Ok(self.clone()),
-            (TupleExps(es1), TupleExps(es2)) => Ok(TupleExps(es1.append(es2))),
-            (RecordExps((None, None)), RecordExps((es1, es2))) => {
-                Ok(RecordExps((es1.clone(), es2.clone())))
-            }
-            (RecordExps((es1, None)), RecordExps((None, Some(es3)))) => {
-                Ok(RecordExps((es1.clone(), Some(es3.clone()))))
-            }
-            (RecordExps((es1, es2)), RecordExps((None, es3))) => Ok(match (es2, es3) {
-                (Some(es2), None) => RecordExps((es1.clone(), Some(es2.clone()))),
-                (None, es3) => RecordExps((es1.clone(), es3.clone())),
-                (Some(es2), Some(es3)) => RecordExps((es1.clone(), Some(es2.append(es3)))),
-            }),
-            (Cases(cs1), Cases(cs2)) => Ok(Cases(cs1.append(cs2))),
-            (Id_(i1), Id_(i2)) => Ok(Id_(NodeData(
-                crate::ast::Id::new(format!("{}{}", i1.0.as_str(), i2.0.as_str())),
-                Source::Evaluation,
-            )
-            .share())),
-            (Decs(ds1), Decs(ds2)) => Ok(Decs(ds1.append(ds2))),
-            (TuplePats(_), TuplePats(_)) => todo!(),
-            (RecordPats(_), RecordPats(_)) => todo!(),
-            (DecFields(_), DecFields(_)) => todo!(),
-            (_, _) => crate::type_mismatch!(file!(), line!()),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum AdaptonNavDim {
     Space,
@@ -639,7 +617,6 @@ pub type ExpObjectBody = (Option<Delim<Exp_>>, Option<ExpFields>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Exp {
-    Value_(Value_),
     Hole,
     Prim(Result<PrimFunction, String>),
     Var(IdPos_),
@@ -999,4 +976,79 @@ pub fn source_from_decs(decs: &im_rc::Vector<Dec_>) -> Source {
             Some(back) => first.expand(&back.1),
         }
     }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum PrimFunction {
+    AdaptonNow,
+    AdaptonHere,
+    AdaptonSpace,
+    AdaptonTime,
+    AdaptonPointer,
+    AdaptonPeek,
+    AdaptonPoke,
+    AtSignVar(String),
+    DebugPrint,
+    NatToText,
+    SymbolLevel,
+    WriteFile,
+    RustDebugText,
+    ReifyValue,
+    ReflectValue,
+    ReifyCore,
+    ReflectCore,
+    Collection(CollectionFunction),
+}
+
+impl PrimFunction {
+    pub fn resolve(name: String) -> Result<PrimFunction, String> {
+        use CollectionFunction::*;
+        use PrimFunction::*;
+        Ok(match name.as_str() {
+            "\"adaptonNow\"" => AdaptonNow,
+            "\"adaptonHere\"" => AdaptonHere,
+            "\"adaptonTime\"" => AdaptonTime,
+            "\"adaptonSpace\"" => AdaptonSpace,
+            "\"adaptonPointer\"" => AdaptonPointer,
+            "\"adaptonPeek\"" => AdaptonPeek,
+            "\"adaptonPoke\"" => AdaptonPoke,
+            "\"print\"" => DebugPrint,
+            "\"natToText\"" => NatToText,
+            "\"symbolLevel\"" => SymbolLevel,
+            "\"hashMapNew\"" => Collection(HashMap(HashMapFunction::New)),
+            "\"hashMapPut\"" => Collection(HashMap(HashMapFunction::Put)),
+            "\"hashMapGet\"" => Collection(HashMap(HashMapFunction::Get)),
+            "\"hashMapRemove\"" => Collection(HashMap(HashMapFunction::Remove)),
+            "\"fastRandIterNew\"" => Collection(FastRandIter(FastRandIterFunction::New)),
+            "\"fastRandIterNext\"" => Collection(FastRandIter(FastRandIterFunction::Next)),
+            "\"writeFile\"" => WriteFile,
+            "\"rustDebugText\"" => RustDebugText,
+            "\"reifyValue\"" => ReifyValue,
+            "\"reflectValue\"" => ReflectValue,
+            "\"reifyCore\"" => ReifyCore,
+            "\"reflectCore\"" => ReflectCore,
+            _ => Err(name.to_string())?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum CollectionFunction {
+    HashMap(HashMapFunction),
+    FastRandIter(FastRandIterFunction),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum HashMapFunction {
+    New,
+    Put,
+    Get,
+    Remove,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum FastRandIterFunction {
+    New,
+    Next,
 }

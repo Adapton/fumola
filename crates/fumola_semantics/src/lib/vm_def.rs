@@ -1,7 +1,7 @@
-use crate::ast::{
+use fumola_syntax::ast::{
     Dec, Delim, Exp, ExpField, ExpField_, Exp_, Id, Id_, Mut, Pat, Source, Stab_, Vis_,
 };
-use crate::shared::{FastClone, Share};
+use fumola_syntax::shared::{FastClone, Share};
 use crate::value::{ActorId, Closed, ClosedFunction, Value, Value_};
 use crate::vm_types::{
     def::{
@@ -212,10 +212,11 @@ fn path_base(path: &String) -> String {
 
 pub mod def {
     use log::{debug, info};
+    use fumola_syntax::ast;
 
     use super::*;
+    use fumola_syntax::ast::{DecField, DecFields, Literal};   
     use crate::{
-        ast::{DecField, DecFields, Literal},
         format::format_pretty,
         value::{Symbol, Text},
         Shared,
@@ -288,7 +289,7 @@ pub mod def {
                 let (saved, ctxid) = active.defs().enter_context(true);
                 for dec in init.outer_decs.iter() {
                     let dec = dec.clone();
-                    let df = crate::ast::DecField {
+                    let df = fumola_syntax::ast::DecField {
                         attrs: None,
                         vis: None,
                         stab: None,
@@ -305,11 +306,11 @@ pub mod def {
                             vec:
                             init.fields.vec.iter().map(
                                 |f|
-                                crate::ast::NodeData(
+                                fumola_syntax::ast::NodeData(
                                     DecField{
                                         vis:Some(
-                                            crate::ast::NodeData(crate::ast::Vis::Public(None),
-                                                                 crate::ast::Source::ImportPrim).share()),
+                                            fumola_syntax::ast::NodeData(fumola_syntax::ast::Vis::Public(None),
+                                                                 fumola_syntax::ast::Source::ImportPrim).share()),
                                         .. f.0.clone()},
                                     f.1.clone()).share()).collect(),
                             .. init.fields.clone()
@@ -396,22 +397,22 @@ pub mod def {
             }
             // to do -- introduce better semantic logic for attributes.
             if let Some((attr, width_arg)) = attrs.vec.iter().find_map(|attr| match &attr.0 {
-                crate::ast::Attr::Id(id) => {
+                ast::Attr::Id(id) => {
                     if id.0.as_str() == "listing" {
                         Some((attr, None))
                     } else {
                         None
                     }
                 }
-                crate::ast::Attr::Call(id, width_arg) => {
+                ast::Attr::Call(id, width_arg) => {
                     if id.0.as_str() == "listing" {
                         Some((attr, Some(width_arg)))
                     } else {
                         None
                     }
                 }
-                crate::ast::Attr::Field(_, _) => None,
-                crate::ast::Attr::Literal(_) => None,
+                ast::Attr::Field(_, _) => None,
+                ast::Attr::Literal(_) => None,
             }) {
                 let file = active
                     .module_files()
@@ -424,7 +425,7 @@ pub mod def {
                     None => default_width,
                     Some(args) => {
                         if args.vec.len() == 1 {
-                            if let crate::ast::Attr::Literal(l) = &args.vec[0].0 {
+                            if let ast::Attr::Literal(l) = &args.vec[0].0 {
                                 if let Literal::Nat(ref width) = l.0 {
                                     width.parse().unwrap_or(default_width)
                                 } else {
@@ -796,7 +797,7 @@ fn exp_field_is_static(e: &ExpField) -> bool {
     }
 }
 
-fn object_is_static(d: &crate::ast::Delim<ExpField_>) -> bool {
+fn object_is_static(d: &fumola_syntax::ast::Delim<ExpField_>) -> bool {
     for ef in d.vec.iter() {
         if !exp_field_is_static(&ef.0) {
             return false;
@@ -805,7 +806,7 @@ fn object_is_static(d: &crate::ast::Delim<ExpField_>) -> bool {
     true
 }
 
-fn delim_is_static(d: &crate::ast::Delim<Exp_>) -> bool {
+fn delim_is_static(d: &fumola_syntax::ast::Delim<Exp_>) -> bool {
     for e in d.vec.iter() {
         if !exp_is_static(&e.0) {
             return false;

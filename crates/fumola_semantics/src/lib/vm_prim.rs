@@ -1,14 +1,15 @@
 use crate::adapton::AdaptonState;
-use crate::ast::{Inst, Literal, Pat};
+use fumola_syntax::ast::{Inst, Literal, Pat};
+use fumola_syntax::ast::{ CollectionFunction, FastRandIterFunction, HashMapFunction, PrimFunction};
 use crate::value::{
-    CollectionFunction, FastRandIter, FastRandIterFunction, HashMapFunction, PrimFunction, Text,
+    FastRandIter, Text,
     Value, Value_,
 };
 use crate::vm_types::{Active, Cont, DebugPrintLine, Interruption, Step};
 use crate::{adapton, nyi, type_mismatch_};
 
-use crate::vm_step::{cont_value, cont_value_, type_mismatch, unit_step};
-
+use crate::vm_step::{cont_value, cont_value_, unit_step};
+use crate::type_mismatch;
 use im_rc::HashMap;
 use std::collections::hash_map;
 use std::hash::{Hash, Hasher};
@@ -96,30 +97,25 @@ pub fn call_prim_function<A: Active>(
                 Ok(Step {})
             }
         },
-        #[cfg(feature = "to-motoko")]
-        #[cfg(feature = "value-reflection")]
         ReifyValue => {
             use crate::value::ToMotoko;
             *active.cont() = cont_value(args.to_motoko().map_err(Interruption::ValueError)?);
             Ok(Step {})
         }
-        #[cfg(feature = "value-reflection")]
         ReflectValue => {
             *active.cont() = cont_value(args.to_rust::<Value>().map_err(Interruption::ValueError)?);
             Ok(Step {})
         }
-        #[cfg(feature = "to-motoko")]
-        #[cfg(feature = "core-reflection")]
+        /*
         ReifyActive => {
             use crate::value::ToMotoko;
             *active.cont() = cont_value(active.to_motoko().map_err(Interruption::ValueError)?);
             Ok(Step {})
         }
-        #[cfg(feature = "core-reflection")]
         ReflectActive => {
             *active = args.to_rust::<Active>().map_err(Interruption::ValueError)?;
             Ok(Step {})
-        }
+        } */
         Collection(cf) => call_collection_function(active, cf, targs, args),
         AdaptonNow => {
             *active.cont() = cont_value(Value::AdaptonTime(active.adapton().now()));
@@ -187,6 +183,8 @@ pub fn call_prim_function<A: Active>(
                 type_mismatch!(file!(), line!())
             }
         }
+        ReifyCore => todo!(),
+        ReflectCore => todo!(),
     }
 }
 
@@ -234,7 +232,8 @@ fn call_hashmap_function<A: Active>(
 mod collection {
     pub mod fastranditer {
         use super::super::*;
-        use crate::{shared::Share, value::Collection};
+        use fumola_syntax::shared::Share;
+        use crate::{value::Collection};
 
         pub fn new<A: Active>(
             active: &mut A,
@@ -278,7 +277,8 @@ mod collection {
 
     pub mod hashmap {
         use super::super::*;
-        use crate::{shared::FastClone, value::Collection, Share};
+        use fumola_syntax::shared::FastClone;
+        use crate::{value::Collection, Share};
         use im_rc::vector;
 
         pub fn new<A: Active>(active: &mut A, v: Value_) -> Result<Step, Interruption> {

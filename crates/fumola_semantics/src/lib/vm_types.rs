@@ -1,11 +1,9 @@
 use crate::adapton;
-use crate::ast::{Inst, Mut};
-#[cfg(feature = "parser")]
-use crate::parser_types::SyntaxError as SyntaxErrorCode;
-use crate::shared::FastClone;
+use fumola_syntax::ast::{Inst, Mut};
+use fumola_syntax::shared::FastClone;
 use crate::value::{ActorId, ActorMethod, Symbol, Text, ValueError};
+use fumola_syntax::ast::{Dec_, Exp_, Id, Id_, PrimType, Source, Span};
 pub use crate::{
-    ast::{Dec_, Exp_, Id, Id_, PrimType, Source, Span},
     value::Value_,
 };
 use crate::{Share, Value};
@@ -19,7 +17,7 @@ pub type Result<T = Value_, E = Interruption> = std::result::Result<T, E>;
 pub struct SyntaxError {
     pub package_name: Option<String>,
     pub local_path: String,
-    pub code: SyntaxErrorCode,
+    //pub code: SyntaxErrorCode,
 }
 
 #[macro_export]
@@ -87,7 +85,7 @@ macro_rules! nyi {
 }
 
 pub mod def {
-    use crate::ast::{Id, Source, Stab_, Vis_};
+    use fumola_syntax::ast::{Id, Source, Stab_, Vis_};
     use im_rc::HashMap;
     use serde::{Deserialize, Serialize};
 
@@ -156,7 +154,7 @@ pub mod def {
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
     pub struct Function {
         pub context: CtxId,
-        pub function: crate::ast::Function,
+        pub function: fumola_syntax::ast::Function,
         pub rec_value: crate::value::Value_,
     }
 }
@@ -179,7 +177,7 @@ pub enum LocalPointer {
     Named(NamedPointer),
 }
 
-impl<'a> crate::shared::FastClone<Pointer> for &'a Pointer {
+impl<'a> fumola_syntax::shared::FastClone<Pointer> for &'a Pointer {
     fn fast_clone(self) -> Pointer {
         self.clone()
     }
@@ -209,7 +207,7 @@ pub fn source_from_cont(cont: &Cont) -> Source {
         Frame(_, _) => {
             unreachable!("no source for Frame continuation. This signals a VM bug.  Please report.")
         }
-        Decs(decs) => crate::ast::source_from_decs(decs),
+        Decs(decs) => fumola_syntax::ast::source_from_decs(decs),
         Exp_(exp_, decs) => {
             if decs.is_empty() {
                 exp_.1.clone()
@@ -218,14 +216,14 @@ pub fn source_from_cont(cont: &Cont) -> Source {
             }
         }
         LetVarRet(s, _) => s.clone(),
-        Value_(_v) => Source::Evaluation,
+        Value_(_v) => fumola_syntax::ast::Source::Evaluation,
     }
 }
 
 pub mod stack {
     use super::{def::CtxId, Cont, Env, Pointer, RespTarget, Vector};
     pub use crate::adapton::Navigation as AdaptonNav;
-    use crate::ast::{
+    use fumola_syntax::ast::{
         AdaptonNav_, BinOp, Cases, Dec_, ExpField_, Exp_, Id_, Inst, Mut, Pat_, PrimType,
         ProjIndex, RelOp, Source, Type_, UnOp,
     };
@@ -668,7 +666,7 @@ pub struct ModuleFileInit {
     pub file_content: String,
     pub outer_decs: Vector<Dec_>,
     pub id: Option<Id_>,
-    pub fields: crate::ast::DecFields,
+    pub fields: fumola_syntax::ast::DecFields,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -825,9 +823,6 @@ pub enum Interruption {
     TypeMismatch(OptionCoreSource),
     NonLiteralInit(Source),
     NoMatchingCase,
-    #[cfg(feature = "parser")]
-    SyntaxError(SyntaxError),
-    SyntaxErrorCode(SyntaxErrorCode),
     ValueError(ValueError),
     EvalInitError(EvalInitError),
     UnboundIdentifer(Id),
@@ -881,17 +876,19 @@ impl Interruption {
     }
 }
 
+/* 
 impl From<SyntaxError> for Interruption {
     fn from(err: SyntaxError) -> Self {
         Interruption::SyntaxError(err)
     }
-}
+} */
 
+/*
 impl From<SyntaxErrorCode> for Interruption {
     fn from(err: SyntaxErrorCode) -> Self {
         Interruption::SyntaxErrorCode(err)
     }
-}
+} */
 
 impl From<ValueError> for Interruption {
     fn from(err: ValueError) -> Self {

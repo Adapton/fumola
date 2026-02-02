@@ -3,11 +3,12 @@ use std::num::Wrapping;
 use std::rc::Rc;
 
 use crate::adapton::{Pointer as AdaptonPointer, Space as AdaptonSpace, Time as AdaptonTime};
-use crate::ast::{
+use fumola_syntax::ast::{
+    PrimFunction,
     BinOp, Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, QuotedAst, ToId, UnOp,
 };
 use crate::dynamic::Dynamic;
-use crate::shared::{FastClone, Share, Shared};
+use fumola_syntax::shared::{FastClone, Share, Shared};
 use crate::type_mismatch;
 use crate::vm_types::LocalPointer;
 use crate::vm_types::{def::Actor as ActorDef, def::CtxId, def::Module as ModuleDef, Env};
@@ -120,19 +121,6 @@ pub type Pointer = crate::vm_types::Pointer;
 pub struct ClosedFunction(pub Closed<Function>);
 
 pub type Float = OrderedFloat<f64>;
-
-impl PartialOrd for Id {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.string.partial_cmp(&other.string)
-    }
-}
-
-impl Ord for Id {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.string.cmp(&other.string)
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Value {
     Null,
@@ -338,98 +326,32 @@ impl FastRandIter {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
-pub enum PrimFunction {
-    AdaptonNow,
-    AdaptonHere,
-    AdaptonSpace,
-    AdaptonTime,
-    AdaptonPointer,
-    AdaptonPeek,
-    AdaptonPoke,
-    AtSignVar(String),
-    DebugPrint,
-    NatToText,
-    SymbolLevel,
-    WriteFile,
-    RustDebugText,
-    #[cfg(feature = "to-motoko")]
-    #[cfg(feature = "value-reflection")]
-    ReifyValue,
-    #[cfg(feature = "value-reflection")]
-    ReflectValue,
-    #[cfg(feature = "to-motoko")]
-    #[cfg(feature = "core-reflection")]
-    ReifyCore,
-    #[cfg(feature = "core-reflection")]
-    ReflectCore,
-    Collection(CollectionFunction),
-}
-
-impl PrimFunction {
-    pub fn resolve(name: String) -> Result<PrimFunction, String> {
-        use CollectionFunction::*;
-        use PrimFunction::*;
-        Ok(match name.as_str() {
-            "\"adaptonNow\"" => AdaptonNow,
-            "\"adaptonHere\"" => AdaptonHere,
-            "\"adaptonTime\"" => AdaptonTime,
-            "\"adaptonSpace\"" => AdaptonSpace,
-            "\"adaptonPointer\"" => AdaptonPointer,
-            "\"adaptonPeek\"" => AdaptonPeek,
-            "\"adaptonPoke\"" => AdaptonPoke,
-            "\"print\"" => DebugPrint,
-            "\"natToText\"" => NatToText,
-            "\"symbolLevel\"" => SymbolLevel,
-            "\"hashMapNew\"" => Collection(HashMap(HashMapFunction::New)),
-            "\"hashMapPut\"" => Collection(HashMap(HashMapFunction::Put)),
-            "\"hashMapGet\"" => Collection(HashMap(HashMapFunction::Get)),
-            "\"hashMapRemove\"" => Collection(HashMap(HashMapFunction::Remove)),
-            "\"fastRandIterNew\"" => Collection(FastRandIter(FastRandIterFunction::New)),
-            "\"fastRandIterNext\"" => Collection(FastRandIter(FastRandIterFunction::Next)),
-            "\"writeFile\"" => WriteFile,
-            "\"rustDebugText\"" => RustDebugText,
-            #[cfg(feature = "to-motoko")]
-            #[cfg(feature = "value-reflection")]
-            "\"reifyValue\"" => ReifyValue,
-            #[cfg(feature = "value-reflection")]
-            "\"reflectValue\"" => ReflectValue,
-            #[cfg(feature = "to-motoko")]
-            #[cfg(feature = "core-reflection")]
-            "\"reifyCore\"" => ReifyCore,
-            #[cfg(feature = "core-reflection")]
-            "\"reflectCore\"" => ReflectCore,
-            _ => Err(name.to_string())?,
-        })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
-pub enum CollectionFunction {
-    HashMap(HashMapFunction),
-    FastRandIter(FastRandIterFunction),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
-pub enum HashMapFunction {
-    New,
-    Put,
-    Get,
-    Remove,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
-pub enum FastRandIterFunction {
-    New,
-    Next,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct Closed<X> {
     pub ctx: CtxId,
     #[serde(with = "crate::serde_utils::im_rc_hashmap")]
     pub env: Env,
     pub content: X,
+}
+
+impl Share for crate::value::Value {
+    fn share(self) -> Shared<Self> {
+        use crate::value::Value;
+        std::thread_local! {
+            static UNIT: Shared<Value> = Shared::new(Value::Unit);
+            static NULL: Shared<Value> = Shared::new(Value::Null);
+            static TRUE: Shared<Value> = Shared::new(Value::Bool(true));
+            static FALSE: Shared<Value> = Shared::new(Value::Bool(false));
+            // TODO: common literals such as 0, 1, "", etc?
+        };
+        match self {
+            Value::Unit => UNIT.with(|s| s.fast_clone()),
+            Value::Null => NULL.with(|s| s.fast_clone()),
+            Value::Bool(true) => TRUE.with(|s| s.fast_clone()),
+            Value::Bool(false) => FALSE.with(|s| s.fast_clone()),
+            _ => Shared::new(self),
+        }
+    }
 }
 
 impl Value {
@@ -800,11 +722,11 @@ impl Value {
     // }
 
     /// Convert to any deserializable Rust type.
-    #[cfg(not(feature = "serde-paths"))]
     pub fn to_rust<T: DeserializeOwned>(&self) -> Result<T> {
         serde_json::from_value(self.json_value()?).map_err(|e| ValueError::ToRust(e.to_string()))
     }
-    #[cfg(feature = "serde-paths")]
+    
+    /*
     pub fn to_rust<T: DeserializeOwned>(&self) -> Result<T> {
         // Include paths in error messages
         let s: String = serde_json::to_string(&self.json_value()?).unwrap();
@@ -812,9 +734,8 @@ impl Value {
         Ok(serde_path_to_error::deserialize(des)
             .map_err(|err| err.to_string())
             .unwrap())
-    }
+    } */
 
-    #[cfg(feature = "to-motoko")]
     pub fn from_rust<T: ToMotoko>(value: T) -> Result {
         value.to_motoko()
     }
@@ -834,7 +755,6 @@ impl Value {
     }
 }
 
-#[cfg(feature = "to-motoko")]
 pub trait ToMotoko {
     fn to_motoko(self) -> Result;
 
@@ -846,7 +766,6 @@ pub trait ToMotoko {
     }
 }
 
-#[cfg(feature = "to-motoko")]
 impl<T: Serialize> ToMotoko for T {
     fn to_motoko(self) -> Result {
         // println!("{}",ron::to_string(&self).unwrap());//////
