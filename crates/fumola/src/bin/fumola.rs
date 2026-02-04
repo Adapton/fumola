@@ -1,9 +1,10 @@
-use fumola::{Interruption, ToMotoko, Value_};
+use fumola_semantics::{Interruption, ToMotoko, Value_};
 
 use log::{error, info, trace};
 
-use fumola::format::{format_one_line, format_pretty, ToDoc};
-use fumola::vm_types::{Core, Limits};
+use fumola_semantics::format::{format_one_line, format_pretty, ToDoc};
+use fumola_semantics::vm_types::{self, Core, Limits};
+use fumola_parser::parser_types;
 
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -22,14 +23,14 @@ impl From<()> for OurError {
     }
 }
 
-impl From<fumola::vm_types::Error> for OurError {
-    fn from(err: fumola::vm_types::Error) -> Self {
+impl From<vm_types::Error> for OurError {
+    fn from(err: vm_types::Error) -> Self {
         OurError::VM(err)
     }
 }
 
-impl From<fumola::parser_types::SyntaxError> for OurError {
-    fn from(err: fumola::parser_types::SyntaxError) -> Self {
+impl From<parser_types::SyntaxError> for OurError {
+    fn from(err: parser_types::SyntaxError) -> Self {
         OurError::Syntax(err)
     }
 }
@@ -38,8 +39,8 @@ impl From<fumola::parser_types::SyntaxError> for OurError {
 pub enum OurError {
     Unknown,
     String(String),
-    VM(fumola::vm_types::Error),
-    Syntax(fumola::parser_types::SyntaxError),
+    VM(vm_types::Error),
+    Syntax(parser_types::SyntaxError),
     FileNotFound(String),
 }
 
@@ -97,7 +98,7 @@ fn init_log(level_filter: log::LevelFilter) {
 
 fn main() -> OurResult<()> {
     info!("Starting...");
-    use fumola::vm_types::Core;
+    use fumola_semantics::vm_types::Core;
     let mut core = Core::empty();
     let cli_opt = CliOpt::parse();
     info!("Init log...");
@@ -133,7 +134,7 @@ fn main() -> OurResult<()> {
             println!("{}", format_one_line(&p));
         }
         CliCommand::Format { input, width } => {
-            let p = fumola::lexer::create_token_tree(&input)?;
+            let p = fumola_syntax::lexer::create_token_tree(&input)?;
             println!("{}", format_pretty(&p, width));
         }
         CliCommand::Eval { input, step_limit } => {
@@ -206,7 +207,7 @@ fn repl(core: &mut Core) {
 fn inspect_result(core: &mut Core, result: Result<Value_, Interruption>, depth: usize) {
     match result {
         Ok(v) => {
-            println!("{}", fumola::format::format_(v.doc(), 80))
+            println!("{}", fumola_semantics::format::format_(v.doc(), 80))
         }
         Err(Interruption::ModuleFileNotFound(path)) => {
             if depth > 0 {
@@ -239,6 +240,7 @@ fn inspect_result(core: &mut Core, result: Result<Value_, Interruption>, depth: 
 }
 
 fn report_error(core: &mut Core, error: Interruption) {
+    use fumola_semantics::Value;
     error!("Error: {:?}", error);
     info!("  Hint: Inspect lastError for details.");
     info!(
@@ -246,9 +248,9 @@ fn report_error(core: &mut Core, error: Interruption) {
     );
     /* dump core, without chaining with any prior core dump. */
     if let Some(_) = core.get_var("lastInterruption") {
-        core.define("lastInterruptionCore", fumola::Value::Unit);
-        core.define("lastInterruption", fumola::Value::Unit);
-        core.define("lastError", fumola::Value::Unit);
+        core.define("lastInterruptionCore", Value::Unit);
+        core.define("lastInterruption", Value::Unit);
+        core.define("lastError", Value::Unit);
     };
     core.define("lastInterruptionCore", core.clone().to_motoko().unwrap());
     core.clear_cont();

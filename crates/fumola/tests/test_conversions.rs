@@ -1,5 +1,3 @@
-#![cfg(feature = "to-motoko")]
-
 use std::collections::HashMap;
 use std::fmt::Debug;
 

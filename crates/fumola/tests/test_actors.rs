@@ -1,8 +1,8 @@
-use fumola::ast::ToId;
+use fumola_syntax::ast::ToId;
 use fumola::check::assert_vm_eval as assert_;
 use fumola::check::assert_vm_interruption as assert_x;
-use fumola::value::ActorId;
-use fumola::vm_types::{Interruption, LocalPointer, NumericPointer, Pointer, ScheduleChoice};
+use fumola_semantics::value::ActorId;
+use fumola_semantics::vm_types::{Interruption, LocalPointer, NumericPointer, Pointer, ScheduleChoice};
 
 use test_log::test; // enable logging output for tests by default.
 

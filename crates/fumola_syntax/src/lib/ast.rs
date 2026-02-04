@@ -978,7 +978,6 @@ pub fn source_from_decs(decs: &im_rc::Vector<Dec_>) -> Source {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum PrimFunction {
     AdaptonNow,
