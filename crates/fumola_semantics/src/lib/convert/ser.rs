@@ -1,17 +1,15 @@
-use std::fmt::Display;
-use fumola_syntax::{shared, ast};
+use fumola_syntax::{ast, shared};
 use im_rc::{HashMap, Vector};
 use num_bigint::{BigInt, BigUint};
 use serde::Serialize;
+use std::fmt::Display;
 
-use {  
+use {
     ast::{Id, Mut, ToId},
     shared::Share,
-  };
-
-use crate::{
-    value::{FieldValue, Text, Value, ValueError, Value_},
 };
+
+use crate::value::{FieldValue, Text, Value, ValueError, Value_};
 
 type Error = ValueError;
 type Result<T> = std::result::Result<T, Error>;
@@ -67,10 +65,10 @@ impl serde::Serializer for Serializer {
         self.serialize_int(value.into())
     }
 
-        fn serialize_i128(self, value: i128) -> Result<Value> {
-            self.serialize_int(value.into())
-        }
-  
+    fn serialize_i128(self, value: i128) -> Result<Value> {
+        self.serialize_int(value.into())
+    }
+
     #[inline]
     fn serialize_u8(self, value: u8) -> Result<Value> {
         self.serialize_nat(value.into())
@@ -91,10 +89,10 @@ impl serde::Serializer for Serializer {
         self.serialize_nat(value.into())
     }
 
-        fn serialize_u128(self, value: u128) -> Result<Value> {
-            self.serialize_nat(value.into())
-        }
-  
+    fn serialize_u128(self, value: u128) -> Result<Value> {
+        self.serialize_nat(value.into())
+    }
+
     #[inline]
     fn serialize_f32(self, value: f32) -> Result<Value> {
         self.serialize_f64(value as f64)

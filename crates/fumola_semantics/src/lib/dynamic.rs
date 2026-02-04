@@ -2,9 +2,9 @@ use std::cell::RefCell;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-use fumola_syntax::ast::{Inst, ToId};
 use crate::value::{DynamicValue, Value, Value_};
 use crate::vm_types::{Interruption, Store};
+use fumola_syntax::ast::{Inst, ToId};
 
 pub use dyn_clone::DynClone;
 

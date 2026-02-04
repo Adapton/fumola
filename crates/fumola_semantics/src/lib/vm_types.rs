@@ -1,12 +1,10 @@
 use crate::adapton;
+pub use crate::value::Value_;
+use crate::value::{ActorId, ActorMethod, Symbol, Text, ValueError};
+use crate::{Share, Value};
+use fumola_syntax::ast::{Dec_, Exp_, Id, Id_, PrimType, Source, Span};
 use fumola_syntax::ast::{Inst, Mut};
 use fumola_syntax::shared::FastClone;
-use crate::value::{ActorId, ActorMethod, Symbol, Text, ValueError};
-use fumola_syntax::ast::{Dec_, Exp_, Id, Id_, PrimType, Source, Span};
-pub use crate::{
-    value::Value_,
-};
-use crate::{Share, Value};
 use im_rc::{HashMap, Vector};
 use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
@@ -216,11 +214,11 @@ pub fn source_from_cont(cont: &Cont) -> Source {
 pub mod stack {
     use super::{def::CtxId, Cont, Env, Pointer, RespTarget, Vector};
     pub use crate::adapton::Navigation as AdaptonNav;
+    use crate::value::{Value, Value_};
     use fumola_syntax::ast::{
         AdaptonNav_, BinOp, Cases, Dec_, ExpField_, Exp_, Id_, Inst, Mut, Pat_, PrimType,
         ProjIndex, RelOp, Source, Type_, UnOp,
     };
-    use crate::value::{Value, Value_};
     use serde::{Deserialize, Serialize};
 
     /// Local continuation, stored in a stack frame.
@@ -869,7 +867,7 @@ impl Interruption {
     }
 }
 
-/* 
+/*
 impl From<SyntaxError> for Interruption {
     fn from(err: SyntaxError) -> Self {
         Interruption::SyntaxError(err)

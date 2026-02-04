@@ -1,7 +1,7 @@
-use fumola_syntax::ast::{Id_, Literal, Pat, Source};
-use fumola_syntax::shared::{FastClone, Share};
 use crate::value::{Value, Value_};
 use crate::vm_types::{Env, Interruption, Pointer};
+use fumola_syntax::ast::{Id_, Literal, Pat, Source};
+use fumola_syntax::shared::{FastClone, Share};
 use std::vec::Vec;
 
 use crate::type_mismatch;

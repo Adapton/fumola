@@ -1,7 +1,4 @@
 use crate::adapton::AdaptonState;
-use fumola_syntax::ast::PrimType;
-use fumola_syntax::ast::{Exp_, Id, Inst, Prog, Source, ToId};
-use fumola_syntax::shared::{FastClone, Share};
 use crate::value::{ActorId, ActorMethod, Value, Value_};
 use crate::vm_types::def::CtxId;
 use crate::vm_types::Actor;
@@ -11,12 +8,16 @@ use crate::vm_types::Stack;
 use crate::vm_types::{
     def::{Actor as ActorDef, Def, Defs, Field as FieldDef, Module as ModuleDef},
     stack::{Frame, FrameCont},
-    Activation, Active, Actors, Agent, Cont, Core, Counts, Interruption, Limits, ModuleFiles, ModulePath, Pointer, Response, ScheduleChoice, Step,
+    Activation, Active, Actors, Agent, Cont, Core, Counts, Interruption, Limits, ModuleFiles,
+    ModulePath, Pointer, Response, ScheduleChoice, Step,
 };
 use crate::vm_types::{ActiveBorrow, OutputFiles};
 use crate::vm_types::{EvalInitError, Store};
 use crate::vm_types::{LocalPointer, NamedPointer};
 use crate::{nyi, type_mismatch};
+use fumola_syntax::ast::PrimType;
+use fumola_syntax::ast::{Exp_, Id, Inst, Prog, Source, ToId};
+use fumola_syntax::shared::{FastClone, Share};
 use im_rc::{HashMap, Vector};
 use std::vec::Vec;
 
@@ -521,7 +522,7 @@ impl Core {
     //     Self::assert_module_def(path, s).is_ok()
     // }
 
-    /* 
+    /*
     /// path is only used to form SyntaxError Interruptions, if they are needed.
     fn assert_module_def(path: ModulePath, s: &str) -> Result<ModuleFileInit, Interruption> {
         let p = match crate::check::parse(s) {
@@ -553,7 +554,7 @@ impl Core {
         }
     } */
 
-    /* 
+    /*
     /// Set the actor `id` to the given `definition`, regardless of whether `id` is defined already or not.
     /// If not defined, this is the same as `create_actor`.
     /// Otherwise, it is the same as `update_actor`.
@@ -649,7 +650,7 @@ impl Core {
         self.run(limits)
     }
 
-    /* 
+    /*
     /// Create a new actor with the given (unused) `id`, and the definition `def`.
     pub fn create_actor(
         &mut self,
@@ -677,7 +678,7 @@ impl Core {
         Ok(())
     } */
 
-    /* 
+    /*
     /// Upgrade an existing actor with the given `id`, with new definition `def`.
     pub fn upgrade_actor(
         &mut self,
@@ -865,12 +866,12 @@ impl Core {
     //     self.run(&Limits::none())
     // }
 
- /* 
-    pub fn eval_str(&mut self, input: &str) -> Result<Value_, Interruption> {
-        let prog = crate::check::parse(input)?;
-        self.eval_prog(prog)
-    }
-*/
+    /*
+        pub fn eval_str(&mut self, input: &str) -> Result<Value_, Interruption> {
+            let prog = crate::check::parse(input)?;
+            self.eval_prog(prog)
+        }
+    */
     pub fn clear_cont(&mut self) {
         *self.cont() = Cont::Value_(Value::Unit.share());
 

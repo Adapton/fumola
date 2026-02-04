@@ -2,9 +2,9 @@ use candid::parser::value::{IDLArgs, IDLValue, VariantValue};
 use candid::types::Label;
 use im_rc::HashMap;
 
-use fumola_syntax::ast::{Id, Mut, ToId};
 use crate::value::{FieldValue, Result};
 use crate::{Share, Value, ValueError};
+use fumola_syntax::ast::{Id, Mut, ToId};
 
 fn resolve_id(label: Label) -> Result<Id> {
     use candid::types::Label::*;

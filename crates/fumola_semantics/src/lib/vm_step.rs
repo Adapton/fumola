@@ -1,15 +1,15 @@
 use crate::adapton::Navigation as AdaptonNav;
-use fumola_syntax::ast::{
-    AdaptonNav as AdaptonNavAst, AdaptonNavDim, AdaptonNav_, Dec, Dec_, Delim, Exp, ExpField_,
-    Exp_, Id, IdPos_, Literal, Pat, Pat_, Source, Type,
-};
-use fumola_syntax::shared::{FastClone, Share};
 use crate::value::{ActorId, Closed, ClosedFunction, Value, Value_};
 use crate::vm_types::{
     def::{Def, Field as FieldDef},
     stack::{FieldContext, Frame, FrameCont},
     Active, ActiveBorrow, Breakpoint, Cont, Interruption, Limit, Limits, ModulePath, Step,
 };
+use fumola_syntax::ast::{
+    AdaptonNav as AdaptonNavAst, AdaptonNavDim, AdaptonNav_, Dec, Dec_, Delim, Exp, ExpField_,
+    Exp_, Id, IdPos_, Literal, Pat, Pat_, Source, Type,
+};
+use fumola_syntax::shared::{FastClone, Share};
 use im_rc::{vector, HashMap, Vector};
 
 pub use crate::{nyi, type_mismatch, type_mismatch_};
@@ -148,10 +148,10 @@ pub fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interrupti
     use Exp::*;
     let source = exp.1.clone();
     match &exp.0 {
-      //  Value_(v) => {
-      //      *active.cont() = cont_value((**v).clone());
-      //      Ok(Step {})
-      //  }
+        //  Value_(v) => {
+        //      *active.cont() = cont_value((**v).clone());
+        //      Ok(Step {})
+        //  }
         QuotedAst(q) => {
             use crate::quoted::QuotedClose;
             *active.cont() = cont_value(Value::QuotedAst(q.quoted_close(active.env())?));
