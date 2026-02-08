@@ -1,7 +1,7 @@
 use fumola::check::assert_vm_eval as assert_;
 use fumola::check::assert_vm_interruption as assert_x;
-use fumola::type_mismatch_;
-use fumola::vm_types::Interruption;
+use fumola_semantics::type_mismatch_;
+use fumola_semantics::vm_types::Interruption;
 
 use test_log::test; // enable logging output for tests by default.
 
@@ -495,12 +495,12 @@ f()
 
 #[test]
 fn test_core_eval() {
-    let mut core = fumola::vm_types::Core::empty();
+    let mut core = fumola_semantics::vm_types::Core::empty();
     core.eval("var x = 1").expect("oops");
     core.eval("var y = x + 1").expect("oops");
     let y = core.eval("y").expect("oops");
     assert_eq!(
         &*y,
-        &fumola::value::Value::Nat(num_bigint::BigUint::from(2_u32))
+        &fumola_semantics::value::Value::Nat(num_bigint::BigUint::from(2_u32))
     )
 }
