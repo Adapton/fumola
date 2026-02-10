@@ -1,10 +1,13 @@
 use crate::check;
 use crate::Error;
+use fumola_semantics::value::ActorId;
 use fumola_semantics::value::Value_;
+use fumola_semantics::Interruption;
 use fumola_semantics::{
     vm_def::def,
     vm_types::{Active, Core, Limits, ModuleFileState, ModulePath},
 };
+use fumola_syntax::ast::Id;
 use fumola_syntax::ast::{DecField, Source};
 
 pub struct State {
@@ -21,6 +24,18 @@ impl State {
     pub fn eval(&mut self, input: &str) -> Result<Value_, crate::Error> {
         let prog = check::parse(input)?;
         Ok(self.semantic_state.eval_prog(prog)?)
+    }
+
+    /// Call an actor method.
+    pub fn call(
+        &mut self,
+        actor: &ActorId,
+        method: &Id,
+        arg: Value_,
+    ) -> Result<Value_, crate::Error> {
+        self.semantic_state
+            .call(actor, method, arg, &Limits::none())
+            .map_err(|x| x.into())
     }
 
     /// Load `base` library into an existing Core.
@@ -41,19 +56,29 @@ impl State {
         Ok(())
     }
 
-    /*
+    /// Set the actor `id` to the given `definition`, regardless of whether `id` is defined already or not.
+    /// If not defined, this is the same as `create_actor`.
+    /// Otherwise, it is the same as `update_actor`.
+    pub fn set_actor(&mut self, path: String, id: ActorId, def: &str) -> Result<(), Error> {
+        if self.semantic_state.actors.map.get(&id).is_none() {
+            self.create_actor(path, id, def)
+        } else {
+            self.upgrade_actor(path, id, def)
+        }
+    }
+
     /// Create a new actor with the given (unused) `id`, and the definition `def`.
     pub fn create_actor(
         &mut self,
         path: String,
         id: ActorId,
         def: &str,
-    ) -> Result<(), Interruption> {
-        if let Some(_) = self.actors.map.get(&id) {
-            return Err(Interruption::AmbiguousActorId(id));
+    ) -> Result<(), crate::Error> {
+        if let Some(_) = self.semantic_state.actors.map.get(&id) {
+            return Err(Interruption::AmbiguousActorId(id).into());
         };
-        let (decs, _id, dfs) = Self::assert_actor_def(path.clone(), def)?;
-        let (saved, new_root) = self.defs().enter_context(true);
+        let (decs, _id, dfs) = check::assert_actor_def(path.clone(), def)?;
+        let (saved, new_root) = self.semantic_state.defs().enter_context(true);
         for dec in decs.iter() {
             let dec = dec.clone();
             let df = fumola_syntax::ast::DecField {
@@ -62,28 +87,30 @@ impl State {
                 stab: None,
                 dec,
             };
-            def::insert_static_field(self, &df.dec.1, &df)?;
+            def::insert_static_field(&mut self.semantic_state, &df.dec.1, &df)?;
         }
-        def::actor(self, path, &id, Source::CoreCreateActor, None, None, &dfs)?;
-        self.defs().leave_context(saved, &new_root);
+        def::actor(
+            &mut self.semantic_state,
+            path,
+            &id,
+            Source::CoreCreateActor,
+            None,
+            None,
+            &dfs,
+        )?;
+        self.semantic_state.defs().leave_context(saved, &new_root);
         Ok(())
-    } */
+    }
 
-    /*
     /// Upgrade an existing actor with the given `id`, with new definition `def`.
-    pub fn upgrade_actor(
-        &mut self,
-        path: String,
-        id: ActorId,
-        def: &str,
-    ) -> Result<(), Interruption> {
-        let old_def = if let Some(old) = self.actors.map.get(&id) {
+    pub fn upgrade_actor(&mut self, path: String, id: ActorId, def: &str) -> Result<(), Error> {
+        let old_def = if let Some(old) = self.semantic_state.actors.map.get(&id) {
             old.def.clone()
         } else {
-            return Err(Interruption::ActorIdNotFound(id));
+            return Err(Interruption::ActorIdNotFound(id).into());
         };
-        let (decs, _id, dfs) = Self::assert_actor_def(path.clone(), def)?;
-        let (saved, ctxid, old_ctx) = self.defs().reenter_context(&old_def.context);
+        let (decs, _id, dfs) = check::assert_actor_def(path.clone(), def)?;
+        let (saved, ctxid, old_ctx) = self.semantic_state.defs().reenter_context(&old_def.context);
         for dec in decs.iter() {
             let dec = dec.clone();
             let df = fumola_syntax::ast::DecField {
@@ -92,10 +119,10 @@ impl State {
                 stab: None,
                 dec,
             };
-            def::insert_static_field(self, &df.dec.1, &df)?;
+            def::insert_static_field(&mut self.semantic_state, &df.dec.1, &df)?;
         }
         def::actor_upgrade(
-            self,
+            &mut self.semantic_state,
             path,
             &id,
             Source::CoreUpgradeActor,
@@ -104,26 +131,11 @@ impl State {
             &dfs,
             &old_def,
         )?;
-        self.defs().releave_context(saved, &ctxid, &old_ctx);
+        self.semantic_state
+            .defs()
+            .releave_context(saved, &ctxid, &old_ctx);
         Ok(())
-    } */
-    // /// Evaluate a new program fragment, assuming agent is idle.
-    // #[cfg(feature = "parser")]
-    // pub fn eval(&mut self, new_prog_frag: &str) -> Result<Value_, Interruption> {
-    //     self.assert_idle_agent()
-    //         .map_err(Interruption::EvalInitError)?;
-    //     let local_path = "<anonymous>".to_string();
-    //     let package_name = None;
-    //     let p = crate::check::parse(new_prog_frag).map_err(|code| {
-    //         Interruption::SyntaxError(SyntaxError {
-    //             code,
-    //             local_path,
-    //             package_name,
-    //         })
-    //     })?;
-    //     self.agent.active.cont = Cont::Decs(p.vec);
-    //     self.run(&Limits::none())
-    // }
+    }
 
     /// Evaluate a new program fragment, NOT assuming agent is idle.
     /// generally, self.agent.active.stack is non-empty, and we are trying to return something to it that got stuck earlier.
@@ -141,25 +153,6 @@ impl State {
         let v = self.semantic_state.run(&Limits::none())?;
         Ok(v)
     }
-
-    /*
-        pub fn eval_str(&mut self, input: &str) -> Result<Value_, Interruption> {
-            let prog = crate::check::parse(input)?;
-            self.eval_prog(prog)
-        }
-    */
-
-    /*
-    /// Set the actor `id` to the given `definition`, regardless of whether `id` is defined already or not.
-    /// If not defined, this is the same as `create_actor`.
-    /// Otherwise, it is the same as `update_actor`.
-    pub fn set_actor(&mut self, path: String, id: ActorId, def: &str) -> Result<(), Interruption> {
-        if self.actors.map.get(&id).is_none() {
-            self.create_actor(path, id, def)
-        } else {
-            self.upgrade_actor(path, id, def)
-        }
-    } */
 
     /// Set the path's file content (initially), or re-set it, when it changes.
     ///
