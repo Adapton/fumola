@@ -1,10 +1,11 @@
-use fumola_semantics::{Interruption, ToMotoko, Value_};
+use fumola_semantics::{Interruption, Value_};
 
 use log::{error, info, trace};
 
-use fumola_semantics::format::{format_one_line, format_pretty, ToDoc};
-use fumola_semantics::vm_types::{self, Core, Limits};
+use fumola::state::State;
 use fumola_parser::parser_types;
+use fumola_semantics::format::{format_one_line, format_pretty, ToDoc};
+use fumola_semantics::vm_types::{self, Limits};
 
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -98,8 +99,7 @@ fn init_log(level_filter: log::LevelFilter) {
 
 fn main() -> OurResult<()> {
     info!("Starting...");
-    use fumola_semantics::vm_types::Core;
-    let mut core = Core::empty();
+    let mut state = fumola::state::State::empty();
     let cli_opt = CliOpt::parse();
     info!("Init log...");
     init_log(
@@ -114,7 +114,7 @@ fn main() -> OurResult<()> {
     for path in cli_opt.import.iter() {
         let file_content = read_file_if_exists(path);
         if let Some(file_content) = file_content {
-            let res = core.set_module(None, path.clone(), file_content.as_str());
+            let res = state.set_module(None, path.clone(), file_content.as_str());
             if res.is_err() {
                 return Err(OurError::String(format!("{:?}", res)));
             }
@@ -142,19 +142,19 @@ fn main() -> OurResult<()> {
                 None => Limits::none(),
                 Some(limit) => Limits::none().step(limit),
             };
-            let v = core.eval_str(&input); // to do -- use _limits
+            let v = state.eval(&input); // to do -- use _limits
             if let Ok(v) = &v {
                 println!("{}", format_pretty(v, 80))
             } else {
                 println!("Error: {:?}", v)
             }
         }
-        CliCommand::Repl {} => repl(&mut core),
+        CliCommand::Repl {} => repl(&mut state),
     };
     Ok(())
 }
 
-fn repl(core: &mut Core) {
+fn repl(state: &mut State) {
     let mut rl = Editor::<()>::new();
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
@@ -163,13 +163,13 @@ fn repl(core: &mut Core) {
         let readline = rl.readline("fumola> ");
         match readline {
             Ok(line) => {
-                core.clear_cont();
-                let v = core.eval_str(&line);
-                for line in core.debug_print_out.iter() {
+                state.semantic_state.clear_cont();
+                let v = state.eval(&line);
+                for line in state.semantic_state.debug_print_out.iter() {
                     println!("{}", line.text.to_string())
                 }
-                core.debug_print_out = im_rc::vector::Vector::new();
-                for (path, content) in core.output_files.iter() {
+                state.semantic_state.debug_print_out = im_rc::vector::Vector::new();
+                for (path, content) in state.semantic_state.output_files.iter() {
                     let path_string = format_one_line(path).replace("`", "");
                     let content = content.to_string();
                     info!(
@@ -183,9 +183,9 @@ fn repl(core: &mut Core) {
                         .expect("writing output file");
                     file.flush().expect("flush output file")
                 }
-                core.output_files = im_rc::hashmap::HashMap::new();
+                state.semantic_state.output_files = im_rc::hashmap::HashMap::new();
                 rl.add_history_entry(line.as_str());
-                inspect_result(core, v, 0)
+                inspect_result(state, v, 0)
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
@@ -204,18 +204,20 @@ fn repl(core: &mut Core) {
     rl.save_history("history.txt").unwrap();
 }
 
-fn inspect_result(core: &mut Core, result: Result<Value_, Interruption>, depth: usize) {
+fn inspect_result(state: &mut State, result: Result<Value_, fumola::Error>, depth: usize) {
     match result {
         Ok(v) => {
             println!("{}", fumola_semantics::format::format_(v.doc(), 80))
         }
-        Err(Interruption::ModuleFileNotFound(path)) => {
+        Err(fumola::Error::Interruption(fumola_semantics::Interruption::ModuleFileNotFound(
+            path,
+        ))) => {
             if depth > 0 {
-                return report_error(core, Interruption::ModuleFileNotFound(path));
+                return report_error(state, Interruption::ModuleFileNotFound(path).into());
             }
             if let None = path.package_name {
                 if let Some(content) = read_file_if_exists(&path.local_path) {
-                    match core.set_module(
+                    match state.set_module(
                         path.package_name.clone(),
                         path.local_path.clone(),
                         &content,
@@ -226,37 +228,21 @@ fn inspect_result(core: &mut Core, result: Result<Value_, Interruption>, depth: 
                         }
                         Ok(()) => (),
                     }
-                    let result = core.resume(format!("import {:?}", path.local_path).as_str());
-                    inspect_result(core, result, depth + 1);
+                    let result = state.resume(format!("import {:?}", path.local_path).as_str());
+                    inspect_result(state, result, depth + 1);
                 } else {
-                    report_error(core, Interruption::ModuleFileNotFound(path))
+                    report_error(state, Interruption::ModuleFileNotFound(path).into())
                 }
             } else {
-                report_error(core, Interruption::ModuleFileNotFound(path))
+                report_error(state, Interruption::ModuleFileNotFound(path).into())
             }
         }
-        Err(e) => report_error(core, e),
+        Err(e) => report_error(state, e),
     }
 }
 
-fn report_error(core: &mut Core, error: Interruption) {
-    use fumola_semantics::Value;
+fn report_error(_state: &mut State, error: fumola::Error) {
     error!("Error: {:?}", error);
-    info!("  Hint: Inspect lastError for details.");
-    info!(
-        "  For example, lastError.core.agent.active.cont, if lastError.core.scedule_choice == #Agent"
-    );
-    /* dump core, without chaining with any prior core dump. */
-    if let Some(_) = core.get_var("lastInterruption") {
-        core.define("lastInterruptionCore", Value::Unit);
-        core.define("lastInterruption", Value::Unit);
-        core.define("lastError", Value::Unit);
-    };
-    core.define("lastInterruptionCore", core.clone().to_motoko().unwrap());
-    core.clear_cont();
-    core.define("lastInterruption", error.to_motoko().unwrap());
-    core.eval_str("let lastError = {interruption=lastInterruption; core=lastInterruptionCore}")
-        .expect("define errorInfo");
 }
 
 fn read_file_if_exists(path: &str) -> Option<String> {
