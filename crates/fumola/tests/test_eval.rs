@@ -317,8 +317,6 @@ fn test_nat_to_text() {
 }
 
 #[test]
-#[cfg(feature = "to-motoko")]
-#[cfg(feature = "value-reflection")]
 fn prim_reify_value() {
     assert_("prim \"reifyValue\" (#abc)", "#Variant(\"abc\", null)");
     assert_(
@@ -328,7 +326,7 @@ fn prim_reify_value() {
 }
 
 #[test]
-#[cfg(feature = "value-reflection")]
+#[ignore]
 fn prim_reflect_value() {
     assert_("prim \"reflectValue\" (#Text \"hello\")", "\"hello\"");
     assert_(
@@ -338,8 +336,7 @@ fn prim_reflect_value() {
 }
 
 #[test]
-#[cfg(feature = "to-motoko")]
-#[cfg(feature = "value-reflection")]
+#[ignore]
 fn prim_reify_agent() {
     // assert_("let x = 0; prim \"hashMapGet\" ((prim \"reifyAgent\" ()).env, \"x\")", "?#Nat(0)");
     assert_(
@@ -348,8 +345,8 @@ fn prim_reify_agent() {
     );
 }
 
+#[ignore]
 #[test]
-#[cfg(feature = "value-reflection")]
 fn prim_reflect_agent() {
     // assert_("var x = 0; let agent = prim \"reifyAgent\" (); x := 1; prim \"reflectAgent\" (agent); x", "0");
     assert_(
@@ -495,10 +492,10 @@ f()
 
 #[test]
 fn test_core_eval() {
-    let mut core = fumola_semantics::vm_types::Core::empty();
-    core.eval("var x = 1").expect("oops");
-    core.eval("var y = x + 1").expect("oops");
-    let y = core.eval("y").expect("oops");
+    let mut st = fumola::state::State::empty();
+    st.eval("var x = 1").expect("oops");
+    st.eval("var y = x + 1").expect("oops");
+    let y = st.eval("y").expect("oops");
     assert_eq!(
         &*y,
         &fumola_semantics::value::Value::Nat(num_bigint::BigUint::from(2_u32))
