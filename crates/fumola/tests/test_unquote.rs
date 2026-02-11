@@ -5,9 +5,9 @@ fn assert_is_value(v: &str) {
 }
 
 fn assert_(s1: &str, s2: &str) {
-    use fumola::format::format_one_line as fmt;
-    let v1 = fumola::vm::eval(s1);
-    let v2 = fumola::vm::eval(s2);
+    use fumola_semantics::format::format_one_line as fmt;
+    let v1 = fumola::eval::eval(s1);
+    let v2 = fumola::eval::eval(s2);
     assert_eq!(fmt(v1.unwrap().as_ref()), fmt(v2.unwrap().as_ref()));
 }
 

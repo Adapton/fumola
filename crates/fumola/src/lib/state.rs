@@ -10,6 +10,7 @@ use fumola_semantics::{
 use fumola_syntax::ast::Id;
 use fumola_syntax::ast::{DecField, Source};
 
+#[derive(Clone, Debug)]
 pub struct State {
     pub semantic_state: Core,
 }

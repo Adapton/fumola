@@ -2,7 +2,7 @@ use fumola::{
     package::{
         get_base_library, get_base_library_tests, get_matchers_library, get_prim_library, Package,
     },
-    vm_types::Core,
+    state::State,
 };
 
 use test_log::test;
@@ -14,7 +14,7 @@ fn import_and_eval_debug_print() {
  import Debug "mo:base/Debug";
  Debug.print "hello world"
  "##;
-    let mut core = Core::empty();
+    let mut core = fumola::state::State::empty();
     core.load_base().expect("load base");
     core.eval(&print_hello_world)
         .expect("eval print hello world");
@@ -70,7 +70,7 @@ fn import_all_your_base() {
  import TrieSet "mo:base/TrieSet";
    "##;
 
-    let mut core = Core::empty();
+    let mut core = State::empty();
     core.load_base().expect("load base");
     core.eval(&import_all).expect("eval import all");
 }
@@ -110,7 +110,7 @@ fn assert_eval_packages(main_package: Package, dependencies: Vec<Package>) {
     println!("Evaluating package: {}", main_package.name);
     let packages = vec![vec![main_package], dependencies].concat();
     //assert!(!packages.iter().all(|p| !p.files.is_empty()));
-    let mut core = Core::empty();
+    let mut core = fumola::state::State::empty();
     let mut files = packages
         .into_iter()
         .flat_map(|p| {
@@ -133,7 +133,7 @@ fn assert_eval_packages(main_package: Package, dependencies: Vec<Package>) {
         parse_count += 1;
         // drop .mo from the path (will not be there for the imports)
         let path = format!("{}", &path[0..path.len() - 3]);
-        if Core::is_module_def(&file.content) {
+        if fumola::check::is_module_def(&file.content) {
             match core.set_module(Some(package_name.to_string()), path.clone(), &file.content) {
                 Ok(_) => {
                     total_loaded += 1;
@@ -170,6 +170,7 @@ fn assert_eval_packages(main_package: Package, dependencies: Vec<Package>) {
         eval_count += 1;
         let mut core2 = core.clone();
         core2
+            .semantic_state
             .set_ambient_package_name(Some(package_name.clone()))
             .expect("");
         match core2.eval(&file.content) {

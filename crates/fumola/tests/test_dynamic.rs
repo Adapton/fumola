@@ -1,8 +1,8 @@
-use fumola_syntax::ast::ToId;
-use fumola_syntax::shared::{FastClone, Share};
 use fumola_semantics::value::Value;
 use fumola_semantics::vm_types::{Interruption, Store};
 use fumola_semantics::{dynamic::Dynamic, value::Value_};
+use fumola_syntax::ast::ToId;
+use fumola_syntax::shared::{FastClone, Share};
 
 #[test]
 fn dyn_struct() {
