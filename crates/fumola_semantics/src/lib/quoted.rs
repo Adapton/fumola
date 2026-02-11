@@ -1,10 +1,10 @@
+use crate::type_mismatch;
+use crate::vm_types::{Env, Interruption};
 use fumola_syntax::ast::{
     Case, CasesPos, Dec, DecField, DecFieldsPos, Delim, Exp, ExpField, IdPos, NodeData, Pat,
     PatField, QuotedAst, Type,
 };
 use fumola_syntax::shared::{Share, Shared};
-use crate::type_mismatch;
-use crate::vm_types::{Env, Interruption};
 use im_rc::Vector;
 
 pub trait QuotedClose {
@@ -186,7 +186,7 @@ impl QuotedClose for Exp {
     fn quoted_close(&self, env: &Env) -> Result<Exp, Interruption> {
         use Exp::*;
         match &self {
-           // Exp::Value_(_) => todo!(),
+            // Exp::Value_(_) => todo!(),
             Exp::Hole => todo!(),
             Exp::Prim(_) => todo!(),
             Exp::Var(x) => {
@@ -300,34 +300,36 @@ impl QuotedClose for QuotedAst {
     }
 }
 
-
-pub fn append(first: &QuotedAst, other: &QuotedAst) -> Result<QuotedAst, crate::vm_types::Interruption> {
-        use QuotedAst::*;
-        match (first, other) {
-            (Empty, _) => Ok(other.clone()),
-            (_, Empty) => Ok(first.clone()),
-            (TupleExps(es1), TupleExps(es2)) => Ok(TupleExps(es1.append(es2))),
-            (RecordExps((None, None)), RecordExps((es1, es2))) => {
-                Ok(RecordExps((es1.clone(), es2.clone())))
-            }
-            (RecordExps((es1, None)), RecordExps((None, Some(es3)))) => {
-                Ok(RecordExps((es1.clone(), Some(es3.clone()))))
-            }
-            (RecordExps((es1, es2)), RecordExps((None, es3))) => Ok(match (es2, es3) {
-                (Some(es2), None) => RecordExps((es1.clone(), Some(es2.clone()))),
-                (None, es3) => RecordExps((es1.clone(), es3.clone())),
-                (Some(es2), Some(es3)) => RecordExps((es1.clone(), Some(es2.append(es3)))),
-            }),
-            (Cases(cs1), Cases(cs2)) => Ok(Cases(cs1.append(cs2))),
-            (Id_(i1), Id_(i2)) => Ok(Id_(NodeData(
-                fumola_syntax::ast::Id::new(format!("{}{}", i1.0.as_str(), i2.0.as_str())),
-                fumola_syntax::ast::Source::Evaluation,
-            )
-            .share())),
-            (Decs(ds1), Decs(ds2)) => Ok(Decs(ds1.append(ds2))),
-            (TuplePats(_), TuplePats(_)) => todo!(),
-            (RecordPats(_), RecordPats(_)) => todo!(),
-            (DecFields(_), DecFields(_)) => todo!(),
-            (_, _) => crate::type_mismatch!(file!(), line!()),
+pub fn append(
+    first: &QuotedAst,
+    other: &QuotedAst,
+) -> Result<QuotedAst, crate::vm_types::Interruption> {
+    use QuotedAst::*;
+    match (first, other) {
+        (Empty, _) => Ok(other.clone()),
+        (_, Empty) => Ok(first.clone()),
+        (TupleExps(es1), TupleExps(es2)) => Ok(TupleExps(es1.append(es2))),
+        (RecordExps((None, None)), RecordExps((es1, es2))) => {
+            Ok(RecordExps((es1.clone(), es2.clone())))
         }
+        (RecordExps((es1, None)), RecordExps((None, Some(es3)))) => {
+            Ok(RecordExps((es1.clone(), Some(es3.clone()))))
+        }
+        (RecordExps((es1, es2)), RecordExps((None, es3))) => Ok(match (es2, es3) {
+            (Some(es2), None) => RecordExps((es1.clone(), Some(es2.clone()))),
+            (None, es3) => RecordExps((es1.clone(), es3.clone())),
+            (Some(es2), Some(es3)) => RecordExps((es1.clone(), Some(es2.append(es3)))),
+        }),
+        (Cases(cs1), Cases(cs2)) => Ok(Cases(cs1.append(cs2))),
+        (Id_(i1), Id_(i2)) => Ok(Id_(NodeData(
+            fumola_syntax::ast::Id::new(format!("{}{}", i1.0.as_str(), i2.0.as_str())),
+            fumola_syntax::ast::Source::Evaluation,
+        )
+        .share())),
+        (Decs(ds1), Decs(ds2)) => Ok(Decs(ds1.append(ds2))),
+        (TuplePats(_), TuplePats(_)) => todo!(),
+        (RecordPats(_), RecordPats(_)) => todo!(),
+        (DecFields(_), DecFields(_)) => todo!(),
+        (_, _) => crate::type_mismatch!(file!(), line!()),
     }
+}

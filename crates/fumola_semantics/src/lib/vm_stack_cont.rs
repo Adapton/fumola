@@ -1,12 +1,15 @@
 //use crate::{ast::{Mut, ProjIndex}, shared::FastClone, type_mismatch, vm_types::{stack::{FieldContext, FieldValue, Frame, FrameCont}, Active, Cont, Step}, Interruption, Value, Value_};
 
 use crate::adapton::AdaptonState;
-use fumola_syntax::ast::{Cases, Exp_, Inst, Mut, Pat_, ProjIndex, QuotedAst};
 use crate::format::format_one_line;
-use fumola_syntax::shared::{FastClone, Share};
+use crate::type_mismatch;
 use crate::value::{
     ActorMethod, ArrayIterator, ArrayIteratorFunc, ArrayIteratorNextFunc, ArraySizeFunc,
     ClosedFunction, DynamicValue, Symbol, Text, Value, Value_,
+};
+use crate::vm_step::{
+    cont_value, decs_step, exp_cont, exp_conts, exp_step, literal_step, object_step, return_,
+    return_step, tuple_step, unit_step, var_step,
 };
 use crate::vm_types::{
     def::Function as FunctionDef,
@@ -15,12 +18,9 @@ use crate::vm_types::{
 };
 use crate::vm_types::{OptionCoreSource, Store};
 use crate::{nyi, type_mismatch_, vm_step, Dynamic, Shared};
+use fumola_syntax::ast::{Cases, Exp_, Inst, Mut, Pat_, ProjIndex, QuotedAst};
+use fumola_syntax::shared::{FastClone, Share};
 use im_rc::{HashMap, Vector};
-use crate::type_mismatch;
-use crate::vm_step::{
-    cont_value, decs_step, exp_cont, exp_conts, exp_step, literal_step, object_step, return_,
-    return_step, tuple_step, unit_step, var_step,
-};
 
 // continue execution using the top-most stack frame, if any.
 pub fn stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Interruption> {

@@ -127,3 +127,7 @@ impl Share for String {
         Shared::new(self)
     }
 }
+
+use std::panic::{RefUnwindSafe, UnwindSafe};
+impl<T: ?Sized> !RefUnwindSafe for Shared<T> {}
+impl<T: ?Sized> !UnwindSafe for Shared<T> {}

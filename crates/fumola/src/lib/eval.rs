@@ -1,9 +1,9 @@
-use crate::value::Value_;
-use crate::vm_types::{Core, Interruption, Limits, SyntaxError};
+use crate::{Error, SyntaxError};
+use fumola_semantics::value::Value_;
+use fumola_semantics::vm_types::{Core, Limits};
 
-#[cfg(feature = "parser")]
 /// Used for tests in check module.
-pub fn eval_limit(prog: &str, limits: &Limits) -> Result<Value_, Interruption> {
+pub fn eval_limit(prog: &str, limits: &Limits) -> Result<Value_, Error> {
     info!("eval_limit:");
     info!("  - prog = {}", prog);
     info!("  - limits = {:#?}", limits);
@@ -11,7 +11,7 @@ pub fn eval_limit(prog: &str, limits: &Limits) -> Result<Value_, Interruption> {
     let package_name = None;
     let local_path = "<anonymous>".to_string();
     let p = crate::check::parse(prog).map_err(|code| {
-        Interruption::SyntaxError(SyntaxError {
+        Error::SyntaxError(SyntaxError {
             code,
             local_path,
             package_name,
@@ -22,16 +22,13 @@ pub fn eval_limit(prog: &str, limits: &Limits) -> Result<Value_, Interruption> {
     let r = c.run(limits);
     use log::info;
     info!("eval_limit: result: {:#?}", r);
-    r
+    r.map_err(|e| Error::Interruption(e))
 }
 
-/// Used for tests in check module.
-#[cfg(feature = "parser")]
-pub fn eval(prog: &str) -> Result<Value_, Interruption> {
+pub fn eval(prog: &str) -> Result<Value_, Error> {
     eval_limit(prog, &Limits::none())
 }
 
-#[cfg(feature = "parser")]
-pub fn eval_into<T: serde::de::DeserializeOwned>(prog: &str) -> Result<T, Interruption> {
-    eval(prog)?.to_rust().map_err(Interruption::ValueError)
+pub fn eval_into<T: serde::de::DeserializeOwned>(prog: &str) -> Result<T, Error> {
+    eval(prog)?.to_rust().map_err(|_| Error::ValueError)
 }

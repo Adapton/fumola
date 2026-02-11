@@ -1,7 +1,7 @@
-use fumola_syntax::ast::Exp_;
-use crate::format::{format_one_line};
+use crate::format::format_one_line;
 use crate::value::{Closed, Symbol, Symbol_, ThunkBody, Value, Value_};
 use crate::Shared;
+use fumola_syntax::ast::Exp_;
 use im_rc::{HashMap, Vector};
 use log::info;
 use num_bigint::BigUint;

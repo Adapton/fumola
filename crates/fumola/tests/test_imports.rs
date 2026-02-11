@@ -1,16 +1,16 @@
-use fumola::ast::ToId;
+use fumola_syntax::ast::ToId;
 use im_rc::vector;
+
 //use motoko::check::assert_vm_eval as assert_;
-use fumola::ToMotoko;
-use fumola::eval;
-use fumola::shared::Share;
-use fumola::value::ActorId;
-use fumola::vm_types::{Core, Interruption, Limits, ModulePath};
+use fumola_semantics::value::ActorId;
+use fumola_semantics::vm_types::{Interruption, ModulePath};
+use fumola_semantics::ToMotoko;
+use fumola_syntax::shared::Share;
 use test_log::test; // enable logging output for tests by default.
 
 #[test]
 fn import_cycle() {
-    let mut core = Core::empty();
+    let mut core = fumola::state::State::empty();
 
     core.set_module(None, "M".to_string(), "import M \"M\"; module { }")
         .expect("set_module");
@@ -28,12 +28,12 @@ fn import_cycle() {
         local_path: "M".to_string(),
     };
     let stack = vector![path.clone(), path.clone()];
-    assert_eq!(r, Err(Interruption::ImportCycle(stack)))
+    assert_eq!(r, Err(Interruption::ImportCycle(stack).into()))
 }
 
 #[test]
 fn import_dag_size2() {
-    let mut core = Core::empty();
+    let mut core = fumola::state::State::empty();
 
     core.set_module(
         None,
@@ -55,19 +55,14 @@ fn import_dag_size2() {
     .expect("set_actor");
 
     assert_eq!(
-        core.call(
-            &id,
-            &"f".to_id(),
-            ().to_motoko().unwrap().share(),
-            &Limits::none()
-        ),
-        eval("#ok")
+        core.call(&id, &"f".to_id(), ().to_motoko().unwrap().share()),
+        fumola::eval::eval("#ok")
     );
 }
 
 #[test]
 fn import_package_module() {
-    let mut core = Core::empty();
+    let mut core = fumola::state::State::empty();
 
     core.set_module(
         Some("p".to_string()),
@@ -86,12 +81,7 @@ fn import_package_module() {
     .expect("set_actor");
 
     assert_eq!(
-        core.call(
-            &id,
-            &"f".to_id(),
-            ().to_motoko().unwrap().share(),
-            &Limits::none()
-        ),
-        eval("#ok")
+        core.call(&id, &"f".to_id(), ().to_motoko().unwrap().share(),),
+        fumola::eval::eval("#ok")
     );
 }

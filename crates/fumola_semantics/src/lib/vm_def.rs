@@ -1,7 +1,3 @@
-use fumola_syntax::ast::{
-    Dec, Delim, Exp, ExpField, ExpField_, Exp_, Id, Id_, Mut, Pat, Source, Stab_, Vis_,
-};
-use fumola_syntax::shared::{FastClone, Share};
 use crate::value::{ActorId, Closed, ClosedFunction, Value, Value_};
 use crate::vm_types::{
     def::{
@@ -11,6 +7,10 @@ use crate::vm_types::{
     Active, ActiveBorrow, Cont, Core, Interruption, Limits, LocalPointer, ModuleFile,
     ModuleFileState, ModulePath, NamedPointer, Pointer, ScheduleChoice,
 };
+use fumola_syntax::ast::{
+    Dec, Delim, Exp, ExpField, ExpField_, Exp_, Id, Id_, Mut, Pat, Source, Stab_, Vis_,
+};
+use fumola_syntax::shared::{FastClone, Share};
 use im_rc::{HashMap, Vector};
 use std::vec::Vec;
 
@@ -211,16 +211,16 @@ fn path_base(path: &String) -> String {
 }
 
 pub mod def {
-    use log::{debug, info};
     use fumola_syntax::ast;
+    use log::{debug, info};
 
     use super::*;
-    use fumola_syntax::ast::{DecField, DecFields, Literal};   
     use crate::{
         format::format_pretty,
         value::{Symbol, Text},
         Shared,
     };
+    use fumola_syntax::ast::{DecField, DecFields, Literal};
 
     pub fn import<A: Active>(active: &mut A, path: &str) -> Result<ModuleDef, Interruption> {
         let path0 = path; // for log.

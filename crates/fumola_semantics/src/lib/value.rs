@@ -3,16 +3,16 @@ use std::num::Wrapping;
 use std::rc::Rc;
 
 use crate::adapton::{Pointer as AdaptonPointer, Space as AdaptonSpace, Time as AdaptonTime};
-use fumola_syntax::ast::{
-    PrimFunction,
-    BinOp, Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, QuotedAst, ToId, UnOp,
-};
 use crate::dynamic::Dynamic;
-use fumola_syntax::shared::{FastClone, Share, Shared};
 use crate::type_mismatch;
 use crate::vm_types::LocalPointer;
 use crate::vm_types::{def::Actor as ActorDef, def::CtxId, def::Module as ModuleDef, Env};
 use crate::Interruption;
+use fumola_syntax::ast::{
+    BinOp, Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, PrimFunction, QuotedAst,
+    ToId, UnOp,
+};
+use fumola_syntax::shared::{FastClone, Share, Shared};
 
 use im_rc::Vector;
 use im_rc::{vector, HashMap};
@@ -725,7 +725,7 @@ impl Value {
     pub fn to_rust<T: DeserializeOwned>(&self) -> Result<T> {
         serde_json::from_value(self.json_value()?).map_err(|e| ValueError::ToRust(e.to_string()))
     }
-    
+
     /*
     pub fn to_rust<T: DeserializeOwned>(&self) -> Result<T> {
         // Include paths in error messages

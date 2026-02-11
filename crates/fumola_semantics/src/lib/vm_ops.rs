@@ -1,13 +1,12 @@
 use std::cmp::Ordering;
 
-use fumola_syntax::ast::{BinOp, PrimType, RelOp, UnOp};
 use crate::value::{Symbol, Value, Value_};
 use crate::vm_types::Interruption;
-use crate::{Shared, quoted, type_mismatch_};
+use crate::{quoted, type_mismatch_, Shared};
+use fumola_syntax::ast::{BinOp, PrimType, RelOp, UnOp};
 use num_bigint::{BigUint, ToBigInt};
 
 use crate::{nyi, type_mismatch};
-
 
 pub fn unop(un: UnOp, v: Value_) -> Result<Value, Interruption> {
     match (&un, &*v) {
@@ -101,7 +100,9 @@ pub fn binop(
         },
         Cat => match (cont_prim_type, &*v1, &*v2) {
             (_, Value::Text(t1), Value::Text(t2)) => Ok(Value::Text(t1.append(t2))),
-            (_, Value::QuotedAst(q1), Value::QuotedAst(q2)) => Ok(Value::QuotedAst(quoted::append(q1, q2)?)),
+            (_, Value::QuotedAst(q1), Value::QuotedAst(q2)) => {
+                Ok(Value::QuotedAst(quoted::append(q1, q2)?))
+            }
             (_, Value::Array(xm, xs), Value::Array(_ym, ys)) => {
                 let mut xs = xs.clone();
                 xs.append(ys.clone());

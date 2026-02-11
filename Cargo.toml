@@ -4,13 +4,9 @@ members = [
     "crates/fumola_syntax",
     "crates/fumola_semantics",
     "crates/fumola_parser",
+    "crates/fumola",
+   #"crates/fumola_proc_macro",
 ]
-# members = [
-#    "crates/fumola_syntax",
-#    "crates/fumola_semantics",
-#    "crates/fumola",
-#    "crates/fumola_proc_macro",
-# ]
 
 [profile.dev]
 incremental = true

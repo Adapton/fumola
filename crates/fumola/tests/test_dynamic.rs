@@ -1,8 +1,8 @@
-use fumola::ast::ToId;
-use fumola::shared::{FastClone, Share};
-use fumola::value::Value;
-use fumola::vm_types::{Interruption, Store};
-use fumola::{dynamic::Dynamic, value::Value_};
+use fumola_semantics::value::Value;
+use fumola_semantics::vm_types::{Interruption, Store};
+use fumola_semantics::{dynamic::Dynamic, value::Value_};
+use fumola_syntax::ast::ToId;
+use fumola_syntax::shared::{FastClone, Share};
 
 #[test]
 fn dyn_struct() {
@@ -13,7 +13,7 @@ fn dyn_struct() {
     }
 
     impl Dynamic for Struct {
-        fn get_index(&self, _store: &Store, index: Value_) -> fumola::dynamic::Result {
+        fn get_index(&self, _store: &Store, index: Value_) -> fumola_semantics::dynamic::Result {
             self.map
                 .get(&index)
                 .map(FastClone::fast_clone)
@@ -25,7 +25,7 @@ fn dyn_struct() {
             _store: &mut Store,
             key: Value_,
             value: Value_,
-        ) -> fumola::dynamic::Result<()> {
+        ) -> fumola_semantics::dynamic::Result<()> {
             self.map.insert(key, value);
             Ok(())
         }
@@ -50,18 +50,18 @@ fn dyn_struct() {
         fn call(
             &mut self,
             _store: &mut Store,
-            _inst: &Option<fumola::ast::Inst>,
+            _inst: &Option<fumola_syntax::ast::Inst>,
             args: Value_,
-        ) -> fumola::dynamic::Result {
+        ) -> fumola_semantics::dynamic::Result {
             Ok(args)
         }
 
-        fn iter_next(&mut self, _store: &mut Store) -> fumola::dynamic::Result {
+        fn iter_next(&mut self, _store: &mut Store) -> fumola_semantics::dynamic::Result {
             Ok(Value::Null.share())
         }
     }
 
-    let mut core = fumola::vm_types::Core::empty();
+    let mut core = fumola_semantics::vm_types::Core::empty();
 
     core.assign_alloc("value".to_id(), Struct::default().into_value());
 

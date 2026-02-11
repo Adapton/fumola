@@ -16,8 +16,8 @@ fn assert_parse_err(s: &str) {
 fn test_prim_types() {
     let d = fumola::check::parse("type t = Nat8").expect("assert_parse_ok");
     match &d.vec.get(0).expect("get parsed decl").0 {
-        fumola::ast::Dec::Type(_, _, t) => match &t.0 {
-            fumola::ast::Type::Prim(_) => {}
+        fumola_syntax::ast::Dec::Type(_, _, t) => match &t.0 {
+            fumola_syntax::ast::Type::Prim(_) => {}
             t => unreachable!("expected Type::Prim, not {:?}", t),
         },
         d => unreachable!("expected Dec::Type, not {:?}", d),

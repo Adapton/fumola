@@ -1,15 +1,12 @@
 use crate::adapton::AdaptonState;
-use fumola_syntax::ast::{Inst, Literal, Pat};
-use fumola_syntax::ast::{ CollectionFunction, FastRandIterFunction, HashMapFunction, PrimFunction};
-use crate::value::{
-    FastRandIter, Text,
-    Value, Value_,
-};
+use crate::value::{FastRandIter, Text, Value, Value_};
 use crate::vm_types::{Active, Cont, DebugPrintLine, Interruption, Step};
 use crate::{adapton, nyi, type_mismatch_};
+use fumola_syntax::ast::{CollectionFunction, FastRandIterFunction, HashMapFunction, PrimFunction};
+use fumola_syntax::ast::{Inst, Literal, Pat};
 
-use crate::vm_step::{cont_value, cont_value_, unit_step};
 use crate::type_mismatch;
+use crate::vm_step::{cont_value, cont_value_, unit_step};
 use im_rc::HashMap;
 use std::collections::hash_map;
 use std::hash::{Hash, Hasher};
@@ -159,7 +156,7 @@ pub fn call_prim_function<A: Active>(
                 let ov = active.adapton().peek(p)?;
                 let v = match ov {
                     None => Value::Null,
-                    Some(v) => Value::Option(v)
+                    Some(v) => Value::Option(v),
                 };
                 *active.cont() = cont_value(v);
                 Ok(Step {})
@@ -232,8 +229,8 @@ fn call_hashmap_function<A: Active>(
 mod collection {
     pub mod fastranditer {
         use super::super::*;
+        use crate::value::Collection;
         use fumola_syntax::shared::Share;
-        use crate::{value::Collection};
 
         pub fn new<A: Active>(
             active: &mut A,
@@ -277,8 +274,8 @@ mod collection {
 
     pub mod hashmap {
         use super::super::*;
-        use fumola_syntax::shared::FastClone;
         use crate::{value::Collection, Share};
+        use fumola_syntax::shared::FastClone;
         use im_rc::vector;
 
         pub fn new<A: Active>(active: &mut A, v: Value_) -> Result<Step, Interruption> {
@@ -365,4 +362,3 @@ mod collection {
         }
     }
 }
-
