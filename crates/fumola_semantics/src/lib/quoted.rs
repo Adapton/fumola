@@ -188,7 +188,7 @@ impl QuotedClose for Exp {
         match &self {
             // Exp::Value_(_) => todo!(),
             Exp::Hole => todo!(),
-            Exp::Prim(_) => todo!(),
+            Exp::Prim(_) => Ok(self.clone()),
             Exp::Var(x) => {
                 if x.0.unquote {
                     match env.get(x.0.id_ref()) {
