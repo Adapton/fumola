@@ -168,6 +168,15 @@ pub fn call_prim_function<A: Active>(
                 type_mismatch!(file!(), line!())
             }
         }
+        AdaptonPeekCell => {
+            if let Ok(p) = args.into_adapton_pointer_or(()) {
+                let v = active.adapton().peek_cell(p)?;
+                *active.cont() = cont_value_(v);
+                Ok(Step {})
+            } else {
+                type_mismatch!(file!(), line!())
+            }
+        }
         AdaptonPoke => {
             if let Ok(args) = args.into_tuple_or(()) {
                 if args.len() == 2 {

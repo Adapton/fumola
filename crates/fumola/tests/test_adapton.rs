@@ -20,6 +20,16 @@ fn force_simple_cache_hit() {
 }
 
 #[test]
+fn peek_cell_some_result() {
+    assert_("let p = 1 := thunk { }; force(p); switch((prim \"adaptonPeekCell\" p)) { case (?#Thunk(t)) { t.result! } }", "#Unit")
+}
+
+#[test]
+fn peek_cell_null_result() {
+    assert_("let p = 1 := thunk { }; switch((prim \"adaptonPeekCell\" p)) { case (?#Thunk(t)) { t.result } }", "null")
+}
+
+#[test]
 fn get_put() {
     assert_("@(1 := 1)", "1")
 }

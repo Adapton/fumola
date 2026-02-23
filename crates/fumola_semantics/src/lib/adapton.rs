@@ -1,6 +1,6 @@
 use crate::format::format_one_line;
 use crate::value::{Closed, Symbol, Symbol_, ThunkBody, Value, Value_};
-use crate::Shared;
+use crate::{Shared, ToMotoko};
 use fumola_syntax::ast::Exp_;
 use im_rc::{HashMap, Vector};
 use log::info;
@@ -25,6 +25,7 @@ pub trait AdaptonState {
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()>;
     fn navigate_end(&mut self) -> Res<()>;
     fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>>;
+    fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_>;
     fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()>;
 }
 
@@ -258,6 +259,13 @@ impl AdaptonState for State {
         match self {
             Self::Simple(s) => s.peek(pointer),
             Self::Graphical(g) => g.peek(pointer),
+        }
+    }
+
+    fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_> {
+        match self {
+            Self::Simple(s) => s.peek_cell(pointer),
+            Self::Graphical(g) => g.peek_cell(pointer),
         }
     }
 
@@ -568,6 +576,15 @@ impl AdaptonState for SimpleState {
         }
     }
 
+    fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_> {
+        match self.get_cell(&pointer) {
+            Ok(c) => Some(c).to_motoko_shared().map_err(|_| Error::Unreachable),
+            Err(_) => None::<Value_>
+                .to_motoko_shared()
+                .map_err(|_| Error::Unreachable),
+        }
+    }
+
     fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()> {
         match time {
             None => self.put_pointer(pointer, value),
@@ -703,6 +720,10 @@ impl AdaptonState for GraphicalState {
         todo!()
     }
     fn peek(&mut self, _pointer: Pointer) -> Res<Option<Value_>> {
+        todo!()
+    }
+
+    fn peek_cell(&mut self, _pointer: Pointer) -> Res<Value_> {
         todo!()
     }
 }
