@@ -1,7 +1,7 @@
 use crate::adapton::AdaptonState;
 use crate::value::{FastRandIter, Text, Value, Value_};
 use crate::vm_types::{Active, Cont, DebugPrintLine, Interruption, Step};
-use crate::{adapton, nyi, type_mismatch_};
+use crate::{ToMotoko, adapton, nyi, type_mismatch_};
 use fumola_syntax::ast::{CollectionFunction, FastRandIterFunction, HashMapFunction, PrimFunction};
 use fumola_syntax::ast::{Inst, Literal, Pat};
 
@@ -114,6 +114,10 @@ pub fn call_prim_function<A: Active>(
             Ok(Step {})
         } */
         Collection(cf) => call_collection_function(active, cf, targs, args),
+        AdaptonReset => {
+            *active.cont() = cont_value(active.adapton().reset()?.to_motoko()?);
+            Ok(Step {})
+        }
         AdaptonNow => {
             *active.cont() = cont_value(Value::AdaptonTime(active.adapton().now()));
             Ok(Step {})

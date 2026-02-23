@@ -980,6 +980,7 @@ pub fn source_from_decs(decs: &im_rc::Vector<Dec_>) -> Source {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum PrimFunction {
+    AdaptonReset,
     AdaptonNow,
     AdaptonHere,
     AdaptonSpace,
@@ -1006,6 +1007,7 @@ impl PrimFunction {
         use PrimFunction::*;
         Ok(match name.as_str() {
             "\"adaptonNow\"" => AdaptonNow,
+            "\"adaptonReset\"" => AdaptonReset,
             "\"adaptonHere\"" => AdaptonHere,
             "\"adaptonTime\"" => AdaptonTime,
             "\"adaptonSpace\"" => AdaptonSpace,

@@ -15,6 +15,7 @@ pub trait AdaptonState {
     fn new() -> Self
     where
         Self: Sized;
+    fn reset(&mut self) -> Res<()>;
     fn now(&self) -> Time;
     fn here(&self) -> Space;
     fn put_pointer(&mut self, _pointer: Pointer, _value: Value_) -> Res<()>;
@@ -164,6 +165,11 @@ impl AdaptonState for State {
         Self: Sized,
     {
         State::Simple(SimpleState::new())
+    }
+
+    fn reset(&mut self) -> Res<()> {
+        *self = State::Simple(SimpleState::new());
+        Ok(())
     }
 
     fn put_pointer(&mut self, pointer: Pointer, value: Value_) -> Res<()> {
@@ -427,6 +433,11 @@ fn truncate_with_ellipsis(s: &str, max_len: usize) -> String {
 }
 
 impl AdaptonState for SimpleState {
+    fn reset(&mut self) -> Res<()> {
+        *self = SimpleState::new();
+        Ok(())
+    }
+
     fn new() -> Self {
         SimpleState {
             time: Time::Now,
@@ -628,6 +639,11 @@ impl AdaptonState for GraphicalState {
             edges: HashMap::new(),
             stack: Vector::new(),
         }
+    }
+
+    fn reset(&mut self) -> Res<()> {
+        *self = GraphicalState::new();
+        Ok(())
     }
 
     // todo -- use result monad.

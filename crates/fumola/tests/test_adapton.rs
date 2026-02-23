@@ -2,6 +2,11 @@ use fumola::check::assert_vm_eval as assert_;
 //use fumola::check::assert_vm_eval_result_line as assert__;
 
 #[test]
+fn reset_simple() {
+    assert_("let p = 1 := (); prim \"adaptonReset\" (); prim \"adaptonPeek\" p", "null")
+}
+
+#[test]
 fn force_thunk() {
     assert_("force (thunk {1 + 2})", "3")
 }
