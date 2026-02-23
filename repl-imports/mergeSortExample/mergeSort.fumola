@@ -96,6 +96,32 @@ module {
     public func bigOutput () {
         Seq.takeAll(Seq.lazyMergeSort(@(inputSeqBig()!)))
     };
-   
- 
+
+    public func generateRandomInput(seed : Nat, size : Nat) {
+        let iter = prim "fastRandIterNew" (?size, seed);
+        var count = 0;
+        var result = [];
+        let maxValue = size * 137;
+        for (x in iter) {
+            count += 1;
+            result #= [(count, x % maxValue)]
+        };
+        result
+    };
+
+    public func runRandom(seed : Nat, size : Nat, demandPattern) {
+        prim "adaptonReset" ();
+        let inputArray = generateRandomInput(seed, size);
+        let inputSeq = Seq.fromArray(inputArray);
+        let sorted = Seq.lazyMergeSort(@(inputSeq!)); 
+        let result = switch (demandPattern) {
+            case (null) { Seq.takeAll(sorted) };
+            case (null or (?#all)) { Seq.takeAll(sorted) };
+            case (?#one) { Seq.takeOne(sorted) };
+            case (?#half) { Seq.takeN(sorted, size / 2) };
+        };
+        let comparisonCount = (prim "adaptonPeek" (prim "adaptonPointer" (`merge)))!;
+        { result ; comparisonCount }
+    }
 }
+ 
