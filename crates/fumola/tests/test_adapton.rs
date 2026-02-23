@@ -3,7 +3,10 @@ use fumola::check::assert_vm_eval as assert_;
 
 #[test]
 fn reset_simple() {
-    assert_("let p = 1 := (); prim \"adaptonReset\" (); prim \"adaptonPeek\" p", "null")
+    assert_(
+        "let p = 1 := (); prim \"adaptonReset\" (); prim \"adaptonPeek\" p",
+        "null",
+    )
 }
 
 #[test]

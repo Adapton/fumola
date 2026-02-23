@@ -1,7 +1,7 @@
 use crate::adapton::AdaptonState;
 use crate::value::{FastRandIter, Text, Value, Value_};
 use crate::vm_types::{Active, Cont, DebugPrintLine, Interruption, Step};
-use crate::{ToMotoko, adapton, nyi, type_mismatch_};
+use crate::{adapton, nyi, type_mismatch_, ToMotoko};
 use fumola_syntax::ast::{CollectionFunction, FastRandIterFunction, HashMapFunction, PrimFunction};
 use fumola_syntax::ast::{Inst, Literal, Pat};
 

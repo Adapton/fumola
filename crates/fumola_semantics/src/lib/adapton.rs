@@ -40,7 +40,7 @@ pub enum Error {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ForceBeginResult {
     CacheMiss(ThunkBody),
-    CacheHit(Value_)
+    CacheHit(Value_),
 }
 
 pub type Res<Ok> = Result<Ok, Error>;
@@ -315,10 +315,10 @@ impl Cell {
             Cell::Thunk(tc) => Ok(Value::Thunk(tc.body.clone()).into()),
         }
     }
-    pub fn set_cache_value(&mut self, v : Value_) -> Res<()> {
+    pub fn set_cache_value(&mut self, v: Value_) -> Res<()> {
         match self {
             Cell::NonThunk(_) => Err(Error::Unreachable),
-            Cell::Thunk(t)=> {
+            Cell::Thunk(t) => {
                 t.result = Some(v);
                 Ok(())
             }
@@ -520,17 +520,19 @@ impl AdaptonState for SimpleState {
             if let Some(cache_value) = tc.result {
                 Ok(ForceBeginResult::CacheHit(cache_value))
             } else {
-            self.push_stack();
-            self.thunk_pointer = Some(pointer);
-            self.space = tc.space.clone();
-            Ok(ForceBeginResult::CacheMiss(tc.body.clone()))
+                self.push_stack();
+                self.thunk_pointer = Some(pointer);
+                self.space = tc.space.clone();
+                Ok(ForceBeginResult::CacheMiss(tc.body.clone()))
             }
         } else {
             Err(Error::TypeMismatch(line!()))
         }
     }
     fn force_end(&mut self, value: Value_) -> Res<()> {
-        let cell = self.get_cell_mut(&self.thunk_pointer.clone().unwrap(), &self.now()).ok_or(Error::Unreachable)?;
+        let cell = self
+            .get_cell_mut(&self.thunk_pointer.clone().unwrap(), &self.now())
+            .ok_or(Error::Unreachable)?;
         cell.set_cache_value(value)?;
         let _fr = self.pop_stack()?;
         Ok(())
