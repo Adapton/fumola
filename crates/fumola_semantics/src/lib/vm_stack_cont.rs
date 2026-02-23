@@ -1,6 +1,6 @@
 //use crate::{ast::{Mut, ProjIndex}, shared::FastClone, type_mismatch, vm_types::{stack::{FieldContext, FieldValue, Frame, FrameCont}, Active, Cont, Step}, Interruption, Value, Value_};
 
-use crate::adapton::AdaptonState;
+use crate::adapton::{AdaptonState, ForceBeginResult};
 use crate::format::format_one_line;
 use crate::type_mismatch;
 use crate::value::{
@@ -693,20 +693,29 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
         }
         Force1 => {
             if let Value::AdaptonPointer(ref p) = *v {
-                let thunk_body = active.adapton().force_begin(p.clone())?;
-                let env = active.env().fast_clone();
-                let context = active.defs().active_ctx.clone();
-                active.stack().push_front(Frame {
+                let force_begin_result = active.adapton().force_begin(p.clone())?;
+                match force_begin_result {
+                    ForceBeginResult::CacheHit(v) => {
+                        *active.cont() = Cont::Value_(v);
+                        Ok(Step {})        
+                    }
+                    ForceBeginResult::CacheMiss(thunk_body) => {
+                    let env = active.env().fast_clone();
+                    let context = active.defs().active_ctx.clone();
+                    active.stack().push_front(Frame {
                     context,
                     env,
                     cont: FrameCont::ForceAdaptonPointer,
                     cont_prim_type: None,
                     source: fumola_syntax::ast::Source::Evaluation,
-                });
-                *active.env() = thunk_body.env;
-                *active.ctx_id() = thunk_body.ctx;
-                exp_step(active, thunk_body.content)
-            } else if let Value::Thunk(ref thunk_body) = *v {
+                    });
+                     *active.env() = thunk_body.env;
+                    *active.ctx_id() = thunk_body.ctx;
+                    exp_step(active, thunk_body.content)
+                 }
+                 }
+                }
+            else if let Value::Thunk(ref thunk_body) = *v {
                 let env = active.env().fast_clone();
                 let context = active.defs().active_ctx.clone();
                 active.stack().push_front(Frame {

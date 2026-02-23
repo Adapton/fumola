@@ -12,6 +12,11 @@ fn force_thunk() {
 }
 
 #[test]
+fn force_simple_cache_hit() {
+    assert_("let count = 1 := 0; let myThunk = 2 := thunk { let orig = @ count; count := 1 + (@ count); orig }; force(myThunk); (@ count, force(myThunk))", "(1, 0)")
+}
+
+#[test]
 fn get_put() {
     assert_("@(1 := 1)", "1")
 }

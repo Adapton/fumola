@@ -1,6 +1,3 @@
-//
-// 2026-02-11 16:01
-//
 use crate::format::format_one_line;
 use crate::value::{Closed, Symbol, Symbol_, ThunkBody, Value, Value_};
 use crate::Shared;
@@ -23,7 +20,7 @@ pub trait AdaptonState {
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_>;
     fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()>;
     fn put_symbol_delay(&mut self, symbol: Symbol_, time: Time, value: Value_) -> Res<Pointer>;
-    fn force_begin(&mut self, _pointer: Pointer) -> Res<ThunkBody>;
+    fn force_begin(&mut self, _pointer: Pointer) -> Res<ForceBeginResult>;
     fn force_end(&mut self, _value: Value_) -> Res<()>;
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()>;
     fn navigate_end(&mut self) -> Res<()>;
@@ -36,6 +33,14 @@ pub enum Error {
     Internal(u32),
     TypeMismatch(u32),
     UndefinedNow(Pointer),
+    Unreachable,
+}
+
+/// A force either results in a cache hit, or a cache miss; the execution of each situation continues differently.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ForceBeginResult {
+    CacheMiss(ThunkBody),
+    CacheHit(Value_)
 }
 
 pub type Res<Ok> = Result<Ok, Error>;
@@ -193,7 +198,7 @@ impl AdaptonState for State {
         }
     }
 
-    fn force_begin(&mut self, pointer: Pointer) -> Res<ThunkBody> {
+    fn force_begin(&mut self, pointer: Pointer) -> Res<ForceBeginResult> {
         match self {
             Self::Simple(s) => s.force_begin(pointer),
             Self::Graphical(g) => g.force_begin(pointer),
@@ -310,6 +315,15 @@ impl Cell {
             Cell::Thunk(tc) => Ok(Value::Thunk(tc.body.clone()).into()),
         }
     }
+    pub fn set_cache_value(&mut self, v : Value_) -> Res<()> {
+        match self {
+            Cell::NonThunk(_) => Err(Error::Unreachable),
+            Cell::Thunk(t)=> {
+                t.result = Some(v);
+                Ok(())
+            }
+        }
+    }
 }
 
 impl SimpleState {
@@ -335,7 +349,7 @@ impl SimpleState {
         }
         self.time_space.get(t).unwrap()
     }
-    fn _get_cell_mut<'a>(&'a mut self, p: &Pointer, t: &Time) -> Option<&'a mut Cell> {
+    fn get_cell_mut<'a>(&'a mut self, p: &Pointer, t: &Time) -> Option<&'a mut Cell> {
         self.get_cell_by_time_mut(p).get_mut(t)
     }
     fn new_cell(space: Space, value: Value_) -> Cell {
@@ -355,12 +369,13 @@ impl SimpleState {
             thunk_pointer: self.thunk_pointer.clone(),
         });
     }
-    fn pop_stack(&mut self) -> Res<()> {
+    fn pop_stack(&mut self) -> Res<SimpleFrame> {
         if let Some(frame) = self.stack.pop_back() {
+            let r = frame.clone();
             self.time = frame.ambient_time;
             self.thunk_pointer = frame.thunk_pointer;
             self.space = frame.ambient_space;
-            Ok(())
+            Ok(r)
         } else {
             Err(Error::Internal(line!()))
         }
@@ -499,30 +514,26 @@ impl AdaptonState for SimpleState {
         };
         Ok(())
     }
-    fn force_begin(&mut self, pointer: Pointer) -> Res<ThunkBody> {
+    fn force_begin(&mut self, pointer: Pointer) -> Res<ForceBeginResult> {
         let cell = self.get_cell(&pointer)?.clone();
-        if false {
-            // to do -- introduce a flag to check.
-            let indent = "| ".repeat(self.stack.len());
-            info!("{}BEGIN: force {}", indent, format_one_line(&pointer));
-        }
         if let Cell::Thunk(tc) = cell {
+            if let Some(cache_value) = tc.result {
+                Ok(ForceBeginResult::CacheHit(cache_value))
+            } else {
             self.push_stack();
             self.thunk_pointer = Some(pointer);
             self.space = tc.space.clone();
-            Ok(tc.body.clone())
+            Ok(ForceBeginResult::CacheMiss(tc.body.clone()))
+            }
         } else {
             Err(Error::TypeMismatch(line!()))
         }
     }
     fn force_end(&mut self, value: Value_) -> Res<()> {
-        if false {
-            // to do -- introduce a flag to check.
-            let indent = "| ".repeat(self.stack.len() - 1);
-            info!("{}END: force returns {}", indent, format_one_line(&value));
-        }
-        // to do -- save _value
-        self.pop_stack()
+        let cell = self.get_cell_mut(&self.thunk_pointer.clone().unwrap(), &self.now()).ok_or(Error::Unreachable)?;
+        cell.set_cache_value(value)?;
+        let _fr = self.pop_stack()?;
+        Ok(())
     }
 
     fn now(&self) -> Time {
@@ -646,9 +657,6 @@ impl AdaptonState for GraphicalState {
         Ok(())
     }
 
-    // todo -- use result monad.
-    // todo -- introduce Result -- interruptions vs normal return types.
-
     fn put_pointer(&mut self, _pointer: Pointer, _value: Value_) -> Res<()> {
         todo!()
     }
@@ -658,7 +666,7 @@ impl AdaptonState for GraphicalState {
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_> {
         todo!()
     }
-    fn force_begin(&mut self, _pointer: Pointer) -> Res<ThunkBody> {
+    fn force_begin(&mut self, _pointer: Pointer) -> Res<ForceBeginResult> {
         todo!()
     }
     fn force_end(&mut self, _value: Value_) -> Res<()> {
