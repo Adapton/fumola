@@ -315,6 +315,7 @@ impl ToDoc for PrimFunction {
             PrimFunction::AdaptonPoke => str("\"adaptonPoke\""),
             PrimFunction::ReifyCore => todo!(),
             PrimFunction::ReflectCore => todo!(),
+            PrimFunction::SymbolHash => str("\"symbolHash\""),
         }
     }
 }

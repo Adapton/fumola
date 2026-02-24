@@ -11,6 +11,35 @@ use im_rc::HashMap;
 use std::collections::hash_map;
 use std::hash::{Hash, Hasher};
 
+pub fn geometric_pack(hash: u64) -> u64 {
+    const CHUNK_BITS: u32 = 8;
+    const K: u32 = 8;
+    const FIELD_BITS: u32 = 4;
+    let mut output = 0u64;
+    for i in 0..K {
+        let chunk = ((hash >> (i * CHUNK_BITS)) & 0xFFFF) as u16;
+        let mut trial = chunk.trailing_zeros();
+        if trial > CHUNK_BITS {
+            trial = CHUNK_BITS;
+        }
+        output |= (trial as u64) << (i * FIELD_BITS);
+    }
+    output
+}
+
+pub fn geometric_levels<const K: usize>(hash: u64) -> u64 {
+    const FIELD_BITS: u32 = 6; // enough for values up to 63
+    let mut out = 0u64;
+    for i in 0..K {
+        // Derive independent-looking stream
+        let h = hash.rotate_left((i as u32) * 13);
+        // Geometric trial
+        let level = h.trailing_zeros();
+        out |= (level as u64) << (i as u32 * FIELD_BITS);
+    }
+    out
+}
+
 pub fn call_prim_function<A: Active>(
     active: &mut A,
     pf: &PrimFunction,
@@ -20,6 +49,18 @@ pub fn call_prim_function<A: Active>(
     use PrimFunction::*;
     match pf {
         SymbolLevel => {
+            if let Ok(symbol) = args.as_ref().into_sym_or(()) {
+                let mut hasher = hash_map::DefaultHasher::new();
+                symbol.as_ref().hash(&mut hasher);
+                let hash = hasher.finish();
+                let level = geometric_levels::<4>(hash);
+                *active.cont() = Cont::Value_(Value::Nat(level.into()).into());
+                Ok(Step {})
+            } else {
+                type_mismatch!(file!(), line!())
+            }
+        }
+        SymbolHash => {
             if let Ok(symbol) = args.as_ref().into_sym_or(()) {
                 let mut hasher = hash_map::DefaultHasher::new();
                 symbol.as_ref().hash(&mut hasher);
