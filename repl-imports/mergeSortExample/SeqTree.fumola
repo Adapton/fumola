@@ -70,11 +70,9 @@ module {
       case (?xc, ?yc) {
         Counters.inc `merge;
         if (xc.element <= yc.element) {
-          let xc_next = force(xc.next);
-          ?{ element=xc.element; symbol=xc.symbol; next = xc.symbol := thunk { merge(xc_next, ?yc) } }
+          ?{ element=xc.element; symbol=xc.symbol; next = xc.symbol := thunk { merge(force(xc.next), ?yc) } }
         } else {
-          let yc_next = force(yc.next);
-          ?{ element=yc.element; symbol=yc.symbol; next = yc.symbol := thunk { merge(?xc, yc_next) } }
+          ?{ element=yc.element; symbol=yc.symbol; next = yc.symbol := thunk { merge(?xc, force(yc.next)) } }
         }
       };
     }
@@ -136,6 +134,16 @@ module {
       case null [];
       case (?lc) {
         [(lc.symbol, lc.element)] # takeAll(lc.next)
+      }
+    }
+  };
+
+  #[listing]
+  public func takeOne(l : LazyList<X>) : [(Symbol, X)] {
+    switch (force l) {
+      case null [];
+      case (?lc) {
+        [(lc.symbol, lc.element)]
       }
     }
   };
