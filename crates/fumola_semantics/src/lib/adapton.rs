@@ -1,6 +1,6 @@
 use crate::format::format_one_line;
 use crate::value::{Closed, Symbol, Symbol_, ThunkBody, Value, Value_};
-use crate::Shared;
+use crate::{Shared, ToMotoko};
 use fumola_syntax::ast::Exp_;
 use im_rc::{HashMap, Vector};
 use log::info;
@@ -8,10 +8,124 @@ use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
+///
+/// Any symbol with a prefix of `adapton` is reserved for future use.
+///
+pub fn is_future_reserved_symbol(symbol: &Symbol) -> bool {
+    match symbol {
+        Symbol::Id(x) => x.as_str() == "adapton",
+        Symbol::Call(x, _) => is_future_reserved_symbol(x),
+        Symbol::Dot(x, _) => is_future_reserved_symbol(x),
+        Symbol::BinOp(x, _, _) => is_future_reserved_symbol(x),
+        Symbol::Nat(_) => false,
+        Symbol::Int(_) => false,
+        Symbol::QuotedAst(_) => false,
+        Symbol::UnOp(_, x) => is_future_reserved_symbol(x),
+    }
+}
+
+// Current Reserved Symbols:
+//
+// `adapton(`state)
+// `adapton(`settings)(`forceBeginAlwaysMisses).
+// `adapton(`settings)(`forceEndForgetsResult).
+// `adapton(`counts)(`cells)
+//                  (`nonThunkCells)
+//                  (`thunkCells)
+//                  (`put)
+//                  (`get)
+//                  (`forceBegin)
+//                  (`forceEnd)
+//                  (`forceBeginCacheHit)
+//                  (`forceBeginCacheMiss)
+//
+// Operations on these symbols have special meaning:
+//  - They are not part of the graphical representation of dependencies.
+//  - Every put acts like a poke; every get acts like a peek.
+//
+// There are peek/poke mode restrictions:
+//  1. `settings(*) permit both peek and poke modes.
+//  2. `state and `counts(*) permits only peek mode.
+//
+pub enum ReservedSymbol {
+    State,
+    SettingsForceBeginAlwaysMisses,
+    SettingsForceEndForgetsResult,
+    CountsCells,
+    CountsThunkCells,
+    CountsNonThunkCells,
+    CountsPut,
+    CountsGet,
+    CountsForceBegin,
+    CountsForceEnd,
+    CountsForceBeginCacheHit,
+    CountsForceBeginCacheMiss,
+}
+
+pub fn into_reserved_symbol(symbol: &Symbol) -> Option<ReservedSymbol> {
+    match symbol {
+        Symbol::Call(x, y) => match x.get() {
+            Symbol::Id(id) => {
+                if id.as_str() == "adapton" {
+                    match y.get() {
+                        Symbol::Id(id) => {
+                            if id.as_str() == "state" {
+                                Some(ReservedSymbol::State)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            Symbol::Call(x1, x2) => match (x1.get(), x2.get(), y.get()) {
+                (Symbol::Id(x), Symbol::Id(y), Symbol::Id(z)) => {
+                    if x.as_str() != "adapton" {
+                        return None;
+                    };
+                    match y.as_str() {
+                        "counts" => match z.as_str() {
+                            "cells" => Some(ReservedSymbol::CountsCells),
+                            "nonThunkCells" => Some(ReservedSymbol::CountsNonThunkCells),
+                            "thunkCells" => Some(ReservedSymbol::CountsThunkCells),
+                            "put" => Some(ReservedSymbol::CountsPut),
+                            "get" => Some(ReservedSymbol::CountsGet),
+                            "forceBegin" => Some(ReservedSymbol::CountsForceBegin),
+                            "forceEnd" => Some(ReservedSymbol::CountsForceEnd),
+                            "forceBeginCacheHit" => Some(ReservedSymbol::CountsForceBeginCacheHit),
+                            "forceBeginCacheMiss" => {
+                                Some(ReservedSymbol::CountsForceBeginCacheMiss)
+                            }
+                            _ => None,
+                        },
+                        "settings" => match z.as_str() {
+                            "forceBeginAlwaysMisses" => {
+                                Some(ReservedSymbol::SettingsForceBeginAlwaysMisses)
+                            }
+                            "forceEndForgetsResult" => {
+                                Some(ReservedSymbol::SettingsForceEndForgetsResult)
+                            }
+                            _ => None,
+                        },
+                        _ => None,
+                    }
+                }
+                _ => None,
+            },
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 pub trait AdaptonState {
     fn new() -> Self
     where
         Self: Sized;
+    fn reset(&mut self) -> Res<()>;
     fn now(&self) -> Time;
     fn here(&self) -> Space;
     fn put_pointer(&mut self, _pointer: Pointer, _value: Value_) -> Res<()>;
@@ -19,11 +133,12 @@ pub trait AdaptonState {
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_>;
     fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()>;
     fn put_symbol_delay(&mut self, symbol: Symbol_, time: Time, value: Value_) -> Res<Pointer>;
-    fn force_begin(&mut self, _pointer: Pointer) -> Res<ThunkBody>;
+    fn force_begin(&mut self, _pointer: Pointer) -> Res<ForceBeginResult>;
     fn force_end(&mut self, _value: Value_) -> Res<()>;
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()>;
     fn navigate_end(&mut self) -> Res<()>;
     fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>>;
+    fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_>;
     fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()>;
 }
 
@@ -32,6 +147,14 @@ pub enum Error {
     Internal(u32),
     TypeMismatch(u32),
     UndefinedNow(Pointer),
+    Unreachable,
+}
+
+/// A force either results in a cache hit, or a cache miss; the execution of each situation continues differently.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ForceBeginResult {
+    CacheMiss(ThunkBody),
+    CacheHit(Value_),
 }
 
 pub type Res<Ok> = Result<Ok, Error>;
@@ -163,6 +286,11 @@ impl AdaptonState for State {
         State::Simple(SimpleState::new())
     }
 
+    fn reset(&mut self) -> Res<()> {
+        *self = State::Simple(SimpleState::new());
+        Ok(())
+    }
+
     fn put_pointer(&mut self, pointer: Pointer, value: Value_) -> Res<()> {
         match self {
             Self::Simple(s) => s.put_pointer(pointer, value),
@@ -184,7 +312,7 @@ impl AdaptonState for State {
         }
     }
 
-    fn force_begin(&mut self, pointer: Pointer) -> Res<ThunkBody> {
+    fn force_begin(&mut self, pointer: Pointer) -> Res<ForceBeginResult> {
         match self {
             Self::Simple(s) => s.force_begin(pointer),
             Self::Graphical(g) => g.force_begin(pointer),
@@ -247,6 +375,13 @@ impl AdaptonState for State {
         }
     }
 
+    fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_> {
+        match self {
+            Self::Simple(s) => s.peek_cell(pointer),
+            Self::Graphical(g) => g.peek_cell(pointer),
+        }
+    }
+
     fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()> {
         match self {
             Self::Simple(s) => s.poke(pointer, time, value),
@@ -301,6 +436,15 @@ impl Cell {
             Cell::Thunk(tc) => Ok(Value::Thunk(tc.body.clone()).into()),
         }
     }
+    pub fn set_cache_value(&mut self, v: Value_) -> Res<()> {
+        match self {
+            Cell::NonThunk(_) => Err(Error::Unreachable),
+            Cell::Thunk(t) => {
+                t.result = Some(v);
+                Ok(())
+            }
+        }
+    }
 }
 
 impl SimpleState {
@@ -326,7 +470,7 @@ impl SimpleState {
         }
         self.time_space.get(t).unwrap()
     }
-    fn _get_cell_mut<'a>(&'a mut self, p: &Pointer, t: &Time) -> Option<&'a mut Cell> {
+    fn get_cell_mut<'a>(&'a mut self, p: &Pointer, t: &Time) -> Option<&'a mut Cell> {
         self.get_cell_by_time_mut(p).get_mut(t)
     }
     fn new_cell(space: Space, value: Value_) -> Cell {
@@ -346,12 +490,13 @@ impl SimpleState {
             thunk_pointer: self.thunk_pointer.clone(),
         });
     }
-    fn pop_stack(&mut self) -> Res<()> {
+    fn pop_stack(&mut self) -> Res<SimpleFrame> {
         if let Some(frame) = self.stack.pop_back() {
+            let r = frame.clone();
             self.time = frame.ambient_time;
             self.thunk_pointer = frame.thunk_pointer;
             self.space = frame.ambient_space;
-            Ok(())
+            Ok(r)
         } else {
             Err(Error::Internal(line!()))
         }
@@ -424,6 +569,11 @@ fn truncate_with_ellipsis(s: &str, max_len: usize) -> String {
 }
 
 impl AdaptonState for SimpleState {
+    fn reset(&mut self) -> Res<()> {
+        *self = SimpleState::new();
+        Ok(())
+    }
+
     fn new() -> Self {
         SimpleState {
             time: Time::Now,
@@ -485,30 +635,28 @@ impl AdaptonState for SimpleState {
         };
         Ok(())
     }
-    fn force_begin(&mut self, pointer: Pointer) -> Res<ThunkBody> {
+    fn force_begin(&mut self, pointer: Pointer) -> Res<ForceBeginResult> {
         let cell = self.get_cell(&pointer)?.clone();
-        if false {
-            // to do -- introduce a flag to check.
-            let indent = "| ".repeat(self.stack.len());
-            info!("{}BEGIN: force {}", indent, format_one_line(&pointer));
-        }
         if let Cell::Thunk(tc) = cell {
-            self.push_stack();
-            self.thunk_pointer = Some(pointer);
-            self.space = tc.space.clone();
-            Ok(tc.body.clone())
+            if let Some(cache_value) = tc.result {
+                Ok(ForceBeginResult::CacheHit(cache_value))
+            } else {
+                self.push_stack();
+                self.thunk_pointer = Some(pointer);
+                self.space = tc.space.clone();
+                Ok(ForceBeginResult::CacheMiss(tc.body.clone()))
+            }
         } else {
             Err(Error::TypeMismatch(line!()))
         }
     }
     fn force_end(&mut self, value: Value_) -> Res<()> {
-        if false {
-            // to do -- introduce a flag to check.
-            let indent = "| ".repeat(self.stack.len() - 1);
-            info!("{}END: force returns {}", indent, format_one_line(&value));
-        }
-        // to do -- save _value
-        self.pop_stack()
+        let cell = self
+            .get_cell_mut(&self.thunk_pointer.clone().unwrap(), &self.now())
+            .ok_or(Error::Unreachable)?;
+        cell.set_cache_value(value)?;
+        let _fr = self.pop_stack()?;
+        Ok(())
     }
 
     fn now(&self) -> Time {
@@ -538,6 +686,15 @@ impl AdaptonState for SimpleState {
         match self.get_cell(&pointer) {
             Ok(c) => Ok(Some(c.get_value()?)),
             Err(_) => Ok(None),
+        }
+    }
+
+    fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_> {
+        match self.get_cell(&pointer) {
+            Ok(c) => Some(c).to_motoko_shared().map_err(|_| Error::Unreachable),
+            Err(_) => None::<Value_>
+                .to_motoko_shared()
+                .map_err(|_| Error::Unreachable),
         }
     }
 
@@ -627,8 +784,10 @@ impl AdaptonState for GraphicalState {
         }
     }
 
-    // todo -- use result monad.
-    // todo -- introduce Result -- interruptions vs normal return types.
+    fn reset(&mut self) -> Res<()> {
+        *self = GraphicalState::new();
+        Ok(())
+    }
 
     fn put_pointer(&mut self, _pointer: Pointer, _value: Value_) -> Res<()> {
         todo!()
@@ -639,7 +798,7 @@ impl AdaptonState for GraphicalState {
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_> {
         todo!()
     }
-    fn force_begin(&mut self, _pointer: Pointer) -> Res<ThunkBody> {
+    fn force_begin(&mut self, _pointer: Pointer) -> Res<ForceBeginResult> {
         todo!()
     }
     fn force_end(&mut self, _value: Value_) -> Res<()> {
@@ -674,6 +833,10 @@ impl AdaptonState for GraphicalState {
         todo!()
     }
     fn peek(&mut self, _pointer: Pointer) -> Res<Option<Value_>> {
+        todo!()
+    }
+
+    fn peek_cell(&mut self, _pointer: Pointer) -> Res<Value_> {
         todo!()
     }
 }

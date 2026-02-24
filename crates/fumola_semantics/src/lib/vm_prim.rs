@@ -1,7 +1,7 @@
 use crate::adapton::AdaptonState;
 use crate::value::{FastRandIter, Text, Value, Value_};
 use crate::vm_types::{Active, Cont, DebugPrintLine, Interruption, Step};
-use crate::{adapton, nyi, type_mismatch_};
+use crate::{adapton, nyi, type_mismatch_, ToMotoko};
 use fumola_syntax::ast::{CollectionFunction, FastRandIterFunction, HashMapFunction, PrimFunction};
 use fumola_syntax::ast::{Inst, Literal, Pat};
 
@@ -10,6 +10,35 @@ use crate::vm_step::{cont_value, cont_value_, unit_step};
 use im_rc::HashMap;
 use std::collections::hash_map;
 use std::hash::{Hash, Hasher};
+
+pub fn geometric_pack(hash: u64) -> u64 {
+    const CHUNK_BITS: u32 = 8;
+    const K: u32 = 8;
+    const FIELD_BITS: u32 = 4;
+    let mut output = 0u64;
+    for i in 0..K {
+        let chunk = ((hash >> (i * CHUNK_BITS)) & 0xFFFF) as u16;
+        let mut trial = chunk.trailing_zeros();
+        if trial > CHUNK_BITS {
+            trial = CHUNK_BITS;
+        }
+        output |= (trial as u64) << (i * FIELD_BITS);
+    }
+    output
+}
+
+pub fn geometric_levels<const K: usize>(hash: u64) -> u64 {
+    const FIELD_BITS: u32 = 6; // enough for values up to 63
+    let mut out = 0u64;
+    for i in 0..K {
+        // Derive independent-looking stream
+        let h = hash.rotate_left((i as u32) * 13);
+        // Geometric trial
+        let level = h.trailing_zeros();
+        out |= (level as u64) << (i as u32 * FIELD_BITS);
+    }
+    out
+}
 
 pub fn call_prim_function<A: Active>(
     active: &mut A,
@@ -20,6 +49,18 @@ pub fn call_prim_function<A: Active>(
     use PrimFunction::*;
     match pf {
         SymbolLevel => {
+            if let Ok(symbol) = args.as_ref().into_sym_or(()) {
+                let mut hasher = hash_map::DefaultHasher::new();
+                symbol.as_ref().hash(&mut hasher);
+                let hash = hasher.finish();
+                let level = geometric_levels::<4>(hash);
+                *active.cont() = Cont::Value_(Value::Nat(level.into()).into());
+                Ok(Step {})
+            } else {
+                type_mismatch!(file!(), line!())
+            }
+        }
+        SymbolHash => {
             if let Ok(symbol) = args.as_ref().into_sym_or(()) {
                 let mut hasher = hash_map::DefaultHasher::new();
                 symbol.as_ref().hash(&mut hasher);
@@ -114,6 +155,10 @@ pub fn call_prim_function<A: Active>(
             Ok(Step {})
         } */
         Collection(cf) => call_collection_function(active, cf, targs, args),
+        AdaptonReset => {
+            *active.cont() = cont_value(active.adapton().reset()?.to_motoko()?);
+            Ok(Step {})
+        }
         AdaptonNow => {
             *active.cont() = cont_value(Value::AdaptonTime(active.adapton().now()));
             Ok(Step {})
@@ -159,6 +204,15 @@ pub fn call_prim_function<A: Active>(
                     Some(v) => Value::Option(v),
                 };
                 *active.cont() = cont_value(v);
+                Ok(Step {})
+            } else {
+                type_mismatch!(file!(), line!())
+            }
+        }
+        AdaptonPeekCell => {
+            if let Ok(p) = args.into_adapton_pointer_or(()) {
+                let v = active.adapton().peek_cell(p)?;
+                *active.cont() = cont_value_(v);
                 Ok(Step {})
             } else {
                 type_mismatch!(file!(), line!())

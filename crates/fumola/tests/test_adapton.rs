@@ -2,8 +2,31 @@ use fumola::check::assert_vm_eval as assert_;
 //use fumola::check::assert_vm_eval_result_line as assert__;
 
 #[test]
+fn reset_simple() {
+    assert_(
+        "let p = 1 := (); prim \"adaptonReset\" (); prim \"adaptonPeek\" p",
+        "null",
+    )
+}
+
+#[test]
 fn force_thunk() {
     assert_("force (thunk {1 + 2})", "3")
+}
+
+#[test]
+fn force_simple_cache_hit() {
+    assert_("let count = 1 := 0; let myThunk = 2 := thunk { let orig = @ count; count := 1 + (@ count); orig }; force(myThunk); (@ count, force(myThunk))", "(1, 0)")
+}
+
+#[test]
+fn peek_cell_some_result() {
+    assert_("let p = 1 := thunk { }; force(p); switch((prim \"adaptonPeekCell\" p)) { case (?#Thunk(t)) { t.result! } }", "#Unit")
+}
+
+#[test]
+fn peek_cell_null_result() {
+    assert_("let p = 1 := thunk { }; switch((prim \"adaptonPeekCell\" p)) { case (?#Thunk(t)) { t.result } }", "null")
 }
 
 #[test]

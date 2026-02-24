@@ -295,6 +295,7 @@ impl ToDoc for Module {
 impl ToDoc for PrimFunction {
     fn doc(&'_ self) -> RcDoc<'_> {
         match self {
+            PrimFunction::AdaptonReset => str("\"adaptonReset\""),
             PrimFunction::AdaptonNow => str("\"adaptonNow\""),
             PrimFunction::AdaptonHere => str("\"adaptonHere\""),
             PrimFunction::AdaptonSpace => str("\"adaptonSpace\""),
@@ -310,9 +311,11 @@ impl ToDoc for PrimFunction {
             PrimFunction::RustDebugText => str("\"rustDebugText\""),
             PrimFunction::AdaptonPointer => str("\"adaptonPointer\""),
             PrimFunction::AdaptonPeek => str("\"adaptonPeek\""),
+            PrimFunction::AdaptonPeekCell => str("\"adaptonPeekCell\""),
             PrimFunction::AdaptonPoke => str("\"adaptonPoke\""),
             PrimFunction::ReifyCore => todo!(),
             PrimFunction::ReflectCore => todo!(),
+            PrimFunction::SymbolHash => str("\"symbolHash\""),
         }
     }
 }
