@@ -4,10 +4,10 @@ use crate::adapton::{Space, Time};
 use crate::format_utils::*;
 use crate::value::{Closed, FieldValue, Pointer, Symbol, Value, Value_};
 use crate::vm_types::def::Module;
-use crate::vm_types::{def::CtxId, Env, LocalPointer, ScheduleChoice};
+use crate::vm_types::{Env, LocalPointer, ScheduleChoice, def::CtxId};
 use fumola_syntax::ast::{
-    AdaptonNav, AdaptonNavDim, BinOp, BindSort, Case, CasesPos, Dec, DecField, DecFieldsPos, Dec_,
-    Delim, Exp, ExpField, Exp_, Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat,
+    AdaptonNav, AdaptonNavDim, BinOp, BindSort, Case, CasesPos, Dec, Dec_, DecField, DecFieldsPos,
+    Delim, Exp, Exp_, ExpField, Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat,
     PatField, PrimFunction, PrimType, QuotedAst, RelOp, Stab, Type, TypeBind, TypeField, TypePath,
     TypeTag, TypeTag_, UnOp, Unquote, Vis,
 };
@@ -73,11 +73,7 @@ fn hashmap<'a>(m: &'a im_rc::HashMap<Value_, Value_>) -> RcDoc<'a> {
 // optional delimiter on the right
 fn delim<'a, T: ToDoc + Clone>(d: &'a Delim<T>, sep: &'a str) -> RcDoc<'a> {
     let doc = strict_concat(d.vec.iter().map(|x| x.doc()), sep);
-    if d.has_trailing {
-        doc.append(sep)
-    } else {
-        doc
-    }
+    if d.has_trailing { doc.append(sep) } else { doc }
 }
 
 // optional delimiter on the left
@@ -295,6 +291,7 @@ impl ToDoc for Module {
 impl ToDoc for PrimFunction {
     fn doc(&'_ self) -> RcDoc<'_> {
         match self {
+            PrimFunction::AdaptonReset => str("\"adaptonReset\""),
             PrimFunction::AdaptonNow => str("\"adaptonNow\""),
             PrimFunction::AdaptonHere => str("\"adaptonHere\""),
             PrimFunction::AdaptonSpace => str("\"adaptonSpace\""),
@@ -310,9 +307,11 @@ impl ToDoc for PrimFunction {
             PrimFunction::RustDebugText => str("\"rustDebugText\""),
             PrimFunction::AdaptonPointer => str("\"adaptonPointer\""),
             PrimFunction::AdaptonPeek => str("\"adaptonPeek\""),
+            PrimFunction::AdaptonPeekCell => str("\"adaptonPeekCell\""),
             PrimFunction::AdaptonPoke => str("\"adaptonPoke\""),
             PrimFunction::ReifyCore => todo!(),
             PrimFunction::ReflectCore => todo!(),
+            PrimFunction::SymbolHash => str("\"symbolHash\""),
         }
     }
 }
@@ -991,9 +990,9 @@ fn filter_whitespace_<'a>(trees: &'a [TokenTree], results: &mut Vec<&'a TokenTre
 }
 
 fn get_space_between<'a>(a: &'a TokenTree, b: &'a TokenTree) -> RcDoc<'a> {
-    use fumola_syntax::lexer_types::Token::*;
     use GroupType::*;
     use TokenTree::*;
+    use fumola_syntax::lexer_types::Token::*;
     match (a, b) {
         // TODO: refactor these rules to a text-based configuration file
         (Token(Loc(Space(_), _)), _) | (_, Token(Loc(Space(_), _))) => nil(),

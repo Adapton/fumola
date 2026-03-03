@@ -2,12 +2,12 @@ use std::fmt::Display;
 use std::num::Wrapping;
 use std::rc::Rc;
 
+use crate::Interruption;
 use crate::adapton::{Pointer as AdaptonPointer, Space as AdaptonSpace, Time as AdaptonTime};
 use crate::dynamic::Dynamic;
 use crate::type_mismatch;
 use crate::vm_types::LocalPointer;
-use crate::vm_types::{def::Actor as ActorDef, def::CtxId, def::Module as ModuleDef, Env};
-use crate::Interruption;
+use crate::vm_types::{Env, def::Actor as ActorDef, def::CtxId, def::Module as ModuleDef};
 use fumola_syntax::ast::{
     BinOp, Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, PrimFunction, QuotedAst,
     ToId, UnOp,
@@ -15,7 +15,7 @@ use fumola_syntax::ast::{
 use fumola_syntax::shared::{FastClone, Share, Shared};
 
 use im_rc::Vector;
-use im_rc::{vector, HashMap};
+use im_rc::{HashMap, vector};
 use num_bigint::{BigInt, BigUint};
 use num_traits::ToPrimitive;
 use ordered_float::OrderedFloat;
@@ -493,6 +493,13 @@ impl Value {
         }
     }
 
+    pub fn into_bool_or<E>(&self, err: E) -> Result<bool, E> {
+        match self {
+            Value::Bool(b) => Ok(b.clone()),
+            _ => Err(err),
+        }
+    }
+
     pub fn into_sym_or<E>(&self, err: E) -> Result<Symbol_, E> {
         match self {
             Value::Symbol(s) => Ok(s.clone()),
@@ -501,7 +508,10 @@ impl Value {
             Value::QuotedAst(QuotedAst::Id_(i)) => {
                 // in this very common case, we strip away the position information.
                 // unlike more general quoted ASTs, the Ids are meant to reappear without being distinguished by their occurances.
-                Ok(Shared::new(Symbol::QuotedAst(QuotedAst::Id(i.0.clone()))))
+                //
+                // Ok(Shared::new(Symbol::QuotedAst(QuotedAst::Id(i.0.clone()))))
+                //
+                Ok(Shared::new(Symbol::Id(i.0.clone())))
             }
             Value::QuotedAst(q) => Ok(Shared::new(Symbol::QuotedAst(q.clone()))),
             _ => Err(err),
@@ -578,8 +588,8 @@ impl Value {
 
     /// Create a JSON-style representation of the Motoko value.
     fn json_value(&self) -> Result<serde_json::Value> {
-        use serde_json::json;
         use serde_json::Value::*;
+        use serde_json::json;
         Ok(match self {
             Value::Unit => Null,
             Value::Null => Null,

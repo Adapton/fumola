@@ -1,101 +1,36 @@
 import Seq "SeqTree";
 module {
-   public let tinyInputArray = [
-        (`1, 66),
-        (`2, 77),
-        (`3, 33),
-        (`4, 35),
-        (`5, 32),
-        (`6, 31),
-    ];
-   
-    public let inputArray = [
-        (`1, 2),
-        (`2, 7),
-        (`3, 3),
-        (`6, 13),
-        (`7, 8),
-        (`3-`1, 5),
-        (`4, 6),
-        (`5, 4),
-	(`8, 1),
-        (`9, 9),
-    ];
-    
-    public let inputArrayBig = [
-        (`1, 2),
-        (`2, 7),
-        (`3, 3),
-        (`3-`1, 5),
-        (`4, 6),
-        (`5, 4),
-        (`6, 13),
-        (`7, 8),
-        (`8, 1),
-        (`9, 9),
-        (`10, 2),
-        (`11, 17),
-        (`12, 17),
-        (`13, 13),
-        (`13-`1, 15),
-        (`14, 61),
-        (`15, 41),
-        (`16, 113),
-        (`17, 81),
-        (`18, 11),
-        (`19, 91),
-        (`21, 21),
-        (`22, 17),
-        (`23, 13),
-        (`23-`1, 15),
-        (`24, 61),
-        (`25, 41),
-        (`26, 13),
-        (`27, 81),
-        (`28, 12),
-        (`29, 91),
-        (`31, 21),
-        (`32, 71),
-        (`33, 31),
-        (`33-`1, 15),
-        (`34, 61),
-        (`35, 41),
-        (`36, 137),
-        (`37, 18),
-        (`38, 111),
-        (`39, 19),
-        (`40, 21),
-        (`41, 17),
-        (`42, 13),
-    ];    
-
-    public func inputSeq () {
-        let s = Seq.fromArray(inputArray);
-        Seq.writeTikzText(`mergeSort-`inputSeq, s);
-        s
-    };
-    public func output () {
-        Seq.takeAll(Seq.lazyMergeSort(@(inputSeq()!)))
-    };
-    
-
-    public func tinyInputSeq () {
-        let s = Seq.fromArray(tinyInputArray);
-        Seq.writeTikzText(`mergeSort-`tinyInputSeq, s);
-        s
-    };
-    public func tinyOutput () {
-        Seq.takeAll(Seq.lazyMergeSort(@(tinyInputSeq()!)))
+    public func generateRandomInput(seed : Nat, size : Nat) : [(Nat, Nat)] {
+        let iter = prim "fastRandIterNew" (?size, seed);
+        var count = 0;
+        var result = [];
+        let maxValue = size * 137;
+        for (x in iter) {
+            count += 1;
+            result #= [(count, x % maxValue)]
+        };
+        result
     };
 
-    public func inputSeqBig () {
-        let s = Seq.fromArray(inputArrayBig);
-        Seq.writeTikzText(`mergeSort-`inputSeqBig, s);
-        s
-    };    
-    public func bigOutput () {
-        Seq.takeAll(Seq.lazyMergeSort(@(inputSeqBig()!)))
-    };
-   
- 
+    public func runRandom(seed : Nat, size : Nat, demandPattern) {
+        prim "adaptonReset" ();
+        let inputArray = generateRandomInput(seed, size);
+        let inputSeq = Seq.fromArray(inputArray);
+        Seq.writeTikzText(`mergeSort-`inputSeq-`seed-seed-`size-size, inputSeq);
+        let sorted = Seq.lazyMergeSort(@(inputSeq!)); 
+        let result = switch (demandPattern) {
+            case (null) { Seq.takeAll(sorted) };
+            case (null or (?#all)) { Seq.takeAll(sorted) };
+            case (?#one) { Seq.takeOne(sorted) };
+            case (?#quater) { Seq.takeN(sorted, size / 4) };
+            case (?#half) { Seq.takeN(sorted, size / 2) };
+            case (?#frac(f)) { Seq.takeN(sorted, size * f) };
+        };
+        let comparisonCount = (prim "adaptonPeek" (prim "adaptonPointer" (`merge)))!;
+        let thunkCells = @(`adapton(`counts)(`thunkCells));
+        let nonThunkCells = @(`adapton(`counts)(`nonThunkCells));
+        let adaptonCounts = @(`adapton(`counts));
+        { result; comparisonCount; thunkCells; nonThunkCells; adaptonCounts }
+    }
 }
+ 

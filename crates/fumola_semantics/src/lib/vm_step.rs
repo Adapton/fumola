@@ -1,16 +1,16 @@
 use crate::adapton::Navigation as AdaptonNav;
 use crate::value::{ActorId, Closed, ClosedFunction, Value, Value_};
 use crate::vm_types::{
+    Active, ActiveBorrow, Breakpoint, Cont, Interruption, Limit, Limits, ModulePath, Step,
     def::{Def, Field as FieldDef},
     stack::{FieldContext, Frame, FrameCont},
-    Active, ActiveBorrow, Breakpoint, Cont, Interruption, Limit, Limits, ModulePath, Step,
 };
 use fumola_syntax::ast::{
-    AdaptonNav as AdaptonNavAst, AdaptonNavDim, AdaptonNav_, Dec, Dec_, Delim, Exp, ExpField_,
-    Exp_, Id, IdPos_, Literal, Pat, Pat_, Source, Type,
+    AdaptonNav as AdaptonNavAst, AdaptonNav_, AdaptonNavDim, Dec, Dec_, Delim, Exp, Exp_,
+    ExpField_, Id, IdPos_, Literal, Pat, Pat_, Source, Type,
 };
 use fumola_syntax::shared::{FastClone, Share};
-use im_rc::{vector, HashMap, Vector};
+use im_rc::{HashMap, Vector, vector};
 
 pub use crate::{nyi, type_mismatch, type_mismatch_};
 

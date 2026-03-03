@@ -1,6 +1,6 @@
 //use crate::{ast::{Mut, ProjIndex}, shared::FastClone, type_mismatch, vm_types::{stack::{FieldContext, FieldValue, Frame, FrameCont}, Active, Cont, Step}, Interruption, Value, Value_};
 
-use crate::adapton::AdaptonState;
+use crate::adapton::{AdaptonState, ForceBeginResult};
 use crate::format::format_one_line;
 use crate::type_mismatch;
 use crate::value::{
@@ -12,12 +12,12 @@ use crate::vm_step::{
     return_step, tuple_step, unit_step, var_step,
 };
 use crate::vm_types::{
+    Active, Cont, Env, Interruption, Pointer, Response, Step,
     def::Function as FunctionDef,
     stack::{FieldContext, FieldValue, Frame, FrameCont},
-    Active, Cont, Env, Interruption, Pointer, Response, Step,
 };
 use crate::vm_types::{OptionCoreSource, Store};
-use crate::{nyi, type_mismatch_, vm_step, Dynamic, Shared};
+use crate::{Dynamic, Shared, nyi, type_mismatch_, vm_step};
 use fumola_syntax::ast::{Cases, Exp_, Inst, Mut, Pat_, ProjIndex, QuotedAst};
 use fumola_syntax::shared::{FastClone, Share};
 use im_rc::{HashMap, Vector};
@@ -189,11 +189,13 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                 unit_step(active)
             }
             Value::AdaptonPointer(name) => {
-                active.adapton().put_pointer(name.clone(), v)?;
+                let mut dummy = crate::adapton::Counts::new();
+                active.adapton().put_pointer(&mut dummy, name.clone(), v)?;
                 return_step(active, Value::AdaptonPointer(name.clone()).share())
             }
             Value::Symbol(symbol) => {
-                let p = active.adapton().put_symbol(symbol.clone(), v)?;
+                let mut dummy = crate::adapton::Counts::new();
+                let p = active.adapton().put_symbol(&mut dummy, symbol.clone(), v)?;
                 return_step(active, Value::AdaptonPointer(p).share())
             }
             Value::Tuple(vs) => match (vs.get(0), vs.get(1)) {
@@ -222,7 +224,8 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             },
             v1 => {
                 if let Ok(symbol) = v1.into_sym_or(()) {
-                    let p = active.adapton().put_symbol(symbol.clone(), v)?;
+                    let mut dummy = crate::adapton::Counts::new();
+                    let p = active.adapton().put_symbol(&mut dummy, symbol.clone(), v)?;
                     return_step(active, Value::AdaptonPointer(p).share())
                 } else {
                     return Err(crate::Interruption::TypeMismatch(
@@ -245,7 +248,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                         line!(),
                         "BinAssign2: expected Value::Pointer, but got {:?}",
                         x
-                    )
+                    );
                 }
             };
             let v3 = crate::vm_ops::binop(&active.cont_prim_type(), bop, v1d.clone(), v.clone())?;
@@ -687,25 +690,44 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                 let v = active.adapton().get_pointer(p)?;
                 *active.cont() = Cont::Value_(v);
                 Ok(Step {})
+            } else if let Value::Symbol(s) = v.get() {
+                let v = active
+                    .adapton()
+                    .get_pointer(crate::adapton::Space::Symbol(s))?;
+                *active.cont() = Cont::Value_(v);
+                Ok(Step {})
             } else {
                 type_mismatch!(file!(), line!())
             }
         }
         Force1 => {
             if let Value::AdaptonPointer(ref p) = *v {
-                let thunk_body = active.adapton().force_begin(p.clone())?;
-                let env = active.env().fast_clone();
-                let context = active.defs().active_ctx.clone();
-                active.stack().push_front(Frame {
-                    context,
-                    env,
-                    cont: FrameCont::ForceAdaptonPointer,
-                    cont_prim_type: None,
-                    source: fumola_syntax::ast::Source::Evaluation,
-                });
-                *active.env() = thunk_body.env;
-                *active.ctx_id() = thunk_body.ctx;
-                exp_step(active, thunk_body.content)
+                let mut dummy2 = crate::adapton::Counts::new();
+                let dummy1 = crate::adapton::Settings::new();
+                let force_begin_result =
+                    active
+                        .adapton()
+                        .force_begin(&dummy1, &mut dummy2, p.clone())?;
+                match force_begin_result {
+                    ForceBeginResult::CacheHit(v) => {
+                        *active.cont() = Cont::Value_(v);
+                        Ok(Step {})
+                    }
+                    ForceBeginResult::CacheMiss(thunk_body) => {
+                        let env = active.env().fast_clone();
+                        let context = active.defs().active_ctx.clone();
+                        active.stack().push_front(Frame {
+                            context,
+                            env,
+                            cont: FrameCont::ForceAdaptonPointer,
+                            cont_prim_type: None,
+                            source: fumola_syntax::ast::Source::Evaluation,
+                        });
+                        *active.env() = thunk_body.env;
+                        *active.ctx_id() = thunk_body.ctx;
+                        exp_step(active, thunk_body.content)
+                    }
+                }
             } else if let Value::Thunk(ref thunk_body) = *v {
                 let env = active.env().fast_clone();
                 let context = active.defs().active_ctx.clone();
@@ -728,7 +750,8 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             Ok(Step {})
         }
         ForceAdaptonPointer => {
-            active.adapton().force_end(v.clone())?;
+            let settings = crate::adapton::Settings::new();
+            active.adapton().force_end(&settings, v.clone())?;
             *active.cont() = Cont::Value_(v);
             Ok(Step {})
         }

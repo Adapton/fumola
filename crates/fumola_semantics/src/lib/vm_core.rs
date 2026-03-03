@@ -1,15 +1,15 @@
 use crate::adapton::AdaptonState;
 use crate::value::{ActorId, ActorMethod, Value, Value_};
-use crate::vm_types::def::CtxId;
 use crate::vm_types::Actor;
 use crate::vm_types::DebugPrintLine;
 use crate::vm_types::Env;
 use crate::vm_types::Stack;
+use crate::vm_types::def::CtxId;
 use crate::vm_types::{
-    def::{Actor as ActorDef, Def, Defs, Field as FieldDef, Module as ModuleDef},
-    stack::{Frame, FrameCont},
     Activation, Active, Actors, Agent, Cont, Core, Counts, Interruption, Limits, ModuleFiles,
     ModulePath, Pointer, Response, ScheduleChoice, Step,
+    def::{Actor as ActorDef, Def, Defs, Field as FieldDef, Module as ModuleDef},
+    stack::{Frame, FrameCont},
 };
 use crate::vm_types::{ActiveBorrow, OutputFiles};
 use crate::vm_types::{EvalInitError, Store};

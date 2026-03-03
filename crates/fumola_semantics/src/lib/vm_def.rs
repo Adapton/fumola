@@ -1,14 +1,14 @@
 use crate::value::{ActorId, Closed, ClosedFunction, Value, Value_};
 use crate::vm_types::{
+    Active, ActiveBorrow, Cont, Core, Interruption, Limits, LocalPointer, ModuleFile,
+    ModuleFileState, ModulePath, NamedPointer, Pointer, ScheduleChoice,
     def::{
         Actor as ActorDef, Ctx, CtxId, Def, Defs, Field as FieldDef, Function as FunctionDef,
         Module as ModuleDef, Var as VarDef,
     },
-    Active, ActiveBorrow, Cont, Core, Interruption, Limits, LocalPointer, ModuleFile,
-    ModuleFileState, ModulePath, NamedPointer, Pointer, ScheduleChoice,
 };
 use fumola_syntax::ast::{
-    Dec, Delim, Exp, ExpField, ExpField_, Exp_, Id, Id_, Mut, Pat, Source, Stab_, Vis_,
+    Dec, Delim, Exp, Exp_, ExpField, ExpField_, Id, Id_, Mut, Pat, Source, Stab_, Vis_,
 };
 use fumola_syntax::shared::{FastClone, Share};
 use im_rc::{HashMap, Vector};
@@ -216,9 +216,9 @@ pub mod def {
 
     use super::*;
     use crate::{
+        Shared,
         format::format_pretty,
         value::{Symbol, Text},
-        Shared,
     };
     use fumola_syntax::ast::{DecField, DecFields, Literal};
 
