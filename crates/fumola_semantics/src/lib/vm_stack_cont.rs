@@ -702,7 +702,8 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
         }
         Force1 => {
             if let Value::AdaptonPointer(ref p) = *v {
-                let force_begin_result = active.adapton().force_begin(p.clone())?;
+                let mut dummy = crate::adapton::Counts::new();
+                let force_begin_result = active.adapton().force_begin(&mut dummy, p.clone())?;
                 match force_begin_result {
                     ForceBeginResult::CacheHit(v) => {
                         *active.cont() = Cont::Value_(v);

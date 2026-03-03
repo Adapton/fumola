@@ -123,7 +123,10 @@ module {
             case (?#frac(f)) { Seq.takeN(sorted, size * f) };
         };
         let comparisonCount = (prim "adaptonPeek" (prim "adaptonPointer" (`merge)))!;
-        { result ; comparisonCount }
+        let thunkCells = @(`adapton(`counts)(`thunkCells));
+        let nonThunkCells = @(`adapton(`counts)(`nonThunkCells));
+        let adaptonCounts = @(`adapton(`counts));
+        { result; comparisonCount; thunkCells; nonThunkCells; adaptonCounts }
     }
 }
  

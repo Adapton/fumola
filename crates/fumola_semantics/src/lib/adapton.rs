@@ -49,8 +49,10 @@ pub fn is_future_reserved_symbol(symbol: &Symbol) -> bool {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ReservedSymbol {
     State,
+    Settings,
     SettingsForceBeginAlwaysMisses,
     SettingsForceEndForgetsResult,
+    Counts,
     CountsCells,
     CountsThunkCells,
     CountsNonThunkCells,
@@ -69,13 +71,12 @@ pub fn into_reserved_symbol(symbol: &Symbol) -> Option<ReservedSymbol> {
             Symbol::Id(id) => {
                 if id.as_str() == "adapton" {
                     match y.get() {
-                        Symbol::Id(id) => {
-                            if id.as_str() == "state" {
-                                Some(ReservedSymbol::State)
-                            } else {
-                                None
-                            }
-                        }
+                        Symbol::Id(id) => match id.as_str() {
+                            "state" => Some(ReservedSymbol::State),
+                            "settings" => Some(ReservedSymbol::Settings),
+                            "counts" => Some(ReservedSymbol::Counts),
+                            _ => None,
+                        },
                         _ => None,
                     }
                 } else {
@@ -136,7 +137,7 @@ pub trait AdaptonState {
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_>;
     fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()>;
     fn put_symbol_delay(&mut self, symbol: Symbol_, time: Time, value: Value_) -> Res<Pointer>;
-    fn force_begin(&mut self, _pointer: Pointer) -> Res<ForceBeginResult>;
+    fn force_begin(&mut self, counts: &mut Counts, _pointer: Pointer) -> Res<ForceBeginResult>;
     fn force_end(&mut self, _value: Value_) -> Res<()>;
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()>;
     fn navigate_end(&mut self) -> Res<()>;
@@ -384,6 +385,8 @@ impl State {
             ReservedSymbol::CountsForceBeginCacheMiss => {
                 self.counts.force_begin_cache_miss.to_motoko_shared()
             }
+            ReservedSymbol::Settings => self.settings.clone().to_motoko_shared(),
+            ReservedSymbol::Counts => self.counts.clone().to_motoko_shared(),
         }
         .map_err(|_e| Error::Unreachable)
     }
@@ -451,11 +454,11 @@ impl AdaptonState for State {
         }
     }
 
-    fn force_begin(&mut self, pointer: Pointer) -> Res<ForceBeginResult> {
+    fn force_begin(&mut self, _counts: &mut Counts, pointer: Pointer) -> Res<ForceBeginResult> {
         self.counts.force_begin += 1;
         match &mut self.inner {
-            InnerState::Simple(s) => s.force_begin(pointer),
-            InnerState::Graphical(g) => g.force_begin(pointer),
+            InnerState::Simple(s) => s.force_begin(&mut self.counts, pointer),
+            InnerState::Graphical(g) => g.force_begin(&mut self.counts, pointer),
         }
     }
 
@@ -735,8 +738,8 @@ impl AdaptonState for SimpleState {
         let new_cell = Self::new_cell(space, value);
         let is_thunk = new_cell.is_thunk();
         let cells = cells.update(time, new_cell);
-        log::info!("{} {}", cells.len(), cells_orig_len);
         if cells.len() > cells_orig_len {
+            counts.cells += 1;
             if is_thunk {
                 counts.thunk_cells += 1
             } else {
@@ -773,12 +776,14 @@ impl AdaptonState for SimpleState {
         };
         Ok(())
     }
-    fn force_begin(&mut self, pointer: Pointer) -> Res<ForceBeginResult> {
+    fn force_begin(&mut self, counts: &mut Counts, pointer: Pointer) -> Res<ForceBeginResult> {
         let cell = self.get_cell(&pointer)?.clone();
         if let Cell::Thunk(tc) = cell {
             if let Some(cache_value) = tc.result {
+                counts.force_begin_cache_hit += 1;
                 Ok(ForceBeginResult::CacheHit(cache_value))
             } else {
+                counts.force_begin_cache_miss += 1;
                 self.push_stack();
                 self.thunk_pointer = Some(pointer);
                 self.space = tc.space.clone();
@@ -942,7 +947,7 @@ impl AdaptonState for GraphicalState {
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_> {
         todo!()
     }
-    fn force_begin(&mut self, _pointer: Pointer) -> Res<ForceBeginResult> {
+    fn force_begin(&mut self, _counts: &mut Counts, _pointer: Pointer) -> Res<ForceBeginResult> {
         todo!()
     }
     fn force_end(&mut self, _value: Value_) -> Res<()> {
