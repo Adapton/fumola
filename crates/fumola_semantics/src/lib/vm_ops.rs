@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use crate::value::{Symbol, Value, Value_};
 use crate::vm_types::Interruption;
-use crate::{quoted, type_mismatch_, Shared};
+use crate::{Shared, quoted, type_mismatch_};
 use fumola_syntax::ast::{BinOp, PrimType, RelOp, UnOp};
 use num_bigint::{BigUint, ToBigInt};
 

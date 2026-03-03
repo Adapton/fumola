@@ -2,7 +2,7 @@
 name = "fumola_semantics"
 version = "0.0.29"
 authors = ["Matthew Hammer", "Ryan Vandersmith"]
-edition = "2021"
+edition = "2024"
 license = "Apache-2.0"
 description = "A library for parsing and running Fumola in Rust"
 readme = "README.md"

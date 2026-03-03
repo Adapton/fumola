@@ -9,7 +9,7 @@ use {
     shared::Share,
 };
 
-use crate::value::{FieldValue, Text, Value, ValueError, Value_};
+use crate::value::{FieldValue, Text, Value, Value_, ValueError};
 
 type Error = ValueError;
 type Result<T> = std::result::Result<T, Error>;

@@ -1,7 +1,7 @@
 use crate::adapton::AdaptonState;
 use crate::value::{FastRandIter, Text, Value, Value_};
 use crate::vm_types::{Active, Cont, DebugPrintLine, Interruption, Step};
-use crate::{adapton, nyi, type_mismatch_, ToMotoko};
+use crate::{ToMotoko, adapton, nyi, type_mismatch_};
 use fumola_syntax::ast::{CollectionFunction, FastRandIterFunction, HashMapFunction, PrimFunction};
 use fumola_syntax::ast::{Inst, Literal, Pat};
 
@@ -328,7 +328,7 @@ mod collection {
 
     pub mod hashmap {
         use super::super::*;
-        use crate::{value::Collection, Share};
+        use crate::{Share, value::Collection};
         use fumola_syntax::shared::FastClone;
         use im_rc::vector;
 

@@ -2,12 +2,12 @@ use std::fmt::Display;
 use std::num::Wrapping;
 use std::rc::Rc;
 
+use crate::Interruption;
 use crate::adapton::{Pointer as AdaptonPointer, Space as AdaptonSpace, Time as AdaptonTime};
 use crate::dynamic::Dynamic;
 use crate::type_mismatch;
 use crate::vm_types::LocalPointer;
-use crate::vm_types::{def::Actor as ActorDef, def::CtxId, def::Module as ModuleDef, Env};
-use crate::Interruption;
+use crate::vm_types::{Env, def::Actor as ActorDef, def::CtxId, def::Module as ModuleDef};
 use fumola_syntax::ast::{
     BinOp, Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, PrimFunction, QuotedAst,
     ToId, UnOp,
@@ -15,7 +15,7 @@ use fumola_syntax::ast::{
 use fumola_syntax::shared::{FastClone, Share, Shared};
 
 use im_rc::Vector;
-use im_rc::{vector, HashMap};
+use im_rc::{HashMap, vector};
 use num_bigint::{BigInt, BigUint};
 use num_traits::ToPrimitive;
 use ordered_float::OrderedFloat;
@@ -588,8 +588,8 @@ impl Value {
 
     /// Create a JSON-style representation of the Motoko value.
     fn json_value(&self) -> Result<serde_json::Value> {
-        use serde_json::json;
         use serde_json::Value::*;
+        use serde_json::json;
         Ok(match self {
             Value::Unit => Null,
             Value::Null => Null,

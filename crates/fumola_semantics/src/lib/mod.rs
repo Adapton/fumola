@@ -27,5 +27,5 @@ pub use crate::dynamic::Dynamic;
 pub use fumola_syntax::shared::{Share, Shared};
 
 pub use crate::value::ToMotoko;
-pub use crate::value::{Value, ValueError, Value_};
+pub use crate::value::{Value, Value_, ValueError};
 pub use vm_types::{Agent, Interruption};

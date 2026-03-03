@@ -12,12 +12,12 @@ use crate::vm_step::{
     return_step, tuple_step, unit_step, var_step,
 };
 use crate::vm_types::{
+    Active, Cont, Env, Interruption, Pointer, Response, Step,
     def::Function as FunctionDef,
     stack::{FieldContext, FieldValue, Frame, FrameCont},
-    Active, Cont, Env, Interruption, Pointer, Response, Step,
 };
 use crate::vm_types::{OptionCoreSource, Store};
-use crate::{nyi, type_mismatch_, vm_step, Dynamic, Shared};
+use crate::{Dynamic, Shared, nyi, type_mismatch_, vm_step};
 use fumola_syntax::ast::{Cases, Exp_, Inst, Mut, Pat_, ProjIndex, QuotedAst};
 use fumola_syntax::shared::{FastClone, Share};
 use im_rc::{HashMap, Vector};
@@ -248,7 +248,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                         line!(),
                         "BinAssign2: expected Value::Pointer, but got {:?}",
                         x
-                    )
+                    );
                 }
             };
             let v3 = crate::vm_ops::binop(&active.cont_prim_type(), bop, v1d.clone(), v.clone())?;
@@ -702,8 +702,12 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
         }
         Force1 => {
             if let Value::AdaptonPointer(ref p) = *v {
-                let mut dummy = crate::adapton::Counts::new();
-                let force_begin_result = active.adapton().force_begin(&mut dummy, p.clone())?;
+                let mut dummy2 = crate::adapton::Counts::new();
+                let dummy1 = crate::adapton::Settings::new();
+                let force_begin_result =
+                    active
+                        .adapton()
+                        .force_begin(&dummy1, &mut dummy2, p.clone())?;
                 match force_begin_result {
                     ForceBeginResult::CacheHit(v) => {
                         *active.cont() = Cont::Value_(v);
@@ -746,7 +750,8 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             Ok(Step {})
         }
         ForceAdaptonPointer => {
-            active.adapton().force_end(v.clone())?;
+            let settings = crate::adapton::Settings::new();
+            active.adapton().force_end(&settings, v.clone())?;
             *active.cont() = Cont::Value_(v);
             Ok(Step {})
         }

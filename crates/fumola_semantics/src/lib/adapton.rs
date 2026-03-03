@@ -133,12 +133,17 @@ pub trait AdaptonState {
     fn here(&self) -> Space;
     fn put_pointer(&mut self, counts: &mut Counts, _pointer: Pointer, _value: Value_) -> Res<()>;
     fn put_symbol(&mut self, counts: &mut Counts, _symbol: Symbol_, _value: Value_)
-        -> Res<Pointer>;
+    -> Res<Pointer>;
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_>;
     fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()>;
     fn put_symbol_delay(&mut self, symbol: Symbol_, time: Time, value: Value_) -> Res<Pointer>;
-    fn force_begin(&mut self, counts: &mut Counts, _pointer: Pointer) -> Res<ForceBeginResult>;
-    fn force_end(&mut self, _value: Value_) -> Res<()>;
+    fn force_begin(
+        &mut self,
+        settings: &Settings,
+        counts: &mut Counts,
+        _pointer: Pointer,
+    ) -> Res<ForceBeginResult>;
+    fn force_end(&mut self, settings: &Settings, _value: Value_) -> Res<()>;
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()>;
     fn navigate_end(&mut self) -> Res<()>;
     fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>>;
@@ -238,6 +243,15 @@ impl Counts {
 pub struct Settings {
     force_begin_always_misses: bool,
     force_end_forgets_result: bool,
+}
+
+impl Settings {
+    pub fn new() -> Self {
+        Settings {
+            force_begin_always_misses: false,
+            force_end_forgets_result: false,
+        }
+    }
 }
 
 impl Time {
@@ -454,19 +468,24 @@ impl AdaptonState for State {
         }
     }
 
-    fn force_begin(&mut self, _counts: &mut Counts, pointer: Pointer) -> Res<ForceBeginResult> {
+    fn force_begin(
+        &mut self,
+        _settings: &Settings,
+        _counts: &mut Counts,
+        pointer: Pointer,
+    ) -> Res<ForceBeginResult> {
         self.counts.force_begin += 1;
         match &mut self.inner {
-            InnerState::Simple(s) => s.force_begin(&mut self.counts, pointer),
-            InnerState::Graphical(g) => g.force_begin(&mut self.counts, pointer),
+            InnerState::Simple(s) => s.force_begin(&self.settings, &mut self.counts, pointer),
+            InnerState::Graphical(g) => g.force_begin(&self.settings, &mut self.counts, pointer),
         }
     }
 
-    fn force_end(&mut self, value: Value_) -> Res<()> {
+    fn force_end(&mut self, _settings: &Settings, value: Value_) -> Res<()> {
         self.counts.force_end += 1;
         match &mut self.inner {
-            InnerState::Simple(s) => s.force_end(value),
-            InnerState::Graphical(g) => g.force_end(value),
+            InnerState::Simple(s) => s.force_end(&self.settings, value),
+            InnerState::Graphical(g) => g.force_end(&self.settings, value),
         }
     }
 
@@ -776,10 +795,17 @@ impl AdaptonState for SimpleState {
         };
         Ok(())
     }
-    fn force_begin(&mut self, counts: &mut Counts, pointer: Pointer) -> Res<ForceBeginResult> {
+    fn force_begin(
+        &mut self,
+        settings: &Settings,
+        counts: &mut Counts,
+        pointer: Pointer,
+    ) -> Res<ForceBeginResult> {
         let cell = self.get_cell(&pointer)?.clone();
         if let Cell::Thunk(tc) = cell {
-            if let Some(cache_value) = tc.result {
+            if let Some(cache_value) = tc.result
+                && !settings.force_begin_always_misses
+            {
                 counts.force_begin_cache_hit += 1;
                 Ok(ForceBeginResult::CacheHit(cache_value))
             } else {
@@ -793,11 +819,13 @@ impl AdaptonState for SimpleState {
             Err(Error::TypeMismatch(line!()))
         }
     }
-    fn force_end(&mut self, value: Value_) -> Res<()> {
+    fn force_end(&mut self, settings: &Settings, value: Value_) -> Res<()> {
         let cell = self
             .get_cell_mut(&self.thunk_pointer.clone().unwrap(), &self.now())
             .ok_or(Error::Unreachable)?;
-        cell.set_cache_value(value)?;
+        if !settings.force_end_forgets_result {
+            cell.set_cache_value(value)?;
+        }
         let _fr = self.pop_stack()?;
         Ok(())
     }
@@ -947,10 +975,15 @@ impl AdaptonState for GraphicalState {
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_> {
         todo!()
     }
-    fn force_begin(&mut self, _counts: &mut Counts, _pointer: Pointer) -> Res<ForceBeginResult> {
+    fn force_begin(
+        &mut self,
+        _settings: &Settings,
+        _counts: &mut Counts,
+        _pointer: Pointer,
+    ) -> Res<ForceBeginResult> {
         todo!()
     }
-    fn force_end(&mut self, _value: Value_) -> Res<()> {
+    fn force_end(&mut self, _settings: &Settings, _value: Value_) -> Res<()> {
         todo!()
     }
 

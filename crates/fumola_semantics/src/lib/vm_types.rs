@@ -212,11 +212,11 @@ pub fn source_from_cont(cont: &Cont) -> Source {
 }
 
 pub mod stack {
-    use super::{def::CtxId, Cont, Env, Pointer, RespTarget, Vector};
+    use super::{Cont, Env, Pointer, RespTarget, Vector, def::CtxId};
     pub use crate::adapton::Navigation as AdaptonNav;
     use crate::value::{Value, Value_};
     use fumola_syntax::ast::{
-        AdaptonNav_, BinOp, Cases, Dec_, ExpField_, Exp_, Id_, Inst, Mut, Pat_, PrimType,
+        AdaptonNav_, BinOp, Cases, Dec_, Exp_, ExpField_, Id_, Inst, Mut, Pat_, PrimType,
         ProjIndex, RelOp, Source, Type_, UnOp,
     };
     use serde::{Deserialize, Serialize};
