@@ -493,6 +493,13 @@ impl Value {
         }
     }
 
+    pub fn into_bool_or<E>(&self, err: E) -> Result<bool, E> {
+        match self {
+            Value::Bool(b) => Ok(b.clone()),
+            _ => Err(err),
+        }
+    }
+
     pub fn into_sym_or<E>(&self, err: E) -> Result<Symbol_, E> {
         match self {
             Value::Symbol(s) => Ok(s.clone()),
@@ -501,7 +508,10 @@ impl Value {
             Value::QuotedAst(QuotedAst::Id_(i)) => {
                 // in this very common case, we strip away the position information.
                 // unlike more general quoted ASTs, the Ids are meant to reappear without being distinguished by their occurances.
-                Ok(Shared::new(Symbol::QuotedAst(QuotedAst::Id(i.0.clone()))))
+                //
+                // Ok(Shared::new(Symbol::QuotedAst(QuotedAst::Id(i.0.clone()))))
+                //
+                Ok(Shared::new(Symbol::Id(i.0.clone())))
             }
             Value::QuotedAst(q) => Ok(Shared::new(Symbol::QuotedAst(q.clone()))),
             _ => Err(err),

@@ -158,6 +158,39 @@ fn now() {
 }
 
 #[test]
+fn get_settings() {
+    assert_("@ (`adapton(`settings)(`forceBeginAlwaysMisses))", "false");
+    assert_("@ (`adapton(`settings)(`forceEndForgetsResult))", "false");
+}
+
+#[test]
+fn get_put_count() {
+    assert_("1 := 1; @ (`adapton(`counts)(`put))", "1");
+}
+
+#[test]
+fn put_settings() {
+    assert_("`adapton(`settings)(`forceBeginAlwaysMisses) := true; @ (`adapton(`settings)(`forceBeginAlwaysMisses))", "true");
+    assert_("`adapton(`settings)(`forceEndForgetsResult) := true; @ (`adapton(`settings)(`forceEndForgetsResult))", "true");
+}
+
+#[test]
+fn get_cell_counts() {
+    assert_("@(`adapton(`counts)(`thunkCells))", "0");
+    assert_("@(`adapton(`counts)(`nonThunkCells))", "0");
+    assert_("0 := thunk { }; @(`adapton(`counts)(`thunkCells))", "1");
+    assert_("0 := (); @(`adapton(`counts)(`nonThunkCells))", "1")
+}
+
+#[test]
+fn get_state() {
+    assert_(
+        "switch (@ (`adapton(`state))) { case (#Simple(_)) () }",
+        "()",
+    )
+}
+
+#[test]
 fn symbol_ordering() {
     assert_("1-`x == 1-`x", "true");
     assert_("1-`x == 2-`x", "false");

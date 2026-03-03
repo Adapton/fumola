@@ -97,7 +97,7 @@ module {
         Seq.takeAll(Seq.lazyMergeSort(@(inputSeqBig()!)))
     };
 
-    public func generateRandomInput(seed : Nat, size : Nat) {
+    public func generateRandomInput(seed : Nat, size : Nat) : [(Nat, Nat)] {
         let iter = prim "fastRandIterNew" (?size, seed);
         var count = 0;
         var result = [];
@@ -118,7 +118,9 @@ module {
             case (null) { Seq.takeAll(sorted) };
             case (null or (?#all)) { Seq.takeAll(sorted) };
             case (?#one) { Seq.takeOne(sorted) };
+            case (?#quater) { Seq.takeN(sorted, size / 4) };
             case (?#half) { Seq.takeN(sorted, size / 2) };
+            case (?#frac(f)) { Seq.takeN(sorted, size * f) };
         };
         let comparisonCount = (prim "adaptonPeek" (prim "adaptonPointer" (`merge)))!;
         { result ; comparisonCount }

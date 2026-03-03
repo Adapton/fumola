@@ -189,11 +189,13 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                 unit_step(active)
             }
             Value::AdaptonPointer(name) => {
-                active.adapton().put_pointer(name.clone(), v)?;
+                let mut dummy = crate::adapton::Counts::new();
+                active.adapton().put_pointer(&mut dummy, name.clone(), v)?;
                 return_step(active, Value::AdaptonPointer(name.clone()).share())
             }
             Value::Symbol(symbol) => {
-                let p = active.adapton().put_symbol(symbol.clone(), v)?;
+                let mut dummy = crate::adapton::Counts::new();
+                let p = active.adapton().put_symbol(&mut dummy, symbol.clone(), v)?;
                 return_step(active, Value::AdaptonPointer(p).share())
             }
             Value::Tuple(vs) => match (vs.get(0), vs.get(1)) {
@@ -222,7 +224,8 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             },
             v1 => {
                 if let Ok(symbol) = v1.into_sym_or(()) {
-                    let p = active.adapton().put_symbol(symbol.clone(), v)?;
+                    let mut dummy = crate::adapton::Counts::new();
+                    let p = active.adapton().put_symbol(&mut dummy, symbol.clone(), v)?;
                     return_step(active, Value::AdaptonPointer(p).share())
                 } else {
                     return Err(crate::Interruption::TypeMismatch(
@@ -685,6 +688,12 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
         GetAdaptonPointer => {
             if let Value::AdaptonPointer(p) = v.get() {
                 let v = active.adapton().get_pointer(p)?;
+                *active.cont() = Cont::Value_(v);
+                Ok(Step {})
+            } else if let Value::Symbol(s) = v.get() {
+                let v = active
+                    .adapton()
+                    .get_pointer(crate::adapton::Space::Symbol(s))?;
                 *active.cont() = Cont::Value_(v);
                 Ok(Step {})
             } else {

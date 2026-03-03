@@ -1,9 +1,7 @@
-use crate::format::format_one_line;
 use crate::value::{Closed, Symbol, Symbol_, ThunkBody, Value, Value_};
 use crate::{Shared, ToMotoko};
 use fumola_syntax::ast::Exp_;
 use im_rc::{HashMap, Vector};
-use log::info;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -33,6 +31,7 @@ pub fn is_future_reserved_symbol(symbol: &Symbol) -> bool {
 //                  (`nonThunkCells)
 //                  (`thunkCells)
 //                  (`put)
+//                  (`putDelay`)
 //                  (`get)
 //                  (`forceBegin)
 //                  (`forceEnd)
@@ -47,6 +46,7 @@ pub fn is_future_reserved_symbol(symbol: &Symbol) -> bool {
 //  1. `settings(*) permit both peek and poke modes.
 //  2. `state and `counts(*) permits only peek mode.
 //
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ReservedSymbol {
     State,
     SettingsForceBeginAlwaysMisses,
@@ -55,6 +55,7 @@ pub enum ReservedSymbol {
     CountsThunkCells,
     CountsNonThunkCells,
     CountsPut,
+    CountsPutDelay,
     CountsGet,
     CountsForceBegin,
     CountsForceEnd,
@@ -92,6 +93,7 @@ pub fn into_reserved_symbol(symbol: &Symbol) -> Option<ReservedSymbol> {
                             "nonThunkCells" => Some(ReservedSymbol::CountsNonThunkCells),
                             "thunkCells" => Some(ReservedSymbol::CountsThunkCells),
                             "put" => Some(ReservedSymbol::CountsPut),
+                            "putDelay" => Some(ReservedSymbol::CountsPutDelay),
                             "get" => Some(ReservedSymbol::CountsGet),
                             "forceBegin" => Some(ReservedSymbol::CountsForceBegin),
                             "forceEnd" => Some(ReservedSymbol::CountsForceEnd),
@@ -128,8 +130,9 @@ pub trait AdaptonState {
     fn reset(&mut self) -> Res<()>;
     fn now(&self) -> Time;
     fn here(&self) -> Space;
-    fn put_pointer(&mut self, _pointer: Pointer, _value: Value_) -> Res<()>;
-    fn put_symbol(&mut self, _symbol: Symbol_, _value: Value_) -> Res<Pointer>;
+    fn put_pointer(&mut self, counts: &mut Counts, _pointer: Pointer, _value: Value_) -> Res<()>;
+    fn put_symbol(&mut self, counts: &mut Counts, _symbol: Symbol_, _value: Value_)
+        -> Res<Pointer>;
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_>;
     fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()>;
     fn put_symbol_delay(&mut self, symbol: Symbol_, time: Time, value: Value_) -> Res<Pointer>;
@@ -148,6 +151,8 @@ pub enum Error {
     TypeMismatch(u32),
     UndefinedNow(Pointer),
     Unreachable,
+    DanglingPointer(Space),
+    CannotPutReadOnlyReservedSymbol(ReservedSymbol),
 }
 
 /// A force either results in a cache hit, or a cache miss; the execution of each situation continues differently.
@@ -185,9 +190,53 @@ pub enum Space {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum State {
+pub enum InnerState {
     Simple(SimpleState),
     Graphical(GraphicalState),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct State {
+    inner: InnerState,
+    settings: Settings,
+    counts: Counts,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Counts {
+    cells: u64,
+    non_thunk_cells: u64,
+    thunk_cells: u64,
+    put: u64,
+    put_delay: u64,
+    get: u64,
+    force_begin: u64,
+    force_end: u64,
+    force_begin_cache_hit: u64,
+    force_begin_cache_miss: u64,
+}
+
+impl Counts {
+    pub fn new() -> Self {
+        Counts {
+            cells: 0,
+            non_thunk_cells: 0,
+            thunk_cells: 0,
+            put: 0,
+            put_delay: 0,
+            get: 0,
+            force_begin: 0,
+            force_end: 0,
+            force_begin_cache_hit: 0,
+            force_begin_cache_miss: 0,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Settings {
+    force_begin_always_misses: bool,
+    force_end_forgets_result: bool,
 }
 
 impl Time {
@@ -215,11 +264,28 @@ impl Space {
             Space::Exp_(None, closed) => Space::Exp_(Some(symbol), closed.clone()),
         }
     }
+
+    pub fn into_symbol(&self) -> Res<Symbol_> {
+        match self {
+            Space::Here => todo!(),
+            Space::Symbol(s) => Ok(s.clone()),
+            Space::Exp_(_, _) => todo!(),
+        }
+    }
 }
 
 impl PartialOrd for Symbol {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
+            // We choose non-equal Ids (including symbols) to be incomparable.
+            // That permits their use to express certain kinds of independence/parallelism in the time ordering.
+            (Symbol::Id(i1), Symbol::Id(i2)) => {
+                if i1 == i2 {
+                    Some(Ordering::Equal)
+                } else {
+                    None
+                }
+            }
             (Symbol::QuotedAst(q1), Symbol::QuotedAst(q2)) => {
                 // We choose non-equal QuotedAsts (including symbols) to be incomparable.
                 // That permits their use to express certain kinds of independence/parallelism in the time ordering.
@@ -278,114 +344,191 @@ impl PartialOrd for Time {
     }
 }
 
+impl State {
+    fn put_reserved_symbol(&mut self, symbol: ReservedSymbol, value: Value_) -> Res<()> {
+        match symbol {
+            ReservedSymbol::SettingsForceBeginAlwaysMisses => {
+                self.settings.force_begin_always_misses =
+                    value.as_ref().into_bool_or(Error::TypeMismatch(line!()))?;
+                Ok(())
+            }
+            ReservedSymbol::SettingsForceEndForgetsResult => {
+                self.settings.force_end_forgets_result =
+                    value.as_ref().into_bool_or(Error::TypeMismatch(line!()))?;
+                Ok(())
+            }
+            _ => Err(Error::CannotPutReadOnlyReservedSymbol(symbol)),
+        }
+    }
+
+    fn get_reserved_symbol(&mut self, symbol: ReservedSymbol) -> Res<Value_> {
+        match symbol {
+            ReservedSymbol::State => self.inner.clone().to_motoko_shared(),
+            ReservedSymbol::SettingsForceBeginAlwaysMisses => {
+                self.settings.force_begin_always_misses.to_motoko_shared()
+            }
+            ReservedSymbol::SettingsForceEndForgetsResult => {
+                self.settings.force_end_forgets_result.to_motoko_shared()
+            }
+            ReservedSymbol::CountsCells => self.counts.cells.to_motoko_shared(),
+            ReservedSymbol::CountsThunkCells => self.counts.thunk_cells.to_motoko_shared(),
+            ReservedSymbol::CountsNonThunkCells => self.counts.non_thunk_cells.to_motoko_shared(),
+            ReservedSymbol::CountsPut => self.counts.put.to_motoko_shared(),
+            ReservedSymbol::CountsPutDelay => self.counts.put_delay.to_motoko_shared(),
+            ReservedSymbol::CountsGet => self.counts.get.to_motoko_shared(),
+            ReservedSymbol::CountsForceBegin => self.counts.force_begin.to_motoko_shared(),
+            ReservedSymbol::CountsForceEnd => self.counts.force_end.to_motoko_shared(),
+            ReservedSymbol::CountsForceBeginCacheHit => {
+                self.counts.force_begin_cache_hit.to_motoko_shared()
+            }
+            ReservedSymbol::CountsForceBeginCacheMiss => {
+                self.counts.force_begin_cache_miss.to_motoko_shared()
+            }
+        }
+        .map_err(|_e| Error::Unreachable)
+    }
+}
+
+//
+// TODO: Inner vs Outer traits.
+//
 impl AdaptonState for State {
     fn new() -> Self
     where
         Self: Sized,
     {
-        State::Simple(SimpleState::new())
-    }
-
-    fn reset(&mut self) -> Res<()> {
-        *self = State::Simple(SimpleState::new());
-        Ok(())
-    }
-
-    fn put_pointer(&mut self, pointer: Pointer, value: Value_) -> Res<()> {
-        match self {
-            Self::Simple(s) => s.put_pointer(pointer, value),
-            Self::Graphical(g) => g.put_pointer(pointer, value),
+        State {
+            inner: InnerState::Simple(SimpleState::new()),
+            settings: Settings {
+                force_begin_always_misses: false,
+                force_end_forgets_result: false,
+            },
+            counts: Counts::new(),
         }
     }
 
-    fn put_symbol(&mut self, symbol: Symbol_, value: Value_) -> Res<Pointer> {
-        match self {
-            Self::Simple(s) => s.put_symbol(symbol, value),
-            Self::Graphical(g) => g.put_symbol(symbol, value),
+    fn reset(&mut self) -> Res<()> {
+        *self = Self::new();
+        Ok(())
+    }
+
+    fn put_pointer(&mut self, _counts: &mut Counts, pointer: Pointer, value: Value_) -> Res<()> {
+        // check if pointer is reserved.
+        if let Some(reserved_symbol) = into_reserved_symbol(&*pointer.into_symbol()?) {
+            self.put_reserved_symbol(reserved_symbol, value)
+        } else {
+            self.counts.put += 1;
+            match &mut self.inner {
+                InnerState::Simple(s) => s.put_pointer(&mut self.counts, pointer, value),
+                InnerState::Graphical(g) => g.put_pointer(&mut self.counts, pointer, value),
+            }
+        }
+    }
+
+    fn put_symbol(&mut self, _counts: &mut Counts, symbol: Symbol_, value: Value_) -> Res<Pointer> {
+        if let Some(reserved_symbol) = into_reserved_symbol(&symbol) {
+            self.put_reserved_symbol(reserved_symbol, value)?;
+            Ok(Space::Symbol(symbol))
+        } else {
+            self.counts.put += 1;
+            match &mut self.inner {
+                InnerState::Simple(s) => s.put_symbol(&mut self.counts, symbol, value),
+                InnerState::Graphical(g) => g.put_symbol(&mut self.counts, symbol, value),
+            }
         }
     }
 
     fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_> {
-        match self {
-            Self::Simple(s) => s.get_pointer(pointer),
-            Self::Graphical(g) => g.get_pointer(pointer),
+        // check if pointer is reserved.
+        if let Some(reserved_symbol) = into_reserved_symbol(&*pointer.into_symbol()?) {
+            self.get_reserved_symbol(reserved_symbol)
+        } else {
+            self.counts.get += 1;
+            match &mut self.inner {
+                InnerState::Simple(s) => s.get_pointer(pointer),
+                InnerState::Graphical(g) => g.get_pointer(pointer),
+            }
         }
     }
 
     fn force_begin(&mut self, pointer: Pointer) -> Res<ForceBeginResult> {
-        match self {
-            Self::Simple(s) => s.force_begin(pointer),
-            Self::Graphical(g) => g.force_begin(pointer),
+        self.counts.force_begin += 1;
+        match &mut self.inner {
+            InnerState::Simple(s) => s.force_begin(pointer),
+            InnerState::Graphical(g) => g.force_begin(pointer),
         }
     }
 
     fn force_end(&mut self, value: Value_) -> Res<()> {
-        match self {
-            Self::Simple(s) => s.force_end(value),
-            Self::Graphical(g) => g.force_end(value),
+        self.counts.force_end += 1;
+        match &mut self.inner {
+            InnerState::Simple(s) => s.force_end(value),
+            InnerState::Graphical(g) => g.force_end(value),
         }
     }
 
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()> {
-        match self {
-            Self::Simple(s) => s.navigate_begin(nav, symbol),
-            Self::Graphical(g) => g.navigate_begin(nav, symbol),
+        match &mut self.inner {
+            InnerState::Simple(s) => s.navigate_begin(nav, symbol),
+            InnerState::Graphical(g) => g.navigate_begin(nav, symbol),
         }
     }
 
     fn navigate_end(&mut self) -> Res<()> {
-        match self {
-            Self::Simple(s) => s.navigate_end(),
-            Self::Graphical(g) => g.navigate_end(),
+        match &mut self.inner {
+            InnerState::Simple(s) => s.navigate_end(),
+            InnerState::Graphical(g) => g.navigate_end(),
         }
     }
 
     fn now(&self) -> Time {
-        match self {
-            Self::Simple(s) => s.now(),
-            Self::Graphical(g) => g.now(),
+        match &self.inner {
+            InnerState::Simple(s) => s.now(),
+            InnerState::Graphical(g) => g.now(),
         }
     }
 
     fn here(&self) -> Space {
-        match self {
-            Self::Simple(s) => s.here(),
-            Self::Graphical(g) => g.here(),
+        match &self.inner {
+            InnerState::Simple(s) => s.here(),
+            InnerState::Graphical(g) => g.here(),
         }
     }
 
     fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()> {
-        match self {
-            Self::Simple(s) => s.put_pointer_delay(pointer, time, value),
-            Self::Graphical(g) => g.put_pointer_delay(pointer, time, value),
+        self.counts.put_delay += 1;
+        match &mut self.inner {
+            InnerState::Simple(s) => s.put_pointer_delay(pointer, time, value),
+            InnerState::Graphical(g) => g.put_pointer_delay(pointer, time, value),
         }
     }
 
     fn put_symbol_delay(&mut self, symbol: Symbol_, time: Time, value: Value_) -> Res<Pointer> {
-        match self {
-            Self::Simple(s) => s.put_symbol_delay(symbol, time, value),
-            Self::Graphical(g) => g.put_symbol_delay(symbol, time, value),
+        self.counts.put_delay += 1;
+        match &mut self.inner {
+            InnerState::Simple(s) => s.put_symbol_delay(symbol, time, value),
+            InnerState::Graphical(g) => g.put_symbol_delay(symbol, time, value),
         }
     }
 
     fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>> {
-        match self {
-            Self::Simple(s) => s.peek(pointer),
-            Self::Graphical(g) => g.peek(pointer),
+        match &mut self.inner {
+            InnerState::Simple(s) => s.peek(pointer),
+            InnerState::Graphical(g) => g.peek(pointer),
         }
     }
 
     fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_> {
-        match self {
-            Self::Simple(s) => s.peek_cell(pointer),
-            Self::Graphical(g) => g.peek_cell(pointer),
+        match &mut self.inner {
+            InnerState::Simple(s) => s.peek_cell(pointer),
+            InnerState::Graphical(g) => g.peek_cell(pointer),
         }
     }
 
     fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()> {
-        match self {
-            Self::Simple(s) => s.poke(pointer, time, value),
-            Self::Graphical(g) => g.poke(pointer, time, value),
+        match &mut self.inner {
+            InnerState::Simple(s) => s.poke(pointer, time, value),
+            InnerState::Graphical(g) => g.poke(pointer, time, value),
         }
     }
 }
@@ -430,6 +573,12 @@ pub type TimeSpace = HashMap<Time, CellsBySpace>;
 pub type CellsBySpace = HashMap<Space, Cell>;
 
 impl Cell {
+    pub fn is_thunk(&self) -> bool {
+        match self {
+            Cell::Thunk(_) => true,
+            Cell::NonThunk(_) => false,
+        }
+    }
     pub fn get_value(&self) -> Res<Value_> {
         match self {
             Cell::NonThunk(v) => Ok(v.clone()),
@@ -511,7 +660,8 @@ impl SimpleState {
         self.time_space.insert(self.time.clone(), HashMap::new());
         for (pointer, cell) in delayed_cells.iter() {
             let cell_value = cell.get_value()?;
-            self.put_pointer(pointer.clone(), cell_value)?;
+            let mut dummy: Counts = Counts::new();
+            self.put_pointer(&mut dummy, pointer.clone(), cell_value)?;
         }
         Ok(())
     }
@@ -551,20 +701,8 @@ impl SimpleState {
                 }
             }
         } else {
-            Err(Error::Internal(line!()))
+            Err(Error::DanglingPointer(pointer.clone()))
         }
-    }
-}
-
-fn truncate_with_ellipsis(s: &str, max_len: usize) -> String {
-    if s.chars().count() <= max_len {
-        s.to_string()
-    } else if max_len <= 3 {
-        // Not enough space for even one character plus ellipsis
-        ".".repeat(max_len)
-    } else {
-        let truncated: String = s.chars().take(max_len - 3).collect();
-        format!("{}...", truncated)
     }
 }
 
@@ -584,28 +722,28 @@ impl AdaptonState for SimpleState {
             thunk_pointer: None,
         }
     }
-    fn put_symbol(&mut self, symbol: Symbol_, value: Value_) -> Res<Pointer> {
+    fn put_symbol(&mut self, counts: &mut Counts, symbol: Symbol_, value: Value_) -> Res<Pointer> {
         let p: Pointer = self.space.apply(symbol);
-        self.put_pointer(p.clone(), value)?;
+        self.put_pointer(counts, p.clone(), value)?;
         Ok(p)
     }
-    fn put_pointer(&mut self, pointer: Pointer, value: Value_) -> Res<()> {
+    fn put_pointer(&mut self, counts: &mut Counts, pointer: Pointer, value: Value_) -> Res<()> {
         let time = self.time.clone();
         let space = self.space.clone();
-        if false {
-            // to do -- introduce a flag to check.
-            let indent = "| ".repeat(self.stack.len());
-            info!(
-                "{}{} := {}",
-                indent,
-                format_one_line(&pointer),
-                truncate_with_ellipsis(format_one_line(&value).as_str(), 77)
-            );
-        }
-        let updated = self
-            .get_cell_by_time(&pointer)
-            .update(time, Self::new_cell(space, value));
-        self.space_time.insert(pointer, updated);
+        let cells = self.get_cell_by_time(&pointer);
+        let cells_orig_len = cells.len();
+        let new_cell = Self::new_cell(space, value);
+        let is_thunk = new_cell.is_thunk();
+        let cells = cells.update(time, new_cell);
+        log::info!("{} {}", cells.len(), cells_orig_len);
+        if cells.len() > cells_orig_len {
+            if is_thunk {
+                counts.thunk_cells += 1
+            } else {
+                counts.non_thunk_cells += 1;
+            }
+        };
+        self.space_time.insert(pointer, cells);
         Ok(())
     }
     fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_> {
@@ -699,8 +837,9 @@ impl AdaptonState for SimpleState {
     }
 
     fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()> {
+        let mut dummy = Counts::new();
         match time {
-            None => self.put_pointer(pointer, value),
+            None => self.put_pointer(&mut dummy, pointer, value),
             Some(time) => self.put_pointer_delay(pointer, time, value),
         }
     }
@@ -789,10 +928,15 @@ impl AdaptonState for GraphicalState {
         Ok(())
     }
 
-    fn put_pointer(&mut self, _pointer: Pointer, _value: Value_) -> Res<()> {
+    fn put_pointer(&mut self, _counts: &mut Counts, _pointer: Pointer, _value: Value_) -> Res<()> {
         todo!()
     }
-    fn put_symbol(&mut self, _symbol: Symbol_, _value: Value_) -> Res<Pointer> {
+    fn put_symbol(
+        &mut self,
+        _counts: &mut Counts,
+        _symbol: Symbol_,
+        _value: Value_,
+    ) -> Res<Pointer> {
         todo!()
     }
     fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_> {
