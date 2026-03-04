@@ -16,21 +16,33 @@ module {
         prim "adaptonReset" ();
         let inputArray = generateRandomInput(seed, size);
         let inputSeq = Seq.fromArray(inputArray);
+        let inputBuildCounts = @(`adapton(`counts));
         Seq.writeTikzText(`mergeSort-`inputSeq-`seed-seed-`size-size, inputSeq);
-        let sorted = Seq.lazyMergeSort(@(inputSeq!)); 
+        let inputWriteCounts = @(`adapton(`counts));
+        let sorted = Seq.lazyMergeSort(@(inputSeq!));
+        let preDemandCounts = @(`adapton(`counts));
         let result = switch (demandPattern) {
             case (null) { Seq.takeAll(sorted) };
-            case (null or (?#all)) { Seq.takeAll(sorted) };
+            case (?#all) { Seq.takeAll(sorted) };
             case (?#one) { Seq.takeOne(sorted) };
-            case (?#quater) { Seq.takeN(sorted, size / 4) };
+            case (?#quarter) { Seq.takeN(sorted, size / 4) };
             case (?#half) { Seq.takeN(sorted, size / 2) };
             case (?#frac(f)) { Seq.takeN(sorted, size * f) };
         };
+        let postDemandCounts = @(`adapton(`counts));
         let comparisonCount = (prim "adaptonPeek" (prim "adaptonPointer" (`merge)))!;
-        let thunkCells = @(`adapton(`counts)(`thunkCells));
-        let nonThunkCells = @(`adapton(`counts)(`nonThunkCells));
-        let adaptonCounts = @(`adapton(`counts));
-        { result; comparisonCount; thunkCells; nonThunkCells; adaptonCounts }
+        let counts = { comparisonCount; inputBuildCounts; inputWriteCounts; preDemandCounts; postDemandCounts };
+        let output = { seed; size; counts };
+        output
+    };
+
+    public func run() {
+        var outputs = [];
+        for (size in [3,5,7,11,13,17,21].vals()) {
+            let output = runRandom(10, size, null);
+            outputs #= [ output ];
+        };
+        // prim "print" outputs;
     }
 }
  
