@@ -12,25 +12,68 @@ module {
         result
     };
 
-    public func runRandom(seed : Nat, size : Nat, demandPattern) {
+    public func runRandom(seed : Nat, size : Nat, enableCache, demandPattern) {
         prim "adaptonReset" ();
+        if (not enableCache) {
+            `adapton(`settings)(`forceBeginAlwaysMisses) := true
+        };
+        assert (enableCache == (not (@ (`adapton(`settings)(`forceBeginAlwaysMisses)))));
         let inputArray = generateRandomInput(seed, size);
         let inputSeq = Seq.fromArray(inputArray);
+        let inputBuildCounts = @(`adapton(`counts));
         Seq.writeTikzText(`mergeSort-`inputSeq-`seed-seed-`size-size, inputSeq);
-        let sorted = Seq.lazyMergeSort(@(inputSeq!)); 
+        let inputWriteCounts = @(`adapton(`counts));
+        let sorted = Seq.lazyMergeSort(@(inputSeq!));
+        let preDemandCounts = @(`adapton(`counts));
         let result = switch (demandPattern) {
             case (null) { Seq.takeAll(sorted) };
-            case (null or (?#all)) { Seq.takeAll(sorted) };
+            case (?#all) { Seq.takeAll(sorted) };
             case (?#one) { Seq.takeOne(sorted) };
-            case (?#quater) { Seq.takeN(sorted, size / 4) };
+            case (?#quarter) { Seq.takeN(sorted, size / 4) };
             case (?#half) { Seq.takeN(sorted, size / 2) };
             case (?#frac(f)) { Seq.takeN(sorted, size * f) };
         };
+        let postDemandCounts = @(`adapton(`counts));
         let comparisonCount = (prim "adaptonPeek" (prim "adaptonPointer" (`merge)))!;
-        let thunkCells = @(`adapton(`counts)(`thunkCells));
-        let nonThunkCells = @(`adapton(`counts)(`nonThunkCells));
-        let adaptonCounts = @(`adapton(`counts));
-        { result; comparisonCount; thunkCells; nonThunkCells; adaptonCounts }
+        let counts = { comparisonCount; inputBuildCounts; inputWriteCounts; preDemandCounts; postDemandCounts };
+        let output = { seed; size; counts };
+        output
+    };
+
+    public func run() {
+        var output = [];
+        for (sizes in [[3,5,7,11,13,17,21],
+                       [25,50,75,100,125,150,175],
+                       [200,250,300,350,400,450],[500,750],
+                       [1000],[1500],[2000],[2500],[5000]
+                       ].vals()) {
+            prim "print" { sizes };
+            for (size in sizes.vals()) {
+                let data = runRandom(10, size, true, null);
+                output  #= [ data ];
+                //
+                // At small sizes, re-run without a cache
+                // and assert that there's no difference: 
+                // Our MergeSort algorithm forces each thunk
+                // at most once.
+                //
+                if (size < 100) {
+                    let data_ = runRandom(10, size, false, null);
+                    assert (data_.counts.comparisonCount ==
+                            data.counts.comparisonCount)
+                }
+            }
+        };
+        
+        // Prepare ouput files.
+        var sizes = "";
+        var comparisonCounts = "";
+        for (out in output.vals()) {
+            sizes #= ((debug_show out.size) # "\n");
+            comparisonCounts #= ((debug_show out.counts.comparisonCount) # "\n");
+        };
+        prim "writeFile" (`run-`size, sizes);
+        prim "writeFile" (`run-`comparisonCount, comparisonCounts);      
     }
 }
  
