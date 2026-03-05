@@ -1,0 +1,25 @@
+//
+// test code for delayed puts.
+//
+// The assert statements ensure the expected behavior:
+// The while loop runs exactly one iteration,
+// then it exits the loop, as the delayed
+// put takes effect when the block for time `t ends.
+//
+module {
+  public func go() {
+    let start = (prim "adaptonNow") ();
+    let cell = 0 := null;
+    while ((@ cell) == null) { 
+      do within time `t { 
+        assert ((prim "adaptonNow" ()) == (prim "adaptonTime" `t));
+        assert ((@ cell) == null);
+        (cell, start) := ?1;
+        assert ((@ cell) == null)
+      };
+      assert ((@ cell) == ?1);
+      assert ((prim "adaptonNow" ()) == start);
+    };
+    assert ((@ cell) == ?1)
+  }
+}

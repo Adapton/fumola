@@ -18,11 +18,20 @@ module {
             `adapton(`settings)(`forceBeginAlwaysMisses) := true
         };
         assert (enableCache == (not (@ (`adapton(`settings)(`forceBeginAlwaysMisses)))));
+        //
+        // Build input sequence, as a tree.
+        //
         let inputArray = generateRandomInput(seed, size);
         let inputSeq = Seq.fromArray(inputArray);
         let inputBuildCounts = @(`adapton(`counts));
+        //
+        // Record the input tree as TikZ for a LaTeX report, if applicable.
+        //
         Seq.writeTikzText(`mergeSort-`inputSeq-`seed-seed-`size-size, inputSeq);
         let inputWriteCounts = @(`adapton(`counts));
+        //
+        // Demand-driven (lazy) MergeSort on the input tree.
+        //
         let sorted = Seq.lazyMergeSort(@(inputSeq!));
         let preDemandCounts = @(`adapton(`counts));
         let result = switch (demandPattern) {
@@ -35,7 +44,12 @@ module {
         };
         let postDemandCounts = @(`adapton(`counts));
         let comparisonCount = (prim "adaptonPeek" (prim "adaptonPointer" (`merge)))!;
-        let counts = { comparisonCount; inputBuildCounts; inputWriteCounts; preDemandCounts; postDemandCounts };
+        let counts = { comparisonCount;
+                       inputBuildCounts; 
+                       inputWriteCounts;
+                       preDemandCounts;
+                       postDemandCounts
+                     };
         let output = { seed; size; counts };
         output
     };
