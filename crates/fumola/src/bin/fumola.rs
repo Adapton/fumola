@@ -1,6 +1,6 @@
 use fumola_semantics::{Interruption, Value_};
 
-use log::{error, info, trace};
+use log::{debug, error, info, trace};
 
 use fumola::state::State;
 use fumola_parser::parser_types;
@@ -172,7 +172,7 @@ fn repl(state: &mut State) {
                 for (path, content) in state.semantic_state.output_files.iter() {
                     let path_string = format_one_line(path).replace("`", "");
                     let content = content.to_string();
-                    info!(
+                    debug!(
                         "writing file `{}` with \"{}\"",
                         path_string,
                         truncate_with_ellipsis(content.as_str(), 69)

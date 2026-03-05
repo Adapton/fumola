@@ -212,7 +212,7 @@ fn path_base(path: &String) -> String {
 
 pub mod def {
     use fumola_syntax::ast;
-    use log::{debug, info};
+    use log::{debug};
 
     use super::*;
     use crate::{
@@ -439,7 +439,7 @@ pub mod def {
                         }
                     }
                 };
-                info!(
+                debug!(
                     "Listing, width={}: {}: {:?}\n{}",
                     width,
                     file.clone().unwrap_or("(no file)".to_string()),

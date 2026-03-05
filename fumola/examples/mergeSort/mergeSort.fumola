@@ -12,7 +12,7 @@ module {
         result
     };
 
-    public func runRandom(seed : Nat, size : Nat, enableCache, demandPattern) {
+    public func runRandom(seed : Nat, size : Nat, enableCache, demand) {
         prim "adaptonReset" ();
         if (not enableCache) {
             `adapton(`settings)(`forceBeginAlwaysMisses) := true
@@ -27,14 +27,14 @@ module {
         //
         // Record the input tree as TikZ for a LaTeX report, if applicable.
         //
-        Seq.writeTikzText(`mergeSort-`inputSeq-`seed-seed-`size-size, inputSeq);
+        Seq.writeTikzText(`mergeSort-`inputSeq-`seed-seed-`size-size-`TikZ, inputSeq);
         let inputWriteCounts = @(`adapton(`counts));
         //
         // Demand-driven (lazy) MergeSort on the input tree.
         //
         let sorted = Seq.lazyMergeSort(@(inputSeq!));
         let preDemandCounts = @(`adapton(`counts));
-        let result = switch (demandPattern) {
+        let result = switch (demand) {
             case (null) { Seq.takeAll(sorted) };
             case (?#all) { Seq.takeAll(sorted) };
             case (?#one) { Seq.takeOne(sorted) };
@@ -50,44 +50,57 @@ module {
                        preDemandCounts;
                        postDemandCounts
                      };
-        let output = { seed; size; counts };
+        let output = { seed; size; counts; demand };
         output
     };
 
     public func run() {
-        var output = [];
-        for (sizes in [[3,5,7,11,13,17,21],
+        let demands = [null, ?#one, ?#half]; // param?
+
+        var outputs = [];
+        for (demand in demands.vals()) {
+            var output = [];
+            for (sizes in [[3,5,7,11,13,17,21],
                        [25,50,75,100,125,150,175],
                        [200,250,300,350,400,450],[500,750],
                        [1000],[1500],[2000],[2500],[5000]
                        ].vals()) {
-            prim "print" { sizes };
-            for (size in sizes.vals()) {
-                let data = runRandom(10, size, true, null);
-                output  #= [ data ];
-                //
-                // At small sizes, re-run without a cache
-                // and assert that there's no difference: 
-                // Our MergeSort algorithm forces each thunk
-                // at most once.
-                //
-                if (size < 100) {
-                    let data_ = runRandom(10, size, false, null);
-                    assert (data_.counts.comparisonCount ==
-                            data.counts.comparisonCount)
+                prim "print" { demand ; sizes };
+                for (size in sizes.vals()) {
+                    let data = runRandom(10, size, true, demand);
+                    output  #= [ data ];
+                    //
+                    // At small sizes, re-run without a cache
+                    // and assert that there's no difference: 
+                    // Our MergeSort algorithm forces each thunk
+                    // at most once.
+                    //
+                    if (size < 100) {
+                      let data_ = runRandom(10, size, false, demand);
+                      assert (data_.counts.comparisonCount ==
+                              data.counts.comparisonCount)
+                    }
                 }
-            }
+            };
+            outputs #= [(demand, output)];
         };
         
         // Prepare ouput files.
-        var sizes = "";
-        var comparisonCounts = "";
-        for (out in output.vals()) {
-            sizes #= ((debug_show out.size) # "\n");
-            comparisonCounts #= ((debug_show out.counts.comparisonCount) # "\n");
-        };
-        prim "writeFile" (`run-`size, sizes);
-        prim "writeFile" (`run-`comparisonCount, comparisonCounts);      
+        for ((demand, output) in outputs.vals()) {
+            var sizes = "";
+            var comparisonCounts = "";
+            let demandSym = switch demand {
+                case null `full;
+                case (?#one) `one;
+                case (?#half) `half;
+            };
+            for (out in output.vals()) {
+               sizes #= ((debug_show out.size) # "\n");
+               comparisonCounts #= ((debug_show out.counts.comparisonCount) # "\n");
+            };
+            prim "writeFile" (`demand-demandSym-`size-`dat, sizes);
+            prim "writeFile" (`demand-demandSym-`comparisonCount-`dat, comparisonCounts);
+        }      
     }
 }
  

@@ -1,4 +1,1 @@
-# 
-# Try (prim "reifyValue") 
-#
-cargo run repl $@
+cargo run repl --import `find fumola -name "*.fumola"` $@

@@ -129,6 +129,17 @@ module {
   };
 
   #[listing]
+  public func takeN(l : LazyList<X>, len : Nat) : [(Symbol, X)] {
+    if (len == 0) { return [] };
+    switch (force l) {
+      case null [];
+      case (?lc) {
+        [(lc.symbol, lc.element)] # takeN(lc.next, len - 1)
+      }
+    }
+  };
+
+  #[listing]
   public func takeAll(l : LazyList<X>) : [(Symbol, X)] {
     switch (force l) {
       case null [];
