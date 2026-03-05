@@ -1,0 +1,65 @@
+import Counters "Counters";
+
+module {
+
+  #[listing(23)]
+  public type LazyListCell<X> = {
+    element : X;
+    symbol : Symbol;
+    next : LazyList_<X>;
+  };
+
+  #[listing]
+  public type LazyList<X> = ?LazyListCell<X>;
+  
+  #[listing]
+  public type LazyList_<X> = Pointer<Thunk<LazyList<X>>>;
+
+  #[listing(69)]
+  public func merge(xs : LazyList<X>, ys : LazyList<X>) : LazyList<X> {
+    switch (xs, ys) {
+      case (_, null) xs;
+      case (null, _) ys;
+      case (?xc, ?yc) {
+        Counters.inc `merge;
+        if (xc.element <= yc.element) {
+          ?{ element=xc.element; symbol=xc.symbol; next = xc.symbol := thunk { merge(force(xc.next), ?yc) } }
+        } else {
+          ?{ element=yc.element; symbol=yc.symbol; next = yc.symbol := thunk { merge(?xc, force(yc.next)) } }
+        }
+      };
+    }
+  };
+
+  #[listing]
+  public func takeN(l : LazyList<X>, len : Nat) : [(Symbol, X)] {
+    if (len == 0) { return [] };
+    switch (force l) {
+      case null [];
+      case (?lc) {
+        [(lc.symbol, lc.element)] # takeN(lc.next, len - 1)
+      }
+    }
+  };
+
+  #[listing]
+  public func takeAll(l : LazyList<X>) : [(Symbol, X)] {
+    switch (force l) {
+      case null [];
+      case (?lc) {
+        [(lc.symbol, lc.element)] # takeAll(lc.next)
+      }
+    }
+  };
+
+  #[listing]
+  public func takeOne(l : LazyList<X>) : [(Symbol, X)] {
+    switch (force l) {
+      case null [];
+      case (?lc) {
+        [(lc.symbol, lc.element)]
+      }
+    }
+  };
+
+}

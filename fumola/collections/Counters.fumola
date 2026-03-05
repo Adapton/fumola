@@ -1,0 +1,19 @@
+module {
+    public func ptr (symbol:Symbol) {
+      prim "adaptonPointer" (symbol);
+    };
+    public func get (symbol:Symbol) {
+      (prim "adaptonPeek" (ptr symbol))
+    };
+    public func inc (symbol:Symbol) {
+      let p = ptr(symbol); 
+      switch (prim "adaptonPeek" p) {
+        case null {
+	          prim "adaptonPoke" (p, 1);
+        };
+        case (?n) {
+           prim "adaptonPoke" (p, n + 1);
+        };
+      }
+    }
+}

@@ -1,4 +1,6 @@
 import Seq "SeqTree";
+import LazyList "LazyList";
+
 module {
     public func generateRandomInput(seed : Nat, size : Nat) : [(Nat, Nat)] {
         let iter = prim "fastRandIterNew" (?size, seed);
@@ -35,12 +37,12 @@ module {
         let sorted = Seq.lazyMergeSort(@(inputSeq!));
         let preDemandCounts = @(`adapton(`counts));
         let result = switch (demand) {
-            case (null) { Seq.takeAll(sorted) };
-            case (?#all) { Seq.takeAll(sorted) };
-            case (?#one) { Seq.takeOne(sorted) };
-            case (?#quarter) { Seq.takeN(sorted, size / 4) };
-            case (?#half) { Seq.takeN(sorted, size / 2) };
-            case (?#frac(f)) { Seq.takeN(sorted, size * f) };
+            case (null) { LazyList.takeAll(sorted) };
+            case (?#all) { LazyList.takeAll(sorted) };
+            case (?#one) { LazyList.takeOne(sorted) };
+            case (?#quarter) { LazyList.takeN(sorted, size / 4) };
+            case (?#half) { LazyList.takeN(sorted, size / 2) };
+            case (?#frac(f)) { LazyList.takeN(sorted, size * f) };
         };
         let postDemandCounts = @(`adapton(`counts));
         let comparisonCount = (prim "adaptonPeek" (prim "adaptonPointer" (`merge)))!;
