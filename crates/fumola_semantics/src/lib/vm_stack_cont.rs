@@ -189,13 +189,11 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                 unit_step(active)
             }
             Value::AdaptonPointer(name) => {
-                let mut dummy = crate::adapton::Counts::new();
-                active.adapton().put_pointer(&mut dummy, name.clone(), v)?;
+                active.adapton().put_pointer(name.clone(), v)?;
                 return_step(active, Value::AdaptonPointer(name.clone()).share())
             }
             Value::Symbol(symbol) => {
-                let mut dummy = crate::adapton::Counts::new();
-                let p = active.adapton().put_symbol(&mut dummy, symbol.clone(), v)?;
+                let p = active.adapton().put_symbol(symbol.clone(), v)?;
                 return_step(active, Value::AdaptonPointer(p).share())
             }
             Value::Tuple(vs) => match (vs.get(0), vs.get(1)) {
@@ -224,8 +222,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             },
             v1 => {
                 if let Ok(symbol) = v1.into_sym_or(()) {
-                    let mut dummy = crate::adapton::Counts::new();
-                    let p = active.adapton().put_symbol(&mut dummy, symbol.clone(), v)?;
+                    let p = active.adapton().put_symbol(symbol.clone(), v)?;
                     return_step(active, Value::AdaptonPointer(p).share())
                 } else {
                     return Err(crate::Interruption::TypeMismatch(
@@ -702,12 +699,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
         }
         Force1 => {
             if let Value::AdaptonPointer(ref p) = *v {
-                let mut dummy2 = crate::adapton::Counts::new();
-                let dummy1 = crate::adapton::Settings::new();
-                let force_begin_result =
-                    active
-                        .adapton()
-                        .force_begin(&dummy1, &mut dummy2, p.clone())?;
+                let force_begin_result = active.adapton().force_begin(p.clone())?;
                 match force_begin_result {
                     ForceBeginResult::CacheHit(v) => {
                         *active.cont() = Cont::Value_(v);
@@ -750,8 +742,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             Ok(Step {})
         }
         ForceAdaptonPointer => {
-            let settings = crate::adapton::Settings::new();
-            active.adapton().force_end(&settings, v.clone())?;
+            active.adapton().force_end(v.clone())?;
             *active.cont() = Cont::Value_(v);
             Ok(Step {})
         }

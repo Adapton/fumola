@@ -213,7 +213,7 @@ fn path_base(path: &String) -> String {
 pub mod def {
 
     use fumola_syntax::ast;
-    use log::{debug};
+    use log::debug;
 
     use super::*;
     use crate::{
@@ -287,8 +287,8 @@ pub mod def {
                     debug!("Pre  {:?}", active.defs().active_path);
                     active.defs().active_path = Some(path_base(&local_path));
                     debug!("Post {:?}", active.defs().active_path);
-                    
-                    debug!("Pushing {:?}", path);                   
+
+                    debug!("Pushing {:?}", path);
                     active.module_files().import_stack.push_back(path.clone());
                 };
                 let importing_package = active.package().clone();
@@ -342,8 +342,12 @@ pub mod def {
                     match active.module_files().import_stack.head() {
                         Some(active_module_path) => {
                             debug!("Top module {:?}", active_module_path);
-                            debug!("Path of top {:?}", path_base(&active_module_path.local_path));
-                            active.defs().active_path = Some(path_base(&active_module_path.local_path))
+                            debug!(
+                                "Path of top {:?}",
+                                path_base(&active_module_path.local_path)
+                            );
+                            active.defs().active_path =
+                                Some(path_base(&active_module_path.local_path))
                         }
                         None => active.defs().active_path = None,
                     };
