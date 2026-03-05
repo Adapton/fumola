@@ -501,7 +501,7 @@ pub struct Counts {
 ///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Agent {
-    pub adapton_state: adapton::State,
+    pub adapton_state: adapton::state::State,
     pub store: Store,
     pub counts: Counts,
     pub active: Activation,
@@ -553,7 +553,7 @@ pub struct Actor {
     pub def: def::Actor,
     pub env: Env,
     pub store: Store,
-    pub adapton_state: adapton::State,
+    pub adapton_state: adapton::state::State,
     pub counts: Counts,
     pub active: Option<Activation>,
     pub awaiting: HashMap<RespId, Activation>,
@@ -691,7 +691,7 @@ pub trait Active: ActiveBorrow {
     fn package<'a>(&'a mut self) -> &'a mut Option<String>;
     fn debug_print_out<'a>(&'a mut self) -> &'a mut Vector<DebugPrintLine>;
     fn counts<'a>(&'a mut self) -> &'a mut Counts;
-    fn adapton<'a>(&'a mut self) -> &'a mut adapton::State;
+    fn adapton<'a>(&'a mut self) -> &'a mut adapton::state::State;
     fn alloc(&mut self, value: impl Into<Value_>) -> Pointer {
         self.store().alloc(value)
     }
