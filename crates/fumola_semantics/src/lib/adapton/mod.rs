@@ -12,11 +12,16 @@ mod simple;
 
 pub mod state;
 
+pub enum Strategy {
+    Simple,
+    Graphical,
+}
+
 pub trait AdaptonState {
-    fn new() -> Self
+    fn new(strategy: Strategy) -> Self
     where
         Self: Sized;
-    fn reset(&mut self) -> Res<()>;
+    fn reset(&mut self, strategy: Strategy) -> Res<()>;
     fn now(&self) -> Time;
     fn here(&self) -> Space;
     fn put_pointer(&mut self, pointer: Pointer, value: Value_) -> Res<()>;
