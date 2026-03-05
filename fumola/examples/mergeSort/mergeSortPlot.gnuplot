@@ -6,6 +6,15 @@ set output "mergeSortPlot.png"
 set title "Comparisons for Demand-Driven MergeSort"
 set key left top
 
+set title font ",16"
+set xlabel "Input size (n)" font ",16"
+set ylabel "Number of comparisons" font ",16"
+
+set xtics font ",14"
+set ytics font ",14"
+
+set key font ",14"
+
 plot \
     "comparisonCount.dat" using 1:4 with linespoints title "Fumola: Demand All", \
     "comparisonCount.dat" using 1:(lgamma($1+1)/log(2)) with linespoints title "Optimal Demand All", \
