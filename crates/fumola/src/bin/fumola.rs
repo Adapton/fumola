@@ -242,7 +242,10 @@ fn inspect_result(state: &mut State, result: Result<Value_, fumola::Error>, dept
 }
 
 fn report_error(_state: &mut State, error: fumola::Error) {
-    error!("Error: {:?}", error);
+    //for frame in state.backtrace() {
+    //    info!("{:?}", frame);
+    //}
+    error!("{:?}", error);
 }
 
 fn read_file_if_exists(path: &str) -> Option<String> {

@@ -211,8 +211,9 @@ fn path_base(path: &String) -> String {
 }
 
 pub mod def {
+
     use fumola_syntax::ast;
-    use log::{debug};
+    use log::{debug, info};
 
     use super::*;
     use crate::{
@@ -241,6 +242,7 @@ pub mod def {
                 return nyi!(line!(), "import {}", path);
             }
         } else {
+            info!("Pre  {:?} {:?}", active.defs().active_path.as_ref(), path);
             let path = match active.defs().active_path.as_ref() {
                 // we are "active" at some other path that's relative to this one.
                 // we need to account for that.
@@ -257,13 +259,14 @@ pub mod def {
                     prefix
                 }
             };
+            info!("Post {:?} {:?}", active.defs().active_path.as_ref(), path);
             (active.package().clone(), path)
         };
         let path = crate::vm_types::ModulePath {
             package_name: package_name.clone(),
             local_path: local_path.clone(),
         };
-        log::debug!(
+        log::info!(
             "`import {}` resolves as `import {:?}`.  Attemping to import...",
             path0,
             path
@@ -281,7 +284,11 @@ pub mod def {
                     stack.push_back(path.clone());
                     return Err(Interruption::ImportCycle(stack));
                 } else {
+                    info!("Pre  {:?}", active.defs().active_path);
                     active.defs().active_path = Some(path_base(&local_path));
+                    info!("Post {:?}", active.defs().active_path);
+                    
+                    info!("Pushing {:?}", path);                   
                     active.module_files().import_stack.push_back(path.clone());
                 };
                 let importing_package = active.package().clone();
@@ -331,9 +338,12 @@ pub mod def {
                 active.defs().leave_context(saved, &ctxid);
                 *active.package() = importing_package;
                 if let Some(top_path) = active.module_files().import_stack.pop_back() {
+                    info!("Popping {:?}", top_path);
                     match active.module_files().import_stack.head() {
                         Some(active_module_path) => {
-                            active.defs().active_path = Some(active_module_path.local_path.clone())
+                            info!("Top module {:?}", active_module_path);
+                            info!("Path of top {:?}", path_base(&active_module_path.local_path));
+                            active.defs().active_path = Some(path_base(&active_module_path.local_path))
                         }
                         None => active.defs().active_path = None,
                     };
@@ -357,7 +367,7 @@ pub mod def {
                 }
             }
         };
-        log::debug!("`import {}` Success.", path0);
+        log::info!("`import {}` Success.", path0);
         Ok(mf.def())
     }
 
