@@ -95,7 +95,7 @@ pub fn call_prim_function<A: Active>(
             Value::Text(s) => {
                 let schedule_choice = active.schedule_choice().clone();
                 log::info!(
-                    "DebugPrint: {:?}, {}: {:?}",
+                    "DebugPrint: {:?}, {}:\n{:?}",
                     schedule_choice,
                     active.cont_source(),
                     s
@@ -112,7 +112,7 @@ pub fn call_prim_function<A: Active>(
                 let txt = crate::format::format_pretty(v, 80);
                 let schedule_choice = active.schedule_choice().clone();
                 log::info!(
-                    "DebugPrint: {:?}: {}: {:?}",
+                    "DebugPrint: {:?}: {}:\n{:?}",
                     schedule_choice,
                     active.cont_source(),
                     txt
@@ -156,7 +156,15 @@ pub fn call_prim_function<A: Active>(
         } */
         Collection(cf) => call_collection_function(active, cf, targs, args),
         AdaptonReset => {
-            *active.cont() = cont_value(active.adapton().reset()?.to_motoko()?);
+            // to do:
+            // cases: (add some utils to Value impl)
+            // - args.is_null() or args.is_unit() -- defaults to graphical
+            // - args.is_variant_with_id("simple")
+            // - args.is_variant_with_id("graphical")
+            //
+            let strategy = crate::adapton::Strategy::Simple;
+            let r = active.adapton().reset(strategy)?.to_motoko()?;
+            *active.cont() = cont_value(r);
             Ok(Step {})
         }
         AdaptonNow => {

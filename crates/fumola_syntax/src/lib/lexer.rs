@@ -77,8 +77,18 @@ pub fn create_token_vec(input: &str) -> LexResult<Tokens> {
                 Token::Error => Token::Unknown(input[span.clone()].to_string()),
                 t => t,
             };
-            let (line, col) = line_col.get(span.start);
-            Loc(t, Source::Known(Rc::new(SourceKnown { span, line, col })))
+            let (start_line, start_col) = line_col.get(span.start);
+            let (end_line, end_col) = line_col.get(span.end);
+            Loc(
+                t,
+                Source::Known(Rc::new(SourceKnown {
+                    span,
+                    start_line,
+                    start_col,
+                    end_line,
+                    end_col,
+                })),
+            )
         }));
     };
     let comment_spans = find_comment_spans(input);
@@ -90,7 +100,8 @@ pub fn create_token_vec(input: &str) -> LexResult<Tokens> {
     for (i, span) in comment_spans.iter().enumerate() {
         // Add comment token
         let comment = input[span.clone()].to_string();
-        let (line, col) = line_col.get(span.start);
+        let (start_line, start_col) = line_col.get(span.start);
+        let (end_line, end_col) = line_col.get(span.end);
         tokens.push(Loc(
             if comment.starts_with("//") {
                 Token::LineComment(comment)
@@ -99,8 +110,10 @@ pub fn create_token_vec(input: &str) -> LexResult<Tokens> {
             },
             Source::Known(Rc::new(SourceKnown {
                 span: span.clone(),
-                line,
-                col,
+                start_line,
+                start_col,
+                end_line,
+                end_col,
             })),
         ));
         // Tokenize source after comment

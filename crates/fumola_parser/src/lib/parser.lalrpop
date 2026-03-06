@@ -15,8 +15,9 @@ grammar(lookup: &LineColLookup<'input>);
 #[inline]
 Node<T>: Node<T> = {
     <start:@L> <t:T> <end:@R> => {
-        let (line, col) = lookup.get(start);
-        NodeData::new(t, Source::Known(Rc::new(SourceKnown{ span: start..end, line, col }))).share()
+        let (start_line, start_col) = lookup.get(start);
+        let (end_line, end_col) = lookup.get(end);
+        NodeData::new(t, Source::Known(Rc::new(SourceKnown{ span: start..end, start_line, start_col, end_line, end_col }))).share()
     },
 }
 
