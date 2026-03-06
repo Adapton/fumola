@@ -91,8 +91,10 @@ pub enum Source {
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct SourceKnown {
     pub span: Span,
-    pub line: usize,
-    pub col: usize,
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
 }
 
 impl Source {
@@ -109,8 +111,10 @@ impl Source {
             (Unknown, Unknown) => Source::Unknown,
             (Known(k1), Known(k2)) => Known(Rc::new(SourceKnown {
                 span: k1.span.start..k2.span.end,
-                line: k1.line,
-                col: k2.col,
+                start_line: k1.start_line,
+                start_col: k1.start_col,
+                end_line: k2.end_line,
+                end_col: k2.end_col,
             })),
             (_, Unknown) => self.clone(),
             (Unknown, _) => other.clone(),
@@ -130,7 +134,15 @@ impl std::fmt::Display for Source {
         match self {
             //Source::Known { line, col, .. } => write!(f, "{}:{}", line, col),
             Source::Known(k) => {
-                write!(f, "{}..{} @ {}:{}", k.span.start, k.span.end, k.line, k.col)
+                if k.start_line == k.end_line {
+                    write!(f, "{}:{}..{}", k.start_line, k.start_col, k.end_col)
+                } else {
+                    write!(
+                        f,
+                        "{}:{}..{}:{}",
+                        k.start_line, k.start_col, k.end_line, k.end_col
+                    )
+                }
             }
             // Source::ExpStep { source } => {
             //     write!(f, "ExpStep({})", source)

@@ -1,10 +1,10 @@
 use crate::adapton::AdaptonState;
 use crate::value::{ActorId, ActorMethod, Value, Value_};
-use crate::vm_types::Actor;
 use crate::vm_types::DebugPrintLine;
 use crate::vm_types::Env;
 use crate::vm_types::Stack;
 use crate::vm_types::def::CtxId;
+use crate::vm_types::{self, Actor};
 use crate::vm_types::{
     Activation, Active, Actors, Agent, Cont, Core, Counts, Interruption, Limits, ModuleFiles,
     ModulePath, Pointer, Response, ScheduleChoice, Step,
@@ -574,6 +574,13 @@ impl Core {
                 Err(i) => return Err(i),
             }
         }
+    }
+
+    pub fn agent_stack(&self) -> Result<vm_types::Stack, EvalInitError> {
+        if self.schedule_choice != ScheduleChoice::Agent {
+            return Err(EvalInitError::AgentNotScheduled);
+        }
+        Ok(self.agent.active.stack.clone())
     }
 
     /// Assert that the Agent is idle.
