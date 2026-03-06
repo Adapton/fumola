@@ -6,12 +6,28 @@ module {
         let iter = prim "fastRandIterNew" (?size, seed);
         var count = 0;
         var result = [];
-        let maxValue = size * 137;
+        let maxValue = size * 137; // encourage non-unique elements for large sizes.
         for (x in iter) {
             count += 1;
             result #= [(count, x % maxValue)]
         };
         result
+    };
+
+    public func report( outputs ) {
+        //
+        // For now, just report about the
+        // comparison counts and the related input trees' depths.
+        //
+        prim "print" "";
+        prim "print" "## SeqTree input metrics";
+        for (run in (outputs[0].1).vals()) {
+            prim "print" {
+                _A_size = run.size;
+                _B_depth = run.inputSeqMetrics.depth;
+                _C_comparisonCount = run.counts.comparisonCount;
+            };
+        };
     };
 
     public func runRandom(seed : Nat, size : Nat, enableCache, demand) {
@@ -27,10 +43,16 @@ module {
         let inputSeq = Seq.fromArray(inputArray);
         let inputBuildCounts = @(`adapton(`counts));
         //
+        // Compute some input metrics.
+        //
+        let inputSeqMetrics = Seq.metrics(inputSeq!);
+        assert (inputSeqMetrics.size == size);
+        let postInputMetricsCounts = @(`adapton(`counts));
+        //
         // Record the input tree as TikZ for a LaTeX report, if applicable.
         //
         Seq.writeTikzText(`mergeSort-`inputSeq-`seed-seed-`size-size-`TikZ, inputSeq);
-        let inputWriteCounts = @(`adapton(`counts));
+        let postInputWriteCounts = @(`adapton(`counts));
         //
         // Demand-driven (lazy) MergeSort on the input tree.
         //
@@ -47,13 +69,14 @@ module {
         let postDemandCounts = @(`adapton(`counts));
         let comparisonCount = (prim "adaptonPeek" (prim "adaptonPointer" (`merge)))!;
         let counts = { comparisonCount;
-                       inputBuildCounts; 
-                       inputWriteCounts;
+                       inputBuildCounts;
+                       postInputMetricsCounts;
+                       postInputWriteCounts;  
                        preDemandCounts;
                        postDemandCounts
                      };
-        let output = { seed; size; counts; demand };
-        output
+        let res = { seed; size; counts; demand; inputSeqMetrics };
+        res
     };
 
     public func run() {
@@ -63,9 +86,9 @@ module {
         for (demand in demands.vals()) {
             var output = [];
             for (sizes in [[3,5,7,11,13,17,21],
-                       [25,50,75,100,125,150,175],
-                       [200,250,300,350,400,450],[500,750],
-                       [1000],[1500],[2000],[2500],[5000]
+                           [25,50,75,100,125,150,175],
+                           [200,250,300,350,400,450],[500,750],
+                           [1000],[1500],[2000],[2500],[5000]
                        ].vals()) {
                 prim "print" { demand ; sizes };
                 for (size in sizes.vals()) {
@@ -90,6 +113,7 @@ module {
         // Prepare ouput files.
         for ((demand, output) in outputs.vals()) {
             var sizes = "";
+            var depths = "";
             var comparisonCounts = "";
             let demandSym = switch demand {
                 case null `full;
@@ -98,11 +122,17 @@ module {
             };
             for (out in output.vals()) {
                sizes #= ((debug_show out.size) # "\n");
+               depths #= ((debug_show out.inputSeqMetrics.depth)) # "\n";
                comparisonCounts #= ((debug_show out.counts.comparisonCount) # "\n");
             };
             prim "writeFile" (`demand-demandSym-`size-`dat, sizes);
+            prim "writeFile" (`demand-demandSym-`depth-`dat, depths);
             prim "writeFile" (`demand-demandSym-`comparisonCount-`dat, comparisonCounts);
-        }      
+        };
+
+        report(outputs);
+
+        return outputs
     }
 }
  

@@ -95,7 +95,7 @@ pub fn call_prim_function<A: Active>(
             Value::Text(s) => {
                 let schedule_choice = active.schedule_choice().clone();
                 log::info!(
-                    "DebugPrint: {:?}, {}: {:?}",
+                    "DebugPrint: {:?}, {}:\n{:?}",
                     schedule_choice,
                     active.cont_source(),
                     s
@@ -112,7 +112,7 @@ pub fn call_prim_function<A: Active>(
                 let txt = crate::format::format_pretty(v, 80);
                 let schedule_choice = active.schedule_choice().clone();
                 log::info!(
-                    "DebugPrint: {:?}: {}: {:?}",
+                    "DebugPrint: {:?}: {}:\n{:?}",
                     schedule_choice,
                     active.cont_source(),
                     txt

@@ -32,6 +32,9 @@ pub struct GraphicalState {
     pub nodes: Nodes,
     pub edges: Edges,
     pub stack: Vector<Frame>,
+    pub time: Time,
+    pub space: Space,
+    pub thunk_pointer: Option<Pointer>, // None ==> stack(i).thunk_pointer == None, for all i.
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -81,6 +84,9 @@ impl CacheState for GraphicalState {
             nodes: HashMap::new(),
             edges: HashMap::new(),
             stack: Vector::new(),
+            space: Space::Here,
+            time: Time::Now,
+            thunk_pointer: None,
         }
     }
 
