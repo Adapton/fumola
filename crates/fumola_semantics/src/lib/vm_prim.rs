@@ -12,9 +12,9 @@ use std::collections::hash_map;
 use std::hash::{Hash, Hasher};
 
 pub fn geometric_pack(hash: u64) -> u64 {
-    const CHUNK_BITS: u32 = 8;
-    const K: u32 = 8;
-    const FIELD_BITS: u32 = 4;
+    const CHUNK_BITS: u32 = 16;
+    const K: u32 = 4;
+    const FIELD_BITS: u32 = 6;
     let mut output = 0u64;
     for i in 0..K {
         let chunk = ((hash >> (i * CHUNK_BITS)) & 0xFFFF) as u16;
@@ -53,7 +53,9 @@ pub fn call_prim_function<A: Active>(
                 let mut hasher = hash_map::DefaultHasher::new();
                 symbol.as_ref().hash(&mut hasher);
                 let hash = hasher.finish();
-                let level = geometric_levels::<4>(hash);
+                //let level = geometric_levels::<4>(hash);
+                let level = geometric_pack(hash);
+
                 *active.cont() = Cont::Value_(Value::Nat(level.into()).into());
                 Ok(Step {})
             } else {
