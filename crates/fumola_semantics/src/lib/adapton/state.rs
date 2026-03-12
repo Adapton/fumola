@@ -74,7 +74,6 @@ pub trait CacheState {
     fn new() -> Self
     where
         Self: Sized;
-    fn reset(&mut self) -> Res<()>;
     fn now(&self) -> Time;
     fn here(&self) -> Space;
     fn put_pointer(&mut self, counts: &mut Counts, _pointer: Pointer, _value: Value_) -> Res<()>;

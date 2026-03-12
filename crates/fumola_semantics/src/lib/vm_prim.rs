@@ -164,7 +164,19 @@ pub fn call_prim_function<A: Active>(
             // - args.is_variant_with_id("simple")
             // - args.is_variant_with_id("graphical")
             //
-            let strategy = crate::adapton::Strategy::Simple;
+            let strategy = match args.as_ref() {
+                Value::Unit => crate::adapton::Strategy::Graphical,
+                Value::Variant(tag, _) => {
+                    if tag.as_str() == "simple" {
+                        crate::adapton::Strategy::Simple
+                    } else if tag.as_str() == "graphical" {
+                        crate::adapton::Strategy::Graphical
+                    } else {
+                        type_mismatch!(file!(), line!())
+                    }
+                }
+                _ => type_mismatch!(file!(), line!()),
+            };
             let r = active.adapton().reset(strategy)?.to_motoko()?;
             *active.cont() = cont_value(r);
             Ok(Step {})

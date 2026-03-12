@@ -180,11 +180,6 @@ impl SimpleState {
 }
 
 impl CacheState for SimpleState {
-    fn reset(&mut self) -> Res<()> {
-        *self = SimpleState::new();
-        Ok(())
-    }
-
     fn new() -> Self {
         SimpleState {
             time: Time::Now,

@@ -89,12 +89,6 @@ impl CacheState for GraphicalState {
             thunk_pointer: None,
         }
     }
-
-    fn reset(&mut self) -> Res<()> {
-        *self = GraphicalState::new();
-        Ok(())
-    }
-
     fn put_pointer(&mut self, _counts: &mut Counts, _pointer: Pointer, _value: Value_) -> Res<()> {
         todo!()
     }
