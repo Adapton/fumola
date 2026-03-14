@@ -462,6 +462,13 @@ impl Value {
         })
     }
 
+    pub fn into_variant_or<E>(&self, err: E) -> Result<(Id, Option<Value_>), E> {
+        match self {
+            Value::Variant(tag, arg) => Ok((tag.clone(), arg.clone())),
+            _ => Err(err),
+        }
+    }
+
     pub fn into_tuple_or<E>(&self, err: E) -> Result<Vector<Value_>, E> {
         match self {
             Value::Tuple(vs) => Ok(vs.clone()),

@@ -1,64 +1,104 @@
+use crate::ToMotoko;
+use crate::Value;
 use crate::adapton::state::{CacheState, Counts, Settings};
 use crate::adapton::{Error, ForceBeginResult, Navigation, Pointer, Res, Space, Time};
-
-use crate::ToMotoko;
-use crate::value::{Symbol_, ThunkBody, Value, Value_};
+use crate::value::{Symbol_, ThunkBody, Value_};
+use fumola_syntax::ast::Exp_;
 use im_rc::{HashMap, Vector};
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub enum Cell {
+pub enum Node {
     NonThunk(Value_),
-    Thunk(ThunkCell),
+    Thunk(ThunkNode),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct ThunkCell {
+pub struct ThunkNode {
     pub body: ThunkBody,
     pub space: Space,
+    pub trace: Vector<EdgeId>,
     pub result: Option<Value_>,
 }
 
+pub type SpaceTime = HashMap<Space, NodesByTime>;
+pub type NodesByTime = HashMap<(Time, MetaTime), Node>;
+
+pub type TimeSpace = HashMap<Time, NodesBySpace>;
+pub type NodesBySpace = HashMap<(Space, MetaTime), Node>;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SimpleState {
+pub struct GraphicalState {
+    pub meta_time: MetaTime,
     pub space_time: SpaceTime,
     pub time_space: TimeSpace,
-    pub stack: Vector<SimpleFrame>,
+    pub edges: Edges,
+    pub stack: Vector<Frame>,
     pub time: Time,
     pub space: Space,
     pub thunk_pointer: Option<Pointer>, // None ==> stack(i).thunk_pointer == None, for all i.
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SimpleFrame {
-    pub ambient_space: Space,
-    pub ambient_time: Time,
-    pub thunk_pointer: Option<Pointer>, // None ==> stack(i).thunk_pointer == None, for all i.
+pub enum FrameKind {
+    Push, // TEMP
+    DoWithin,
+    Eval(NodeId),
+    Clean(NodeId),
 }
 
-pub type SpaceTime = HashMap<Space, CellByTime>;
-pub type CellByTime = HashMap<Time, Cell>;
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Frame {
+    pub kind: FrameKind,
+    pub ambient_space: Space,
+    pub ambient_time: Time,
+    pub thunk_pointer: Option<Pointer>,
+    pub trace: Vector<EdgeId>,
+}
 
-pub type TimeSpace = HashMap<Time, CellsBySpace>;
-pub type CellsBySpace = HashMap<Space, Cell>;
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct MetaTime(BigUint);
 
-impl Cell {
+// the full identity of a node includes a Time and MetaTime.
+pub type NodeId = (Space, Time, MetaTime);
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct EdgeId(pub BigUint);
+
+pub type Edges = HashMap<EdgeId, Edge>;
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct Edge {
+    pub source: NodeId,
+    pub target: NodeId,
+    pub action: Action,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum Action {
+    Force(Exp_, Value_),
+    Put(Value_),
+    Get(Value_),
+}
+
+impl Node {
     pub fn is_thunk(&self) -> bool {
         match self {
-            Cell::Thunk(_) => true,
-            Cell::NonThunk(_) => false,
+            Node::Thunk(_) => true,
+            Node::NonThunk(_) => false,
         }
     }
     pub fn get_value(&self) -> Res<Value_> {
         match self {
-            Cell::NonThunk(v) => Ok(v.clone()),
-            Cell::Thunk(tc) => Ok(Value::Thunk(tc.body.clone()).into()),
+            Node::NonThunk(v) => Ok(v.clone()),
+            Node::Thunk(tc) => Ok(Value::Thunk(tc.body.clone()).into()),
         }
     }
     pub fn set_cache_value(&mut self, v: Value_) -> Res<()> {
         match self {
-            Cell::NonThunk(_) => Err(Error::Unreachable),
-            Cell::Thunk(t) => {
+            Node::NonThunk(_) => Err(Error::Unreachable),
+            Node::Thunk(t) => {
                 t.result = Some(v);
                 Ok(())
             }
@@ -66,50 +106,57 @@ impl Cell {
     }
 }
 
-impl SimpleState {
+impl GraphicalState {
     #[allow(dead_code)]
-    fn get_cell_by_time_mut<'a>(&'a mut self, p: &Pointer) -> &'a mut CellByTime {
+    fn get_node_by_time_mut<'a>(&'a mut self, p: &Pointer) -> &'a mut NodesByTime {
         let exists = self.space_time.get(p) != None;
         if !exists {
             self.space_time.insert(p.clone(), HashMap::new());
         }
         self.space_time.get_mut(p).unwrap() // always succeeds, because of check above.
     }
-    fn get_cell_by_time<'a>(&'a mut self, p: &Pointer) -> &'a CellByTime {
+    fn get_node_by_time<'a>(&'a mut self, p: &Pointer) -> &'a NodesByTime {
         let not_exists = self.space_time.get(p) == None;
         if not_exists {
             assert_eq!(self.space_time.insert(p.clone(), HashMap::new()), None);
         }
         self.space_time.get(p).unwrap()
     }
-    fn get_cell_by_space<'a>(&'a mut self, t: &Time) -> &'a CellsBySpace {
+    fn get_node_by_space<'a>(&'a mut self, t: &Time) -> &'a NodesBySpace {
         let not_exists = self.time_space.get(t) == None;
         if not_exists {
             assert_eq!(self.time_space.insert(t.clone(), HashMap::new()), None);
         }
         self.time_space.get(t).unwrap()
     }
-    fn get_cell_mut<'a>(&'a mut self, p: &Pointer, t: &Time) -> Option<&'a mut Cell> {
-        self.get_cell_by_time_mut(p).get_mut(t)
+    fn init_meta_time() -> MetaTime {
+        MetaTime(BigUint::from(0u64))
     }
-    fn new_cell(space: Space, value: Value_) -> Cell {
+    fn get_node_mut<'a>(&'a mut self, p: &Pointer, t: &Time) -> Option<&'a mut Node> {
+        self.get_node_by_time_mut(p)
+            .get_mut(&(t.clone(), Self::init_meta_time()))
+    }
+    fn new_node(space: Space, value: Value_) -> Node {
         match &*value {
-            Value::Thunk(e) => Cell::Thunk(ThunkCell {
+            Value::Thunk(e) => Node::Thunk(ThunkNode {
                 body: e.clone(),
                 space: space,
                 result: None,
+                trace: Vector::new(),
             }),
-            _ => Cell::NonThunk(value),
+            _ => Node::NonThunk(value),
         }
     }
     fn push_stack(&mut self) {
-        self.stack.push_back(SimpleFrame {
+        self.stack.push_back(Frame {
+            kind: FrameKind::Push,
+            trace: Vector::new(),
             ambient_space: self.space.clone(),
             ambient_time: self.time.clone(),
             thunk_pointer: self.thunk_pointer.clone(),
         });
     }
-    fn pop_stack(&mut self) -> Res<SimpleFrame> {
+    fn pop_stack(&mut self) -> Res<Frame> {
         if let Some(frame) = self.stack.pop_back() {
             let r = frame.clone();
             self.time = frame.ambient_time;
@@ -122,50 +169,50 @@ impl SimpleState {
     }
 
     fn undelay(&mut self) -> Res<()> {
-        let delayed_cells = self
+        let delayed_nodes = self
             .time_space
             .get(&self.time)
             .map(|x| x.clone())
             .unwrap_or(HashMap::new());
         self.time_space.insert(self.time.clone(), HashMap::new());
-        for (pointer, cell) in delayed_cells.iter() {
-            let cell_value = cell.get_value()?;
+        for ((pointer, _meta_time), node) in delayed_nodes.iter() {
+            let node_value = node.get_value()?;
             let mut dummy: Counts = Counts::new();
-            self.put_pointer(&mut dummy, pointer.clone(), cell_value)?;
+            self.put_pointer(&mut dummy, pointer.clone(), node_value)?;
         }
         Ok(())
     }
 
-    // get_cell --
-    // find the cellsbytime.
+    // get_node --
+    // find the nodesbytime.
     // does the exact time exist?
     // if so, use it.
     // if not, do a linear scan and find the nearest time, if any exist before the current time.
     //
     // (doing a log time search is possible in the future: would require an ordered representation,
     // and the boilerplate for Serialize/Deserialize for it)
-    fn get_cell<'a>(&'a self, pointer: &Pointer) -> Res<&'a Cell> {
-        if let Some(cells_by_time) = self.space_time.get(pointer) {
-            if let Some(cell) = cells_by_time.get(&self.time) {
-                Ok(cell)
+    fn get_node<'a>(&'a self, pointer: &Pointer) -> Res<&'a Node> {
+        if let Some(nodes_by_time) = self.space_time.get(pointer) {
+            if let Some(node) = nodes_by_time.get(&(self.time.clone(), Self::init_meta_time())) {
+                Ok(node)
             } else {
                 let mut time = None;
-                let mut cell = None;
-                for (time_, cell_) in cells_by_time.iter() {
+                let mut node = None;
+                for ((time_, _meta_time), node_) in nodes_by_time.iter() {
                     if &self.time >= time_ && time == None {
-                        // Initialize with a viable cell's time.
+                        // Initialize with a viable node's time.
                         time = Some(time_);
-                        cell = Some(cell_);
+                        node = Some(node_);
                     } else if let Some(t) = time {
-                        // This cell's time is closer to the current moment.
-                        // It shadows the earlier cell we found.
+                        // This node's time is closer to the current moment.
+                        // It shadows the earlier node we found.
                         if t < time_ && time_ <= &self.time {
                             time = Some(time_);
-                            cell = Some(cell_);
+                            node = Some(node_);
                         }
                     }
                 }
-                match cell {
+                match node {
                     Some(c) => Ok(c),
                     None => Err(Error::UndefinedNow(pointer.clone())),
                 }
@@ -176,17 +223,20 @@ impl SimpleState {
     }
 }
 
-impl CacheState for SimpleState {
+impl CacheState for GraphicalState {
     fn new() -> Self {
-        SimpleState {
-            time: Time::Now,
-            space: Space::Here,
+        GraphicalState {
+            meta_time: MetaTime(BigUint::from(0 as usize)),
             space_time: HashMap::new(),
             time_space: HashMap::new(),
+            edges: HashMap::new(),
             stack: Vector::new(),
+            space: Space::Here,
+            time: Time::Now,
             thunk_pointer: None,
         }
     }
+
     fn put_symbol(&mut self, counts: &mut Counts, symbol: Symbol_, value: Value_) -> Res<Pointer> {
         let p: Pointer = self.space.apply(symbol);
         self.put_pointer(counts, p.clone(), value)?;
@@ -195,12 +245,12 @@ impl CacheState for SimpleState {
     fn put_pointer(&mut self, counts: &mut Counts, pointer: Pointer, value: Value_) -> Res<()> {
         let time = self.time.clone();
         let space = self.space.clone();
-        let cells = self.get_cell_by_time(&pointer);
-        let cells_orig_len = cells.len();
-        let new_cell = Self::new_cell(space, value);
-        let is_thunk = new_cell.is_thunk();
-        let cells = cells.update(time, new_cell);
-        if cells.len() > cells_orig_len {
+        let nodes = self.get_node_by_time(&pointer);
+        let nodes_orig_len = nodes.len();
+        let new_node = Self::new_node(space, value);
+        let is_thunk = new_node.is_thunk();
+        let nodes = nodes.update((time, Self::init_meta_time()), new_node);
+        if nodes.len() > nodes_orig_len {
             counts.cells += 1;
             if is_thunk {
                 counts.thunk_cells += 1
@@ -208,12 +258,12 @@ impl CacheState for SimpleState {
                 counts.non_thunk_cells += 1;
             }
         };
-        self.space_time.insert(pointer, cells);
+        self.space_time.insert(pointer, nodes);
         Ok(())
     }
     fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_> {
-        let cell = self.get_cell(&pointer)?;
-        cell.get_value()
+        let node = self.get_node(&pointer)?;
+        node.get_value()
     }
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()> {
         self.push_stack();
@@ -244,8 +294,8 @@ impl CacheState for SimpleState {
         counts: &mut Counts,
         pointer: Pointer,
     ) -> Res<ForceBeginResult> {
-        let cell = self.get_cell(&pointer)?.clone();
-        if let Cell::Thunk(tc) = cell {
+        let node = self.get_node(&pointer)?.clone();
+        if let Node::Thunk(tc) = node {
             if let Some(cache_value) = tc.result
                 && !settings.force_begin_always_misses
             {
@@ -263,11 +313,11 @@ impl CacheState for SimpleState {
         }
     }
     fn force_end(&mut self, settings: &Settings, value: Value_) -> Res<()> {
-        let cell = self
-            .get_cell_mut(&self.thunk_pointer.clone().unwrap(), &self.now())
+        let node = self
+            .get_node_mut(&self.thunk_pointer.clone().unwrap(), &self.now())
             .ok_or(Error::Unreachable)?;
         if !settings.force_end_forgets_result {
-            cell.set_cache_value(value)?;
+            node.set_cache_value(value)?;
         }
         let _fr = self.pop_stack()?;
         Ok(())
@@ -283,9 +333,10 @@ impl CacheState for SimpleState {
 
     fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()> {
         let space = self.space.clone();
-        let updated = self
-            .get_cell_by_space(&time)
-            .update(pointer, Self::new_cell(space, value));
+        let updated = self.get_node_by_space(&time).update(
+            (pointer, Self::init_meta_time()),
+            Self::new_node(space, value),
+        );
         self.time_space.insert(time, updated);
         Ok(())
     }
@@ -297,14 +348,14 @@ impl CacheState for SimpleState {
     }
 
     fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>> {
-        match self.get_cell(&pointer) {
+        match self.get_node(&pointer) {
             Ok(c) => Ok(Some(c.get_value()?)),
             Err(_) => Ok(None),
         }
     }
 
     fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_> {
-        match self.get_cell(&pointer) {
+        match self.get_node(&pointer) {
             Ok(c) => Some(c).to_motoko_shared().map_err(|_| Error::Unreachable),
             Err(_) => None::<Value_>
                 .to_motoko_shared()

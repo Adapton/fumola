@@ -1,10 +1,10 @@
 use crate::adapton::AdaptonState;
 use crate::value::{ActorId, ActorMethod, Value, Value_};
-use crate::vm_types::Actor;
 use crate::vm_types::DebugPrintLine;
 use crate::vm_types::Env;
 use crate::vm_types::Stack;
 use crate::vm_types::def::CtxId;
+use crate::vm_types::{self, Actor};
 use crate::vm_types::{
     Activation, Active, Actors, Agent, Cont, Core, Counts, Interruption, Limits, ModuleFiles,
     ModulePath, Pointer, Response, ScheduleChoice, Step,
@@ -25,7 +25,7 @@ fn agent_init(prog: Prog) -> Agent {
     let mut a = Agent {
         store: Store::new(ScheduleChoice::Agent),
         //debug_print_out: Vector::new(),
-        adapton_state: crate::adapton::state::State::new(),
+        adapton_state: crate::adapton::state::State::new(crate::adapton::Strategy::Graphical),
         counts: Counts::default(),
         active: Activation::new(),
     };
@@ -188,7 +188,7 @@ impl Active for Core {
             id: name.clone(),
         });
         //let def = self.defs().map.get(&CtxId(0)).unwrap().fields.get(name).unwrap().def.clone();
-        let adapton_state = crate::adapton::state::State::new();
+        let adapton_state = crate::adapton::state::State::new(crate::adapton::Strategy::Graphical);
         let mut store = Store::new(ScheduleChoice::Actor(name.clone()));
         let mut env = self.env().clone();
         let ctx = self.defs().map.get(&def.fields).unwrap();
@@ -241,7 +241,7 @@ impl Active for Core {
         });
         let mut env = HashMap::new();
         let mut store = self.actors.map.get(&name).unwrap().store.clone();
-        let adapton_state = crate::adapton::state::State::new();
+        let adapton_state = crate::adapton::state::State::new(crate::adapton::Strategy::Graphical);
         let counts = self.actors.map.get(&name).unwrap().counts.clone();
         let ctx = self.defs().map.get(&def.fields).unwrap();
         for (i, field) in ctx.fields.iter() {
@@ -574,6 +574,13 @@ impl Core {
                 Err(i) => return Err(i),
             }
         }
+    }
+
+    pub fn agent_stack(&self) -> Result<vm_types::Stack, EvalInitError> {
+        if self.schedule_choice != ScheduleChoice::Agent {
+            return Err(EvalInitError::AgentNotScheduled);
+        }
+        Ok(self.agent.active.stack.clone())
     }
 
     /// Assert that the Agent is idle.

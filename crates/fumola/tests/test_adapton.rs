@@ -1,10 +1,28 @@
-use fumola::check::assert_vm_eval as assert_;
+use fumola::check::assert_vm_eval as assert__;
 //use fumola::check::assert_vm_eval_result_line as assert__;
+
+// Run each of two caching strategies for each assert in the tests below.
+fn assert_(program: &str, expected_result: &str) {
+    let program1 = format!("prim \"adaptonReset\" ({}); {}", "#simple", program);
+    assert__(program1.as_str(), expected_result);
+
+    let program2 = format!("prim \"adaptonReset\" ({}); {}", "#graphical", program);
+    assert__(program2.as_str(), expected_result);
+}
+
+
+#[test]
+fn reset_graphical() {
+    assert_(
+        "let p = 1 := (); prim \"adaptonReset\" (#graphical); prim \"adaptonPeek\" p",
+        "null",
+    )
+}
 
 #[test]
 fn reset_simple() {
     assert_(
-        "let p = 1 := (); prim \"adaptonReset\" (); prim \"adaptonPeek\" p",
+        "let p = 1 := (); prim \"adaptonReset\" (#simple); prim \"adaptonPeek\" p",
         "null",
     )
 }
@@ -185,7 +203,7 @@ fn get_cell_counts() {
 #[test]
 fn get_state() {
     assert_(
-        "switch (@ (`adapton(`state))) { case (#Simple(_)) () }",
+        "switch (@ (`adapton(`state))) { case (#Simple(_)) (); case (#Graphical(_)) () }",
         "()",
     )
 }

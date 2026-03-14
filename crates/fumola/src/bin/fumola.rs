@@ -241,11 +241,15 @@ fn inspect_result(state: &mut State, result: Result<Value_, fumola::Error>, dept
     }
 }
 
-fn report_error(_state: &mut State, error: fumola::Error) {
-    //for frame in state.backtrace() {
-    //    info!("{:?}", frame);
-    //}
-    error!("{:?}", error);
+fn report_error(state: &mut State, error: fumola::Error) {
+    if let Ok(stack) = state.semantic_state.agent_stack() {
+        error!("{:?}", error);
+        for frame in stack.iter() {
+            eprintln!("{}: {:?}", &frame.source, &frame.cont);
+        }
+    } else {
+        error!("(No stack available to print)\n{:?}", error);
+    }
 }
 
 fn read_file_if_exists(path: &str) -> Option<String> {

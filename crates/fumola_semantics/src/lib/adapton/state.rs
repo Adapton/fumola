@@ -1,11 +1,11 @@
 use crate::adapton::{
-    AdaptonState, Error, ForceBeginResult, Navigation, Pointer, Res, Space, Time,
+    AdaptonState, Error, ForceBeginResult, Navigation, Pointer, Res, Space, Strategy, Time,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::adapton::graphical;
 use crate::adapton::reserved::{self, ReservedSymbol};
-use crate::adapton::simple::{self, SimpleState};
+use crate::adapton::simple::{self};
 
 use crate::ToMotoko;
 use crate::value::{Symbol_, Value_};
@@ -74,7 +74,6 @@ pub trait CacheState {
     fn new() -> Self
     where
         Self: Sized;
-    fn reset(&mut self) -> Res<()>;
     fn now(&self) -> Time;
     fn here(&self) -> Space;
     fn put_pointer(&mut self, counts: &mut Counts, _pointer: Pointer, _value: Value_) -> Res<()>;
@@ -145,12 +144,16 @@ impl State {
 }
 
 impl AdaptonState for State {
-    fn new() -> Self
+    fn new(strategy: Strategy) -> Self
     where
         Self: Sized,
     {
+        let inner = match strategy {
+            Strategy::Simple => InnerState::Simple(simple::SimpleState::new()),
+            Strategy::Graphical => InnerState::Graphical(graphical::GraphicalState::new()),
+        };
         State {
-            inner: InnerState::Simple(SimpleState::new()),
+            inner,
             settings: Settings {
                 force_begin_always_misses: false,
                 force_end_forgets_result: false,
@@ -159,8 +162,8 @@ impl AdaptonState for State {
         }
     }
 
-    fn reset(&mut self) -> Res<()> {
-        *self = Self::new();
+    fn reset(&mut self, s: Strategy) -> Res<()> {
+        *self = Self::new(s);
         Ok(())
     }
 
