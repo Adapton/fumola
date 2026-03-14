@@ -10,7 +10,6 @@ fn assert_(program: &str, expected_result: &str) {
     assert__(program2.as_str(), expected_result);
 }
 
-
 #[test]
 fn reset_graphical() {
     assert_(

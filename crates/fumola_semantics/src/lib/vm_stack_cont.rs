@@ -2,7 +2,6 @@
 
 use crate::adapton::{AdaptonState, ForceBeginResult};
 use crate::format::format_one_line;
-use crate::type_mismatch;
 use crate::value::{
     ActorMethod, ArrayIterator, ArrayIteratorFunc, ArrayIteratorNextFunc, ArraySizeFunc,
     ClosedFunction, DynamicValue, Symbol, Text, Value, Value_,
@@ -18,6 +17,7 @@ use crate::vm_types::{
 };
 use crate::vm_types::{OptionCoreSource, Store};
 use crate::{Dynamic, Shared, nyi, type_mismatch_, vm_step};
+use crate::{type_mismatch, value};
 use fumola_syntax::ast::{Cases, Exp_, Inst, Mut, Pat_, ProjIndex, QuotedAst};
 use fumola_syntax::shared::{FastClone, Share};
 use im_rc::{HashMap, Vector};
@@ -448,6 +448,33 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                     *active.cont() = Cont::Value_(
                         Value::Dynamic(DynamicValue::new(ArraySizeFunc {
                             array_size: array.len(),
+                        }))
+                        .into(),
+                    );
+                    Ok(Step {})
+                } else {
+                    type_mismatch!(file!(), line!())
+                }
+            }
+            Value::Collection(value::Collection::HashMap(hm)) => {
+                if f.0.string.as_str() == "vals" {
+                    let array: Vector<(&Value_, &Value_)> = hm.iter().collect();
+                    let array = array
+                        .into_iter()
+                        .map(|(v1, v2)| {
+                            Value::Tuple(Vector::from(vec![v1.clone(), v2.clone()])).share()
+                        })
+                        .collect();
+                    let position = active.store().alloc_array_iter_position().local;
+                    *active.cont() = Cont::Value_(
+                        Value::Dynamic(DynamicValue::new(ArrayIteratorFunc { array, position }))
+                            .into(),
+                    );
+                    Ok(Step {})
+                } else if f.0.string.as_str() == "size" {
+                    *active.cont() = Cont::Value_(
+                        Value::Dynamic(DynamicValue::new(ArraySizeFunc {
+                            array_size: hm.len(),
                         }))
                         .into(),
                     );
