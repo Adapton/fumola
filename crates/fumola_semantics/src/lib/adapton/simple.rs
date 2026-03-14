@@ -187,6 +187,7 @@ impl CacheState for SimpleState {
             thunk_pointer: None,
         }
     }
+
     fn put_symbol(&mut self, counts: &mut Counts, symbol: Symbol_, value: Value_) -> Res<Pointer> {
         let p: Pointer = self.space.apply(symbol);
         self.put_pointer(counts, p.clone(), value)?;
