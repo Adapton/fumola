@@ -1,13 +1,12 @@
+use crate::ToMotoko;
+use crate::Value;
 use crate::adapton::state::{CacheState, Counts, Settings};
-use crate::adapton::{ForceBeginResult, Navigation, Pointer, Res, Space, Time};
+use crate::adapton::{Error, ForceBeginResult, Navigation, Pointer, Res, Space, Time};
 use crate::value::{Symbol_, ThunkBody, Value_};
 use fumola_syntax::ast::Exp_;
 use im_rc::{HashMap, Vector};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
-
-// -----------------------------------------------------------------------------------------
-// Graphical
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Node {
@@ -23,13 +22,17 @@ pub struct ThunkNode {
     pub result: Option<Value_>,
 }
 
-pub type Nodes = HashMap<Space, NodeByTime>;
-pub type NodeByTime = HashMap<(Time, MetaTime), Node>;
+pub type SpaceTime = HashMap<Space, NodesByTime>;
+pub type NodesByTime = HashMap<(Time, MetaTime), Node>;
+
+pub type TimeSpace = HashMap<Time, NodesBySpace>;
+pub type NodesBySpace = HashMap<(Space, MetaTime), Node>;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GraphicalState {
     pub meta_time: MetaTime,
-    pub nodes: Nodes,
+    pub space_time: SpaceTime,
+    pub time_space: TimeSpace,
     pub edges: Edges,
     pub stack: Vector<Frame>,
     pub time: Time,
@@ -39,6 +42,7 @@ pub struct GraphicalState {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum FrameKind {
+    Push, // TEMP
     DoWithin,
     Eval(NodeId),
     Clean(NodeId),
@@ -47,8 +51,9 @@ pub enum FrameKind {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Frame {
     pub kind: FrameKind,
-    pub space: Space,
-    pub time: Time,
+    pub ambient_space: Space,
+    pub ambient_time: Time,
+    pub thunk_pointer: Option<Pointer>,
     pub trace: Vector<EdgeId>,
 }
 
@@ -77,11 +82,153 @@ pub enum Action {
     Get(Value_),
 }
 
+impl Node {
+    pub fn is_thunk(&self) -> bool {
+        match self {
+            Node::Thunk(_) => true,
+            Node::NonThunk(_) => false,
+        }
+    }
+    pub fn get_value(&self) -> Res<Value_> {
+        match self {
+            Node::NonThunk(v) => Ok(v.clone()),
+            Node::Thunk(tc) => Ok(Value::Thunk(tc.body.clone()).into()),
+        }
+    }
+    pub fn set_cache_value(&mut self, v: Value_) -> Res<()> {
+        match self {
+            Node::NonThunk(_) => Err(Error::Unreachable),
+            Node::Thunk(t) => {
+                t.result = Some(v);
+                Ok(())
+            }
+        }
+    }
+}
+
+impl GraphicalState {
+    #[allow(dead_code)]
+    fn get_node_by_time_mut<'a>(&'a mut self, p: &Pointer) -> &'a mut NodesByTime {
+        let exists = self.space_time.get(p) != None;
+        if !exists {
+            self.space_time.insert(p.clone(), HashMap::new());
+        }
+        self.space_time.get_mut(p).unwrap() // always succeeds, because of check above.
+    }
+    fn get_node_by_time<'a>(&'a mut self, p: &Pointer) -> &'a NodesByTime {
+        let not_exists = self.space_time.get(p) == None;
+        if not_exists {
+            assert_eq!(self.space_time.insert(p.clone(), HashMap::new()), None);
+        }
+        self.space_time.get(p).unwrap()
+    }
+    fn get_node_by_space<'a>(&'a mut self, t: &Time) -> &'a NodesBySpace {
+        let not_exists = self.time_space.get(t) == None;
+        if not_exists {
+            assert_eq!(self.time_space.insert(t.clone(), HashMap::new()), None);
+        }
+        self.time_space.get(t).unwrap()
+    }
+    fn init_meta_time() -> MetaTime {
+        MetaTime(BigUint::from(0u64))
+    }
+    fn get_node_mut<'a>(&'a mut self, p: &Pointer, t: &Time) -> Option<&'a mut Node> {
+        self.get_node_by_time_mut(p)
+            .get_mut(&(t.clone(), Self::init_meta_time()))
+    }
+    fn new_node(space: Space, value: Value_) -> Node {
+        match &*value {
+            Value::Thunk(e) => Node::Thunk(ThunkNode {
+                body: e.clone(),
+                space: space,
+                result: None,
+                trace: Vector::new(),
+            }),
+            _ => Node::NonThunk(value),
+        }
+    }
+    fn push_stack(&mut self) {
+        self.stack.push_back(Frame {
+            kind: FrameKind::Push,
+            trace: Vector::new(),
+            ambient_space: self.space.clone(),
+            ambient_time: self.time.clone(),
+            thunk_pointer: self.thunk_pointer.clone(),
+        });
+    }
+    fn pop_stack(&mut self) -> Res<Frame> {
+        if let Some(frame) = self.stack.pop_back() {
+            let r = frame.clone();
+            self.time = frame.ambient_time;
+            self.thunk_pointer = frame.thunk_pointer;
+            self.space = frame.ambient_space;
+            Ok(r)
+        } else {
+            Err(Error::Internal(line!()))
+        }
+    }
+
+    fn undelay(&mut self) -> Res<()> {
+        let delayed_nodes = self
+            .time_space
+            .get(&self.time)
+            .map(|x| x.clone())
+            .unwrap_or(HashMap::new());
+        self.time_space.insert(self.time.clone(), HashMap::new());
+        for ((pointer, _meta_time), node) in delayed_nodes.iter() {
+            let node_value = node.get_value()?;
+            let mut dummy: Counts = Counts::new();
+            self.put_pointer(&mut dummy, pointer.clone(), node_value)?;
+        }
+        Ok(())
+    }
+
+    // get_node --
+    // find the nodesbytime.
+    // does the exact time exist?
+    // if so, use it.
+    // if not, do a linear scan and find the nearest time, if any exist before the current time.
+    //
+    // (doing a log time search is possible in the future: would require an ordered representation,
+    // and the boilerplate for Serialize/Deserialize for it)
+    fn get_node<'a>(&'a self, pointer: &Pointer) -> Res<&'a Node> {
+        if let Some(nodes_by_time) = self.space_time.get(pointer) {
+            if let Some(node) = nodes_by_time.get(&(self.time.clone(), Self::init_meta_time())) {
+                Ok(node)
+            } else {
+                let mut time = None;
+                let mut node = None;
+                for ((time_, _meta_time), node_) in nodes_by_time.iter() {
+                    if &self.time >= time_ && time == None {
+                        // Initialize with a viable node's time.
+                        time = Some(time_);
+                        node = Some(node_);
+                    } else if let Some(t) = time {
+                        // This node's time is closer to the current moment.
+                        // It shadows the earlier node we found.
+                        if t < time_ && time_ <= &self.time {
+                            time = Some(time_);
+                            node = Some(node_);
+                        }
+                    }
+                }
+                match node {
+                    Some(c) => Ok(c),
+                    None => Err(Error::UndefinedNow(pointer.clone())),
+                }
+            }
+        } else {
+            Err(Error::DanglingPointer(pointer.clone()))
+        }
+    }
+}
+
 impl CacheState for GraphicalState {
     fn new() -> Self {
         GraphicalState {
             meta_time: MetaTime(BigUint::from(0 as usize)),
-            nodes: HashMap::new(),
+            space_time: HashMap::new(),
+            time_space: HashMap::new(),
             edges: HashMap::new(),
             stack: Vector::new(),
             space: Space::Here,
@@ -89,64 +236,138 @@ impl CacheState for GraphicalState {
             thunk_pointer: None,
         }
     }
-    fn put_pointer(&mut self, _counts: &mut Counts, _pointer: Pointer, _value: Value_) -> Res<()> {
-        todo!()
-    }
-    fn put_symbol(
-        &mut self,
-        _counts: &mut Counts,
-        _symbol: Symbol_,
-        _value: Value_,
-    ) -> Res<Pointer> {
-        todo!()
-    }
-    fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_> {
-        todo!()
-    }
-    fn force_begin(
-        &mut self,
-        _settings: &Settings,
-        _counts: &mut Counts,
-        _pointer: Pointer,
-    ) -> Res<ForceBeginResult> {
-        todo!()
-    }
-    fn force_end(&mut self, _settings: &Settings, _value: Value_) -> Res<()> {
-        todo!()
-    }
 
-    fn navigate_begin(&mut self, _nav: Navigation, _symbol: Symbol_) -> Res<()> {
-        todo!()
+    fn put_symbol(&mut self, counts: &mut Counts, symbol: Symbol_, value: Value_) -> Res<Pointer> {
+        let p: Pointer = self.space.apply(symbol);
+        self.put_pointer(counts, p.clone(), value)?;
+        Ok(p)
+    }
+    fn put_pointer(&mut self, counts: &mut Counts, pointer: Pointer, value: Value_) -> Res<()> {
+        let time = self.time.clone();
+        let space = self.space.clone();
+        let nodes = self.get_node_by_time(&pointer);
+        let nodes_orig_len = nodes.len();
+        let new_node = Self::new_node(space, value);
+        let is_thunk = new_node.is_thunk();
+        let nodes = nodes.update((time, Self::init_meta_time()), new_node);
+        if nodes.len() > nodes_orig_len {
+            counts.cells += 1;
+            if is_thunk {
+                counts.thunk_cells += 1
+            } else {
+                counts.non_thunk_cells += 1;
+            }
+        };
+        self.space_time.insert(pointer, nodes);
+        Ok(())
+    }
+    fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_> {
+        let node = self.get_node(&pointer)?;
+        node.get_value()
+    }
+    fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()> {
+        self.push_stack();
+        match &nav {
+            Navigation::GotoSpace => self.space = Space::Symbol(symbol),
+            Navigation::WithinSpace => self.space = self.space.apply(symbol),
+            Navigation::GotoTime => self.time = Time::Symbol(symbol),
+            Navigation::WithinTime => self.time = self.time.apply(symbol),
+        };
+        match &nav {
+            Navigation::GotoTime | Navigation::WithinTime => self.undelay()?,
+            _ => (),
+        }
+        Ok(())
     }
 
     fn navigate_end(&mut self) -> Res<()> {
-        todo!()
+        let time0 = self.time.clone();
+        self.pop_stack()?;
+        if self.time != time0 {
+            self.undelay()?;
+        };
+        Ok(())
+    }
+    fn force_begin(
+        &mut self,
+        settings: &Settings,
+        counts: &mut Counts,
+        pointer: Pointer,
+    ) -> Res<ForceBeginResult> {
+        let node = self.get_node(&pointer)?.clone();
+        if let Node::Thunk(tc) = node {
+            if let Some(cache_value) = tc.result
+                && !settings.force_begin_always_misses
+            {
+                counts.force_begin_cache_hit += 1;
+                Ok(ForceBeginResult::CacheHit(cache_value))
+            } else {
+                counts.force_begin_cache_miss += 1;
+                self.push_stack();
+                self.thunk_pointer = Some(pointer);
+                self.space = tc.space.clone();
+                Ok(ForceBeginResult::CacheMiss(tc.body.clone()))
+            }
+        } else {
+            Err(Error::TypeMismatch(line!()))
+        }
+    }
+    fn force_end(&mut self, settings: &Settings, value: Value_) -> Res<()> {
+        let node = self
+            .get_node_mut(&self.thunk_pointer.clone().unwrap(), &self.now())
+            .ok_or(Error::Unreachable)?;
+        if !settings.force_end_forgets_result {
+            node.set_cache_value(value)?;
+        }
+        let _fr = self.pop_stack()?;
+        Ok(())
     }
 
     fn now(&self) -> Time {
-        todo!()
+        self.time.clone()
     }
 
     fn here(&self) -> Space {
-        todo!()
+        self.space.clone()
     }
 
-    fn put_pointer_delay(&mut self, _pointer: Pointer, _time: Time, _value: Value_) -> Res<()> {
-        todo!()
+    fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()> {
+        let space = self.space.clone();
+        let updated = self.get_node_by_space(&time).update(
+            (pointer, Self::init_meta_time()),
+            Self::new_node(space, value),
+        );
+        self.time_space.insert(time, updated);
+        Ok(())
     }
 
-    fn put_symbol_delay(&mut self, _symbol: Symbol_, _time: Time, _value: Value_) -> Res<Pointer> {
-        todo!()
+    fn put_symbol_delay(&mut self, symbol: Symbol_, time: Time, value: Value_) -> Res<Pointer> {
+        let pointer = self.space.apply(symbol);
+        self.put_pointer_delay(pointer.clone(), time, value)?;
+        Ok(pointer)
     }
 
-    fn poke(&mut self, _pointer: Pointer, _time: Option<Time>, _value: Value_) -> Res<()> {
-        todo!()
-    }
-    fn peek(&mut self, _pointer: Pointer) -> Res<Option<Value_>> {
-        todo!()
+    fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>> {
+        match self.get_node(&pointer) {
+            Ok(c) => Ok(Some(c.get_value()?)),
+            Err(_) => Ok(None),
+        }
     }
 
-    fn peek_cell(&mut self, _pointer: Pointer) -> Res<Value_> {
-        todo!()
+    fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_> {
+        match self.get_node(&pointer) {
+            Ok(c) => Some(c).to_motoko_shared().map_err(|_| Error::Unreachable),
+            Err(_) => None::<Value_>
+                .to_motoko_shared()
+                .map_err(|_| Error::Unreachable),
+        }
+    }
+
+    fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()> {
+        let mut dummy = Counts::new();
+        match time {
+            None => self.put_pointer(&mut dummy, pointer, value),
+            Some(time) => self.put_pointer_delay(pointer, time, value),
+        }
     }
 }

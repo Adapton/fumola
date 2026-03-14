@@ -6,9 +6,17 @@ fn assert_(program: &str, expected_result: &str) {
     let program1 = format!("prim \"adaptonReset\" ({}); {}", "#simple", program);
     assert__(program1.as_str(), expected_result);
 
-    // to do -- graphical
-    let program2 = format!("prim \"adaptonReset\" ({}); {}", "#simple", program);
+    let program2 = format!("prim \"adaptonReset\" ({}); {}", "#graphical", program);
     assert__(program2.as_str(), expected_result);
+}
+
+
+#[test]
+fn reset_graphical() {
+    assert_(
+        "let p = 1 := (); prim \"adaptonReset\" (#graphical); prim \"adaptonPeek\" p",
+        "null",
+    )
 }
 
 #[test]
@@ -195,7 +203,7 @@ fn get_cell_counts() {
 #[test]
 fn get_state() {
     assert_(
-        "switch (@ (`adapton(`state))) { case (#Simple(_)) () }",
+        "switch (@ (`adapton(`state))) { case (#Simple(_)) (); case (#Graphical(_)) () }",
         "()",
     )
 }

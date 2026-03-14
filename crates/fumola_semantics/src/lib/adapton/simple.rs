@@ -6,9 +6,6 @@ use crate::value::{Symbol_, ThunkBody, Value, Value_};
 use im_rc::{HashMap, Vector};
 use serde::{Deserialize, Serialize};
 
-// --------------------------------------------------------------------
-// Simple
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Cell {
     NonThunk(Value_),
