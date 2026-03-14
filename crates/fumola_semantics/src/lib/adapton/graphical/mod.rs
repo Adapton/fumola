@@ -42,8 +42,7 @@ pub struct GraphicalState {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum FrameKind {
-    Push, // TEMP
-    DoWithin,
+    Navigation(Navigation),
     Eval(NodeId),
     Clean(NodeId),
 }
@@ -147,9 +146,9 @@ impl GraphicalState {
             _ => Node::NonThunk(value),
         }
     }
-    fn push_stack(&mut self) {
+    fn push_stack(&mut self, frame_kind: FrameKind) {
         self.stack.push_back(Frame {
-            kind: FrameKind::Push,
+            kind: frame_kind,
             trace: Vector::new(),
             ambient_space: self.space.clone(),
             ambient_time: self.time.clone(),
@@ -191,29 +190,40 @@ impl GraphicalState {
     //
     // (doing a log time search is possible in the future: would require an ordered representation,
     // and the boilerplate for Serialize/Deserialize for it)
-    fn get_node<'a>(&'a self, pointer: &Pointer) -> Res<&'a Node> {
+    fn get_node<'a>(&'a self, pointer: &Pointer) -> Res<(NodeId, &'a Node)> {
         if let Some(nodes_by_time) = self.space_time.get(pointer) {
             if let Some(node) = nodes_by_time.get(&(self.time.clone(), Self::init_meta_time())) {
-                Ok(node)
+                let node_id = (pointer.clone(), self.time.clone(), self.meta_time.clone());
+                Ok((node_id, node))
             } else {
                 let mut time = None;
+                let mut meta_time = None;
                 let mut node = None;
-                for ((time_, _meta_time), node_) in nodes_by_time.iter() {
+                for ((time_, meta_time_), node_) in nodes_by_time.iter() {
                     if &self.time >= time_ && time == None {
                         // Initialize with a viable node's time.
                         time = Some(time_);
+                        meta_time = Some(meta_time_);
                         node = Some(node_);
                     } else if let Some(t) = time {
                         // This node's time is closer to the current moment.
                         // It shadows the earlier node we found.
                         if t < time_ && time_ <= &self.time {
                             time = Some(time_);
+                            meta_time = Some(meta_time_);
                             node = Some(node_);
                         }
                     }
                 }
                 match node {
-                    Some(c) => Ok(c),
+                    Some(node) => Ok((
+                        (
+                            pointer.clone(),
+                            time.unwrap().clone(),
+                            meta_time.unwrap().clone(),
+                        ),
+                        node,
+                    )),
                     None => Err(Error::UndefinedNow(pointer.clone())),
                 }
             }
@@ -262,11 +272,11 @@ impl CacheState for GraphicalState {
         Ok(())
     }
     fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_> {
-        let node = self.get_node(&pointer)?;
+        let (_, node) = self.get_node(&pointer)?;
         node.get_value()
     }
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()> {
-        self.push_stack();
+        self.push_stack(FrameKind::Navigation(nav.clone()));
         match &nav {
             Navigation::GotoSpace => self.space = Space::Symbol(symbol),
             Navigation::WithinSpace => self.space = self.space.apply(symbol),
@@ -294,16 +304,18 @@ impl CacheState for GraphicalState {
         counts: &mut Counts,
         pointer: Pointer,
     ) -> Res<ForceBeginResult> {
-        let node = self.get_node(&pointer)?.clone();
+        let (node_id, node) = self.get_node(&pointer)?;
+        let node = node.clone();
         if let Node::Thunk(tc) = node {
-            if let Some(cache_value) = tc.result
+            if let Some(cache_value) = tc.result.clone()
                 && !settings.force_begin_always_misses
             {
                 counts.force_begin_cache_hit += 1;
+                // TODO -- clean.
                 Ok(ForceBeginResult::CacheHit(cache_value))
             } else {
                 counts.force_begin_cache_miss += 1;
-                self.push_stack();
+                self.push_stack(FrameKind::Eval(node_id.clone()));
                 self.thunk_pointer = Some(pointer);
                 self.space = tc.space.clone();
                 Ok(ForceBeginResult::CacheMiss(tc.body.clone()))
@@ -349,14 +361,16 @@ impl CacheState for GraphicalState {
 
     fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>> {
         match self.get_node(&pointer) {
-            Ok(c) => Ok(Some(c.get_value()?)),
+            Ok((_, node)) => Ok(Some(node.get_value()?)),
             Err(_) => Ok(None),
         }
     }
 
     fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_> {
         match self.get_node(&pointer) {
-            Ok(c) => Some(c).to_motoko_shared().map_err(|_| Error::Unreachable),
+            Ok((_, node)) => Some(node)
+                .to_motoko_shared()
+                .map_err(|_| Error::Unreachable),
             Err(_) => None::<Value_>
                 .to_motoko_shared()
                 .map_err(|_| Error::Unreachable),
