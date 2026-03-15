@@ -104,11 +104,12 @@ impl Node {
             Node::Thunk(tc) => Ok(Value::Thunk(tc.body.clone()).into()),
         }
     }
-    pub fn set_cache_value(&mut self, v: Value_) -> Res<()> {
+    pub fn set_cache_value(&mut self, v: Value_, trace: Vector<EdgeId>) -> Res<()> {
         match self {
             Node::NonThunk(_) => Err(Error::Unreachable),
             Node::Thunk(t) => {
                 t.result = Some(v);
+                t.trace = trace;
                 Ok(())
             }
         }
@@ -191,12 +192,13 @@ impl GraphicalState {
         });
     }
     fn pop_stack(&mut self) -> Res<Frame> {
-        if let Some(frame) = self.stack.pop_back() {
+        if let Some(mut frame) = self.stack.pop_back() {
             let r = frame.clone();
             self.time = frame.ambient_time;
             self.thunk_pointer = frame.thunk_pointer;
             self.space = frame.ambient_space;
-            self.trace.append(frame.trace);
+            frame.trace.append(self.trace.clone());
+            self.trace = frame.trace;
             Ok(r)
         } else {
             Err(Error::Internal(line!()))
@@ -365,12 +367,14 @@ impl CacheState for GraphicalState {
         }
     }
     fn force_end(&mut self, settings: &Settings, value: Value_) -> Res<()> {
+        let trace = self.trace.clone();
         let node = self
             .get_node_mut(&self.thunk_pointer.clone().unwrap(), &self.now())
             .ok_or(Error::Unreachable)?;
         if !settings.force_end_forgets_result {
-            node.set_cache_value(value)?;
+            node.set_cache_value(value, trace)?;
         }
+        self.trace = Vector::new(); // trace was cached above. Now clear it.
         let _fr = self.pop_stack()?;
         Ok(())
     }
