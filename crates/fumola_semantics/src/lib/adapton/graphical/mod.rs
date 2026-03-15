@@ -1,3 +1,5 @@
+use std::ops::Add;
+
 use crate::ToMotoko;
 use crate::Value;
 use crate::adapton::state::{CacheState, Counts, Settings};
@@ -31,13 +33,15 @@ pub type NodesBySpace = HashMap<(Space, MetaTime), Node>;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GraphicalState {
     pub meta_time: MetaTime,
+    pub next_edge_id: EdgeId,
     pub space_time: SpaceTime,
     pub time_space: TimeSpace,
     pub edges: Edges,
     pub stack: Vector<Frame>,
+    pub thunk_pointer: Option<Pointer>, // None ==> stack(i).thunk_pointer == None, for all i.
+    pub trace: Vector<EdgeId>,
     pub time: Time,
     pub space: Space,
-    pub thunk_pointer: Option<Pointer>, // None ==> stack(i).thunk_pointer == None, for all i.
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -79,6 +83,12 @@ pub enum Action {
     Force(Exp_, Value_),
     Put(Value_),
     Get(Value_),
+}
+
+impl EdgeId {
+    pub fn next(&self) -> Self {
+        EdgeId(self.0.clone().add(BigUint::from(1u64)))
+    }
 }
 
 impl Node {
@@ -135,6 +145,16 @@ impl GraphicalState {
         self.get_node_by_time_mut(p)
             .get_mut(&(t.clone(), Self::init_meta_time()))
     }
+    fn current_node(&self) -> NodeId {
+        match self.thunk_pointer.clone() {
+            None => (Space::Here, Time::Now, Self::init_meta_time()),
+            Some(space) => {
+                // TODO -- self.time may not reflect the time when
+                //         this thunk began running.  What is the true "current node"?
+                (space, self.time.clone(), Self::init_meta_time())
+            }
+        }
+    }
     fn new_node(space: Space, value: Value_) -> Node {
         match &*value {
             Value::Thunk(e) => Node::Thunk(ThunkNode {
@@ -145,6 +165,21 @@ impl GraphicalState {
             }),
             _ => Node::NonThunk(value),
         }
+    }
+    fn new_edge(&mut self, action: Action, target: NodeId) -> Res<EdgeId> {
+        let id = self.next_edge_id.clone();
+        self.next_edge_id = self.next_edge_id.next();
+        self.trace.push_back(id.clone());
+        let source = self.current_node();
+        self.edges.insert(
+            id.clone(),
+            Edge {
+                source,
+                target,
+                action,
+            },
+        );
+        Ok(id)
     }
     fn push_stack(&mut self, frame_kind: FrameKind) {
         self.stack.push_back(Frame {
@@ -161,6 +196,7 @@ impl GraphicalState {
             self.time = frame.ambient_time;
             self.thunk_pointer = frame.thunk_pointer;
             self.space = frame.ambient_space;
+            self.trace.append(frame.trace);
             Ok(r)
         } else {
             Err(Error::Internal(line!()))
@@ -236,10 +272,12 @@ impl GraphicalState {
 impl CacheState for GraphicalState {
     fn new() -> Self {
         GraphicalState {
+            next_edge_id: EdgeId(BigUint::from(0 as usize)),
             meta_time: MetaTime(BigUint::from(0 as usize)),
             space_time: HashMap::new(),
             time_space: HashMap::new(),
             edges: HashMap::new(),
+            trace: Vector::new(),
             stack: Vector::new(),
             space: Space::Here,
             time: Time::Now,
@@ -257,9 +295,9 @@ impl CacheState for GraphicalState {
         let space = self.space.clone();
         let nodes = self.get_node_by_time(&pointer);
         let nodes_orig_len = nodes.len();
-        let new_node = Self::new_node(space, value);
+        let new_node = Self::new_node(space, value.clone());
         let is_thunk = new_node.is_thunk();
-        let nodes = nodes.update((time, Self::init_meta_time()), new_node);
+        let nodes = nodes.update((time.clone(), Self::init_meta_time()), new_node);
         if nodes.len() > nodes_orig_len {
             counts.cells += 1;
             if is_thunk {
@@ -268,7 +306,9 @@ impl CacheState for GraphicalState {
                 counts.non_thunk_cells += 1;
             }
         };
-        self.space_time.insert(pointer, nodes);
+        self.space_time.insert(pointer.clone(), nodes);
+        let target = (pointer, time, Self::init_meta_time());
+        let _ = self.new_edge(Action::Put(value.clone()), target);
         Ok(())
     }
     fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_> {
