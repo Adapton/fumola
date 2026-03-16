@@ -38,10 +38,11 @@ pub struct GraphicalState {
     pub time_space: TimeSpace,
     pub edges: Edges,
     pub stack: Vector<Frame>,
-    pub thunk_pointer: Option<Pointer>, // None ==> stack(i).thunk_pointer == None, for all i.
+    // Cursor state: current_node, trace, space, time.
+    pub current_node: NodeId, // None ==> stack(i).thunk_pointer == None, for all i.
     pub trace: Vector<EdgeId>,
-    pub time: Time,
     pub space: Space,
+    pub time: Time,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -56,7 +57,7 @@ pub struct Frame {
     pub kind: FrameKind,
     pub ambient_space: Space,
     pub ambient_time: Time,
-    pub thunk_pointer: Option<Pointer>,
+    pub current_node: NodeId,
     pub trace: Vector<EdgeId>,
 }
 
@@ -139,22 +140,16 @@ impl GraphicalState {
         }
         self.time_space.get(t).unwrap()
     }
-    fn init_meta_time() -> MetaTime {
-        MetaTime(BigUint::from(0u64))
+    fn root_node() -> NodeId {
+        (Space::Here, Time::Now, MetaTime(BigUint::from(0u64)))
     }
     fn get_node_mut<'a>(&'a mut self, p: &Pointer, t: &Time) -> Option<&'a mut Node> {
+        let meta_time = self.meta_time.clone();
         self.get_node_by_time_mut(p)
-            .get_mut(&(t.clone(), Self::init_meta_time()))
+            .get_mut(&(t.clone(), meta_time))
     }
     fn current_node(&self) -> NodeId {
-        match self.thunk_pointer.clone() {
-            None => (Space::Here, Time::Now, Self::init_meta_time()),
-            Some(space) => {
-                // TODO -- self.time may not reflect the time when
-                //         this thunk began running.  What is the true "current node"?
-                (space, self.time.clone(), Self::init_meta_time())
-            }
-        }
+        self.current_node.clone()
     }
     fn new_node(space: Space, value: Value_) -> Node {
         match &*value {
@@ -188,14 +183,14 @@ impl GraphicalState {
             trace: Vector::new(),
             ambient_space: self.space.clone(),
             ambient_time: self.time.clone(),
-            thunk_pointer: self.thunk_pointer.clone(),
+            current_node: self.current_node.clone(),
         });
     }
     fn pop_stack(&mut self) -> Res<Frame> {
         if let Some(mut frame) = self.stack.pop_back() {
             let r = frame.clone();
             self.time = frame.ambient_time;
-            self.thunk_pointer = frame.thunk_pointer;
+            self.current_node = frame.current_node;
             self.space = frame.ambient_space;
             frame.trace.append(self.trace.clone());
             self.trace = frame.trace;
@@ -230,7 +225,7 @@ impl GraphicalState {
     // and the boilerplate for Serialize/Deserialize for it)
     fn get_node<'a>(&'a self, pointer: &Pointer) -> Res<(NodeId, &'a Node)> {
         if let Some(nodes_by_time) = self.space_time.get(pointer) {
-            if let Some(node) = nodes_by_time.get(&(self.time.clone(), Self::init_meta_time())) {
+            if let Some(node) = nodes_by_time.get(&(self.time.clone(), self.meta_time.clone())) {
                 let node_id = (pointer.clone(), self.time.clone(), self.meta_time.clone());
                 Ok((node_id, node))
             } else {
@@ -283,7 +278,7 @@ impl CacheState for GraphicalState {
             stack: Vector::new(),
             space: Space::Here,
             time: Time::Now,
-            thunk_pointer: None,
+            current_node: Self::root_node(),
         }
     }
 
@@ -294,12 +289,13 @@ impl CacheState for GraphicalState {
     }
     fn put_pointer(&mut self, counts: &mut Counts, pointer: Pointer, value: Value_) -> Res<()> {
         let time = self.time.clone();
+        let meta_time = self.meta_time.clone();
         let space = self.space.clone();
         let nodes = self.get_node_by_time(&pointer);
         let nodes_orig_len = nodes.len();
         let new_node = Self::new_node(space, value.clone());
         let is_thunk = new_node.is_thunk();
-        let nodes = nodes.update((time.clone(), Self::init_meta_time()), new_node);
+        let nodes = nodes.update((time.clone(), meta_time.clone()), new_node);
         if nodes.len() > nodes_orig_len {
             counts.cells += 1;
             if is_thunk {
@@ -309,7 +305,7 @@ impl CacheState for GraphicalState {
             }
         };
         self.space_time.insert(pointer.clone(), nodes);
-        let target = (pointer, time, Self::init_meta_time());
+        let target = (pointer, time, meta_time);
         let _ = self.new_edge(Action::Put(value.clone()), target);
         Ok(())
     }
@@ -358,7 +354,7 @@ impl CacheState for GraphicalState {
             } else {
                 counts.force_begin_cache_miss += 1;
                 self.push_stack(FrameKind::Eval(node_id.clone()));
-                self.thunk_pointer = Some(pointer);
+                self.current_node = node_id;
                 self.space = tc.space.clone();
                 Ok(ForceBeginResult::CacheMiss(tc.body.clone()))
             }
@@ -369,7 +365,7 @@ impl CacheState for GraphicalState {
     fn force_end(&mut self, settings: &Settings, value: Value_) -> Res<()> {
         let trace = self.trace.clone();
         let node = self
-            .get_node_mut(&self.thunk_pointer.clone().unwrap(), &self.now())
+            .get_node_mut(&self.current_node.0.clone(), &self.now())
             .ok_or(Error::Unreachable)?;
         if !settings.force_end_forgets_result {
             node.set_cache_value(value, trace)?;
@@ -389,10 +385,10 @@ impl CacheState for GraphicalState {
 
     fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()> {
         let space = self.space.clone();
-        let updated = self.get_node_by_space(&time).update(
-            (pointer, Self::init_meta_time()),
-            Self::new_node(space, value),
-        );
+        let meta_time = self.meta_time.clone();
+        let updated = self
+            .get_node_by_space(&time)
+            .update((pointer, meta_time), Self::new_node(space, value));
         self.time_space.insert(time, updated);
         Ok(())
     }
