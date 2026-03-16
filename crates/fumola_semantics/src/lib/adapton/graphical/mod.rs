@@ -5,17 +5,23 @@ use crate::Value;
 use crate::adapton::state::{CacheState, Counts, Settings};
 use crate::adapton::{Error, ForceBeginResult, Navigation, Pointer, Res, Space, Time};
 use crate::value::{Symbol_, ThunkBody, Value_};
-use fumola_syntax::ast::Exp_;
 use im_rc::{HashMap, Vector};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
+// Implement ToMotoko for this if peek_cell it works better.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Node {
     NonThunk(Value_),
     Thunk(ThunkNode),
 }
 
+// Implement ToMotoko
+// - Each ThunkNode field injects into the Value type without re-encoding it.
+// - EdgeIds are tagged Nats, but each is resolved to a triple as well.
+// - prim "adaptonPeekCell" returns this more useful encoding, permitting DCG traversals
+//   by repeated use.  Also returns incoming edges, which we need to index.
+//
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ThunkNode {
     pub body: ThunkBody,
@@ -81,7 +87,7 @@ pub struct Edge {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Action {
-    Force(Exp_, Value_),
+    Force(ThunkBody, Value_),
     Put(Value_),
     Get(Value_),
 }
@@ -103,6 +109,12 @@ impl Node {
         match self {
             Node::NonThunk(v) => Ok(v.clone()),
             Node::Thunk(tc) => Ok(Value::Thunk(tc.body.clone()).into()),
+        }
+    }
+    pub fn force_action(&mut self) -> Res<Action> {
+        match self {
+            Node::NonThunk(_) => Err(Error::Unreachable),
+            Node::Thunk(t) => Ok(Action::Force(t.body.clone(), t.result.clone().unwrap())),
         }
     }
     pub fn set_cache_value(&mut self, v: Value_, trace: Vector<EdgeId>) -> Res<()> {
@@ -176,6 +188,12 @@ impl GraphicalState {
             },
         );
         Ok(id)
+    }
+    fn new_edge_to_pointer(&mut self, action: Action, target: Pointer) -> Res<EdgeId> {
+        let time = self.time.clone();
+        let meta_time = self.meta_time.clone();
+        let edge_id = self.new_edge(action, (target, time, meta_time))?;
+        Ok(edge_id)
     }
     fn push_stack(&mut self, frame_kind: FrameKind) {
         self.stack.push_back(Frame {
@@ -305,13 +323,14 @@ impl CacheState for GraphicalState {
             }
         };
         self.space_time.insert(pointer.clone(), nodes);
-        let target = (pointer, time, meta_time);
-        let _ = self.new_edge(Action::Put(value.clone()), target);
+        let _ = self.new_edge_to_pointer(Action::Put(value.clone()), pointer);
         Ok(())
     }
     fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_> {
         let (_, node) = self.get_node(&pointer)?;
-        node.get_value()
+        let value = node.get_value()?;
+        let _ = self.new_edge_to_pointer(Action::Get(value.clone()), pointer);
+        Ok(value)
     }
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()> {
         self.push_stack(FrameKind::Navigation(nav.clone()));
@@ -370,6 +389,9 @@ impl CacheState for GraphicalState {
         if !settings.force_end_forgets_result {
             node.set_cache_value(value, trace)?;
         }
+        let action = node.force_action()?;
+        // TODO -- compare the NodeIds of each Edge to that of the Node.
+        self.new_edge_to_pointer(action, self.current_node.0.clone())?;
         self.trace = Vector::new(); // trace was cached above. Now clear it.
         let _fr = self.pop_stack()?;
         Ok(())

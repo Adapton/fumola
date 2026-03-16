@@ -783,6 +783,27 @@ pub trait ToMotoko {
     }
 }
 
+pub struct ValueAnchor(Value_);
+
+impl ValueAnchor {
+    pub fn new(v: Value_) -> Self {
+        ValueAnchor(v)
+    }
+    pub fn as_value_(&self) -> Value_ {
+        self.0.clone()
+    }
+}
+//
+// Unlike unanchored Values, these versions are anchored to one representation,
+// and they do not keep re-encoding (re-serializing)
+// themselves back into the value structure under the "reifyValue" primitive.
+//
+impl ToMotoko for ValueAnchor {
+    fn to_motoko(self) -> Result {
+        Ok(self.0.as_ref().clone())
+    }
+}
+
 impl<T: Serialize> ToMotoko for T {
     fn to_motoko(self) -> Result {
         // println!("{}",ron::to_string(&self).unwrap());//////
