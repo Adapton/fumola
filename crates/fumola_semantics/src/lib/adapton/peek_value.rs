@@ -56,12 +56,19 @@ impl PeekValue for NodeInfo {
         Value::object_from(
             [
                 ("node", self.node.into_value_()),
+                ("nodeId", self.node_id.into_value_()),
                 ("incomingEdges", self.incoming_edges.into_value_()),
                 ("outgoingEdges", self.outgoing_edges.into_value_()),
             ]
             .iter(),
         )
         .share()
+    }
+}
+
+impl<X: PeekValue, Y: PeekValue> PeekValue for (X, Y) {
+    fn into_value_(self) -> Value_ {
+        Value::Tuple(vector!(self.0.into_value_(), self.1.into_value_())).share()
     }
 }
 

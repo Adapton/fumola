@@ -5,17 +5,19 @@ use crate::Value;
 use crate::adapton::state::{CacheState, Counts, Settings};
 use crate::adapton::{Error, ForceBeginResult, Navigation, Pointer, Res, Space, Time};
 use crate::value::{Symbol_, ThunkBody, Value_};
+use im_rc::vector;
 use im_rc::{HashMap, Vector};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 /// Node and its incident edges
 pub struct NodeInfo {
+    pub node_id: NodeId,
     pub node: Node,
     /// The edges that target this node, not ordered.
-    pub incoming_edges: Vector<Edge>,
+    pub incoming_edges: Vector<(EdgeId, Edge)>,
     /// The edges where this node is the source, in node's trace order.
-    pub outgoing_edges: Vector<Edge>,
+    pub outgoing_edges: Vector<(EdgeId, Edge)>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -198,9 +200,11 @@ impl GraphicalState {
         Ok(edge_id)
     }
     fn push_stack(&mut self, frame_kind: FrameKind) {
+        let saved_trace = self.trace.clone(); // to do -- do a move.
+        self.trace = vector!();
         self.stack.push_back(Frame {
             kind: frame_kind,
-            trace: Vector::new(),
+            trace: saved_trace,
             ambient_space: self.space.clone(),
             ambient_time: self.time.clone(),
             current_node: self.current_node.clone(),
@@ -233,6 +237,28 @@ impl GraphicalState {
             self.put_pointer(&mut dummy, pointer.clone(), node_value)?;
         }
         Ok(())
+    }
+
+    fn get_incoming_edges<'a>(&'a self, _pointer: &Pointer) -> Res<Vector<(EdgeId, Edge)>> {
+        Ok(vector!())
+    }
+    fn get_outgoing_edges<'a>(&'a self, pointer: &Pointer) -> Res<Vector<(EdgeId, Edge)>> {
+        let (_nid, node) = self.get_node(pointer)?;
+        match node {
+            Node::NonThunk(_) => Ok(vector!()),
+            Node::Thunk(thunk_node) => {
+                let edges = thunk_node
+                    .trace
+                    .clone()
+                    .into_iter()
+                    .map(|edge_id| {
+                        let edge = self.edges.get(&edge_id).unwrap();
+                        (edge_id.clone(), edge.clone())
+                    })
+                    .collect();
+                Ok(edges)
+            }
+        }
     }
 
     // get_node --
@@ -433,11 +459,12 @@ impl CacheState for GraphicalState {
     fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_> {
         use crate::adapton::peek_value::PeekValue;
         match self.get_node(&pointer) {
-            Ok((_, node)) => {
-                let incoming_edges: Vector<Edge> = Vector::new();
-                let outgoing_edges: Vector<Edge> = Vector::new();
+            Ok((node_id, node)) => {
+                let incoming_edges = self.get_incoming_edges(&pointer)?;
+                let outgoing_edges = self.get_outgoing_edges(&pointer)?;
                 let node = node.clone();
                 let info = NodeInfo {
+                    node_id,
                     node,
                     incoming_edges,
                     outgoing_edges,
