@@ -9,19 +9,21 @@ use im_rc::{HashMap, Vector};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
-// Implement ToMotoko for this if peek_cell it works better.
+/// Node and its incident edges
+pub struct NodeInfo {
+    pub node: Node,
+    /// The edges that target this node, not ordered.
+    pub incoming_edges: Vector<Edge>,
+    /// The edges where this node is the source, in node's trace order.
+    pub outgoing_edges: Vector<Edge>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Node {
     NonThunk(Value_),
     Thunk(ThunkNode),
 }
 
-// Implement ToMotoko
-// - Each ThunkNode field injects into the Value type without re-encoding it.
-// - EdgeIds are tagged Nats, but each is resolved to a triple as well.
-// - prim "adaptonPeekCell" returns this more useful encoding, permitting DCG traversals
-//   by repeated use.  Also returns incoming edges, which we need to index.
-//
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ThunkNode {
     pub body: ThunkBody,
@@ -68,7 +70,7 @@ pub struct Frame {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct MetaTime(BigUint);
+pub struct MetaTime(pub BigUint);
 
 // the full identity of a node includes a Time and MetaTime.
 pub type NodeId = (Space, Time, MetaTime);
@@ -429,10 +431,19 @@ impl CacheState for GraphicalState {
     }
 
     fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_> {
+        use crate::adapton::peek_value::PeekValue;
         match self.get_node(&pointer) {
-            Ok((_, node)) => Some(node)
-                .to_motoko_shared()
-                .map_err(|_| Error::Unreachable),
+            Ok((_, node)) => {
+                let incoming_edges: Vector<Edge> = Vector::new();
+                let outgoing_edges: Vector<Edge> = Vector::new();
+                let node = node.clone();
+                let info = NodeInfo {
+                    node,
+                    incoming_edges,
+                    outgoing_edges,
+                };
+                Ok(Some(info).into_value_())
+            }
             Err(_) => None::<Value_>
                 .to_motoko_shared()
                 .map_err(|_| Error::Unreachable),

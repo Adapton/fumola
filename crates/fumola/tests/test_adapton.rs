@@ -38,12 +38,14 @@ fn force_simple_cache_hit() {
 
 #[test]
 fn peek_cell_some_result() {
-    assert_("let p = 1 := thunk { }; force(p); switch((prim \"adaptonPeekCell\" p)) { case (?#Thunk(t)) { t.result! } }", "#Unit")
+    assert__("prim \"adaptonReset\"(#simple); let p = 1 := thunk { }; force(p); let node = (prim \"adaptonPeekCell\" p)!; switch(node){ case(#thunk_(t)){t.result} }", "?()");
+    assert__("let p = 1 := thunk { }; force(p); let node = (prim \"adaptonPeekCell\" p)!.node; switch(node){ case(#thunk_(t)){t.result} }", "?()")
 }
 
 #[test]
 fn peek_cell_null_result() {
-    assert_("let p = 1 := thunk { }; switch((prim \"adaptonPeekCell\" p)) { case (?#Thunk(t)) { t.result } }", "null")
+    assert__("prim \"adaptonReset\"(#simple); let p = 1 := thunk { }; let node = (prim \"adaptonPeekCell\" p)!; switch(node){ case(#thunk_(t)){t.result} }", "null");
+    assert__("let p = 1 := thunk { }; let node = (prim \"adaptonPeekCell\" p)!.node; switch(node){ case(#thunk_(t)){t.result} }", "null")
 }
 
 #[test]

@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::num::Wrapping;
 use std::rc::Rc;
+use std::slice::Iter;
 
 use crate::Interruption;
 use crate::adapton::{Pointer as AdaptonPointer, Space as AdaptonSpace, Time as AdaptonTime};
@@ -769,6 +770,21 @@ impl Value {
             }
             _ => Err(err),
         }
+    }
+
+    pub fn object_from(fields: Iter<(&str, Value_)>) -> Value {
+        let mut map = HashMap::new();
+        for (name, val) in fields {
+            let old = map.insert(
+                Id::new(name.to_string()),
+                FieldValue {
+                    mut_: Mut::Const,
+                    val: val.clone(),
+                },
+            );
+            assert_eq!(old, None)
+        }
+        Value::Object(map)
     }
 }
 
