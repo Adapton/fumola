@@ -390,13 +390,15 @@ impl CacheState for GraphicalState {
         pointer: Pointer,
     ) -> Res<ForceBeginResult> {
         let (node_id, node) = self.get_node(&pointer)?;
-        let node = node.clone();
-        if let Node::Thunk(tc) = node {
+        let node_ = node.clone();
+        if let Node::Thunk(tc) = node_ {
             if let Some(cache_value) = tc.result.clone()
                 && !settings.force_begin_always_misses
             {
                 counts.force_begin_cache_hit += 1;
                 // TODO -- clean.
+                let action = node.clone().force_action()?;
+                self.new_edge_to_pointer(action, pointer)?;
                 Ok(ForceBeginResult::CacheHit(cache_value))
             } else {
                 counts.force_begin_cache_miss += 1;
@@ -418,10 +420,10 @@ impl CacheState for GraphicalState {
             node.set_cache_value(value, trace)?;
         }
         let action = node.force_action()?;
-        // TODO -- compare the NodeIds of each Edge to that of the Node.
-        self.new_edge_to_pointer(action, self.current_node.0.clone())?;
+        let target = self.current_node.0.clone();
         self.trace = Vector::new(); // trace was cached above. Now clear it.
         let _fr = self.pop_stack()?;
+        self.new_edge_to_pointer(action, target)?;
         Ok(())
     }
 
