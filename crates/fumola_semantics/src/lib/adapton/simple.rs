@@ -187,6 +187,7 @@ impl CacheState for SimpleState {
             thunk_pointer: None,
         }
     }
+
     fn put_symbol(&mut self, counts: &mut Counts, symbol: Symbol_, value: Value_) -> Res<Pointer> {
         let p: Pointer = self.space.apply(symbol);
         self.put_pointer(counts, p.clone(), value)?;
@@ -304,8 +305,9 @@ impl CacheState for SimpleState {
     }
 
     fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_> {
+        use crate::adapton::peek_value::PeekValue;
         match self.get_cell(&pointer) {
-            Ok(c) => Some(c).to_motoko_shared().map_err(|_| Error::Unreachable),
+            Ok(c) => Ok(Some(c.clone()).into_value_()),
             Err(_) => None::<Value_>
                 .to_motoko_shared()
                 .map_err(|_| Error::Unreachable),

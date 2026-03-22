@@ -1,12 +1,24 @@
+use std::ops::Add;
+
 use crate::ToMotoko;
 use crate::Value;
 use crate::adapton::state::{CacheState, Counts, Settings};
 use crate::adapton::{Error, ForceBeginResult, Navigation, Pointer, Res, Space, Time};
 use crate::value::{Symbol_, ThunkBody, Value_};
-use fumola_syntax::ast::Exp_;
+use im_rc::vector;
 use im_rc::{HashMap, Vector};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
+
+/// Node and its incident edges
+pub struct NodeInfo {
+    pub node_id: NodeId,
+    pub node: Node,
+    /// The edges that target this node, not ordered.
+    pub incoming_edges: Vector<(EdgeId, Edge)>,
+    /// The edges where this node is the source, in node's trace order.
+    pub outgoing_edges: Vector<(EdgeId, Edge)>,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Node {
@@ -31,19 +43,22 @@ pub type NodesBySpace = HashMap<(Space, MetaTime), Node>;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GraphicalState {
     pub meta_time: MetaTime,
+    pub next_edge_id: EdgeId,
     pub space_time: SpaceTime,
     pub time_space: TimeSpace,
-    pub edges: Edges,
+    pub edges: EdgesByEdgeId,
+    pub edges_by_target: EdgeIdsByTarget,
     pub stack: Vector<Frame>,
-    pub time: Time,
+    // Cursor state: current_node, trace, space, time.
+    pub current_node: NodeId, // None ==> stack(i).thunk_pointer == None, for all i.
+    pub trace: Vector<EdgeId>,
     pub space: Space,
-    pub thunk_pointer: Option<Pointer>, // None ==> stack(i).thunk_pointer == None, for all i.
+    pub time: Time,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum FrameKind {
-    Push, // TEMP
-    DoWithin,
+    Navigation(Navigation),
     Eval(NodeId),
     Clean(NodeId),
 }
@@ -53,12 +68,12 @@ pub struct Frame {
     pub kind: FrameKind,
     pub ambient_space: Space,
     pub ambient_time: Time,
-    pub thunk_pointer: Option<Pointer>,
+    pub current_node: NodeId,
     pub trace: Vector<EdgeId>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct MetaTime(BigUint);
+pub struct MetaTime(pub BigUint);
 
 // the full identity of a node includes a Time and MetaTime.
 pub type NodeId = (Space, Time, MetaTime);
@@ -66,7 +81,8 @@ pub type NodeId = (Space, Time, MetaTime);
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct EdgeId(pub BigUint);
 
-pub type Edges = HashMap<EdgeId, Edge>;
+pub type EdgesByEdgeId = HashMap<EdgeId, Edge>;
+pub type EdgeIdsByTarget = HashMap<NodeId, Vector<EdgeId>>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Edge {
@@ -77,9 +93,15 @@ pub struct Edge {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Action {
-    Force(Exp_, Value_),
+    Force(ThunkBody, Value_),
     Put(Value_),
     Get(Value_),
+}
+
+impl EdgeId {
+    pub fn next(&self) -> Self {
+        EdgeId(self.0.clone().add(BigUint::from(1u64)))
+    }
 }
 
 impl Node {
@@ -95,11 +117,18 @@ impl Node {
             Node::Thunk(tc) => Ok(Value::Thunk(tc.body.clone()).into()),
         }
     }
-    pub fn set_cache_value(&mut self, v: Value_) -> Res<()> {
+    pub fn force_action(&mut self) -> Res<Action> {
+        match self {
+            Node::NonThunk(_) => Err(Error::Unreachable),
+            Node::Thunk(t) => Ok(Action::Force(t.body.clone(), t.result.clone().unwrap())),
+        }
+    }
+    pub fn set_cache_value(&mut self, v: Value_, trace: Vector<EdgeId>) -> Res<()> {
         match self {
             Node::NonThunk(_) => Err(Error::Unreachable),
             Node::Thunk(t) => {
                 t.result = Some(v);
+                t.trace = trace;
                 Ok(())
             }
         }
@@ -129,12 +158,16 @@ impl GraphicalState {
         }
         self.time_space.get(t).unwrap()
     }
-    fn init_meta_time() -> MetaTime {
-        MetaTime(BigUint::from(0u64))
+    fn root_node() -> NodeId {
+        (Space::Here, Time::Now, MetaTime(BigUint::from(0u64)))
     }
     fn get_node_mut<'a>(&'a mut self, p: &Pointer, t: &Time) -> Option<&'a mut Node> {
+        let meta_time = self.meta_time.clone();
         self.get_node_by_time_mut(p)
-            .get_mut(&(t.clone(), Self::init_meta_time()))
+            .get_mut(&(t.clone(), meta_time))
+    }
+    fn current_node(&self) -> NodeId {
+        self.current_node.clone()
     }
     fn new_node(space: Space, value: Value_) -> Node {
         match &*value {
@@ -147,21 +180,57 @@ impl GraphicalState {
             _ => Node::NonThunk(value),
         }
     }
-    fn push_stack(&mut self) {
+    fn new_edge(&mut self, action: Action, target: NodeId) -> Res<EdgeId> {
+        let id = self.next_edge_id.clone();
+        self.next_edge_id = self.next_edge_id.next();
+        self.trace.push_back(id.clone());
+        let source = self.current_node();
+        match self.edges_by_target.get_mut(&target) {
+            Some(edge_ids) => {
+                if !edge_ids.contains(&id) {
+                    edge_ids.push_back(id.clone());
+                }
+            }
+            None => {
+                self.edges_by_target
+                    .insert(target.clone(), vector!(id.clone()));
+            }
+        };
+        self.edges.insert(
+            id.clone(),
+            Edge {
+                source,
+                target,
+                action,
+            },
+        );
+        Ok(id)
+    }
+    fn new_edge_to_pointer(&mut self, action: Action, target: Pointer) -> Res<EdgeId> {
+        let time = self.time.clone();
+        let meta_time = self.meta_time.clone();
+        let edge_id = self.new_edge(action, (target, time, meta_time))?;
+        Ok(edge_id)
+    }
+    fn push_stack(&mut self, frame_kind: FrameKind) {
+        let saved_trace = self.trace.clone(); // to do -- do a move.
+        self.trace = vector!();
         self.stack.push_back(Frame {
-            kind: FrameKind::Push,
-            trace: Vector::new(),
+            kind: frame_kind,
+            trace: saved_trace,
             ambient_space: self.space.clone(),
             ambient_time: self.time.clone(),
-            thunk_pointer: self.thunk_pointer.clone(),
+            current_node: self.current_node.clone(),
         });
     }
     fn pop_stack(&mut self) -> Res<Frame> {
-        if let Some(frame) = self.stack.pop_back() {
+        if let Some(mut frame) = self.stack.pop_back() {
             let r = frame.clone();
             self.time = frame.ambient_time;
-            self.thunk_pointer = frame.thunk_pointer;
+            self.current_node = frame.current_node;
             self.space = frame.ambient_space;
+            frame.trace.append(self.trace.clone());
+            self.trace = frame.trace;
             Ok(r)
         } else {
             Err(Error::Internal(line!()))
@@ -183,6 +252,37 @@ impl GraphicalState {
         Ok(())
     }
 
+    fn get_incoming_edges<'a>(&'a self, pointer: &Pointer) -> Res<Vector<(EdgeId, Edge)>> {
+        let (nid, _) = self.get_node(pointer)?;
+
+        let edge_ids = self.edges_by_target.get(&nid).unwrap_or(&vector!()).clone();
+        Ok(edge_ids
+            .into_iter()
+            .map(|edge_id| {
+                let edge = self.edges.get(&edge_id).unwrap();
+                (edge_id.clone(), edge.clone())
+            })
+            .collect())
+    }
+    fn get_outgoing_edges<'a>(&'a self, pointer: &Pointer) -> Res<Vector<(EdgeId, Edge)>> {
+        let (_nid, node) = self.get_node(pointer)?;
+        match node {
+            Node::NonThunk(_) => Ok(vector!()),
+            Node::Thunk(thunk_node) => {
+                let edges = thunk_node
+                    .trace
+                    .clone()
+                    .into_iter()
+                    .map(|edge_id| {
+                        let edge = self.edges.get(&edge_id).unwrap();
+                        (edge_id.clone(), edge.clone())
+                    })
+                    .collect();
+                Ok(edges)
+            }
+        }
+    }
+
     // get_node --
     // find the nodesbytime.
     // does the exact time exist?
@@ -191,29 +291,40 @@ impl GraphicalState {
     //
     // (doing a log time search is possible in the future: would require an ordered representation,
     // and the boilerplate for Serialize/Deserialize for it)
-    fn get_node<'a>(&'a self, pointer: &Pointer) -> Res<&'a Node> {
+    fn get_node<'a>(&'a self, pointer: &Pointer) -> Res<(NodeId, &'a Node)> {
         if let Some(nodes_by_time) = self.space_time.get(pointer) {
-            if let Some(node) = nodes_by_time.get(&(self.time.clone(), Self::init_meta_time())) {
-                Ok(node)
+            if let Some(node) = nodes_by_time.get(&(self.time.clone(), self.meta_time.clone())) {
+                let node_id = (pointer.clone(), self.time.clone(), self.meta_time.clone());
+                Ok((node_id, node))
             } else {
                 let mut time = None;
+                let mut meta_time = None;
                 let mut node = None;
-                for ((time_, _meta_time), node_) in nodes_by_time.iter() {
+                for ((time_, meta_time_), node_) in nodes_by_time.iter() {
                     if &self.time >= time_ && time == None {
                         // Initialize with a viable node's time.
                         time = Some(time_);
+                        meta_time = Some(meta_time_);
                         node = Some(node_);
                     } else if let Some(t) = time {
                         // This node's time is closer to the current moment.
                         // It shadows the earlier node we found.
                         if t < time_ && time_ <= &self.time {
                             time = Some(time_);
+                            meta_time = Some(meta_time_);
                             node = Some(node_);
                         }
                     }
                 }
                 match node {
-                    Some(c) => Ok(c),
+                    Some(node) => Ok((
+                        (
+                            pointer.clone(),
+                            time.unwrap().clone(),
+                            meta_time.unwrap().clone(),
+                        ),
+                        node,
+                    )),
                     None => Err(Error::UndefinedNow(pointer.clone())),
                 }
             }
@@ -226,14 +337,17 @@ impl GraphicalState {
 impl CacheState for GraphicalState {
     fn new() -> Self {
         GraphicalState {
+            next_edge_id: EdgeId(BigUint::from(0 as usize)),
             meta_time: MetaTime(BigUint::from(0 as usize)),
             space_time: HashMap::new(),
             time_space: HashMap::new(),
             edges: HashMap::new(),
+            edges_by_target: HashMap::new(),
+            trace: Vector::new(),
             stack: Vector::new(),
             space: Space::Here,
             time: Time::Now,
-            thunk_pointer: None,
+            current_node: Self::root_node(),
         }
     }
 
@@ -244,12 +358,13 @@ impl CacheState for GraphicalState {
     }
     fn put_pointer(&mut self, counts: &mut Counts, pointer: Pointer, value: Value_) -> Res<()> {
         let time = self.time.clone();
+        let meta_time = self.meta_time.clone();
         let space = self.space.clone();
         let nodes = self.get_node_by_time(&pointer);
         let nodes_orig_len = nodes.len();
-        let new_node = Self::new_node(space, value);
+        let new_node = Self::new_node(space, value.clone());
         let is_thunk = new_node.is_thunk();
-        let nodes = nodes.update((time, Self::init_meta_time()), new_node);
+        let nodes = nodes.update((time.clone(), meta_time.clone()), new_node);
         if nodes.len() > nodes_orig_len {
             counts.cells += 1;
             if is_thunk {
@@ -258,15 +373,18 @@ impl CacheState for GraphicalState {
                 counts.non_thunk_cells += 1;
             }
         };
-        self.space_time.insert(pointer, nodes);
+        self.space_time.insert(pointer.clone(), nodes);
+        let _ = self.new_edge_to_pointer(Action::Put(value.clone()), pointer);
         Ok(())
     }
     fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_> {
-        let node = self.get_node(&pointer)?;
-        node.get_value()
+        let (_, node) = self.get_node(&pointer)?;
+        let value = node.get_value()?;
+        let _ = self.new_edge_to_pointer(Action::Get(value.clone()), pointer);
+        Ok(value)
     }
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()> {
-        self.push_stack();
+        self.push_stack(FrameKind::Navigation(nav.clone()));
         match &nav {
             Navigation::GotoSpace => self.space = Space::Symbol(symbol),
             Navigation::WithinSpace => self.space = self.space.apply(symbol),
@@ -294,17 +412,21 @@ impl CacheState for GraphicalState {
         counts: &mut Counts,
         pointer: Pointer,
     ) -> Res<ForceBeginResult> {
-        let node = self.get_node(&pointer)?.clone();
-        if let Node::Thunk(tc) = node {
-            if let Some(cache_value) = tc.result
+        let (node_id, node) = self.get_node(&pointer)?;
+        let node_ = node.clone();
+        if let Node::Thunk(tc) = node_ {
+            if let Some(cache_value) = tc.result.clone()
                 && !settings.force_begin_always_misses
             {
                 counts.force_begin_cache_hit += 1;
+                // TODO -- clean.
+                let action = node.clone().force_action()?;
+                self.new_edge_to_pointer(action, pointer)?;
                 Ok(ForceBeginResult::CacheHit(cache_value))
             } else {
                 counts.force_begin_cache_miss += 1;
-                self.push_stack();
-                self.thunk_pointer = Some(pointer);
+                self.push_stack(FrameKind::Eval(node_id.clone()));
+                self.current_node = node_id;
                 self.space = tc.space.clone();
                 Ok(ForceBeginResult::CacheMiss(tc.body.clone()))
             }
@@ -313,13 +435,18 @@ impl CacheState for GraphicalState {
         }
     }
     fn force_end(&mut self, settings: &Settings, value: Value_) -> Res<()> {
+        let trace = self.trace.clone();
         let node = self
-            .get_node_mut(&self.thunk_pointer.clone().unwrap(), &self.now())
+            .get_node_mut(&self.current_node.0.clone(), &self.now())
             .ok_or(Error::Unreachable)?;
         if !settings.force_end_forgets_result {
-            node.set_cache_value(value)?;
+            node.set_cache_value(value, trace)?;
         }
+        let action = node.force_action()?;
+        let target = self.current_node.0.clone();
+        self.trace = Vector::new(); // trace was cached above. Now clear it.
         let _fr = self.pop_stack()?;
+        self.new_edge_to_pointer(action, target)?;
         Ok(())
     }
 
@@ -333,10 +460,10 @@ impl CacheState for GraphicalState {
 
     fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()> {
         let space = self.space.clone();
-        let updated = self.get_node_by_space(&time).update(
-            (pointer, Self::init_meta_time()),
-            Self::new_node(space, value),
-        );
+        let meta_time = self.meta_time.clone();
+        let updated = self
+            .get_node_by_space(&time)
+            .update((pointer, meta_time), Self::new_node(space, value));
         self.time_space.insert(time, updated);
         Ok(())
     }
@@ -349,14 +476,26 @@ impl CacheState for GraphicalState {
 
     fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>> {
         match self.get_node(&pointer) {
-            Ok(c) => Ok(Some(c.get_value()?)),
+            Ok((_, node)) => Ok(Some(node.get_value()?)),
             Err(_) => Ok(None),
         }
     }
 
     fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_> {
+        use crate::adapton::peek_value::PeekValue;
         match self.get_node(&pointer) {
-            Ok(c) => Some(c).to_motoko_shared().map_err(|_| Error::Unreachable),
+            Ok((node_id, node)) => {
+                let incoming_edges = self.get_incoming_edges(&pointer)?;
+                let outgoing_edges = self.get_outgoing_edges(&pointer)?;
+                let node = node.clone();
+                let info = NodeInfo {
+                    node_id,
+                    node,
+                    incoming_edges,
+                    outgoing_edges,
+                };
+                Ok(Some(info).into_value_())
+            }
             Err(_) => None::<Value_>
                 .to_motoko_shared()
                 .map_err(|_| Error::Unreachable),

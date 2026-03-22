@@ -76,10 +76,9 @@ pub trait CacheState {
         Self: Sized;
     fn now(&self) -> Time;
     fn here(&self) -> Space;
-    fn put_pointer(&mut self, counts: &mut Counts, _pointer: Pointer, _value: Value_) -> Res<()>;
-    fn put_symbol(&mut self, counts: &mut Counts, _symbol: Symbol_, _value: Value_)
-    -> Res<Pointer>;
-    fn get_pointer(&mut self, _pointer: Pointer) -> Res<Value_>;
+    fn put_pointer(&mut self, counts: &mut Counts, _pointer: Pointer, value: Value_) -> Res<()>;
+    fn put_symbol(&mut self, counts: &mut Counts, _symbol: Symbol_, value: Value_) -> Res<Pointer>;
+    fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_>;
     fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()>;
     fn put_symbol_delay(&mut self, symbol: Symbol_, time: Time, value: Value_) -> Res<Pointer>;
     fn force_begin(
@@ -88,7 +87,7 @@ pub trait CacheState {
         counts: &mut Counts,
         _pointer: Pointer,
     ) -> Res<ForceBeginResult>;
-    fn force_end(&mut self, settings: &Settings, _value: Value_) -> Res<()>;
+    fn force_end(&mut self, settings: &Settings, value: Value_) -> Res<()>;
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()>;
     fn navigate_end(&mut self) -> Res<()>;
     fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>>;

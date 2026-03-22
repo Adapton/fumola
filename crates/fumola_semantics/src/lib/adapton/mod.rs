@@ -8,6 +8,7 @@ mod reserved;
 use reserved::ReservedSymbol;
 
 mod graphical;
+mod peek_value;
 mod simple;
 
 pub mod state;
@@ -40,8 +41,8 @@ pub trait AdaptonState {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Error {
-    Internal(u32),
-    TypeMismatch(u32),
+    Internal(u32),     // gives line number.
+    TypeMismatch(u32), // gives line number.
     UndefinedNow(Pointer),
     Unreachable,
     DanglingPointer(Space),

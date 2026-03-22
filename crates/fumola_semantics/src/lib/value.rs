@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::num::Wrapping;
 use std::rc::Rc;
+use std::slice::Iter;
 
 use crate::Interruption;
 use crate::adapton::{Pointer as AdaptonPointer, Space as AdaptonSpace, Time as AdaptonTime};
@@ -770,6 +771,21 @@ impl Value {
             _ => Err(err),
         }
     }
+
+    pub fn object_from(fields: Iter<(&str, Value_)>) -> Value {
+        let mut map = HashMap::new();
+        for (name, val) in fields {
+            let old = map.insert(
+                Id::new(name.to_string()),
+                FieldValue {
+                    mut_: Mut::Const,
+                    val: val.clone(),
+                },
+            );
+            assert_eq!(old, None)
+        }
+        Value::Object(map)
+    }
 }
 
 pub trait ToMotoko {
@@ -780,6 +796,27 @@ pub trait ToMotoko {
         Self: Sized,
     {
         Ok(self.to_motoko()?.share())
+    }
+}
+
+pub struct ValueAnchor(Value_);
+
+impl ValueAnchor {
+    pub fn new(v: Value_) -> Self {
+        ValueAnchor(v)
+    }
+    pub fn as_value_(&self) -> Value_ {
+        self.0.clone()
+    }
+}
+//
+// Unlike unanchored Values, these versions are anchored to one representation,
+// and they do not keep re-encoding (re-serializing)
+// themselves back into the value structure under the "reifyValue" primitive.
+//
+impl ToMotoko for ValueAnchor {
+    fn to_motoko(self) -> Result {
+        Ok(self.0.as_ref().clone())
     }
 }
 
