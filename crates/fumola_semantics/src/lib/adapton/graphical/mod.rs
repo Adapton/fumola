@@ -46,7 +46,8 @@ pub struct GraphicalState {
     pub next_edge_id: EdgeId,
     pub space_time: SpaceTime,
     pub time_space: TimeSpace,
-    pub edges: Edges,
+    pub edges: EdgesByEdgeId,
+    pub edges_by_target: EdgeIdsByTarget,
     pub stack: Vector<Frame>,
     // Cursor state: current_node, trace, space, time.
     pub current_node: NodeId, // None ==> stack(i).thunk_pointer == None, for all i.
@@ -80,7 +81,8 @@ pub type NodeId = (Space, Time, MetaTime);
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct EdgeId(pub BigUint);
 
-pub type Edges = HashMap<EdgeId, Edge>;
+pub type EdgesByEdgeId = HashMap<EdgeId, Edge>;
+pub type EdgeIdsByTarget = HashMap<NodeId, Vector<EdgeId>>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Edge {
@@ -183,6 +185,17 @@ impl GraphicalState {
         self.next_edge_id = self.next_edge_id.next();
         self.trace.push_back(id.clone());
         let source = self.current_node();
+        match self.edges_by_target.get_mut(&target) {
+            Some(edge_ids) => {
+                if !edge_ids.contains(&id) {
+                    edge_ids.push_back(id.clone());
+                }
+            }
+            None => {
+                self.edges_by_target
+                    .insert(target.clone(), vector!(id.clone()));
+            }
+        };
         self.edges.insert(
             id.clone(),
             Edge {
@@ -239,8 +252,17 @@ impl GraphicalState {
         Ok(())
     }
 
-    fn get_incoming_edges<'a>(&'a self, _pointer: &Pointer) -> Res<Vector<(EdgeId, Edge)>> {
-        Ok(vector!())
+    fn get_incoming_edges<'a>(&'a self, pointer: &Pointer) -> Res<Vector<(EdgeId, Edge)>> {
+        let (nid, _) = self.get_node(pointer)?;
+
+        let edge_ids = self.edges_by_target.get(&nid).unwrap_or(&vector!()).clone();
+        Ok(edge_ids
+            .into_iter()
+            .map(|edge_id| {
+                let edge = self.edges.get(&edge_id).unwrap();
+                (edge_id.clone(), edge.clone())
+            })
+            .collect())
     }
     fn get_outgoing_edges<'a>(&'a self, pointer: &Pointer) -> Res<Vector<(EdgeId, Edge)>> {
         let (_nid, node) = self.get_node(pointer)?;
@@ -320,6 +342,7 @@ impl CacheState for GraphicalState {
             space_time: HashMap::new(),
             time_space: HashMap::new(),
             edges: HashMap::new(),
+            edges_by_target: HashMap::new(),
             trace: Vector::new(),
             stack: Vector::new(),
             space: Space::Here,
