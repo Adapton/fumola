@@ -5,7 +5,7 @@ use log::{debug, error, info, trace};
 use fumola::state::State;
 use fumola_parser::parser_types;
 use fumola_semantics::format::{format_one_line, format_pretty, ToDoc};
-use fumola_semantics::vm_types::{self, Limits};
+use fumola_semantics::vm_types::{self, Active, Limits};
 
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -242,8 +242,13 @@ fn inspect_result(state: &mut State, result: Result<Value_, fumola::Error>, dept
 }
 
 fn report_error(state: &mut State, error: fumola::Error) {
+    let cont = state.semantic_state.cont().clone();
+    let cont_source = state.semantic_state.cont_source().clone();
     if let Ok(stack) = state.semantic_state.agent_stack() {
+        eprintln!("");
         error!("{:?}", error);
+        eprintln!("");
+        eprintln!("{}: {:?}", cont_source, cont);
         for frame in stack.iter() {
             eprintln!("{}: {:?}", &frame.source, &frame.cont);
         }

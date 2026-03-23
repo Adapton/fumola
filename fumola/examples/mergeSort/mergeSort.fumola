@@ -30,6 +30,26 @@ module {
         };
     };
 
+    public func dcg(seed : Nat, size : Nat, demand) {
+        let inputArray = generateRandomInput(seed, size);
+        let inputSeq = Seq.fromArray(inputArray);
+        let sorted = Seq.lazyMergeSort(@(inputSeq!));
+        let result = switch (demand) {
+            case (null) { LazyList.takeAll(sorted) };
+            case (?#all) { LazyList.takeAll(sorted) };
+            case (?#one) { LazyList.takeOne(sorted) };
+            case (?#quarter) { LazyList.takeN(sorted, size / 4) };
+            case (?#half) { LazyList.takeN(sorted, size / 2) };
+            case (?#frac(f)) { LazyList.takeN(sorted, size * f) };
+        };
+        {
+            inputArray;
+            inputSeq;
+            sorted;
+            result
+        }
+    };
+
     public func runRandom(seed : Nat, size : Nat, enableCache, demand) {
         prim "adaptonReset" ();
         if (not enableCache) {

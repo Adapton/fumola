@@ -192,12 +192,16 @@ pub enum Cont {
     Frame(Value_, Box<stack::FrameCont>),
 }
 
+impl Cont {
+    pub fn source(&self) -> Source {
+        source_from_cont(self)
+    }
+}
+
 pub fn source_from_cont(cont: &Cont) -> Source {
     use Cont::*;
     match cont {
-        Frame(_, _) => {
-            unreachable!("no source for Frame continuation. This signals a VM bug.  Please report.")
-        }
+        Frame(_v, _fr) => Source::Evaluation,
         Decs(decs) => fumola_syntax::ast::source_from_decs(decs),
         Exp_(exp_, decs) => {
             if decs.is_empty() {

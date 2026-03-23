@@ -1,41 +1,47 @@
 module {
-    public type MetaTime = { #metaTime : Nat };
 
-    public type Time = { #time : Symbol };
+    /// Adapton's structures in Fumola.
+    ///
+    /// PeekInfo gives the fumola value-based types for the
+    /// internal state of Adapton within Fumola.
+    ///
+    /// Specifically, these types follow the output of the 
+    /// PeekValue trait (in Rust) within the  
+    /// graphical representation of the Adapton cache.
+    ///
+    public module PeekInfo {
 
-    public type Space = { #space : Symbol };
+        public type MetaTime = Nat;
+        public type Time = { #time : Symbol };
+        public type Space = { #space : Symbol };
+        public type Pointer = Space;
 
-    public type Pointer = Space;
+        public type NodeId = { #nodeId : (Pointer, Time, MetaTime) };
+        public type EdgeId = { #edgeId : Nat };
 
-    public type NodeId = { #nodeId : (Space, Time, MetaTime) };
+        public type Node = {
+            #nonThunk : Any;
+            #thunk_ : ThunkNode;
+        };
 
-    public type EdgeId = { #edgeId : Nat };
+        public type ThunkNode = {
+            body : Thunk<Any>;
+            trace : [ EdgeId ];
+            result : ?Any;
+            space : Space;
+        };
 
-    public type Node = {
-        #nonThunk : Any;
-        #thunk_ : ThunkNode;
+        public type NodeInfo = {
+            node : Node;
+            nodeId : NodeId;
+            incomingEdges : [EdgeId];
+            outgoingEdges : [EdgeId];
+        };
     };
 
-    public type ThunkNode = {
-        body : Thunk<Any>;
-        trace : [ EdgeId ];
-        result : ?Any;
-        space : Space;
-    };
-
-    public type NodeInfo = {
-        node : Node;
-        nodeId : NodeId;
-        incomingEdges : [EdgeId];
-        outgoingEdges : [EdgeId];
-    };
-
-    public func peekInfo(p : Pointer) : ?NodeInfo {
+    public func peekInfo(p : Pointer) : ?PeekInfo.NodeInfo {
         prim "adaptonPeekCell" p
     };
-
-    // TODO.
-    public type PointerSetObj = ();
 
     public module DFS {
         // Simplified, for printing on terminals for human consumption.
@@ -66,14 +72,17 @@ module {
 	        #nonThunk;
 	    };
         public type ShowAction = {
-            #put ; #get ; #force_ 
+            #put ;
+            #get ;
+            #force_ 
         };
         public func showDFS(root: Pointer) : ShowDFS {
-            showDFSRec(root, PointerSetObj.new())
+            showDFSRec(root /*, PointerSetObj.new()*/ )
         };
 
-        public func showDFSRec(root : Pointer, visited : PointerSetOBj) : ShowDFS {
+        public func showDFSRec(root : Pointer /*, visited : PointerSetOBj */) : ShowDFS {
             let nodeInfo = (peekInfo root)!;
+	    let nodeId = nodeInfo.nodeId;
             switch (nodeInfo.node) {
                 case(#nonThunk(value)) {
                     #leaf({
@@ -92,17 +101,19 @@ module {
                         })
                     } else {
                         var edges = [];
-                        for ((_, edge) in nodeInfo.outgoingEdges) {
+                        for ((_, edge) in nodeInfo.outgoingEdges.vals()) {
                             let (action, value) = switch (edge.action) {
                                 case(#put(v)) (#put, v);
                                 case(#get(v)) (#get, v);
-                                case(#force_(v)) (#force_, v);
+                                case(#force_(_, v)) (#force_, v);
                             };
-                            let target = edge.target;
+                            let target = prim "adaptonPointer" (edge.target.0);
+			    prim "print" target;
                             var dfs = null;
-                            if (action == #force_ and not(visited.contains(target))) {
-                                visited.insert(target);
-                                dfs := ? showDFSRec(target, visited);
+                            if (action == #force_ 
+                                /* and not(visited.contains(target)) */ ) {
+                                // visited.insert(target);
+                                dfs := ? showDFSRec(target /*, visited */);
                             };
                             edges #= [ { 
                                 action;
