@@ -1,0 +1,120 @@
+module {
+    public type MetaTime = { #metaTime : Nat };
+
+    public type Time = { #time : Symbol };
+
+    public type Space = { #space : Symbol };
+
+    public type Pointer = Space;
+
+    public type NodeId = { #nodeId : (Space, Time, MetaTime) };
+
+    public type EdgeId = { #edgeId : Nat };
+
+    public type Node = {
+        #nonThunk : Any;
+        #thunk_ : ThunkNode;
+    };
+
+    public type ThunkNode = {
+        body : Thunk<Any>;
+        trace : [ EdgeId ];
+        result : ?Any;
+        space : Space;
+    };
+
+    public type NodeInfo = {
+        node : Node;
+        nodeId : NodeId;
+        incomingEdges : [EdgeId];
+        outgoingEdges : [EdgeId];
+    };
+
+    public func peekInfo(p : Pointer) : ?NodeInfo {
+        prim "adaptonPeekCell" p
+    };
+
+    // TODO.
+    public type PointerSetObj = ();
+
+    public module DFS {
+        // Simplified, for printing on terminals for human consumption.
+        // Also carries enough info for a useful TikZ forest.
+        public type ShowDFS = {
+            #leaf : ShowLeaf;
+            #internal : ShowInternal; 
+        };
+        public type ShowLeaf = {
+            nodeId : NodeId;
+            shape : ShowNodeShape;
+            value : Any;
+        };
+	public type ShowInternal = {
+            nodeId : NodeId;
+            shape : ShowNodeShape;
+	    edges : [ ShowEdge ];
+            value : Any;
+        };
+        public type ShowEdge = {
+            action : ShowAction ;
+            target : ShowNode ;
+            dfs : ?ShowDFS;
+            value : Any;
+        };
+	public type ShowNodeShape = {
+	    #thunk_;
+	    #nonThunk;
+	};
+        public type ShowAction = {
+            #put ; #get ; #force_ 
+        };
+        public func showDFS(root: Pointer) : ShowDFS {
+            showDFSRec(root, PointerSetObj.new())
+        };
+
+        public func showDFSRec(root : Pointer, visited : PointerSetOBj) : ShowDFS {
+            let nodeInfo = (peekInfo root)!;
+            switch (nodeInfo.node) {
+                case(#nonThunk(value)) {
+                    #leaf({
+                        nodeId = nodeInfo.nodeId;
+                        shape = #nonThunk; 
+                        value
+                    })
+                };
+                case(#thunk_(t)) {
+                    if (t.trace.size() == 0) {
+                        assert (nodeInfo.outgoingEdges.size() == 0);
+                        #leaf({
+                            nodeId = nodeInfo.nodeId;
+                            shape = #thunk_;
+                            value = nodeInfo.node.result;
+                        })
+                    } else {
+                        var edges = [];
+                        for ((_, edge) in nodeInfo.outgoingEdges) {
+                            let (action, value) = switch (edge.action) {
+                                case(#put(v)) (#put, v);
+                                case(#get(v)) (#get, v);
+                                case(#force_(v)) (#force_, v);
+                            };
+                            let target = edge.target;
+                            var dfs = null;
+                            if (action == #force_ and not(visited.contains(target))) {
+                                visited.insert(target);
+                                dfs := ? showDFSRec(target, visited);
+                            };
+                            edges #= [ { 
+                                action;
+                                target = edge.target;
+                                dfs;
+                                value
+                            } ];
+                        };
+                        #internal({nodeId; shape = #thunk_ ; edges ; value = t.result})
+                    }
+                }
+            }
+        }
+   }
+}
