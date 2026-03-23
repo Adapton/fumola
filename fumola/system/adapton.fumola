@@ -49,10 +49,10 @@ module {
             shape : ShowNodeShape;
             value : Any;
         };
-	public type ShowInternal = {
+	    public type ShowInternal = {
             nodeId : NodeId;
             shape : ShowNodeShape;
-	    edges : [ ShowEdge ];
+	        edges : [ ShowEdge ];
             value : Any;
         };
         public type ShowEdge = {
@@ -61,10 +61,10 @@ module {
             dfs : ?ShowDFS;
             value : Any;
         };
-	public type ShowNodeShape = {
-	    #thunk_;
-	    #nonThunk;
-	};
+	    public type ShowNodeShape = {
+	        #thunk_;
+	        #nonThunk;
+	    };
         public type ShowAction = {
             #put ; #get ; #force_ 
         };
@@ -106,12 +106,16 @@ module {
                             };
                             edges #= [ { 
                                 action;
-                                target = edge.target;
                                 dfs;
+                                target;
                                 value
                             } ];
                         };
-                        #internal({nodeId; shape = #thunk_ ; edges ; value = t.result})
+                        #internal({
+                            nodeId;
+                            edges;
+                            shape = #thunk_ ;
+                            value = t.result})
                     }
                 }
             }
