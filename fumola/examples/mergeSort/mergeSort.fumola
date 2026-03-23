@@ -33,7 +33,7 @@ module {
     public func dcg(seed : Nat, size : Nat, demand) {
         let inputArray = generateRandomInput(seed, size);
         let inputSeq = Seq.fromArray(inputArray);
-        let sorted = Seq.lazyMergeSort(@(inputSeq!));
+        let sorted = Seq.lazyMergeSort(inputSeq);
         let result = switch (demand) {
             case (null) { LazyList.takeAll(sorted) };
             case (?#all) { LazyList.takeAll(sorted) };
@@ -76,7 +76,7 @@ module {
         //
         // Demand-driven (lazy) MergeSort on the input tree.
         //
-        let sorted = Seq.lazyMergeSort(@(inputSeq!));
+        let sorted = Seq.lazyMergeSort(inputSeq);
         let preDemandCounts = @(`adapton(`counts));
         let result = switch (demand) {
             case (null) { LazyList.takeAll(sorted) };

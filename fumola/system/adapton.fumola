@@ -82,7 +82,7 @@ module {
 
         public func showDFSRec(root : Pointer /*, visited : PointerSetOBj */) : ShowDFS {
             let nodeInfo = (peekInfo root)!;
-	    let nodeId = nodeInfo.nodeId;
+	        let nodeId = nodeInfo.nodeId;
             switch (nodeInfo.node) {
                 case(#nonThunk(value)) {
                     #leaf({
@@ -108,7 +108,6 @@ module {
                                 case(#force_(_, v)) (#force_, v);
                             };
                             let target = prim "adaptonPointer" (edge.target.0);
-			    prim "print" target;
                             var dfs = null;
                             if (action == #force_ 
                                 /* and not(visited.contains(target)) */ ) {

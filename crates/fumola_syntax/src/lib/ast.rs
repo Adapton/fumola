@@ -135,11 +135,11 @@ impl std::fmt::Display for Source {
             //Source::Known { line, col, .. } => write!(f, "{}:{}", line, col),
             Source::Known(k) => {
                 if k.start_line == k.end_line {
-                    write!(f, "{}:{}..{}", k.start_line, k.start_col, k.end_col)
+                    write!(f, "{}: {}..{}", k.start_line, k.start_col, k.end_col)
                 } else {
                     write!(
                         f,
-                        "{}:{}..{}:{}",
+                        "{}:{} .. {}:{}",
                         k.start_line, k.start_col, k.end_line, k.end_col
                     )
                 }

@@ -4,7 +4,7 @@ module {
 public type List<X> = ?{
   element : X;
   symbol : Symbol;
-  next : Pointer<List<X>>
+  next : List<X>;
 };
 
 #[listing]

@@ -241,6 +241,15 @@ fn inspect_result(state: &mut State, result: Result<Value_, fumola::Error>, dept
     }
 }
 
+fn truncate_debug<T: std::fmt::Debug>(value: &T, max_len: usize) -> String {
+    let s = format!("{:?}", value);
+    if s.chars().count() > max_len {
+        s.chars().take(max_len).collect::<String>() + "..."
+    } else {
+        s
+    }
+}
+
 fn report_error(state: &mut State, error: fumola::Error) {
     let cont = state.semantic_state.cont().clone();
     let cont_source = state.semantic_state.cont_source().clone();
@@ -248,9 +257,9 @@ fn report_error(state: &mut State, error: fumola::Error) {
         eprintln!("");
         error!("{:?}", error);
         eprintln!("");
-        eprintln!("{}: {:?}", cont_source, cont);
+        eprintln!("{:17}: {}", cont_source, truncate_debug(&cont, 63));
         for frame in stack.iter() {
-            eprintln!("{}: {:?}", &frame.source, &frame.cont);
+            eprintln!("{:17}: {}", &frame.source, truncate_debug(&frame.cont, 63));
         }
     } else {
         error!("(No stack available to print)\n{:?}", error);

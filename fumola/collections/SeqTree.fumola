@@ -47,13 +47,16 @@ module {
     }
   };
 
-  let nullThunk = thunk { null };
-  func nullThunkPointer () = `nullThunk := nullThunk;
+  // TO DO -- clean this up by giving a static-time phase for
+  //          code to run certain adapton put operations (of static stuff).
+  func nullThunkPointer () = prim "adaptonPointer" `nullThunkPointer;
 
   #[listing(62)]
-  public func lazyMergeSort<X>(t : SeqTree<X>) : LazyList_<X> {
+  public func lazyMergeSort<X>(t : ?SeqTree_<X>) : LazyList_<X> {
+    let empty = `nullThunkPointer := thunk { null };
+    if (t == null) { return empty };
     do within space `lazyMergeSort { `result := thunk {
-    reduceUp(t,
+    reduceUp(@(t!),
           null,
           func(symbol:Symbol, element:X) : LazyList<X> {
              ?{ symbol; element; next = nullThunkPointer() }
