@@ -1,3 +1,4 @@
+use fumola::Error;
 use fumola_semantics::{Interruption, Value_};
 
 use log::{debug, error, info, trace};
@@ -142,12 +143,8 @@ fn main() -> OurResult<()> {
                 None => Limits::none(),
                 Some(limit) => Limits::none().step(limit),
             };
-            let v = state.eval(&input); // to do -- use _limits
-            if let Ok(v) = &v {
-                println!("{}", format_pretty(v, 80))
-            } else {
-                println!("Error: {:?}", v)
-            }
+            let result = state.eval(&input); // to do -- use _limits
+            post_eval(&mut state, result)
         }
         CliCommand::Repl {} => repl(&mut state),
     };
@@ -164,28 +161,9 @@ fn repl(state: &mut State) {
         match readline {
             Ok(line) => {
                 state.semantic_state.clear_cont();
-                let v = state.eval(&line);
-                for line in state.semantic_state.debug_print_out.iter() {
-                    println!("{}", line.text.to_string())
-                }
-                state.semantic_state.debug_print_out = im_rc::vector::Vector::new();
-                for (path, content) in state.semantic_state.output_files.iter() {
-                    let path_string = format_one_line(path).replace("`", "");
-                    let content = content.to_string();
-                    debug!(
-                        "writing file `{}` with \"{}\"",
-                        path_string,
-                        truncate_with_ellipsis(content.as_str(), 69)
-                    );
-                    let mut file = File::create(path_string).expect("opening output file");
-                    let content_to_write = expand_escapes(content.as_str());
-                    file.write_all(content_to_write.to_string().as_bytes())
-                        .expect("writing output file");
-                    file.flush().expect("flush output file")
-                }
-                state.semantic_state.output_files = im_rc::hashmap::HashMap::new();
+                let result = state.eval(&line);
+                post_eval(state, result);
                 rl.add_history_entry(line.as_str());
-                inspect_result(state, v, 0)
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
@@ -202,6 +180,30 @@ fn repl(state: &mut State) {
         }
     }
     rl.save_history("history.txt").unwrap();
+}
+
+fn post_eval(state: &mut State, result: Result<Value_, Error>) {
+    for line in state.semantic_state.debug_print_out.iter() {
+        println!("{}", line.text.to_string())
+    }
+    state.semantic_state.debug_print_out = im_rc::vector::Vector::new();
+    for (path, content) in state.semantic_state.output_files.iter() {
+        let path_string = format_one_line(path).replace("`", "");
+        let content = content.to_string();
+        debug!(
+            "writing file `{}` with \"{}\"",
+            path_string,
+            truncate_with_ellipsis(content.as_str(), 69)
+        );
+        let mut file = File::create(path_string).expect("opening output file");
+        let content_to_write = expand_escapes(content.as_str());
+        file.write_all(content_to_write.to_string().as_bytes())
+            .expect("writing output file");
+        file.flush().expect("flush output file")
+    }
+    state.semantic_state.output_files = im_rc::hashmap::HashMap::new();
+
+    inspect_result(state, result, 0)
 }
 
 fn inspect_result(state: &mut State, result: Result<Value_, fumola::Error>, depth: usize) {
