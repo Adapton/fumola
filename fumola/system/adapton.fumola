@@ -112,9 +112,9 @@ module {
 
         func indentText(n : Nat) : Text {
             if (n == 0) { "" } else 
-            if (n == 1) { " +" } else
-            {
-            " |" # (indentText(n - 1))
+            if (n == 1) { " " }  
+            else {
+            " ┆" # (indentText(n - 1))
             }
         };
 
@@ -122,33 +122,35 @@ module {
             switch dfs {
                 case (#leaf(n)) { debug_show (n.nodeId.0) };
                 case (#internal(n)) {
-                    var result = debug_show (n.__nodeId.0);
+                    var edges = ""; // debug_show (n.__nodeId.0);
                     for (edge in n.edges.vals()) {
-                        result #= "\n" # (edgeIntoText(edge, indent + 1));
+                        edges #= "\n" # (edgeIntoText(edge, indent + 1));
                     };
-                    result
+                    edges # "\n" 
+                    # indentText(indent + 1)
+                    # "╰〜〜> " # (debug_show n.value)
                 }
             }
         };
 
-        public func actionIntoText(action : ShowAction) : Text {
+        public func actionIntoUnicode(action : ShowAction) : Text {
             switch action {
-                case (#put)      { "---|>|> " };
-                case (#get)      { "------> " };
-                case (#putForce) { "===|>|> " };
-                case (#force_)   { "======> " };
+                case (#put)      { "───» " };
+                case (#get)      { "───> " };
+                case (#putForce) { "══▷» " };
+                case (#force_)   { "═══▷ " };
             }
-        };  
+        };
 
         public func edgeIntoText(edge : ShowEdge, indent : Nat) : Text {
-            indentText(indent) # (
+            indentText(indent) # "├" # (
             switch (edge.dfs) {
                 case null {
-                    actionIntoText(edge.action) # 
+                    actionIntoUnicode(edge.action) # 
                     debug_show(edge.actionTarget)
                 };
                 case (?internalDFS) {
-                    actionIntoText(edge.action) # 
+                    actionIntoUnicode(edge.action) # 
                       debug_show edge.actionTarget #
                       dfsIntoTextRec(internalDFS, indent);
                 }
