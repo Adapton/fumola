@@ -31,12 +31,33 @@ module {
             space : Space;
         };
 
+        public type Edge = {
+            source : NodeId;
+            target : NodeId;
+            action : Action;
+        };
+
         public type NodeInfo = {
             node : Node;
             nodeId : NodeId;
-            incomingEdges : [EdgeId];
-            outgoingEdges : [EdgeId];
+            incomingEdges : [(EdgeId, Edge)];
+            outgoingEdges : [(EdgeId, Edge)];
         };
+    };
+
+    public func edgeActionInfo(edge : Edge) : 
+      { 
+        action: Action; 
+        putValue: ?Any; // TODO -- distinguish thunks and non-thunks
+        forcedThunk: ?Thunk<A>
+      } 
+    {
+        switch (edge.action) {
+
+            case(#put(value)) {{action=#put; value; forcedThunk=null}};
+            case(#get(value)) {{action=#get; value; forcedThunk=null}};
+            case(#force_(t, value)) {{action=#force_; value; forcedThunk=?t; value}};
+        }
     };
 
     public func peekInfo(p : Pointer) : ?PeekInfo.NodeInfo {
@@ -44,38 +65,63 @@ module {
     };
 
     public module DFS {
-        // Simplified, for printing on terminals for human consumption.
-        // Also carries enough info for a useful TikZ forest.
-        public type ShowDFS = {
-            #leaf : ShowLeaf;
-            #internal : ShowInternal; 
+        //
+        // DFS representation for printing on terminals,
+        // and for generating other output file formats (Text, HTML, TikZ).
+        //
+        public type DFS = {
+            #leaf : LeafNode;
+            #internal : InternalNode; 
         };
-        public type ShowLeaf = {
+        public type LeafNode = {
             nodeId : NodeId;
-            shape : ShowNodeShape;
+            shape : NodeShape;
             value : Any;
         };
-	    public type ShowInternal = {
+	    public type InternalNode = {
             nodeId : NodeId;
-            shape : ShowNodeShape;
+            shape : NodeShape;
 	        edges : [ ShowEdge ];
             value : Any;
         };
-        public type ShowEdge = {
-            action : ShowAction ;
-            target : ShowNode ;
-            dfs : ?ShowDFS;
-            value : Any;
-        };
-	    public type ShowNodeShape = {
+        public type NodeShape = {
 	        #thunk_;
 	        #nonThunk;
 	    };
-        public type ShowAction = {
+        
+        // Using the prefix "Show" to avoid confusion with
+        // types of otherwise the same name.
+
+        public type ShowEdge = {
+            action : ShowAction ;
+            actionTarget : NodeId ;
+            dfs : ?ShowDFS;
+            forcedThunk : ?Thunk<Any>;
+            value : Any;
+        };
+        //
+        // Just the "tag" of the action, where the other action information
+        // is organized into the ShowEdge type.
+        //
+	    public type ShowAction = {
             #put ;
             #get ;
             #force_ 
         };
+
+        public func nodeIdIntoText(nodeId : NodeId) : Text {
+            debug_show (nodeId.0)
+        };
+
+        public func dfsIntoText(dfs : ShowDFS) : Text {
+            switch dfs {
+                case (#leaf(n)) { nodeIdIntoText(n.nodeId) };
+                case (#internal(n)) {
+
+                }
+            }
+        };
+
         public func showDFS(root: Pointer) : ShowDFS {
             showDFSRec(root /*, PointerSetObj.new()*/ )
         };
@@ -102,23 +148,19 @@ module {
                     } else {
                         var edges = [];
                         for ((_, edge) in nodeInfo.outgoingEdges.vals()) {
-                            let (action, value) = switch (edge.action) {
-                                case(#put(v)) (#put, v);
-                                case(#get(v)) (#get, v);
-                                case(#force_(_, v)) (#force_, v);
-                            };
-                            let target = prim "adaptonPointer" (edge.target.0);
+                            let edgeInfo = edgeActionInfo(edge);
+                            let actionTarget = prim "adaptonPointer" (edge.target.0);
                             var dfs = null;
-                            if (action == #force_ 
+                            if (edgeInfo.action == #force_ 
                                 /* and not(visited.contains(target)) */ ) {
                                 // visited.insert(target);
-                                dfs := ? showDFSRec(target /*, visited */);
+                                dfs := ? showDFSRec(actionTarget /*, visited */);
                             };
                             edges #= [ { 
-                                action;
+                                action=edgeInfo.action;
+                                actionTarget;
                                 dfs;
-                                target;
-                                value
+                                value=edgeInfo.value;
                             } ];
                         };
                         #internal({
