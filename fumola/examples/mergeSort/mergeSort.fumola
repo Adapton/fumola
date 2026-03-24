@@ -1,7 +1,10 @@
 import Seq "SeqTree";
 import LazyList "LazyList";
+import A "adapton";
 
 module {
+    public let defaultSeed = 10;
+
     public func generateRandomInput(seed : Nat, size : Nat) : [(Nat, Nat)] {
         let iter = prim "fastRandIterNew" (?size, seed);
         var count = 0;
@@ -29,7 +32,12 @@ module {
             };
         };
     };
-
+    public func demandSym(demand) = switch demand {
+                case null `full;
+                case (?#one) `one;
+                case (?#half) `half;
+            };
+            
     public func dcg(seed : Nat, size : Nat, demand) {
         let inputArray = generateRandomInput(seed, size);
         let inputSeq = Seq.fromArray(inputArray);
@@ -48,6 +56,13 @@ module {
             sorted;
             result
         }
+    };
+
+    public func writeDcgText(seed : Nat, size : Nat, demand) {
+        let dcg = dcg(seed, size, demand);
+        let dfs = A.DFS.showDFS(dcg.sorted);
+        let text = A.DFS.dfsIntoText(dfs);
+        prim "writeFile" (`demand-demandSym(demand)-`size-size-`seed-seed-`DCG-`txt, text); 
     };
 
     public func runRandom(seed : Nat, size : Nat, enableCache, demand) {
@@ -105,14 +120,17 @@ module {
         var outputs = [];
         for (demand in demands.vals()) {
             var output = [];
-            for (sizes in [[3,5,7,11,13,17,21],
-                           [25,50,75,100,125,150,175],
-                           [200,250,300,350,400,450],[500,750],
-                           [1000],[1500],[2000],[2500],[5000]
+            for (sizes in [[3,5,7,11,13,17,21,23],
+                           //[25,33,50,75,100,125,150,175],
+                           //[200,250,300,350,400,450],[500,750],
+                           //[1000],[1500],[2000],[2500],[5000]
                        ].vals()) {
                 prim "print" { demand ; sizes };
                 for (size in sizes.vals()) {
-                    let data = runRandom(10, size, true, demand);
+                    if (size <= 33) {
+                        writeDcgText(defaultSeed, size, demand)
+                    };
+                    let data = runRandom(defaultSeed, size, true, demand);
                     output  #= [ data ];
                     //
                     // At small sizes, re-run without a cache
@@ -135,19 +153,15 @@ module {
             var sizes = "";
             var depths = "";
             var comparisonCounts = "";
-            let demandSym = switch demand {
-                case null `full;
-                case (?#one) `one;
-                case (?#half) `half;
-            };
             for (out in output.vals()) {
                sizes #= ((debug_show out.size) # "\n");
                depths #= ((debug_show out.inputSeqMetrics.depth)) # "\n";
                comparisonCounts #= ((debug_show out.counts.comparisonCount) # "\n");
             };
-            prim "writeFile" (`demand-demandSym-`size-`dat, sizes);
-            prim "writeFile" (`demand-demandSym-`depth-`dat, depths);
-            prim "writeFile" (`demand-demandSym-`comparisonCount-`dat, comparisonCounts);
+            let demand = demandSym(demand);
+            prim "writeFile" (`demand-demand-`size-`dat, sizes);
+            prim "writeFile" (`demand-demand-`depth-`dat, depths);
+            prim "writeFile" (`demand-demand-`comparisonCount-`dat, comparisonCounts);
         };
 
         report(outputs);

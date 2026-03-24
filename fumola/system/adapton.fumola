@@ -1,5 +1,5 @@
 module {
-
+ 
     /// Adapton's structures in Fumola.
     ///
     /// PeekInfo gives the fumola value-based types for the
@@ -110,17 +110,53 @@ module {
             #force_ 
         };
 
-        public func nodeIdIntoText(nodeId : NodeId) : Text {
-            debug_show (nodeId.0)
+        func indentText(n : Nat) : Text {
+            if (n == 0) { "" } else 
+            if (n == 1) { " +" } else
+            {
+            " |" # (indentText(n - 1))
+            }
+        };
+
+        public func dfsIntoTextRec(dfs : ShowDFS, indent : Nat) : Text {
+            switch dfs {
+                case (#leaf(n)) { debug_show (n.nodeId.0) };
+                case (#internal(n)) {
+                    var result = debug_show (n.__nodeId.0);
+                    for (edge in n.edges.vals()) {
+                        result #= "\n" # (edgeIntoText(edge, indent + 1));
+                    };
+                    result
+                }
+            }
+        };
+
+        public func actionIntoText(action : ShowAction) : Text {
+            switch action {
+                case (#put)      { "---|>|> " };
+                case (#get)      { "------> " };
+                case (#putForce) { "===|>|> " };
+                case (#force_)   { "======> " };
+            }
+        };  
+
+        public func edgeIntoText(edge : ShowEdge, indent : Nat) : Text {
+            indentText(indent) # (
+            switch (edge.dfs) {
+                case null {
+                    actionIntoText(edge.action) # 
+                    debug_show(edge.actionTarget)
+                };
+                case (?internalDFS) {
+                    actionIntoText(edge.action) # 
+                      debug_show edge.actionTarget #
+                      dfsIntoTextRec(internalDFS, indent);
+                }
+            })
         };
 
         public func dfsIntoText(dfs : ShowDFS) : Text {
-            switch dfs {
-                case (#leaf(n)) { nodeIdIntoText(n.nodeId) };
-                case (#internal(n)) {
-
-                }
-            }
+            dfsIntoTextRec(dfs, 0) # "\n"
         };
 
         public func showDFS(root: Pointer) : ShowDFS {
