@@ -79,9 +79,9 @@ module {
             value : Any;
         };
 	    public type InternalNode = {
-            nodeId : NodeId;
-            shape : NodeShape;
-	        edges : [ ShowEdge ];
+            __nodeId : nodeId;      // using __ prefixes to promote in default print order.
+            __shape : NodeShape;
+            edges : [ ShowEdge ];
             value : Any;
         };
         public type NodeShape = {
@@ -105,6 +105,7 @@ module {
         //
 	    public type ShowAction = {
             #put ;
+            #putForce ; // same as #put ; #force_ in sequence.
             #get ;
             #force_ 
         };
@@ -146,7 +147,8 @@ module {
                             value = nodeInfo.node.result;
                         })
                     } else {
-                        var edges = [];
+                        var prevEdge = null;
+                        var edges = [var ];
                         for ((_, edge) in nodeInfo.outgoingEdges.vals()) {
                             let edgeInfo = edgeActionInfo(edge);
                             let actionTarget = prim "adaptonPointer" (edge.target.0);
@@ -156,18 +158,33 @@ module {
                                 // visited.insert(target);
                                 dfs := ? showDFSRec(actionTarget /*, visited */);
                             };
-                            edges #= [ { 
-                                action=edgeInfo.action;
-                                actionTarget;
-                                dfs;
-                                value=edgeInfo.value;
-                            } ];
+                            if ( 
+                                prevEdge != null and
+                                prevEdge!.action == #put and 
+                                prevEdge!.actionTarget == actionTarget  ) {
+                                edges[edges.size() - 1] := {
+                                    actionTarget;
+                                    action=#putForce;
+                                    dfs;
+                                    value=edgeInfo.value;
+                                }
+                            } else { 
+                                let edge = {
+                                    action=edgeInfo.action;
+                                    actionTarget;
+                                    dfs;
+                                    value=edgeInfo.value;
+                                };
+                                edges #= [ edge ];
+                                prevEdge := ?edge;
+                            }
                         };
                         #internal({
-                            nodeId;
+                            __nodeId = nodeId;
+                            __shape = #thunk_ ;
                             edges;
-                            shape = #thunk_ ;
-                            value = t.result})
+                            value = t.result
+                            })
                     }
                 }
             }

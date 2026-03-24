@@ -449,6 +449,9 @@ impl Store {
             .ok_or(Interruption::Dangling(pointer))?;
 
         match &**pointer_ref {
+            Value::Array(Mut::Const, _) => {
+                type_mismatch!(file!(), line!())
+            }
             Value::Array(Mut::Var, a) => {
                 let i = match &*index {
                     Value::Nat(n) => n
