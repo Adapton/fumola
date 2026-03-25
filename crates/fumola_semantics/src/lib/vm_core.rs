@@ -583,6 +583,13 @@ impl Core {
         Ok(self.agent.active.stack.clone())
     }
 
+    pub fn agent_cont_source(&self) -> Result<fumola_syntax::ast::Source, EvalInitError> {
+        if self.schedule_choice != ScheduleChoice::Agent {
+            return Err(EvalInitError::AgentNotScheduled);
+        }
+        Ok(self.agent.active.cont_source.clone())
+    }
+
     /// Assert that the Agent is idle.
     pub fn assert_idle_agent(&self) -> Result<(), EvalInitError> {
         if self.schedule_choice != ScheduleChoice::Agent {

@@ -1,4 +1,4 @@
-use crate::adapton::state::{CacheState, Counts, Settings};
+use crate::adapton::state::{CacheState, Counts, PutBeh, Settings};
 use crate::adapton::{Error, ForceBeginResult, Navigation, Pointer, Res, Space, Time};
 
 use crate::ToMotoko;
@@ -131,7 +131,7 @@ impl SimpleState {
         for (pointer, cell) in delayed_cells.iter() {
             let cell_value = cell.get_value()?;
             let mut dummy: Counts = Counts::new();
-            self.put_pointer(&mut dummy, pointer.clone(), cell_value)?;
+            self.put_pointer(&mut dummy, pointer.clone(), cell_value, PutBeh::Undelay)?;
         }
         Ok(())
     }
@@ -190,10 +190,16 @@ impl CacheState for SimpleState {
 
     fn put_symbol(&mut self, counts: &mut Counts, symbol: Symbol_, value: Value_) -> Res<Pointer> {
         let p: Pointer = self.space.apply(symbol);
-        self.put_pointer(counts, p.clone(), value)?;
+        self.put_pointer(counts, p.clone(), value, PutBeh::Put)?;
         Ok(p)
     }
-    fn put_pointer(&mut self, counts: &mut Counts, pointer: Pointer, value: Value_) -> Res<()> {
+    fn put_pointer(
+        &mut self,
+        counts: &mut Counts,
+        pointer: Pointer,
+        value: Value_,
+        beh: PutBeh,
+    ) -> Res<()> {
         let time = self.time.clone();
         let space = self.space.clone();
         let cells = self.get_cell_by_time(&pointer);
@@ -201,12 +207,14 @@ impl CacheState for SimpleState {
         let new_cell = Self::new_cell(space, value);
         let is_thunk = new_cell.is_thunk();
         let cells = cells.update(time, new_cell);
-        if cells.len() > cells_orig_len {
-            counts.cells += 1;
-            if is_thunk {
-                counts.thunk_cells += 1
-            } else {
-                counts.non_thunk_cells += 1;
+        if beh == PutBeh::Put {
+            if cells.len() > cells_orig_len {
+                counts.cells += 1;
+                if is_thunk {
+                    counts.thunk_cells += 1
+                } else {
+                    counts.non_thunk_cells += 1;
+                }
             }
         };
         self.space_time.insert(pointer, cells);
@@ -311,14 +319,6 @@ impl CacheState for SimpleState {
             Err(_) => None::<Value_>
                 .to_motoko_shared()
                 .map_err(|_| Error::Unreachable),
-        }
-    }
-
-    fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()> {
-        let mut dummy = Counts::new();
-        match time {
-            None => self.put_pointer(&mut dummy, pointer, value),
-            Some(time) => self.put_pointer_delay(pointer, time, value),
         }
     }
 }

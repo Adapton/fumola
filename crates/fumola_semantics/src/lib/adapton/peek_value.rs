@@ -111,7 +111,7 @@ impl PeekValue for Action {
     fn into_value_(self) -> Value_ {
         match self {
             Action::Force(closed_exp, v) => variant(
-                "force",
+                "force_",
                 Value::Tuple(vector![Value::Thunk(closed_exp).share(), v]).share(),
             ),
             Action::Put(v) => variant("put", v),

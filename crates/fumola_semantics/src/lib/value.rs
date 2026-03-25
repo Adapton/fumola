@@ -490,6 +490,7 @@ impl Value {
     pub fn into_adapton_pointer_or<E>(&self, err: E) -> Result<AdaptonPointer, E> {
         match self {
             Value::AdaptonPointer(p) => Ok(p.clone()),
+            Value::AdaptonSpace(s) => Ok(s.clone()),
             _ => Err(err),
         }
     }

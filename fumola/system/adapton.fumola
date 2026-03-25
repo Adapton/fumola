@@ -1,0 +1,231 @@
+module {
+ 
+    /// Adapton's structures in Fumola.
+    ///
+    /// PeekInfo gives the fumola value-based types for the
+    /// internal state of Adapton within Fumola.
+    ///
+    /// Specifically, these types follow the output of the 
+    /// PeekValue trait (in Rust) within the  
+    /// graphical representation of the Adapton cache.
+    ///
+    public module PeekInfo {
+
+        public type MetaTime = Nat;
+        public type Time = { #time : Symbol };
+        public type Space = { #space : Symbol };
+        public type Pointer = Space;
+
+        public type NodeId = { #nodeId : (Pointer, Time, MetaTime) };
+        public type EdgeId = { #edgeId : Nat };
+
+        public type Node = {
+            #nonThunk : Any;
+            #thunk_ : ThunkNode;
+        };
+
+        public type ThunkNode = {
+            body : Thunk<Any>;
+            trace : [ EdgeId ];
+            result : ?Any;
+            space : Space;
+        };
+
+        public type Edge = {
+            source : NodeId;
+            target : NodeId;
+            action : Action;
+        };
+
+        public type NodeInfo = {
+            node : Node;
+            nodeId : NodeId;
+            incomingEdges : [(EdgeId, Edge)];
+            outgoingEdges : [(EdgeId, Edge)];
+        };
+    };
+
+    public func edgeActionInfo(edge : Edge) : 
+      { 
+        action: Action; 
+        putValue: ?Any; // TODO -- distinguish thunks and non-thunks
+        forcedThunk: ?Thunk<A>
+      } 
+    {
+        switch (edge.action) {
+
+            case(#put(value)) {{action=#put; value; forcedThunk=null}};
+            case(#get(value)) {{action=#get; value; forcedThunk=null}};
+            case(#force_(t, value)) {{action=#force_; value; forcedThunk=?t; value}};
+        }
+    };
+
+    public func peekInfo(p : Pointer) : ?PeekInfo.NodeInfo {
+        prim "adaptonPeekCell" p
+    };
+
+    public module DFS {
+        //
+        // DFS representation for printing on terminals,
+        // and for generating other output file formats (Text, HTML, TikZ).
+        //
+        public type DFS = {
+            #leaf : LeafNode;
+            #internal : InternalNode; 
+        };
+        public type LeafNode = {
+            nodeId : NodeId;
+            shape : NodeShape;
+            value : Any;
+        };
+	    public type InternalNode = {
+            __nodeId : nodeId;      // using __ prefixes to promote in default print order.
+            __shape : NodeShape;
+            edges : [ ShowEdge ];
+            value : Any;
+        };
+        public type NodeShape = {
+	        #thunk_;
+	        #nonThunk;
+	    };
+        
+        // Using the prefix "Show" to avoid confusion with
+        // types of otherwise the same name.
+
+        public type ShowEdge = {
+            action : ShowAction ;
+            actionTarget : NodeId ;
+            dfs : ?ShowDFS;
+            forcedThunk : ?Thunk<Any>;
+            value : Any;
+        };
+        //
+        // Just the "tag" of the action, where the other action information
+        // is organized into the ShowEdge type.
+        //
+	    public type ShowAction = {
+            #put ;
+            #putForce ; // same as #put ; #force_ in sequence.
+            #get ;
+            #force_ 
+        };
+
+        func indentText(n : Nat) : Text {
+            if (n == 0) { "" } else 
+            if (n == 1) { " " }  
+            else {
+            " ┆" # (indentText(n - 1))
+            }
+        };
+
+        public func dfsIntoTextRec(dfs : ShowDFS, indent : Nat) : Text {
+            switch dfs {
+                case (#leaf(n)) { debug_show (n.nodeId.0) };
+                case (#internal(n)) {
+                    var text = debug_show (prim "adaptonPointer" (n.__nodeId.0));
+                    for (edge in n.edges.vals()) {
+                        text #= "\n" # (edgeIntoText(edge, indent + 1));
+                    };
+                    text # "\n" 
+                    # indentText(indent + 1)
+                    # "╰〜〜> " # (debug_show n.value)
+                }
+            }
+        };
+
+        public func actionIntoUnicode(action : ShowAction) : Text {
+            switch action {
+                case (#put)      { "───» " };
+                case (#get)      { "───> " };
+                case (#putForce) { "══▷» " };
+                case (#force_)   { "═══▷ " };
+            }
+        };
+
+        public func edgeIntoText(edge : ShowEdge, indent : Nat) : Text {
+            indentText(indent) # "├" # (
+            switch (edge.dfs) {
+                case null {
+                    actionIntoUnicode(edge.action) # 
+                    debug_show(edge.actionTarget)
+                };
+                case (?internalDFS) {
+                    actionIntoUnicode(edge.action) # 
+                      /* debug_show edge.actionTarget # */
+                      dfsIntoTextRec(internalDFS, indent);
+                }
+            })
+        };
+
+        public func dfsIntoText(dfs : ShowDFS) : Text {
+            dfsIntoTextRec(dfs, 0) # "\n"
+        };
+
+        public func showDFS(root: Pointer) : ShowDFS {
+            showDFSRec(root /*, PointerSetObj.new()*/ )
+        };
+
+        public func showDFSRec(root : Pointer /*, visited : PointerSetOBj */) : ShowDFS {
+            let nodeInfo = (peekInfo root)!;
+	        let nodeId = nodeInfo.nodeId;
+            switch (nodeInfo.node) {
+                case(#nonThunk(value)) {
+                    #leaf({
+                        nodeId = nodeInfo.nodeId;
+                        shape = #nonThunk; 
+                        value
+                    })
+                };
+                case(#thunk_(t)) {
+                    if (t.trace.size() == 0) {
+                        assert (nodeInfo.outgoingEdges.size() == 0);
+                        #leaf({
+                            nodeId = nodeInfo.nodeId;
+                            shape = #thunk_;
+                            value = nodeInfo.node.result;
+                        })
+                    } else {
+                        var prevEdge = null;
+                        var edges = [var ];
+                        for ((_, edge) in nodeInfo.outgoingEdges.vals()) {
+                            let edgeInfo = edgeActionInfo(edge);
+                            let actionTarget = prim "adaptonPointer" (edge.target.0);
+                            var dfs = null;
+                            if (edgeInfo.action == #force_ 
+                                /* and not(visited.contains(target)) */ ) {
+                                // visited.insert(target);
+                                dfs := ? showDFSRec(actionTarget /*, visited */);
+                            };
+                            if ( 
+                                prevEdge != null and
+                                prevEdge!.action == #put and 
+                                prevEdge!.actionTarget == actionTarget  ) {
+                                edges[edges.size() - 1] := {
+                                    actionTarget;
+                                    action=#putForce;
+                                    dfs;
+                                    value=edgeInfo.value;
+                                }
+                            } else { 
+                                let edge = {
+                                    action=edgeInfo.action;
+                                    actionTarget;
+                                    dfs;
+                                    value=edgeInfo.value;
+                                };
+                                edges #= [ edge ];
+                                prevEdge := ?edge;
+                            }
+                        };
+                        #internal({
+                            __nodeId = nodeId;
+                            __shape = #thunk_ ;
+                            edges;
+                            value = t.result
+                            })
+                    }
+                }
+            }
+        }
+   }
+}

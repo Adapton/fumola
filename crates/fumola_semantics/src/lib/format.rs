@@ -348,6 +348,8 @@ impl ToDoc for Value {
             }
             Value::Module(m) => m.doc(),
             Value::AdaptonPointer(p) => p.doc(),
+            Value::Thunk(c) => kwd("@thunk").append(enclose("(", c.content.doc(), ")")),
+            /*
             Value::Thunk(c) => kwd("@thunk").append(enclose(
                 "(",
                 c.ctx
@@ -357,7 +359,7 @@ impl ToDoc for Value {
                     .append(RcDoc::text(", env="))
                     .append(c.env.doc()),
                 ")",
-            )),
+            )), */
             Value::Pointer(p) => p.doc(),
             Value::Symbol(s) => s.doc(),
             Value::Opaque(_) => todo!(),

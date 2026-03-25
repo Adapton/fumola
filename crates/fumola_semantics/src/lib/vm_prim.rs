@@ -210,7 +210,10 @@ pub fn call_prim_function<A: Active>(
             Ok(Step {})
         }
         AdaptonPointer => {
-            if let Ok(symbol) = args.into_sym_or(()) {
+            if let Ok(space) = args.into_adapton_pointer_or(()) {
+                *active.cont() = cont_value(Value::AdaptonPointer(space));
+                Ok(Step {})
+            } else if let Ok(symbol) = args.into_sym_or(()) {
                 *active.cont() =
                     cont_value(Value::AdaptonPointer(adapton::Pointer::Symbol(symbol)));
                 Ok(Step {})
