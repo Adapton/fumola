@@ -2,6 +2,7 @@ use std::ops::Add;
 
 use crate::ToMotoko;
 use crate::Value;
+use crate::adapton::state::PutBeh;
 use crate::adapton::state::{CacheState, Counts, Settings};
 use crate::adapton::{Error, ForceBeginResult, Navigation, Pointer, Res, Space, Time};
 use crate::value::{Symbol_, ThunkBody, Value_};
@@ -247,7 +248,7 @@ impl GraphicalState {
         for ((pointer, _meta_time), node) in delayed_nodes.iter() {
             let node_value = node.get_value()?;
             let mut dummy: Counts = Counts::new();
-            self.put_pointer(&mut dummy, pointer.clone(), node_value)?;
+            self.put_pointer(&mut dummy, pointer.clone(), node_value, PutBeh::Undelay)?;
         }
         Ok(())
     }
@@ -353,10 +354,16 @@ impl CacheState for GraphicalState {
 
     fn put_symbol(&mut self, counts: &mut Counts, symbol: Symbol_, value: Value_) -> Res<Pointer> {
         let p: Pointer = self.space.apply(symbol);
-        self.put_pointer(counts, p.clone(), value)?;
+        self.put_pointer(counts, p.clone(), value, PutBeh::Put)?;
         Ok(p)
     }
-    fn put_pointer(&mut self, counts: &mut Counts, pointer: Pointer, value: Value_) -> Res<()> {
+    fn put_pointer(
+        &mut self,
+        counts: &mut Counts,
+        pointer: Pointer,
+        value: Value_,
+        beh: PutBeh,
+    ) -> Res<()> {
         let time = self.time.clone();
         let meta_time = self.meta_time.clone();
         let space = self.space.clone();
@@ -365,8 +372,7 @@ impl CacheState for GraphicalState {
         let new_node = Self::new_node(space, value.clone());
         let is_thunk = new_node.is_thunk();
         let nodes = nodes.update((time.clone(), meta_time.clone()), new_node);
-        if true {
-            // TO DO -- only do if it's an actual put, not a poke.
+        if beh == PutBeh::Put {
             if nodes.len() > nodes_orig_len {
                 counts.cells += 1;
                 if is_thunk {
@@ -503,14 +509,6 @@ impl CacheState for GraphicalState {
             Err(_) => None::<Value_>
                 .to_motoko_shared()
                 .map_err(|_| Error::Unreachable),
-        }
-    }
-
-    fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()> {
-        let mut dummy = Counts::new();
-        match time {
-            None => self.put_pointer(&mut dummy, pointer, value),
-            Some(time) => self.put_pointer_delay(pointer, time, value),
         }
     }
 }

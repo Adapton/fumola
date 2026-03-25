@@ -122,11 +122,11 @@ module {
             switch dfs {
                 case (#leaf(n)) { debug_show (n.nodeId.0) };
                 case (#internal(n)) {
-                    var edges = ""; // debug_show (n.__nodeId.0);
+                    var text = debug_show (prim "adaptonPointer" (n.__nodeId.0));
                     for (edge in n.edges.vals()) {
-                        edges #= "\n" # (edgeIntoText(edge, indent + 1));
+                        text #= "\n" # (edgeIntoText(edge, indent + 1));
                     };
-                    edges # "\n" 
+                    text # "\n" 
                     # indentText(indent + 1)
                     # "╰〜〜> " # (debug_show n.value)
                 }

@@ -69,6 +69,13 @@ impl Settings {
     }
 }
 
+#[derive(PartialEq)]
+pub enum PutBeh {
+    Put,
+    Poke,
+    Undelay,
+}
+
 /// Internal version of `AdaptonState` trait, for different caching strategies to each implement.
 pub trait CacheState {
     fn new() -> Self
@@ -76,7 +83,13 @@ pub trait CacheState {
         Self: Sized;
     fn now(&self) -> Time;
     fn here(&self) -> Space;
-    fn put_pointer(&mut self, counts: &mut Counts, _pointer: Pointer, value: Value_) -> Res<()>;
+    fn put_pointer(
+        &mut self,
+        counts: &mut Counts,
+        _pointer: Pointer,
+        value: Value_,
+        beh: PutBeh,
+    ) -> Res<()>;
     fn put_symbol(&mut self, counts: &mut Counts, _symbol: Symbol_, value: Value_) -> Res<Pointer>;
     fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_>;
     fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()>;
@@ -92,7 +105,6 @@ pub trait CacheState {
     fn navigate_end(&mut self) -> Res<()>;
     fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>>;
     fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_>;
-    fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()>;
 }
 
 impl State {
@@ -174,9 +186,10 @@ impl AdaptonState for State {
             Err(Error::CannotPutFutureReservedSymbol(pointer.into_symbol()?))
         } else {
             self.counts.put += 1;
+            let beh = PutBeh::Put;
             match &mut self.inner {
-                InnerState::Simple(s) => s.put_pointer(&mut self.counts, pointer, value),
-                InnerState::Graphical(g) => g.put_pointer(&mut self.counts, pointer, value),
+                InnerState::Simple(s) => s.put_pointer(&mut self.counts, pointer, value, beh),
+                InnerState::Graphical(g) => g.put_pointer(&mut self.counts, pointer, value, beh),
             }
         }
     }
@@ -284,9 +297,26 @@ impl AdaptonState for State {
     }
 
     fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()> {
-        match &mut self.inner {
-            InnerState::Simple(s) => s.poke(pointer, time, value),
-            InnerState::Graphical(g) => g.poke(pointer, time, value),
+        match time {
+            None => {
+                let beh = PutBeh::Poke;
+                match &mut self.inner {
+                    InnerState::Simple(s) => s.put_pointer(&mut self.counts, pointer, value, beh),
+                    InnerState::Graphical(g) => {
+                        g.put_pointer(&mut self.counts, pointer, value, beh)
+                    }
+                }
+            }
+            Some(time) => {
+                match &mut self.inner {
+                    InnerState::Simple(s) => s.put_pointer_delay(
+                        /* &mut self.counts, */ pointer, time, value, /*  , beh */
+                    ),
+                    InnerState::Graphical(g) => g.put_pointer_delay(
+                        /* &mut self.counts, */ pointer, time, value, /* , beh*/
+                    ),
+                }
+            }
         }
     }
 }
