@@ -365,16 +365,20 @@ impl CacheState for GraphicalState {
         let new_node = Self::new_node(space, value.clone());
         let is_thunk = new_node.is_thunk();
         let nodes = nodes.update((time.clone(), meta_time.clone()), new_node);
-        if nodes.len() > nodes_orig_len {
-            counts.cells += 1;
-            if is_thunk {
-                counts.thunk_cells += 1
-            } else {
-                counts.non_thunk_cells += 1;
+        if true {
+            // TO DO -- only do if it's an actual put, not a poke.
+            if nodes.len() > nodes_orig_len {
+                counts.cells += 1;
+                if is_thunk {
+                    counts.thunk_cells += 1
+                } else {
+                    counts.non_thunk_cells += 1;
+                }
             }
+            let put_action = Action::Put(value.clone());
+            let _ = self.new_edge_to_pointer(put_action, pointer.clone());
         };
-        self.space_time.insert(pointer.clone(), nodes);
-        let _ = self.new_edge_to_pointer(Action::Put(value.clone()), pointer);
+        self.space_time.insert(pointer, nodes);
         Ok(())
     }
     fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_> {
