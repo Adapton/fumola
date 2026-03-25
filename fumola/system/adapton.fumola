@@ -151,7 +151,7 @@ module {
                 };
                 case (?internalDFS) {
                     actionIntoUnicode(edge.action) # 
-                      debug_show edge.actionTarget #
+                      /* debug_show edge.actionTarget # */
                       dfsIntoTextRec(internalDFS, indent);
                 }
             })
