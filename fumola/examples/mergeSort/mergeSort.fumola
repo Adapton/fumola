@@ -40,7 +40,11 @@ module {
             
     public func dcg(seed : Nat, size : Nat, demand) {
         let inputArray = generateRandomInput(seed, size);
-        let inputSeq = Seq.fromArray(inputArray);
+        let inputSeq = 
+        // do @ `SeqFromArray {
+          Seq.fromArray(inputArray);
+        // }
+        // do @ `lazyMergeSortDemand {
         let sorted = Seq.lazyMergeSort(inputSeq);
         let result = switch (demand) {
             case (null) { LazyList.takeAll(sorted) };
@@ -56,6 +60,7 @@ module {
             sorted;
             result
         }
+        // }
     };
 
     public func writeDcgText(seed : Nat, size : Nat, demand) {
@@ -121,10 +126,10 @@ module {
         var outputs = [];
         for (demand in demands.vals()) {
             var output = [];
-            for (sizes in [[3,5,7,11,13,17,21,23],
-                           [25,33,50,75,100,125,150,175],
-                           [200,250,300,350,400,450],[500,750],
-                           [1000],[1500],[2000],[2500],[5000]
+            for (sizes in [[3,5,7,10,11,13,17,21,23],
+                           //[25,33,50,75,100,125,150,175],
+                           //[200,250,300,350,400,450],[500,750],
+                           //[1000],[1500],[2000],[2500],[5000]
                        ].vals()) {
                 prim "print" { demand ; sizes };
                 for (size in sizes.vals()) {

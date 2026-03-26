@@ -1,6 +1,5 @@
 use crate::adapton::AdaptonState;
 use crate::value::{ActorId, ActorMethod, Value, Value_};
-use crate::vm_types::DebugPrintLine;
 use crate::vm_types::Env;
 use crate::vm_types::Stack;
 use crate::vm_types::def::CtxId;
@@ -12,6 +11,7 @@ use crate::vm_types::{
     stack::{Frame, FrameCont},
 };
 use crate::vm_types::{ActiveBorrow, OutputFiles};
+use crate::vm_types::{DebugPrintLine, TestSuite};
 use crate::vm_types::{EvalInitError, Store};
 use crate::vm_types::{LocalPointer, NamedPointer};
 use crate::{nyi, type_mismatch};
@@ -45,6 +45,9 @@ impl Active for Core {
     }
     fn output_files<'a>(&'a mut self) -> &'a mut OutputFiles {
         &mut self.output_files
+    }
+    fn test_suite<'a>(&'a mut self) -> &'a mut TestSuite {
+        &mut self.test_suite
     }
     //fn schedule_choice<'a>(&'a self) -> &'a ScheduleChoice {
     //&self.schedule_choice
@@ -448,6 +451,7 @@ impl Core {
                 map: HashMap::new(),
                 import_stack: Vector::new(),
             },
+            test_suite: HashMap::new(),
             next_resp_id: 0,
             debug_print_out: Vector::new(),
             output_files: HashMap::new(),

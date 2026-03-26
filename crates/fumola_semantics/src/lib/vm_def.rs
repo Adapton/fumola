@@ -168,6 +168,7 @@ pub fn module_project(
     pattern: &Pat,
 ) -> Result<Vec<(Id_, Def)>, Interruption> {
     match pattern {
+        Pat::Wild => Ok(vec![]),
         Pat::Var(x) => Ok(vec![(x.clone(), Def::Module(m.clone()))]),
         Pat::Object(pat_fields) => {
             let mut r = vec![];
@@ -220,6 +221,7 @@ pub mod def {
         Shared,
         format::format_pretty,
         value::{Symbol, Text},
+        vm_types::TestSuiteItem,
     };
     use fumola_syntax::ast::{DecField, DecFields, Literal};
 
@@ -399,11 +401,26 @@ pub mod def {
         }
     }
 
-    pub fn insert_static_field<A: Active>(
-        active: &mut A,
-        source: &Source,
-        df: &DecField,
-    ) -> Result<(), Interruption> {
+    fn handle_test<A: Active>(active: &mut A, df: &DecField) -> Result<(), Interruption> {
+        if let Some(ref attrs) = df.attrs {
+            // to do -- introduce better semantic logic for attributes.
+            attrs.vec.iter().for_each(|attr| match &attr.0 {
+                ast::Attr::Id(id) => {
+                    if id.0.as_str() == "test" {
+                        let item = TestSuiteItem((active.defs().active_context(), df.clone()));
+                        let _ = active.test_suite().insert(item, ());
+                        ()
+                    } else {
+                    }
+                }
+                _ => (),
+            });
+            return Ok(());
+        };
+        Ok(())
+    }
+
+    fn handle_listing<A: Active>(active: &mut A, df: &DecField) -> Result<(), Interruption> {
         if let Some(ref attrs) = df.attrs {
             if attrs.vec.len() > 0 {
                 let (kind, id) = dec_field_kind_and_id(df);
@@ -477,7 +494,20 @@ pub mod def {
                     Text::new(format_pretty(&df.dec, width)).append(&Text::new("\n".to_string())),
                 );
             }
-        };
+            Ok(())
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn insert_static_field<A: Active>(
+        active: &mut A,
+        source: &Source,
+        df: &DecField,
+    ) -> Result<(), Interruption> {
+        handle_listing(active, df)?;
+        handle_test(active, df)?;
+        // handle_test();
         //println!("{:?} -- {:?} ", source, df);
         match &df.dec.0 {
             Dec::Attrs(_attrs, _dec) => {

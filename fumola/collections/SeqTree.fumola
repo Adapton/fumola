@@ -9,6 +9,7 @@ module {
     #element : Element<X>;
     #binary : Binary<X>
   };
+
   #[listing]
   public type SeqTree_<X> = Pointer<SeqTree<X>>;
 
@@ -70,7 +71,6 @@ module {
      )
     }
   };
-
 
   public func fromArray<X>(array : [(Symbol, X)]) : ?SeqTree_<X> {
     fromList(List.fromIter(array.vals()))
@@ -172,5 +172,12 @@ module {
       };
     }
   };
+
+  module Tests {
+    #[test]
+    func testFromListRec() {
+
+    };
+  }
 
 };

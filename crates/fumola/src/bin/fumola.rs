@@ -87,6 +87,7 @@ pub enum CliCommand {
         input: String,
     },
     Repl {},
+    Test {},
 }
 
 fn init_log(level_filter: log::LevelFilter) {
@@ -147,8 +148,27 @@ fn main() -> OurResult<()> {
             post_eval(&mut state, result)
         }
         CliCommand::Repl {} => repl(&mut state),
+        CliCommand::Test {} => test(&mut state),
     };
     Ok(())
+}
+
+fn test(state: &mut State) {
+    let mut state_ = state.clone();
+
+    let files = state_.semantic_state.module_files().map.clone();
+    for (path, _file) in files.iter() {
+        let res = state_.eval(format!("import _ \"{}\";", path.local_path).as_str());
+        if let Ok(_) = res {
+            info!("Imported {:?}", path.local_path);
+        } else {
+            error!("Could not import {:?}", path.local_path);
+            return;
+        }
+    }
+    for (test, ()) in state_.semantic_state.test_suite.iter() {
+        info!("Testing {}", format_one_line(&test.0 .1));
+    }
 }
 
 fn repl(state: &mut State) {
