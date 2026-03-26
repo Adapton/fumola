@@ -186,7 +186,9 @@ module {
     //
     #[listing]
     public func size<X>(tree : SeqTree<X>) : leaf {
-      reduceUp(@(tree!), 0, func(_,_) { 1 }, func(_,l,r){l + r})
+      do goto space (`levelTree(`Index)(`size)) {
+        reduceUp(@(tree!), 0, func(_,_) { 1 }, func(_,l,r){l + r})
+      }
     };
   };
 
