@@ -1,5 +1,5 @@
 use fumola::Error;
-use fumola_semantics::{Interruption, Value_};
+use fumola_semantics::{Interruption, Share, Value, Value_};
 
 use log::{debug, error, info, trace};
 
@@ -87,6 +87,7 @@ pub enum CliCommand {
         input: String,
     },
     Repl {},
+    Test {},
 }
 
 fn init_log(level_filter: log::LevelFilter) {
@@ -147,8 +148,79 @@ fn main() -> OurResult<()> {
             post_eval(&mut state, result)
         }
         CliCommand::Repl {} => repl(&mut state),
+        CliCommand::Test {} => test(&mut state),
     };
     Ok(())
+}
+
+fn test(state: &mut State) {
+    let mut state_ = state.clone();
+
+    let files = state_.semantic_state.module_files().map.clone();
+    for (path, _file) in files.iter() {
+        let res = state_.eval(format!("import _ \"{}\";", path.local_path).as_str());
+        if let Ok(_) = res {
+            info!("Imported {:?}", path.local_path);
+        } else {
+            error!("Could not import {:?}", path.local_path);
+            return;
+        }
+    }
+
+    let tests = state_.semantic_state.test_suite.clone();
+    let mut errors = 0;
+    let mut passed = 0;
+    for (test, ()) in tests.iter() {
+        debug!("Testing {}", format_one_line(&test.0 .1));
+        let defs = test.0 .0.clone();
+        let dec_field = test.0 .2.clone();
+        let ctx_id = test.0 .1.clone();
+        let func_def = test.0 .3.clone();
+        match dec_field.dec.0 {
+            fumola_syntax::ast::Dec::Func(ref function) => {
+                let mut state__ = state_.clone(); // sandbox test
+                match state__
+                    .semantic_state
+                    .call_function_def(func_def, Value::Unit.share())
+                {
+                    Ok(_) => {
+                        info!(
+                            "✅ {}/{:?}: {}: {}",
+                            defs.active_path.unwrap(),
+                            ctx_id,
+                            dec_field.dec.1,
+                            format_one_line(&function.name)
+                        );
+
+                        passed += 1;
+                    }
+                    Err(error) => {
+                        error!(
+                            "❌ {}/{:?}: {}: {}",
+                            defs.active_path.unwrap(),
+                            ctx_id,
+                            dec_field.dec.1,
+                            format_one_line(&function.name)
+                        );
+                        report_error(state, error.into());
+                        errors += 1;
+                    }
+                }
+            }
+            _ => {
+                error!(
+                    "Couldn't test non-function declaration. {}",
+                    &dec_field.dec.1
+                )
+            }
+        }
+    }
+    info!(
+        "{} Tests: {} passed and {} failed.",
+        tests.len(),
+        passed,
+        errors
+    )
 }
 
 fn repl(state: &mut State) {

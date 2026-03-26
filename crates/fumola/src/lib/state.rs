@@ -35,7 +35,7 @@ impl State {
         arg: Value_,
     ) -> Result<Value_, crate::Error> {
         self.semantic_state
-            .call(actor, method, arg, &Limits::none())
+            .call_method(actor, method, arg, &Limits::none())
             .map_err(|x| x.into())
     }
 

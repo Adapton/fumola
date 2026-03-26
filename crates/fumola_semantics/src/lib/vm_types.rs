@@ -1,8 +1,9 @@
 use crate::adapton;
 pub use crate::value::Value_;
 use crate::value::{ActorId, ActorMethod, Symbol, Text, ValueError};
+use crate::vm_types::def::CtxId;
 use crate::{Share, Value};
-use fumola_syntax::ast::{Dec_, Exp_, Id, Id_, PrimType, Source, Span};
+use fumola_syntax::ast::{Dec_, DecField, Exp_, Id, Id_, PrimType, Source, Span};
 use fumola_syntax::ast::{Inst, Mut};
 use fumola_syntax::shared::FastClone;
 use im_rc::{HashMap, Vector};
@@ -588,10 +589,16 @@ pub struct Core {
     pub next_resp_id: usize,
     pub debug_print_out: Vector<DebugPrintLine>,
     pub module_files: ModuleFiles,
+    pub test_suite: TestSuite,
     pub output_files: OutputFiles,
 }
 
 pub type OutputFiles = HashMap<Symbol, Text>;
+
+#[derive(Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TestSuiteItem(pub (def::Defs, CtxId, DecField, def::Function));
+
+pub type TestSuite = HashMap<TestSuiteItem, ()>;
 
 /// The current/last/next schedule choice, depending on context.
 #[derive(Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
@@ -687,6 +694,7 @@ pub trait Active: ActiveBorrow {
     fn defs<'a>(&'a mut self) -> &'a mut def::Defs;
     fn module_files<'a>(&'a mut self) -> &'a mut ModuleFiles;
     fn output_files<'a>(&'a mut self) -> &'a mut OutputFiles;
+    fn test_suite<'a>(&'a mut self) -> &'a mut TestSuite;
     fn ctx_id<'a>(&'a mut self) -> &'a mut def::CtxId;
     //fn schedule_choice<'a>(&'a self) -> &'a ScheduleChoice;
     fn cont<'a>(&'a mut self) -> &'a mut Cont;
