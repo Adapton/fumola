@@ -77,7 +77,8 @@ module {
     fromList(List.fromIter(array.vals()))
   };
 
-  public func intoArray<X>(tree : SeqTree<X>) : [(Symbol, X)] {
+  public func intoArray<X>(tree : ?SeqTree_<X>) : [(Symbol, X)] {
+    if (tree == null) { return [] };
     reduceUp(@(tree!), [], func(s,x){[(s,x)]}, func(_,l,r){l # r})
   };
 
@@ -179,6 +180,7 @@ module {
   };
 
   // The number of leaf nodes.
+  #[listing]
   public func size<X>(tree : SeqTree<X>) : leaf {
     reduceUp(@(tree!), 0, func(_,_) { 1 }, func(_,l,r){l + r})
   };
@@ -187,6 +189,9 @@ module {
 
     #[test]
     func testFromIntoArray() {
+      assert intoArray(fromArray([])) == [];
+      assert intoArray(fromArray([(0,0)])) == [(0,0)];
+      assert intoArray(fromArray([(0,0), (1,1)])) == [(0,0), (1,1)];
       let input = R.generateRandomInput(10, 10);
       let tree = fromArray(input);
       assert intoArray(tree) == input
@@ -202,6 +207,7 @@ module {
     #[test]
     func testInsert() {
       let input = R.generateRandomInput(10, 10);
+      let tree = fromArray(input);
 
       // TO DO
     };
