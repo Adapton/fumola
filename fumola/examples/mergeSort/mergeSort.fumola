@@ -19,7 +19,12 @@ module {
 
     #[test]
     func testGenInput() {
-        let _ = generateRandomInput(10, 10);
+        let i = generateRandomInput(10, 10);
+        assert i == [
+            (1, 470), (2, 0), (3, 1192), (4, 55),
+            (5, 195), (6, 1191), (7, 777),
+            (8, 581), (9, 1306), (10, 545)
+        ];
     };
 
     public func report( outputs ) {
