@@ -1,4 +1,4 @@
-import Seq "SeqTree";
+import Seq "levelTree";
 import LazyList "LazyList";
 import A "adapton";
 
@@ -15,6 +15,11 @@ module {
             result #= [(count, x % maxValue)]
         };
         result
+    };
+
+    #[test]
+    func testGenInput() {
+        let _ = generateRandomInput(10, 10);
     };
 
     public func report( outputs ) {
