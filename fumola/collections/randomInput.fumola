@@ -1,0 +1,26 @@
+module {
+   public let defaultSeed = 10;
+
+    public func generateRandomInput(seed : Nat, size : Nat) : [(Nat, Nat)] {
+        let iter = prim "fastRandIterNew" (?size, seed);
+        var count = 0;
+        var result = [];
+        let maxValue = size * 137; // encourage non-unique elements for large sizes.
+        for (x in iter) {
+            count += 1;
+            result #= [(count, x % maxValue)]
+        };
+        result
+    };
+
+    #[test]
+    func testGenInput() {
+        let i = generateRandomInput(10, 10);
+        assert i == [
+            (1, 470), (2, 0), (3, 1192), (4, 55),
+            (5, 195), (6, 1191), (7, 777),
+            (8, 581), (9, 1306), (10, 545)
+        ];
+    };
+
+}
