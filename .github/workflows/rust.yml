@@ -31,3 +31,6 @@ jobs:
 
       - name: Run Fumola tests
         run: ./test.sh
+
+      - name: Run Fumola/examples/mergeSort data collection
+        run: ./run-example-mergeSort.sh
