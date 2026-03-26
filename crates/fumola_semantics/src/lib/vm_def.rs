@@ -401,13 +401,22 @@ pub mod def {
         }
     }
 
-    fn handle_test<A: Active>(active: &mut A, df: &DecField) -> Result<(), Interruption> {
+    fn handle_test<A: Active>(
+        active: &mut A,
+        df: &DecField,
+        fd: &FunctionDef,
+    ) -> Result<(), Interruption> {
         if let Some(ref attrs) = df.attrs {
             // to do -- introduce better semantic logic for attributes.
             attrs.vec.iter().for_each(|attr| match &attr.0 {
                 ast::Attr::Id(id) => {
                     if id.0.as_str() == "test" {
-                        let item = TestSuiteItem((active.defs().active_context(), df.clone()));
+                        let item = TestSuiteItem((
+                            active.defs().clone(),
+                            active.defs().active_context(),
+                            df.clone(),
+                            fd.clone(),
+                        ));
                         let _ = active.test_suite().insert(item, ());
                         ()
                     } else {
@@ -506,7 +515,6 @@ pub mod def {
         df: &DecField,
     ) -> Result<(), Interruption> {
         handle_listing(active, df)?;
-        handle_test(active, df)?;
         // handle_test();
         //println!("{:?} -- {:?} ", source, df);
         match &df.dec.0 {
@@ -554,6 +562,7 @@ pub mod def {
                         }))
                         .share(),
                     };
+                    handle_test(active, df, &f)?;
                     active.defs().insert_field(
                         name.0.id_ref(),
                         source.clone(),

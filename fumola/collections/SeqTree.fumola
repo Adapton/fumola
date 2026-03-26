@@ -174,10 +174,32 @@ module {
   };
 
   module Tests {
+
     #[test]
     func testFromListRec() {
+      // TO DO
+    };
+
+    #[test]
+    func testInsert() {
+      // TO DO
+    };
+
+    #[test]
+    func testRemove() {
+      // TO DO
+    };
+
+    #[test]
+    func testReplace() {
 
     };
+
+    #[test]
+    func shouldPass() {
+      assert true
+    };
+
   }
 
 };
