@@ -1,5 +1,6 @@
 import List "List";
 import LazyList "LazyList";
+import R "randomInput";
 
 module { 
     
@@ -177,7 +178,11 @@ module {
 
     #[test]
     func testFromListRec() {
-      // TO DO
+      let input = R.generateRandomInput(10, 10);
+      let tree = fromArray(input);
+      assert tree ==
+        ?(prim "adaptonPointer" (9-`binary))
+      // TO DO -- assert intoArray(tree) == input
     };
 
     #[test]
