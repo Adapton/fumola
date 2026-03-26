@@ -179,10 +179,15 @@ module {
     }
   };
 
-  // The number of leaf nodes.
-  #[listing]
-  public func size<X>(tree : SeqTree<X>) : leaf {
-    reduceUp(@(tree!), 0, func(_,_) { 1 }, func(_,l,r){l + r})
+  public module Index {
+    //
+    // The number of leaf nodes.
+    // used by the index-based edit operations in Edit module.
+    //
+    #[listing]
+    public func size<X>(tree : SeqTree<X>) : leaf {
+      reduceUp(@(tree!), 0, func(_,_) { 1 }, func(_,l,r){l + r})
+    };
   };
 
   module Tests {
@@ -201,7 +206,7 @@ module {
     func testSize() {
       let input = R.generateRandomInput(10, 10);
       let tree = fromArray(input);
-      assert size(tree) == 10;
+      assert Index.size(tree) == 10;
     };
 
     #[test]
