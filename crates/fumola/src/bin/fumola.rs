@@ -349,11 +349,11 @@ fn truncate_debug<T: std::fmt::Debug>(value: &T, max_len: usize) -> String {
 fn report_error(state: &mut State, error: fumola::Error) {
     let cont = state.semantic_state.cont().clone();
     let cont_source = state.semantic_state.cont_source().clone();
+    eprintln!("");
+    error!("{:?}", error);
+    eprintln!("");
+    eprintln!("{:17}: {}", cont_source, truncate_debug(&cont, 63));
     if let Ok(stack) = state.semantic_state.agent_stack() {
-        eprintln!("");
-        error!("{:?}", error);
-        eprintln!("");
-        eprintln!("{:17}: {}", cont_source, truncate_debug(&cont, 63));
         for frame in stack.iter() {
             eprintln!("{:17}: {}", &frame.source, truncate_debug(&frame.cont, 63));
         }

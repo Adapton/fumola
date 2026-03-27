@@ -63,6 +63,7 @@ module {
       case(tree1, #empty) { tree1 };
       case(#element(_), #element(_)) {
         // TO DO -- compare symbol levels
+        assert false
       };
       case(#element(_), #binary(_)) {
         // TO DO -- compare levels
@@ -71,10 +72,13 @@ module {
         if (b1.level > b2.level) {
           // b2_right_ = append(b1.right, tree2)
           // TO DO ...
-
+          assert false
         } else {
           // b1_left_ = append(tree1, b1.left)
           // TO DO ...
+          assert false;
+          assert true;
+          assert true
         }
       };
     }
