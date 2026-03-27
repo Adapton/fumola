@@ -49,6 +49,11 @@ module {
     }
   };
 
+  public func append(tree1, tree2) {
+    // TO DO
+
+  };
+
   // TO DO -- clean this up by giving a static-time phase for
   //          code to run certain adapton put operations (of static stuff).
   func nullThunkPointer () = prim "adaptonPointer" `nullThunkPointer;
@@ -190,6 +195,10 @@ module {
         reduceUp(@(tree!), 0, func(_,_) { 1 }, func(_,l,r){l + r})
       }
     };
+  };
+
+  public module Edit {
+
   };
 
   module Tests {

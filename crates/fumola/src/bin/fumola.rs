@@ -1,6 +1,7 @@
 use fumola::Error;
 use fumola_semantics::{Interruption, Share, Value, Value_};
 
+use im_rc::HashMap;
 use log::{debug, error, info, trace};
 
 use fumola::state::State;
@@ -170,48 +171,69 @@ fn test(state: &mut State) {
     let tests = state_.semantic_state.test_suite.clone();
     let mut errors = 0;
     let mut passed = 0;
+    let mut test_func_defs = HashMap::new();
     for (test, ()) in tests.iter() {
         debug!("Testing {}", format_one_line(&test.0 .1));
         let defs = test.0 .0.clone();
         let dec_field = test.0 .2.clone();
         let ctx_id = test.0 .1.clone();
         let func_def = test.0 .3.clone();
-        match dec_field.dec.0 {
-            fumola_syntax::ast::Dec::Func(ref function) => {
-                let mut state__ = state_.clone(); // sandbox test
-                match state__
-                    .semantic_state
-                    .call_function_def(func_def, Value::Unit.share())
-                {
-                    Ok(_) => {
-                        info!(
-                            "✅ {}/{:?}: {}: {}",
-                            defs.active_path.unwrap(),
-                            ctx_id,
-                            dec_field.dec.1,
-                            format_one_line(&function.name)
-                        );
+        if !test_func_defs.contains_key(&func_def.function.exp) {
+            test_func_defs.insert(func_def.function.exp.clone(), ());
+            match dec_field.dec.0 {
+                fumola_syntax::ast::Dec::Func(ref function) => {
+                    let mut state__ = state_.clone(); // sandbox test
+                    match state__
+                        .semantic_state
+                        .call_function_def(func_def, Value::Unit.share())
+                    {
+                        Ok(_) => {
+                            let def = defs.map.get(&ctx_id).unwrap();
+                            if let Some(local_id) = &def.local_id {
+                                info!(
+                                    "✅ {}/{}.{}",
+                                    &defs.active_path.clone().unwrap(),
+                                    format_one_line(local_id),
+                                    format_one_line(&function.name)
+                                );
+                            } else {
+                                info!(
+                                    "✅ {} -- {}",
+                                    &defs.active_path.clone().unwrap(),
+                                    format_one_line(&function.name)
+                                );
+                            }
+                            if false {
+                                info!(
+                                    "✅ {}/{:?}: {}: {}",
+                                    defs.active_path.unwrap(),
+                                    ctx_id,
+                                    dec_field.dec.1,
+                                    format_one_line(&function.name)
+                                );
+                            };
 
-                        passed += 1;
-                    }
-                    Err(error) => {
-                        error!(
-                            "❌ {}/{:?}: {}: {}",
-                            defs.active_path.unwrap(),
-                            ctx_id,
-                            dec_field.dec.1,
-                            format_one_line(&function.name)
-                        );
-                        report_error(state, error.into());
-                        errors += 1;
+                            passed += 1;
+                        }
+                        Err(error) => {
+                            error!(
+                                "❌ {}/{:?}: {}: {}",
+                                defs.active_path.unwrap(),
+                                ctx_id,
+                                dec_field.dec.1,
+                                format_one_line(&function.name)
+                            );
+                            report_error(state, error.into());
+                            errors += 1;
+                        }
                     }
                 }
-            }
-            _ => {
-                error!(
-                    "Couldn't test non-function declaration. {}",
-                    &dec_field.dec.1
-                )
+                _ => {
+                    error!(
+                        "Couldn't test non-function declaration. {}",
+                        &dec_field.dec.1
+                    )
+                }
             }
         }
     }

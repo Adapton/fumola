@@ -118,8 +118,21 @@ module {
     };
 
     #[test]
-    func testRunRandom() {
-        runRandom(10, 10, true, null);
+    public func testRunRandom() {
+        let res = runRandom(10, 10, true, null);
+        assert res.size == 10;
+        assert res.counts.postDemandCounts == ({
+            cells = 75;
+            force_begin = 65;
+            force_begin_cache_hit = 9;
+            force_begin_cache_miss = 56;
+            force_end = 56;
+            get = 57;
+            non_thunk_cells = 19;
+            put = 75;
+            put_delay = 0;
+            thunk_cells = 56
+        })
     };
 
     public func runAll() {
@@ -167,7 +180,7 @@ module {
             };
             let demand = demandSym(demand);
             prim "writeFile" (`demand-demand-`size-`dat, sizes);
-            prim "writeFile" (`demand-demand-`depth-`dat, depths);
+            prim "writeFile" (`demand-demand-`depth-`mdat, depths);
             prim "writeFile" (`demand-demand-`comparisonCount-`dat, comparisonCounts);
         };
 

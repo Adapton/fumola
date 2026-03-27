@@ -77,7 +77,7 @@ macro_rules! nyi {
 }
 
 pub mod def {
-    use fumola_syntax::ast::{Id, Source, Stab_, Vis_};
+    use fumola_syntax::ast::{Id, Id_, Source, Stab_, Vis_};
     use im_rc::HashMap;
     use serde::{Deserialize, Serialize};
 
@@ -103,6 +103,7 @@ pub mod def {
     pub struct Ctx {
         pub parent: Option<CtxId>,
         pub fields: HashMap<Id, Field>,
+        pub local_id: Option<Id_>,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
