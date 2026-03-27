@@ -1,5 +1,6 @@
 import List "List";
 import LazyList "LazyList";
+import R "randomInput";
 
 module { 
     
@@ -48,6 +49,70 @@ module {
     }
   };
 
+  #[listing]
+  public type GenSymThk = Thunk<(Symbol, GenSymThk)>;
+  
+  #[listing]
+  public func append<X>(
+    genSym : GenSymThk,
+    tree1 : SeqTree<X>,
+    tree2 : SeqTree<X>
+  ) : SeqTree<X> {
+    switch(tree1, tree2) {
+      case(#empty, tree2) { tree2 };
+      case(tree1, #empty) { tree1 };
+      case(#element(_), #element(_)) {
+        // TO DO -- compare symbol levels
+      
+      };
+      case(#element(_), #binary(_)) {
+        // TO DO -- compare levels
+
+      };
+      case(#binary(b1), #binary(b2)) {
+        if (b1.level > b2.level) {
+          // b2_right_ = append(b1.right, tree2)
+          // TO DO ...
+        
+        } else {
+          // b1_left_ = append(tree1, b1.left)
+          // TO DO ...  
+
+        }
+      };
+    }
+  };
+
+  #[listing]
+  public func append_<X>(
+    genSym : GenSymThk,
+    left : ?SeqTree_<X>, right : ?SeqTree_<X>
+  ) : ?SeqTree_ {
+    // prim "print" (debug_show (force genSym));
+    switch (left, right) {
+      case (null, _) right;
+      case (_, null) left;
+      case (?l, ?r) {
+        append(genSym, @ l, @ r)
+      }
+    }
+  };
+
+  public func genSymsFrom(s : Symbol, n : Nat) : GenSymThk {
+    thunk { (s-n, genSymsFrom(s, n + 1))}
+  };
+
+  #[test]
+  public func testAppend() {
+    let (lSize, rSize) = (3, 3);
+    let left = fromArray(R.generateRandomInput(10, lSize));
+    let right = fromArray(R.generateRandomInput_(10, lSize, rSize));
+
+    prim "print" (debug_show (intoArray(left), intoArray(right)));
+
+    append_(genSymsFrom(`x, 0), left, right)
+  };
+
   // TO DO -- clean this up by giving a static-time phase for
   //          code to run certain adapton put operations (of static stuff).
   func nullThunkPointer () = prim "adaptonPointer" `nullThunkPointer;
@@ -74,6 +139,11 @@ module {
 
   public func fromArray<X>(array : [(Symbol, X)]) : ?SeqTree_<X> {
     fromList(List.fromIter(array.vals()))
+  };
+
+  public func intoArray<X>(tree : ?SeqTree_<X>) : [(Symbol, X)] {
+    if (tree == null) { return [] };
+    reduceUp(@(tree!), [], func(s,x){[(s,x)]}, func(_,l,r){l # r})
   };
 
   #[listing]
@@ -173,15 +243,47 @@ module {
     }
   };
 
+  public module Index {
+    //
+    // The number of leaf nodes.
+    // used by the index-based edit operations in Edit module.
+    //
+    #[listing]
+    public func size<X>(tree : SeqTree<X>) : leaf {
+      do goto space (`levelTree(`Index)(`size)) {
+        reduceUp(@(tree!), 0, func(_,_) { 1 }, func(_,l,r){l + r})
+      }
+    };
+  };
+
+  public module Edit {
+
+  };
+
   module Tests {
 
     #[test]
-    func testFromListRec() {
-      // TO DO
+    func testFromIntoArray() {
+      assert intoArray(fromArray([])) == [];
+      assert intoArray(fromArray([(0,0)])) == [(0,0)];
+      assert intoArray(fromArray([(0,0), (1,1)])) == [(0,0), (1,1)];
+      let input = R.generateRandomInput(10, 10);
+      let tree = fromArray(input);
+      assert intoArray(tree) == input
+    };
+
+    #[test]
+    func testSize() {
+      let input = R.generateRandomInput(10, 10);
+      let tree = fromArray(input);
+      assert Index.size(tree) == 10;
     };
 
     #[test]
     func testInsert() {
+      let input = R.generateRandomInput(10, 10);
+      let tree = fromArray(input);
+
       // TO DO
     };
 

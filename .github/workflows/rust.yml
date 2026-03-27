@@ -30,5 +30,7 @@ jobs:
         run: cargo test --verbose
 
       - name: Run Fumola tests
-        run: |
-          cargo run -- test --import $(find fumola -name "*.fumola" | sort)
+        run: ./test.sh
+
+      - name: Run Fumola/examples/mergeSort data collection
+        run: ./run-example-mergeSort.sh

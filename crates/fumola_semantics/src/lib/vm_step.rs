@@ -368,7 +368,9 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
 pub fn decs_step<A: Active>(active: &mut A, mut decs: Vector<Dec_>) -> Result<Step, Interruption> {
     if decs.is_empty() {
         *active.cont() = cont_value(Value::Unit);
-        *active.cont_source() = Source::Evaluation;
+
+        // *active.cont_source() = Source::Evaluation;
+
         Ok(Step {})
     } else {
         let dec_ = decs.pop_front().unwrap();

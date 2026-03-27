@@ -79,7 +79,7 @@ impl State {
             return Err(Interruption::AmbiguousActorId(id).into());
         };
         let (decs, _id, dfs) = check::assert_actor_def(path.clone(), def)?;
-        let (saved, new_root) = self.semantic_state.defs().enter_context(true);
+        let (saved, new_root) = self.semantic_state.defs().enter_context(None, true);
         for dec in decs.iter() {
             let dec = dec.clone();
             let df = fumola_syntax::ast::DecField {
@@ -111,7 +111,10 @@ impl State {
             return Err(Interruption::ActorIdNotFound(id).into());
         };
         let (decs, _id, dfs) = check::assert_actor_def(path.clone(), def)?;
-        let (saved, ctxid, old_ctx) = self.semantic_state.defs().reenter_context(&old_def.context);
+        let (saved, ctxid, old_ctx) = self
+            .semantic_state
+            .defs()
+            .reenter_context(None, &old_def.context);
         for dec in decs.iter() {
             let dec = dec.clone();
             let df = fumola_syntax::ast::DecField {
@@ -185,7 +188,10 @@ impl State {
             .get(&path)
             .map(|x| x.clone());
         if let Some(ModuleFileState::Defined(old)) = old {
-            let (saved, ctxid, old_ctx) = self.semantic_state.defs().reenter_context(&old.context);
+            let (saved, ctxid, old_ctx) = self
+                .semantic_state
+                .defs()
+                .reenter_context(None, &old.context);
             for dec in init.outer_decs.iter() {
                 let dec = dec.clone();
                 let df = DecField {

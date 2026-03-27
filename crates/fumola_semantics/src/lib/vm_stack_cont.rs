@@ -348,7 +348,10 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
         }
         Assert => match &*v {
             Value::Bool(true) => unit_step(active),
-            Value::Bool(false) => Err(Interruption::AssertionFailure),
+            Value::Bool(false) => {
+                //eprintln!("{:?}", active.stack());
+                Err(Interruption::AssertionFailure)
+            }
             _ => type_mismatch!(file!(), line!()),
         },
         Ignore => unit_step(active),
