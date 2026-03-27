@@ -49,9 +49,49 @@ module {
     }
   };
 
-  public func append(tree1, tree2) {
-    // TO DO
+  public type GenSymThk = Thunk<(Symbol, GenSymThk)>;
+  public func append<X>(
+    genSym : GenSymThk,
+    tree1 : SeqTree<X>,
+    tree2 : SeqTree<X>
+  ) : SeqTree<X> {
+    switch(tree1, tree2) {
+      case(#empty, tree2) { tree2 };
+      case(tree1, #empty) { tree1 };
+      case(#element(_), #element(_)) {};
+      case(#element(_), #binary(_)) {};
+      case(#binary(b1), #binary(b2)) {
+        if (b1.level > b2.level) {
+          // b2_right_ = append(b1.right, tree2)
 
+        } else {
+          // b1_left_ = append(tree1, b1.left)
+
+        }
+      };
+    }
+  };
+
+  public func append_(genSym, left, right) {
+    // prim "print" (debug_show (force genSym));
+    switch (left, right) {
+      case (null, _) right;
+      case (_, null) left;
+      case (?l, ?r) {
+        append(genSym, @l, @r)
+      }
+    }
+  };
+
+  public func genSymsFrom(s : Symbol, n : Nat) {
+    thunk { (s-n, genSymsFrom(s, n + 1))}
+  };
+
+  #[test]
+  func testAppend() {
+    let left = fromArray(R.generateRandomInput(10, 0));
+    let right = fromArray(R.generateRandomInput_(10, 6, 0));
+    append_(genSymsFrom(`x, 0), left, right)
   };
 
   // TO DO -- clean this up by giving a static-time phase for

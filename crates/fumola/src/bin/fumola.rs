@@ -191,14 +191,14 @@ fn test(state: &mut State) {
                             let def = defs.map.get(&ctx_id).unwrap();
                             if let Some(local_id) = &def.local_id {
                                 info!(
-                                    "✅ {}/{}.{}",
+                                    "✅ {}/{}/???.{}",
                                     &defs.active_path.clone().unwrap(),
                                     format_one_line(local_id),
                                     format_one_line(&function.name)
                                 );
                             } else {
                                 info!(
-                                    "✅ {} -- {}",
+                                    "✅ {}/???.{}",
                                     &defs.active_path.clone().unwrap(),
                                     format_one_line(&function.name)
                                 );
