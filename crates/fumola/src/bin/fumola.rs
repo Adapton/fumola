@@ -171,7 +171,12 @@ fn test(state: &mut State) {
     let tests = state_.semantic_state.test_suite.clone();
     let mut errors = 0;
     let mut passed = 0;
+
+    // WIP -- This was meant to avoid duplicate tests, but does not work currently
+    //        to avoid re-doing the duplicates that arise because of symlinks we use in fumola code library.
+    //        more investigation required. 2026-03-27.
     let mut test_func_defs = HashMap::new();
+
     for (test, ()) in tests.iter() {
         debug!("Testing {}", format_one_line(&test.0 .1));
         let defs = test.0 .0.clone();
@@ -183,12 +188,17 @@ fn test(state: &mut State) {
             match dec_field.dec.0 {
                 fumola_syntax::ast::Dec::Func(ref function) => {
                     let mut state__ = state_.clone(); // sandbox test
-                    match state__
+                                                      // shadow these names, to avoid ambiguity or typos below:
+                    state__.semantic_state.clear_cont();
+
+                    let res = state__
                         .semantic_state
-                        .call_function_def(func_def, Value::Unit.share())
-                    {
+                        .call_function_def(func_def, Value::Unit.share());
+
+                    match res {
                         Ok(_) => {
                             let def = defs.map.get(&ctx_id).unwrap();
+
                             if let Some(local_id) = &def.local_id {
                                 info!(
                                     "✅ {}/{}/???.{}",
@@ -223,7 +233,7 @@ fn test(state: &mut State) {
                                 dec_field.dec.1,
                                 format_one_line(&function.name)
                             );
-                            report_error(state, error.into());
+                            report_error(&mut state__, error.into());
                             errors += 1;
                         }
                     }
@@ -352,10 +362,18 @@ fn report_error(state: &mut State, error: fumola::Error) {
     eprintln!("");
     error!("{:?}", error);
     eprintln!("");
-    eprintln!("{:17}: {}", cont_source, truncate_debug(&cont, 63));
+    eprintln!(
+        "[{:_>17}]: {}",
+        &format!("{}", cont_source),
+        truncate_debug(&cont, 63)
+    );
     if let Ok(stack) = state.semantic_state.agent_stack() {
         for frame in stack.iter() {
-            eprintln!("{:17}: {}", &frame.source, truncate_debug(&frame.cont, 63));
+            eprintln!(
+                "[{:_>17}]: {}",
+                &format!("{}", &frame.source),
+                truncate_debug(&frame.cont, 63)
+            );
         }
     } else {
         error!("(No stack available to print)\n{:?}", error);
