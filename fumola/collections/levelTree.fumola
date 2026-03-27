@@ -49,7 +49,10 @@ module {
     }
   };
 
+  #[listing]
   public type GenSymThk = Thunk<(Symbol, GenSymThk)>;
+  
+  #[listing]
   public func append<X>(
     genSym : GenSymThk,
     tree1 : SeqTree<X>,
@@ -58,39 +61,52 @@ module {
     switch(tree1, tree2) {
       case(#empty, tree2) { tree2 };
       case(tree1, #empty) { tree1 };
-      case(#element(_), #element(_)) {};
-      case(#element(_), #binary(_)) {};
+      case(#element(_), #element(_)) {
+        // TO DO -- compare symbol levels
+      };
+      case(#element(_), #binary(_)) {
+        // TO DO -- compare levels
+      };
       case(#binary(b1), #binary(b2)) {
         if (b1.level > b2.level) {
           // b2_right_ = append(b1.right, tree2)
+          // TO DO ...
 
         } else {
           // b1_left_ = append(tree1, b1.left)
-
+          // TO DO ...
         }
       };
     }
   };
 
-  public func append_(genSym, left, right) {
+  #[listing]
+  public func append_<X>(
+    genSym : GenSymThk,
+    left : ?SeqTree_<X>, right : ?SeqTree_<X>
+  ) : ?SeqTree_ {
     // prim "print" (debug_show (force genSym));
     switch (left, right) {
       case (null, _) right;
       case (_, null) left;
       case (?l, ?r) {
-        append(genSym, @l, @r)
+        append(genSym, @ l, @ r)
       }
     }
   };
 
-  public func genSymsFrom(s : Symbol, n : Nat) {
+  public func genSymsFrom(s : Symbol, n : Nat) : GenSymThk {
     thunk { (s-n, genSymsFrom(s, n + 1))}
   };
 
   #[test]
-  func testAppend() {
-    let left = fromArray(R.generateRandomInput(10, 0));
-    let right = fromArray(R.generateRandomInput_(10, 6, 0));
+  public func testAppend() {
+    let (lSize, rSize) = (3, 3);
+    let left = fromArray(R.generateRandomInput(10, lSize));
+    let right = fromArray(R.generateRandomInput_(10, lSize, rSize));
+
+    prim "print" (debug_show (intoArray(left), intoArray(right)));
+
     append_(genSymsFrom(`x, 0), left, right)
   };
 

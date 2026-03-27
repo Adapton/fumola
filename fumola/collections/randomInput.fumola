@@ -1,20 +1,25 @@
 module {
    public let defaultSeed = 10;
 
+    //
+    // sometimes we need two or more inputs with distinct sets of symbols,
+    // and (mostly) distinct elements, in expectation.
+    //
     public func generateRandomInput_(seed : Nat, startIndex : Nat, size : Nat) : [(Nat, Nat)] {
-        let iter = prim "fastRandIterNew" (?size, seed);
+        let iter = prim "fastRandIterNew" (?size, seed + startIndex);
         var count = 0;
         var result = [];
-        let maxValue = size * 137; // encourage non-unique elements for large sizes.
+        let maxValue = (size + startIndex) * 137; // encourage non-unique elements for large sizes.
         for (x in iter) {
             count += 1;
-            if (count > startIndex) {
-                result #= [(count, x % maxValue)]
-            }
+            result #= [(count + startIndex, x % maxValue)]
         };
         result
     };
 
+    //
+    // Simple case where there's just one input to consider.
+    //
     public func generateRandomInput(seed : Nat, size : Nat) : [(Nat, Nat)] {
         generateRandomInput_(seed, 0, size)
     };
