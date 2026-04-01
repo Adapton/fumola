@@ -597,7 +597,7 @@ pub struct Core {
 pub type OutputFiles = HashMap<Symbol, Text>;
 
 #[derive(Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
-pub struct TestSuiteItem(pub (def::Defs, CtxId, DecField, def::Function));
+pub struct TestSuiteItem(pub (String, def::Defs, CtxId, DecField, def::Function));
 
 pub type TestSuite = HashMap<TestSuiteItem, ()>;
 

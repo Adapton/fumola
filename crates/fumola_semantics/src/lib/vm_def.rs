@@ -217,7 +217,7 @@ fn path_base(path: &String) -> String {
 pub mod def {
 
     use fumola_syntax::ast;
-    use log::debug;
+    use log::{debug, info};
 
     use super::*;
     use crate::{
@@ -414,7 +414,16 @@ pub mod def {
             attrs.vec.iter().for_each(|attr| match &attr.0 {
                 ast::Attr::Id(id) => {
                     if id.0.as_str() == "test" {
+                        let file = active
+                            .module_files()
+                            .import_stack
+                            .back()
+                            .map(|m| m.local_path.clone());
+                        let (_, y) = dec_field_kind_and_id(df);
+                        info!("{}.{}", &file.clone().unwrap(), y);
+
                         let item = TestSuiteItem((
+                            file.clone().unwrap(),
                             active.defs().clone(),
                             active.defs().active_context(),
                             df.clone(),

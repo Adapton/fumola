@@ -178,11 +178,12 @@ fn test(state: &mut State) {
     let mut test_func_defs = HashMap::new();
 
     for (test, ()) in tests.iter() {
-        debug!("Testing {}", format_one_line(&test.0 .1));
-        let defs = test.0 .0.clone();
-        let dec_field = test.0 .2.clone();
-        let ctx_id = test.0 .1.clone();
-        let func_def = test.0 .3.clone();
+        debug!("Testing {}", format_one_line(&test.0 .2));
+        let file = test.0 .0.clone();
+        let defs = test.0 .1.clone();
+        let ctx_id = test.0 .2.clone();
+        let dec_field = test.0 .3.clone();
+        let func_def = test.0 .4.clone();
         if !test_func_defs.contains_key(&func_def.function.exp) {
             test_func_defs.insert(func_def.function.exp.clone(), ());
             match dec_field.dec.0 {
@@ -201,15 +202,17 @@ fn test(state: &mut State) {
 
                             if let Some(local_id) = &def.local_id {
                                 info!(
-                                    "✅ {}/{}/???.{}",
-                                    &defs.active_path.clone().unwrap(),
+                                    "✅ {}.{}.{}",
+                                    file,
+                                    //&defs.active_path.clone().unwrap(),
                                     format_one_line(local_id),
                                     format_one_line(&function.name)
                                 );
                             } else {
                                 info!(
-                                    "✅ {}/???.{}",
-                                    &defs.active_path.clone().unwrap(),
+                                    "✅ {}.{}",
+                                    file,
+                                    //&defs.active_path.clone().unwrap(),
                                     format_one_line(&function.name)
                                 );
                             }

@@ -5,21 +5,21 @@ import R "randomInput";
 module { 
     
   #[listing(30)]
-  public type SeqTree<X> = {
+  public type LevelTree<X> = {
     #empty;
     #element : Element<X>;
     #binary : Binary<X>
   };
 
   #[listing]
-  public type SeqTree_<X> = Pointer<SeqTree<X>>;
+  public type LevelTree_<X> = Pointer<LevelTree<X>>;
 
   #[listing(30)]
   public type Binary<X> = {
     symbol : Symbol;
     level : Nat;
-    left : SeqTree_<X>;
-    right : SeqTree_<X>
+    left : LevelTree_<X>;
+    right : LevelTree_<X>
   };
 
   #[listing(23)]
@@ -30,7 +30,7 @@ module {
 
   #[listing]
   public func reduceUp<X,Y>(
-        t : SeqTree<X>, 
+        t : LevelTree<X>, 
         empty : Y,
         element : (Symbol, X) -> Y,
         binary : (Symbol, Y, Y) -> Y) : Y 
@@ -55,9 +55,9 @@ module {
   #[listing]
   public func append<X>(
     genSym : GenSymThk,
-    tree1 : SeqTree<X>,
-    tree2 : SeqTree<X>
-  ) : SeqTree<X> {
+    tree1 : LevelTree<X>,
+    tree2 : LevelTree<X>
+  ) : LevelTree<X> {
     switch(tree1, tree2) {
       case(#empty, tree2) { tree2 };
       case(tree1, #empty) { tree1 };
@@ -86,8 +86,8 @@ module {
   #[listing]
   public func append_<X>(
     genSym : GenSymThk,
-    left : ?SeqTree_<X>, right : ?SeqTree_<X>
-  ) : ?SeqTree_ {
+    left : ?LevelTree_<X>, right : ?LevelTree_<X>
+  ) : ?LevelTree_ {
     // prim "print" (debug_show (force genSym));
     switch (left, right) {
       case (null, _) right;
@@ -249,7 +249,7 @@ module {
     // used by the index-based edit operations in Edit module.
     //
     #[listing]
-    public func size<X>(tree : SeqTree<X>) : leaf {
+    public func size<X>(tree : ?LevelTree_<X>) : Nat {
       do goto space (`levelTree(`Index)(`size)) {
         reduceUp(@(tree!), 0, func(_,_) { 1 }, func(_,l,r){l + r})
       }
