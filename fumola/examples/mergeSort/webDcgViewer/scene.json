@@ -1,0 +1,19 @@
+{
+  "objects": [
+    {
+      "type": "sphere",
+      "position": [0, 0, 0]
+    },
+    {
+      "type": "box",
+      "position": [2, 0, 0],
+      "label": "x"
+    },
+    {
+      "type": "cylinder",
+      "from": [0, 0, 0],
+      "to": [2, 0, 0],
+      "label": "y"
+    }
+  ]
+}

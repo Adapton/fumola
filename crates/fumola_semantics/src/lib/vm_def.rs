@@ -35,6 +35,7 @@ impl Defs {
         let root = Ctx {
             parent: None,
             fields: HashMap::new(),
+            local_id: None,
         };
         map.insert(CtxId(0), root);
         Defs {
@@ -47,7 +48,7 @@ impl Defs {
     pub fn active_context(&self) -> CtxId {
         self.active_ctx.clone()
     }
-    pub fn enter_context(&mut self, is_a_root: bool) -> (CtxId, CtxId) {
+    pub fn enter_context(&mut self, local_id: Option<Id_>, is_a_root: bool) -> (CtxId, CtxId) {
         let x = self.next_ctx_id;
         self.next_ctx_id = self
             .next_ctx_id
@@ -60,6 +61,7 @@ impl Defs {
                 Some(self.active_ctx.clone())
             },
             fields: HashMap::new(),
+            local_id,
         };
         let prev = self.map.insert(CtxId(x), ctx);
         assert_eq!(prev, None);
@@ -67,11 +69,12 @@ impl Defs {
         self.active_ctx = CtxId(x);
         (saved, CtxId(x))
     }
-    pub fn reenter_context(&mut self, x: &CtxId) -> (CtxId, CtxId, Ctx) {
+    pub fn reenter_context(&mut self, local_id: Option<Id_>, x: &CtxId) -> (CtxId, CtxId, Ctx) {
         let old_ctx = self.map.get(x).unwrap().clone();
         let new_ctx = Ctx {
             parent: old_ctx.parent.clone(),
             fields: HashMap::new(),
+            local_id,
         };
         let saved = self.active_ctx.clone();
         self.active_ctx = x.clone();
@@ -214,7 +217,7 @@ fn path_base(path: &String) -> String {
 pub mod def {
 
     use fumola_syntax::ast;
-    use log::debug;
+    use log::{debug, info};
 
     use super::*;
     use crate::{
@@ -295,7 +298,7 @@ pub mod def {
                 };
                 let importing_package = active.package().clone();
                 *active.package() = package_name;
-                let (saved, ctxid) = active.defs().enter_context(true);
+                let (saved, ctxid) = active.defs().enter_context(init.id.clone(), true);
                 for dec in init.outer_decs.iter() {
                     let dec = dec.clone();
                     let df = fumola_syntax::ast::DecField {
@@ -411,7 +414,16 @@ pub mod def {
             attrs.vec.iter().for_each(|attr| match &attr.0 {
                 ast::Attr::Id(id) => {
                     if id.0.as_str() == "test" {
+                        let file = active
+                            .module_files()
+                            .import_stack
+                            .back()
+                            .map(|m| m.local_path.clone());
+                        let (_, y) = dec_field_kind_and_id(df);
+                        info!("{}.{}", &file.clone().unwrap(), y);
+
                         let item = TestSuiteItem((
+                            file.clone().unwrap(),
                             active.defs().clone(),
                             active.defs().active_context(),
                             df.clone(),
@@ -736,7 +748,7 @@ pub mod def {
         stab: Option<Stab_>,
         dfs: &DecFields,
     ) -> Result<Value_, Interruption> {
-        let (parent, fields) = active.defs().enter_context(false);
+        let (parent, fields) = active.defs().enter_context(None, false);
         for df in dfs.vec.iter() {
             insert_owned_field(active, &ScheduleChoice::Actor(id.clone()), &df.1, &df.0)?;
         }
@@ -770,7 +782,7 @@ pub mod def {
         dfs: &DecFields,
         old_def: &ActorDef,
     ) -> Result<Value_, Interruption> {
-        let (saved, fields, old_ctx) = active.defs().reenter_context(&old_def.fields);
+        let (saved, fields, old_ctx) = active.defs().reenter_context(None, &old_def.fields);
         for df in dfs.vec.iter() {
             insert_owned_field(active, &ScheduleChoice::Actor(id.clone()), &df.1, &df.0)?;
         }
@@ -806,7 +818,7 @@ pub mod def {
         ctx_id: Option<CtxId>,
     ) -> Result<Value_, Interruption> {
         if let Some(ctx_id) = ctx_id {
-            let (saved, fields, old_ctx) = active.defs().reenter_context(&ctx_id);
+            let (saved, fields, old_ctx) = active.defs().reenter_context(id.clone(), &ctx_id);
             for df in dfs.vec.iter() {
                 insert_static_field(active, &df.1, &df.0)?;
             }
@@ -825,7 +837,7 @@ pub mod def {
             }
             active.upgrade_module(path, id.as_ref().map(|x| x.0.clone()), module)
         } else {
-            let (parent, fields) = active.defs().enter_context(false);
+            let (parent, fields) = active.defs().enter_context(id.clone(), false);
             for df in dfs.vec.iter() {
                 insert_static_field(active, &df.1, &df.0)?;
             }
