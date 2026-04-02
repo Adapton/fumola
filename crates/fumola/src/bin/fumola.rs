@@ -1,7 +1,7 @@
 use fumola::Error;
 use fumola_semantics::{Interruption, Share, Value, Value_};
 
-use im_rc::HashMap;
+use im_rc::{HashMap, Vector};
 use log::{debug, error, info, trace};
 
 use fumola::state::State;
@@ -171,22 +171,18 @@ fn test(state: &mut State) {
     let tests = state_.semantic_state.test_suite.clone();
     let mut errors = 0;
     let mut passed = 0;
+    let mut duplicates = 0;
 
     // WIP -- This was meant to avoid duplicate tests, but does not work currently
     //        to avoid re-doing the duplicates that arise because of symlinks we use in fumola code library.
     //        more investigation required. 2026-03-27.
     let mut test_func_defs = HashMap::new();
-
-    for (test, ()) in tests.iter() {
-        debug!("Testing {}", format_one_line(&test.0 .2));
-        let file = test.0 .0.clone();
-        let defs = test.0 .1.clone();
-        let ctx_id = test.0 .2.clone();
-        let dec_field = test.0 .3.clone();
-        let func_def = test.0 .4.clone();
-        if !test_func_defs.contains_key(&func_def.function.exp) {
-            test_func_defs.insert(func_def.function.exp.clone(), ());
-            match dec_field.dec.0 {
+    let mut sorted_tests: Vector<_> = tests.iter().collect();
+    sorted_tests.sort();
+    for (test, ()) in sorted_tests.iter() {
+        if !test_func_defs.contains_key(&test.function.function.exp) {
+            test_func_defs.insert(test.function.function.exp.clone(), ());
+            match test.dec_field.dec.0 {
                 fumola_syntax::ast::Dec::Func(ref function) => {
                     let mut state__ = state_.clone(); // sandbox test
                                                       // shadow these names, to avoid ambiguity or typos below:
@@ -194,16 +190,14 @@ fn test(state: &mut State) {
 
                     let res = state__
                         .semantic_state
-                        .call_function_def(func_def, Value::Unit.share());
+                        .call_function_def(test.function.clone(), Value::Unit.share());
 
                     match res {
                         Ok(_) => {
-                            let def = defs.map.get(&ctx_id).unwrap();
-
-                            if let Some(local_id) = &def.local_id {
+                            if let Some(local_id) = &test.ctx.local_id {
                                 info!(
                                     "✅ {}.{}.{}",
-                                    file,
+                                    test.file,
                                     //&defs.active_path.clone().unwrap(),
                                     format_one_line(local_id),
                                     format_one_line(&function.name)
@@ -211,7 +205,7 @@ fn test(state: &mut State) {
                             } else {
                                 info!(
                                     "✅ {}.{}",
-                                    file,
+                                    test.file,
                                     //&defs.active_path.clone().unwrap(),
                                     format_one_line(&function.name)
                                 );
@@ -219,9 +213,9 @@ fn test(state: &mut State) {
                             if false {
                                 info!(
                                     "✅ {}/{:?}: {}: {}",
-                                    defs.active_path.unwrap(),
-                                    ctx_id,
-                                    dec_field.dec.1,
+                                    test.defs.active_path.clone().unwrap(),
+                                    test.ctx_id,
+                                    test.dec_field.dec.1,
                                     format_one_line(&function.name)
                                 );
                             };
@@ -231,9 +225,9 @@ fn test(state: &mut State) {
                         Err(error) => {
                             error!(
                                 "❌ {}/{:?}: {}: {}",
-                                defs.active_path.unwrap(),
-                                ctx_id,
-                                dec_field.dec.1,
+                                test.file,
+                                test.ctx_id,
+                                test.dec_field.dec.1,
                                 format_one_line(&function.name)
                             );
                             report_error(&mut state__, error.into());
@@ -244,15 +238,17 @@ fn test(state: &mut State) {
                 _ => {
                     error!(
                         "Couldn't test non-function declaration. {}",
-                        &dec_field.dec.1
+                        &test.dec_field.dec.1
                     )
                 }
             }
+        } else {
+            duplicates += 1;
         }
     }
     info!(
-        "{} Tests: {} passed and {} failed.",
-        tests.len(),
+        "{} Unique tests: {} passed and {} failed.",
+        tests.len() - duplicates,
         passed,
         errors
     )

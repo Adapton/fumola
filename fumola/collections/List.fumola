@@ -17,6 +17,7 @@ public func fromIter(iter : Iter<(Symbol, X)>) : List<X> {
     } 
 };
 
+#[test]
 public func testFromIter() {
     let list = fromIter([(1,1), (2,2), (3,3)].vals());
     assert (list!.symbol == 1);
