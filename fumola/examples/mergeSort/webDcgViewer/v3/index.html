@@ -39,16 +39,22 @@
         const pointerDotsByKey = new Map();
 
 
-
         function makeTextTexture(text, type = "prettyFields") {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
+
             const fontSize = 48;
-            ctx.font = `${fontSize}px monospace`;
+            const lineHeight = fontSize * 1.2;
             const padding = 20;
-            const w = ctx.measureText(text).width;
-            canvas.width = w + padding * 2;
-            canvas.height = fontSize + padding * 2;
+
+            ctx.font = `${fontSize}px monospace`;
+
+            const lines = text.split('\n');
+            const maxWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
+
+            canvas.width = maxWidth + padding * 2;
+            canvas.height = lineHeight * lines.length + padding * 2;
+
             ctx.font = `${fontSize}px monospace`;
 
             if (type === "pointerSymbol") {
@@ -57,19 +63,20 @@
                 ctx.strokeStyle = '#888';
                 ctx.strokeRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = 'white';
-                ctx.fillText(text, padding, fontSize + padding / 2);
-            } else if (type === "prettyFields") {
-                // Transparent background: do NOT fill a rect
-                // Draw black text (or RGBA for partial transparency)
-                ctx.fillStyle = 'rgba(0,0,0,1)'; // fully opaque black text
-                ctx.fillText(text, padding, fontSize + padding / 2);
+            } else {
+                ctx.fillStyle = 'rgba(0,0,0,1)';
             }
+
+            lines.forEach((line, i) => {
+                ctx.fillText(line, padding, padding + (i + 1) * lineHeight - (lineHeight - fontSize));
+            });
 
             const texture = new THREE.CanvasTexture(canvas);
             texture.needsUpdate = true;
-            texture.minFilter = THREE.LinearFilter; // prevents dark edges
+            texture.minFilter = THREE.LinearFilter;
 
             const aspect = canvas.height / canvas.width;
+
             return { texture, aspect };
         }
         function createBox(obj) {
