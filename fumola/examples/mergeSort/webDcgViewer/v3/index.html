@@ -12,6 +12,8 @@ body { margin: 0; overflow: hidden; }
 import * as THREE from 'https://esm.sh/three@0.160.0';
 import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
+const BoxDim = 0.23;
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xffffff);
 
@@ -24,7 +26,7 @@ document.body.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 
-scene.add(new THREE.AmbientLight(0x404040));
+scene.add(new THREE.AmbientLight(0xffffff));
 const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(5,5,5);
 scene.add(light);
@@ -42,7 +44,7 @@ function makeTextTexture(text) {
   canvas.width = w + padding * 2;
   canvas.height = fontSize + padding * 2;
   ctx.font = `${fontSize}px monospace`;
-  ctx.fillStyle = '#222';
+  ctx.fillStyle = '#123';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.strokeStyle = '#888';
   ctx.strokeRect(0, 0, canvas.width, canvas.height);
@@ -53,8 +55,8 @@ function makeTextTexture(text) {
 
 function createBox(obj) {
   const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(0.23,0.23,0.23),
-    new THREE.MeshStandardMaterial({ color: 0xaa8844, transparent: true, opacity: 0.6 })
+    new THREE.BoxGeometry(BoxDim, BoxDim, BoxDim),
+    new THREE.MeshStandardMaterial({ color: 0xaa8844, transparent: true, opacity: 0.2 })
   );
   mesh.position.set(...obj.position);
   scene.add(mesh);
@@ -63,8 +65,8 @@ function createBox(obj) {
   const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.2,0.25,0));
   const { texture, aspect } = makeTextTexture(obj.label);
   const labelMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.5, 0.5*aspect),
-    new THREE.MeshBasicMaterial({ map: texture, transparent: true })
+    new THREE.PlaneGeometry(0.1, 0.1*aspect),
+    new THREE.MeshBasicMaterial({ map: texture, transparent: false })
   );
   labelMesh.position.copy(labelAnchor);
   scene.add(labelMesh);
@@ -73,7 +75,7 @@ function createBox(obj) {
   const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.fields || "");
   const fieldMesh = new THREE.Mesh(
     new THREE.PlaneGeometry(0.5, 0.5*fieldAspect),
-    new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: true })
+    new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: false })
   );
   fieldMesh.position.copy(fieldsAnchor);
   scene.add(fieldMesh);
@@ -154,7 +156,8 @@ for (const obj of data.objects) {
     const from = pointerDotsByKey.get(obj.from);
     const target = nodesByLabel.get(obj.to);
     if (!from || !target) continue;
-    const mesh = createPointer(from, target.position);
+    const adjustedTarget = target.position.clone().add(new THREE.Vector3(0, BoxDim/2, 0));
+    const mesh = createPointer(from, adjustedTarget);
     scene.add(mesh);
   }
 }
@@ -179,6 +182,14 @@ window.addEventListener('click', e => {
   }
 });
 
+let hoveredNode = null;
+const highlightColor = 0xffaa00;
+
+window.addEventListener('mousemove', e => {
+  mouse.x = (e.clientX/innerWidth)*2 - 1;
+  mouse.y = -(e.clientY/innerHeight)*2 + 1;
+});
+
 function animate() {
   requestAnimationFrame(animate);
 
@@ -188,6 +199,21 @@ function animate() {
     camera.position.lerpVectors(camera.position, camTargetPos, t);
     controls.target.lerpVectors(controls.target, camTargetLook, t);
     if (t >= 1) camTargetPos = null;
+  }
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects([...nodesByLabel.values()]);
+  if (intersects.length) {
+    if (hoveredNode !== intersects[0].object) {
+      if (hoveredNode) {
+        hoveredNode.material.color.set(0xaa8844);
+      }
+      hoveredNode = intersects[0].object;
+      hoveredNode.material.color.set(highlightColor);
+    }
+  } else {
+    if (hoveredNode) hoveredNode.material.color.set(0xaa8844);
+    hoveredNode = null;
   }
 
   controls.update();
