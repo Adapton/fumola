@@ -38,7 +38,9 @@
         const nodesByLabel = new Map();
         const pointerDotsByKey = new Map();
 
-        function makeTextTexture(text, type) {
+
+
+        function makeTextTexture(text, type = "prettyFields") {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const fontSize = 48;
@@ -48,6 +50,7 @@
             canvas.width = w + padding * 2;
             canvas.height = fontSize + padding * 2;
             ctx.font = `${fontSize}px monospace`;
+
             if (type === "pointerSymbol") {
                 ctx.fillStyle = '#123';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -55,20 +58,20 @@
                 ctx.strokeRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = 'white';
                 ctx.fillText(text, padding, fontSize + padding / 2);
-            } else if (type == "prettyFields") {
-                ctx.fillStyle = '#111';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.strokeStyle = '#888';
-                ctx.strokeRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#aaa';
+            } else if (type === "prettyFields") {
+                // Transparent background: do NOT fill a rect
+                // Draw black text (or RGBA for partial transparency)
+                ctx.fillStyle = 'rgba(0,0,0,1)'; // fully opaque black text
                 ctx.fillText(text, padding, fontSize + padding / 2);
-
-            } else {
-                // to do
             }
-            return { texture: new THREE.CanvasTexture(canvas), aspect: canvas.height / canvas.width };
-        }
 
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            texture.minFilter = THREE.LinearFilter; // prevents dark edges
+
+            const aspect = canvas.height / canvas.width;
+            return { texture, aspect };
+        }
         function createBox(obj) {
             const mesh = new THREE.Mesh(
                 new THREE.BoxGeometry(BoxDim, BoxDim, BoxDim),
@@ -91,7 +94,7 @@
             const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.fields || "", "prettyFields");
             const fieldMesh = new THREE.Mesh(
                 new THREE.PlaneGeometry(0.5, 0.5 * fieldAspect),
-                new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: false })
+                new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: true, alphaTest: 0.1 })
             );
             fieldMesh.position.copy(fieldsAnchor);
             scene.add(fieldMesh);
