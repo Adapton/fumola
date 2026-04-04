@@ -1,0 +1,33 @@
+{
+  "objects": [
+    { "type": "box", "position": [-3,2,0], "label": "A", "fields": "value: 7\ncolor: red", "pointerFields": ["left","right"] },
+    { "type": "box", "position": [-4,1,0], "label": "B", "fields": "value: 3\ncolor: blue", "pointerFields": ["left","right"] },
+    { "type": "box", "position": [-2,1,0], "label": "C", "fields": "value: 11\ncolor: green", "pointerFields": ["left","right"] },
+    { "type": "box", "position": [-4.5,0,0], "label": "D", "fields": "value: 1", "pointerFields": [] },
+    { "type": "box", "position": [-3.5,0,0], "label": "E", "fields": "value: 5", "pointerFields": [] },
+    { "type": "box", "position": [-2.5,0,0], "label": "F", "fields": "value: 9", "pointerFields": [] },
+    { "type": "box", "position": [-1.5,0,0], "label": "G", "fields": "value: 13", "pointerFields": [] },
+
+    { "type": "pointer", "from": "A:left", "to": "B" },
+    { "type": "pointer", "from": "A:right", "to": "C" },
+    { "type": "pointer", "from": "B:left", "to": "D" },
+    { "type": "pointer", "from": "B:right", "to": "E" },
+    { "type": "pointer", "from": "C:left", "to": "F" },
+    { "type": "pointer", "from": "C:right", "to": "G" },
+
+    { "type": "box", "position": [3,2,0], "label": "H", "fields": "val: 8\nnote: root", "pointerFields": ["left","right"] },
+    { "type": "box", "position": [2,1,0], "label": "I", "fields": "val: 4", "pointerFields": ["left","right"] },
+    { "type": "box", "position": [4,1,0], "label": "J", "fields": "val: 12", "pointerFields": ["left","right"] },
+    { "type": "box", "position": [1.5,0,0], "label": "K", "fields": "val: 2", "pointerFields": [] },
+    { "type": "box", "position": [2.5,0,0], "label": "L", "fields": "val: 6", "pointerFields": [] },
+    { "type": "box", "position": [3.5,0,0], "label": "M", "fields": "val: 10", "pointerFields": [] },
+    { "type": "box", "position": [4.5,0,0], "label": "N", "fields": "val: 14", "pointerFields": [] },
+
+    { "type": "pointer", "from": "H:left", "to": "I" },
+    { "type": "pointer", "from": "H:right", "to": "J" },
+    { "type": "pointer", "from": "I:left", "to": "K" },
+    { "type": "pointer", "from": "I:right", "to": "L" },
+    { "type": "pointer", "from": "J:left", "to": "M" },
+    { "type": "pointer", "from": "J:right", "to": "N" }
+  ]
+}
