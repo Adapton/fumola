@@ -34,7 +34,7 @@ scene.add(light);
 const nodesByLabel = new Map();
 const pointerDotsByKey = new Map();
 
-function makeTextTexture(text) {
+function makeTextTexture(text, type) {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   const fontSize = 48;
@@ -44,12 +44,24 @@ function makeTextTexture(text) {
   canvas.width = w + padding * 2;
   canvas.height = fontSize + padding * 2;
   ctx.font = `${fontSize}px monospace`;
-  ctx.fillStyle = '#123';
+  if (type === "pointerSymbol") {
+ctx.fillStyle = '#123';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.strokeStyle = '#888';
   ctx.strokeRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = 'white';
   ctx.fillText(text, padding, fontSize + padding / 2);
+    } else if (type == "prettyFields") {
+ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#888';
+  ctx.strokeRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#aaa';
+  ctx.fillText(text, padding, fontSize + padding / 2);
+ 
+    } else {
+        // to do
+}
   return { texture: new THREE.CanvasTexture(canvas), aspect: canvas.height / canvas.width };
 }
 
@@ -63,7 +75,7 @@ function createBox(obj) {
   nodesByLabel.set(obj.label, mesh);
 
   const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.2,0.25,-BoxDim));
-  const { texture, aspect } = makeTextTexture(obj.label);
+  const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol");
   const labelMesh = new THREE.Mesh(
     new THREE.PlaneGeometry(0.1, 0.1*aspect),
     new THREE.MeshBasicMaterial({ map: texture, transparent: false })
@@ -72,7 +84,7 @@ function createBox(obj) {
   scene.add(labelMesh);
 
   const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(-0.2,-0.25,0));
-  const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.fields || "");
+  const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.fields || "", "prettyFields");
   const fieldMesh = new THREE.Mesh(
     new THREE.PlaneGeometry(0.5, 0.5*fieldAspect),
     new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: false })
