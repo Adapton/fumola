@@ -1,243 +1,248 @@
-
 <!DOCTYPE html>
 <html>
+
 <head>
-<meta charset="utf-8">
-<style>
-body { margin: 0; overflow: hidden; }
-</style>
+    <meta charset="utf-8">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
 </head>
+
 <body>
-<script type="module">
-import * as THREE from 'https://esm.sh/three@0.160.0';
-import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+    <script type="module">
+        import * as THREE from 'https://esm.sh/three@0.160.0';
+        import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
-const BoxDim = 0.23;
+        const BoxDim = 0.23;
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xffffff);
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
 
-const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
-camera.position.set(6, 4, 8);
+        const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
+        camera.position.set(6, 4, 8);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(innerWidth, innerHeight);
-document.body.appendChild(renderer.domElement);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(innerWidth, innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-const controls = new OrbitControls(camera, renderer.domElement);
+        const controls = new OrbitControls(camera, renderer.domElement);
 
-scene.add(new THREE.AmbientLight(0xffffff));
-const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(5,5,5);
-scene.add(light);
+        scene.add(new THREE.AmbientLight(0xffffff));
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(5, 5, 5);
+        scene.add(light);
 
-const nodesByLabel = new Map();
-const pointerDotsByKey = new Map();
+        const nodesByLabel = new Map();
+        const pointerDotsByKey = new Map();
 
-function makeTextTexture(text, type) {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  const fontSize = 48;
-  ctx.font = `${fontSize}px monospace`;
-  const padding = 20;
-  const w = ctx.measureText(text).width;
-  canvas.width = w + padding * 2;
-  canvas.height = fontSize + padding * 2;
-  ctx.font = `${fontSize}px monospace`;
-  if (type === "pointerSymbol") {
-ctx.fillStyle = '#123';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = '#888';
-  ctx.strokeRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = 'white';
-  ctx.fillText(text, padding, fontSize + padding / 2);
-    } else if (type == "prettyFields") {
-ctx.fillStyle = '#111';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = '#888';
-  ctx.strokeRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#aaa';
-  ctx.fillText(text, padding, fontSize + padding / 2);
- 
-    } else {
-        // to do
-}
-  return { texture: new THREE.CanvasTexture(canvas), aspect: canvas.height / canvas.width };
-}
+        function makeTextTexture(text, type) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const fontSize = 48;
+            ctx.font = `${fontSize}px monospace`;
+            const padding = 20;
+            const w = ctx.measureText(text).width;
+            canvas.width = w + padding * 2;
+            canvas.height = fontSize + padding * 2;
+            ctx.font = `${fontSize}px monospace`;
+            if (type === "pointerSymbol") {
+                ctx.fillStyle = '#123';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.strokeStyle = '#888';
+                ctx.strokeRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'white';
+                ctx.fillText(text, padding, fontSize + padding / 2);
+            } else if (type == "prettyFields") {
+                ctx.fillStyle = '#111';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.strokeStyle = '#888';
+                ctx.strokeRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#aaa';
+                ctx.fillText(text, padding, fontSize + padding / 2);
 
-function createBox(obj) {
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(BoxDim, BoxDim, BoxDim),
-    new THREE.MeshStandardMaterial({ color: 0xaa8844, transparent: true, opacity: 0.2 })
-  );
-  mesh.position.set(...obj.position);
-  scene.add(mesh);
-  nodesByLabel.set(obj.label, mesh);
+            } else {
+                // to do
+            }
+            return { texture: new THREE.CanvasTexture(canvas), aspect: canvas.height / canvas.width };
+        }
 
-  const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.2,0.25,-BoxDim));
-  const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol");
-  const labelMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.1, 0.1*aspect),
-    new THREE.MeshBasicMaterial({ map: texture, transparent: false })
-  );
-  labelMesh.position.copy(labelAnchor);
-  scene.add(labelMesh);
+        function createBox(obj) {
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(BoxDim, BoxDim, BoxDim),
+                new THREE.MeshStandardMaterial({ color: 0xaa8844, transparent: true, opacity: 0.2 })
+            );
+            mesh.position.set(...obj.position);
+            scene.add(mesh);
+            nodesByLabel.set(obj.label, mesh);
 
-  const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(-0.2,-0.25,0));
-  const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.fields || "", "prettyFields");
-  const fieldMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.5, 0.5*fieldAspect),
-    new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: false })
-  );
-  fieldMesh.position.copy(fieldsAnchor);
-  scene.add(fieldMesh);
+            const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.2, 0.25, -BoxDim));
+            const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol");
+            const labelMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.1, 0.1 * aspect),
+                new THREE.MeshBasicMaterial({ map: texture, transparent: false })
+            );
+            labelMesh.position.copy(labelAnchor);
+            scene.add(labelMesh);
 
-  const dots = [];
-  if (obj.pointerFields) {
-    const spacing = 0.1;
-    const startX = mesh.position.x - (obj.pointerFields.length-1)*spacing/2;
-    const y = mesh.position.y - 0.35;
-    const z = mesh.position.z;
-    obj.pointerFields.forEach((fname,i) => {
-      const dot = new THREE.Mesh(
-        new THREE.SphereGeometry(0.03,12,12),
-        new THREE.MeshStandardMaterial({ color: 0x000000 })
-      );
-      dot.position.set(startX + i*spacing, y, z);
-      scene.add(dot);
-      dots.push(dot);
-      pointerDotsByKey.set(obj.label+":"+fname, dot.position);
-    });
-  }
+            const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(-0.2, -0.25, 0));
+            const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.fields || "", "prettyFields");
+            const fieldMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.5, 0.5 * fieldAspect),
+                new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: false })
+            );
+            fieldMesh.position.copy(fieldsAnchor);
+            scene.add(fieldMesh);
 
-  return mesh;
-}
+            const dots = [];
+            if (obj.pointerFields) {
+                const spacing = 0.1;
+                const startX = mesh.position.x - (obj.pointerFields.length - 1) * spacing / 2;
+                const y = mesh.position.y - 0.35;
+                const z = mesh.position.z;
+                obj.pointerFields.forEach((fname, i) => {
+                    const dot = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.03, 12, 12),
+                        new THREE.MeshStandardMaterial({ color: 0x000000 })
+                    );
+                    dot.position.set(startX + i * spacing, y, z);
+                    scene.add(dot);
+                    dots.push(dot);
+                    pointerDotsByKey.set(obj.label + ":" + fname, dot.position);
+                });
+            }
 
-function computeEdgeFrame(a, b) {
-  const dir = new THREE.Vector3().subVectors(b, a);
-  const len = dir.length();
-  const n = dir.clone().normalize();
-  const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), n);
-  return { dirNorm: n, length: len, quat };
-}
+            return mesh;
+        }
 
-function createPointer(from, to) {
-  const start = from.clone();
-  const end = to.clone();
-  const { dirNorm, length, quat } = computeEdgeFrame(start, end);
+        function computeEdgeFrame(a, b) {
+            const dir = new THREE.Vector3().subVectors(b, a);
+            const len = dir.length();
+            const n = dir.clone().normalize();
+            const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
+            return { dirNorm: n, length: len, quat };
+        }
 
-  const group = new THREE.Group();
+        function createPointer(from, to) {
+            const start = from.clone();
+            const end = to.clone();
+            const { dirNorm, length, quat } = computeEdgeFrame(start, end);
 
-  const dot = new THREE.Mesh(
-    new THREE.SphereGeometry(0.04, 12, 12),
-    new THREE.MeshStandardMaterial({ color: 0x000000 })
-  );
-  dot.position.copy(start);
-  group.add(dot);
+            const group = new THREE.Group();
 
-  const shaftLen = Math.max(0.001, length - 0.08);
-  const shaft = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.01,0.01,shaftLen,8),
-    new THREE.MeshStandardMaterial({ color: 0x000000 })
-  );
-  const mid = start.clone().addScaledVector(dirNorm, shaftLen/2);
-  shaft.position.copy(mid);
-  shaft.quaternion.copy(quat);
-  group.add(shaft);
+            const dot = new THREE.Mesh(
+                new THREE.SphereGeometry(0.04, 12, 12),
+                new THREE.MeshStandardMaterial({ color: 0x000000 })
+            );
+            dot.position.copy(start);
+            group.add(dot);
 
-  const cone = new THREE.Mesh(
-    new THREE.ConeGeometry(0.03,0.08,8),
-    new THREE.MeshStandardMaterial({ color: 0x000000 })
-  );
-  const center = end.clone().addScaledVector(dirNorm, -0.04);
-  cone.position.copy(center);
-  cone.quaternion.copy(quat);
-  group.add(cone);
+            const shaftLen = Math.max(0.001, length - 0.08);
+            const shaft = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.01, 0.01, shaftLen, 8),
+                new THREE.MeshStandardMaterial({ color: 0x000000 })
+            );
+            const mid = start.clone().addScaledVector(dirNorm, shaftLen / 2);
+            shaft.position.copy(mid);
+            shaft.quaternion.copy(quat);
+            group.add(shaft);
 
-  return group;
-}
+            const cone = new THREE.Mesh(
+                new THREE.ConeGeometry(0.03, 0.08, 8),
+                new THREE.MeshStandardMaterial({ color: 0x000000 })
+            );
+            const center = end.clone().addScaledVector(dirNorm, -0.04);
+            cone.position.copy(center);
+            cone.quaternion.copy(quat);
+            group.add(cone);
 
-const data = await fetch('./scene.json').then(r => r.json());
+            return group;
+        }
 
-for (const obj of data.objects) {
-  if (obj.type === "box") createBox(obj);
-}
+        const data = await fetch('./scene.json').then(r => r.json());
 
-for (const obj of data.objects) {
-  if (obj.type === "pointer") {
-    const from = pointerDotsByKey.get(obj.from);
-    const target = nodesByLabel.get(obj.to);
-    if (!from || !target) continue;
-    const adjustedTarget = target.position.clone().add(new THREE.Vector3(0, BoxDim/2, 0));
-    const mesh = createPointer(from, adjustedTarget);
-    scene.add(mesh);
-  }
-}
+        for (const obj of data.objects) {
+            if (obj.type === "box") createBox(obj);
+        }
 
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-let camTargetPos = null;
-let camTargetLook = null;
-const transitionDuration = 1.3;
-let transitionStart = 0;
+        for (const obj of data.objects) {
+            if (obj.type === "pointer") {
+                const from = pointerDotsByKey.get(obj.from);
+                const target = nodesByLabel.get(obj.to);
+                if (!from || !target) continue;
+                const adjustedTarget = target.position.clone().add(new THREE.Vector3(0, BoxDim / 2, 0));
+                const mesh = createPointer(from, adjustedTarget);
+                scene.add(mesh);
+            }
+        }
 
-window.addEventListener('click', e => {
-  mouse.x = (e.clientX/innerWidth)*2 - 1;
-  mouse.y = -(e.clientY/innerHeight)*2 + 1;
-  raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObjects([...nodesByLabel.values()]);
-  if (intersects.length) {
-    const m = intersects[0].object;
-    camTargetPos = m.position.clone().add(new THREE.Vector3(0,0,2.3));
-    camTargetLook = m.position.clone();
-    transitionStart = performance.now()/1000;
-  }
-});
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let camTargetPos = null;
+        let camTargetLook = null;
+        const transitionDuration = 1.3;
+        let transitionStart = 0;
 
-let hoveredNode = null;
-const highlightColor = 0xffaa00;
+        window.addEventListener('click', e => {
+            mouse.x = (e.clientX / innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects([...nodesByLabel.values()]);
+            if (intersects.length) {
+                const m = intersects[0].object;
+                camTargetPos = m.position.clone().add(new THREE.Vector3(0, 0, 2.3));
+                camTargetLook = m.position.clone();
+                transitionStart = performance.now() / 1000;
+            }
+        });
 
-window.addEventListener('mousemove', e => {
-  mouse.x = (e.clientX/innerWidth)*2 - 1;
-  mouse.y = -(e.clientY/innerHeight)*2 + 1;
-});
+        let hoveredNode = null;
+        const highlightColor = 0xffaa00;
 
-function animate() {
-  requestAnimationFrame(animate);
+        window.addEventListener('mousemove', e => {
+            mouse.x = (e.clientX / innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+        });
 
-  const now = performance.now()/1000;
-  if (camTargetPos) {
-    const t = Math.min((now - transitionStart)/transitionDuration, 1);
-    camera.position.lerpVectors(camera.position, camTargetPos, t);
-    controls.target.lerpVectors(controls.target, camTargetLook, t);
-    if (t >= 1) camTargetPos = null;
-  }
+        function animate() {
+            requestAnimationFrame(animate);
 
-  raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObjects([...nodesByLabel.values()]);
-  if (intersects.length) {
-    if (hoveredNode !== intersects[0].object) {
-      if (hoveredNode) {
-        hoveredNode.material.color.set(0xaa8844);
-      }
-      hoveredNode = intersects[0].object;
-      hoveredNode.material.color.set(highlightColor);
-    }
-  } else {
-    if (hoveredNode) hoveredNode.material.color.set(0xaa8844);
-    hoveredNode = null;
-  }
+            const now = performance.now() / 1000;
+            if (camTargetPos) {
+                const t = Math.min((now - transitionStart) / transitionDuration, 1);
+                camera.position.lerpVectors(camera.position, camTargetPos, t);
+                controls.target.lerpVectors(controls.target, camTargetLook, t);
+                if (t >= 1) camTargetPos = null;
+            }
 
-  controls.update();
-  renderer.render(scene, camera);
-}
-animate();
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects([...nodesByLabel.values()]);
+            if (intersects.length) {
+                if (hoveredNode !== intersects[0].object) {
+                    if (hoveredNode) {
+                        hoveredNode.material.color.set(0xaa8844);
+                    }
+                    hoveredNode = intersects[0].object;
+                    hoveredNode.material.color.set(highlightColor);
+                }
+            } else {
+                if (hoveredNode) hoveredNode.material.color.set(0xaa8844);
+                hoveredNode = null;
+            }
 
-addEventListener('resize', () => {
-  camera.aspect = innerWidth/innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
-</script>
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        addEventListener('resize', () => {
+            camera.aspect = innerWidth / innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(innerWidth, innerHeight);
+        });
+    </script>
 </body>
+
 </html>
