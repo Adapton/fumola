@@ -88,7 +88,7 @@
             scene.add(mesh);
             nodesByLabel.set(obj.label, mesh);
 
-            const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.2, 0.25, BoxDim));
+            const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim));
             const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol");
             const labelMesh = new THREE.Mesh(
                 new THREE.PlaneGeometry(0.1, 0.1 * aspect),
@@ -110,7 +110,7 @@
             if (obj.pointerFields) {
                 const spacing = 0.1;
                 const startX = mesh.position.x - (obj.pointerFields.length - 1) * spacing / 2;
-                const y = mesh.position.y - 0.35;
+                const y = mesh.position.y - 0.17;
                 const z = mesh.position.z;
                 obj.pointerFields.forEach((fname, i) => {
                     const dot = new THREE.Mesh(
