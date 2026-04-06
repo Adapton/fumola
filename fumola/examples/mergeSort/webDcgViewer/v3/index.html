@@ -36,10 +36,13 @@
         scene.add(light);
 
         const nodesByLabel = new Map();
+        const labelsByNode = new Map();
         const pointerDotsByKey = new Map();
 
+        const objectMaterials = new Map();
 
-        function makeTextTexture(text, type = "prettyFields") {
+
+        function makeTextTexture(text, type = "prettyFields", isSprite = false) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
 
@@ -77,19 +80,27 @@
 
             const aspect = canvas.height / canvas.width;
 
+            //var result = texture;
+            //if (isSprite) {
+            //    let material = new THREE.SpriteMaterial({ map: texture });
+            //    result = new THREE.Sprite(material);
+           // }
             return { texture, aspect };
         }
         function createBox(obj) {
+            let material = new THREE.MeshStandardMaterial({ color: 0xaa8844, transparent: true, opacity: 0.2 });
+            objectMaterials.set(obj.label, material);
             const mesh = new THREE.Mesh(
                 new THREE.BoxGeometry(BoxDim, BoxDim, BoxDim),
-                new THREE.MeshStandardMaterial({ color: 0xaa8844, transparent: true, opacity: 0.2 })
+                material
             );
             mesh.position.set(...obj.position);
             scene.add(mesh);
             nodesByLabel.set(obj.label, mesh);
+            labelsByNode.set(mesh, obj.label);
 
             const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim));
-            const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol");
+            const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
             const labelMesh = new THREE.Mesh(
                 new THREE.PlaneGeometry(0.1, 0.1 * aspect),
                 new THREE.MeshBasicMaterial({ map: texture, transparent: false })
@@ -126,6 +137,58 @@
 
             return mesh;
         }
+
+        function createOrb(obj) {
+            let material = new THREE.MeshStandardMaterial({ color: 0x4488aa, transparent: true, opacity: 0.3 });
+            objectMaterials.set(obj.label, material);
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(BoxDim),
+                material
+            );
+            mesh.position.set(...obj.position);
+            scene.add(mesh);
+            nodesByLabel.set(obj.label, mesh);
+            labelsByNode.set(mesh, obj.label);
+
+            const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim));
+            const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
+            const labelMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.1, 0.1 * aspect),
+                new THREE.MeshBasicMaterial({ map: texture, transparent: false })
+            );
+            labelMesh.position.copy(labelAnchor);
+            scene.add(labelMesh);
+
+            const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim));
+            const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.fields || "", "prettyFields");
+            const fieldMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.5, 0.5 * fieldAspect),
+                new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: true, alphaTest: 0.1 })
+            );
+            fieldMesh.position.copy(fieldsAnchor);
+            scene.add(fieldMesh);
+
+            const dots = [];
+            if (obj.pointerFields) {
+                const spacing = 0.1;
+                const startX = mesh.position.x - (obj.pointerFields.length - 1) * spacing / 2;
+                const y = mesh.position.y - 0.17;
+                const z = mesh.position.z;
+                obj.pointerFields.forEach((fname, i) => {
+                    const dot = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.03, 12, 12),
+                        new THREE.MeshStandardMaterial({ color: 0x000000 })
+                    );
+                    dot.position.set(startX + i * spacing, y, z);
+                    scene.add(dot);
+                    dots.push(dot);
+                    pointerDotsByKey.set(obj.label + ":" + fname, dot.position);
+                });
+            }
+
+            return mesh;
+        }
+
 
         function computeEdgeFrame(a, b) {
             const dir = new THREE.Vector3().subVectors(b, a);
@@ -175,6 +238,7 @@
 
         for (const obj of data.objects) {
             if (obj.type === "box") createBox(obj);
+            if (obj.type === "orb") createOrb(obj);
         }
 
         for (const obj of data.objects) {
@@ -208,8 +272,13 @@
             }
         });
 
-        let hoveredNode = null;
-        const highlightColor = 0xffff00;
+        
+        var hoverNode = null;
+
+        // an object to expose state to the console, set whenever hoverNode is set or reset, but never cleared after the hovering is gone, between hovers.
+        var lastHoverNode = { lastHoverNode: null };
+        
+        var frames = 0;
 
         window.addEventListener('mousemove', e => {
             mouse.x = (e.clientX / innerWidth) * 2 - 1;
@@ -217,7 +286,7 @@
         });
 
         function animate() {
-            requestAnimationFrame(animate);
+            frames++;
 
             const now = performance.now() / 1000;
             if (camTargetPos) {
@@ -229,21 +298,52 @@
 
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects([...nodesByLabel.values()]);
-            if (intersects.length) {
-                if (hoveredNode !== intersects[0].object) {
-                    if (hoveredNode) {
-                        hoveredNode.material.color.set(0xaa8844);
-                    }
-                    hoveredNode = intersects[0].object;
-                    hoveredNode.material.color.set(highlightColor);
+
+            function cancelHoverNode() {
+                const DEBUG = false;
+                if (!hoverNode) {
+                    console.error("no hoverNode to cancel")
+                    return
                 }
-            } else {
-                if (hoveredNode) hoveredNode.material.color.set(0xaa8844);
-                hoveredNode = null;
+                let label = labelsByNode.get(hoverNode);
+                if (label) {
+                    DEBUG && console.log("old hover node was " + label);
+                    let material = objectMaterials.get(label);
+                    DEBUG && console.log("  current material uuid is " + hoverNode.material.uuid);
+                    DEBUG && console.log("  original material uuid was " + material.uuid);
+                    hoverNode.material = material.clone();
+                    DEBUG && console.log("  restored, and cloned original as " + material.uuid);
+                    hoverNode = null;
+                } else {
+                    DEBUG && console.log("cancelHoverNode() failed to find label.  Internal error.")
+                }
             }
 
+            if (intersects.length) {
+                const DEBUG = false;
+                if (hoverNode !== intersects[0].object) {
+                    if (hoverNode) { cancelHoverNode() };
+
+                    hoverNode = intersects[0].object;
+                    lastHoverNode.lastHoverNode = hoverNode;
+                    DEBUG && console.log("new hover node is " + labelsByNode.get(hoverNode));
+                    DEBUG && console.log("   material uuid was " + hoverNode.material.uuid);
+
+                    hoverNode.material = hoverNode.material.clone();
+                    DEBUG && console.log("   material uuid is  " + hoverNode.material.uuid);
+                    //let hsl = rgbToHsl(hoverNode.material.color);
+                    //hoverNode.material.color = hslToRgb(hsl);
+                    hoverNode.material.opacity = 0.618;
+                }
+            }
+            else {
+                if (hoverNode) {
+                    cancelHoverNode()
+                }
+            }
             controls.update();
             renderer.render(scene, camera);
+            requestAnimationFrame(animate);
         }
         animate();
 
@@ -252,6 +352,24 @@
             camera.updateProjectionMatrix();
             renderer.setSize(innerWidth, innerHeight);
         });
+
+
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        window.app = {
+            frames,
+            lastHoverNode,
+            objectMaterials,
+            nodesByLabel,
+            labelsByNode,
+            data,
+            scene,
+            camera,
+            renderer,
+            controls
+        };
+
     </script>
 </body>
 

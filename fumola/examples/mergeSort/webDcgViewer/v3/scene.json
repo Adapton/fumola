@@ -28,6 +28,24 @@
     { "type": "pointer", "from": "I:left", "to": "K" },
     { "type": "pointer", "from": "I:right", "to": "L" },
     { "type": "pointer", "from": "J:left", "to": "M" },
-    { "type": "pointer", "from": "J:right", "to": "N" }
-  ]
+    { "type": "pointer", "from": "J:right", "to": "N" },
+
+
+    { "type": "orb", "position": [3,2,-1], "label": "c-H", "fields": "val: 8\nnote: root\ntest: 1\ntest: 2", "pointerFields": ["left","right"] },
+    { "type": "orb", "position": [2,1,-1], "label": "c-I", "fields": "val: 4", "pointerFields": ["left","right"] },
+    { "type": "orb", "position": [4,1,-1], "label": "c-J", "fields": "val: 12", "pointerFields": ["left","right"] },
+    { "type": "orb", "position": [1.5,0,-1], "label": "c-K", "fields": "val: 2", "pointerFields": [] },
+    { "type": "orb", "position": [2.5,0,-1], "label": "c-L", "fields": "val: 6", "pointerFields": [] },
+    { "type": "orb", "position": [3.5,0,-1], "label": "c-M", "fields": "val: 10", "pointerFields": [] },
+    { "type": "orb", "position": [4.5,0,-1], "label": "c-N", "fields": "val: 14", "pointerFields": [] },
+
+    { "type": "pointer", "from": "c-H:left", "to": "c-I" },
+    { "type": "pointer", "from": "c-H:right", "to": "c-J" },
+    { "type": "pointer", "from": "c-I:left", "to": "c-K" },
+    { "type": "pointer", "from": "c-I:right", "to": "c-L" },
+    { "type": "pointer", "from": "c-J:left", "to": "c-M" },
+    { "type": "pointer", "from": "c-J:right", "to": "c-N" }
+
+
+]
 }
