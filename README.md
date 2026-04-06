@@ -1,31 +1,6 @@
 # `fumola`
 
-## FUnctional MOtoko meta-LAnguage.
-
-Motoko extensions and tools, in Rust.
-
-- Lexing.
-- Parsing.
-- Interpreter (partially implemented):
-  - Interactive, break-point-style debugging.
-  - Hot reload of code changes while preserving data.
-
-## Extensions (WIP)
-
-- Quoting and unquoting, with quoted ASTs as a value.
-- Incremental caching and memoization (a la Adapton).
-- local file system access (optional).
-- local web system access (optional).
-- REPL that interacts with IC, or a local replica.
-
-## Out of scope
-
- - No static type system. 
- - [See Motoko compiler project for type system, and definitive semantics](https://github.com/dfinity/motoko).
-
-## Related
-
-[Online interpreter](https://mo-vm.netlify.app/)
+<img width="664" height="627" alt="image" src="https://github.com/user-attachments/assets/33d98551-98c9-4015-85a3-cb6c12ede392" />
 
 ## Contributing
 
