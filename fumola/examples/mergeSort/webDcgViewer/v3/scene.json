@@ -34,10 +34,17 @@
     { "type": "orb", "position": [3,2,-1], "label": "c-H", "fields": "val: 8\nnote: root\ntest: 1\ntest: 2", "pointerFields": ["back","left","right","front"] },
     { "type": "orb", "position": [2,1,-1], "label": "c-I", "fields": "val: 4", "pointerFields": ["back", "left","right","front"] },
     { "type": "orb", "position": [4,1,-1], "label": "c-J", "fields": "val: 12", "pointerFields": ["back", "left","right", "front"] },
-    { "type": "orb", "position": [1.5,0,-1], "label": "c-K", "fields": "val: 2", "pointerFields": ["back", "front"] },
-    { "type": "orb", "position": [2.5,0,-1], "label": "c-L", "fields": "val: 6", "pointerFields": ["back", "front"] },
-    { "type": "orb", "position": [3.5,0,-1], "label": "c-M", "fields": "val: 10", "pointerFields": ["back", "front"] },
-    { "type": "orb", "position": [4.5,0,-1], "label": "c-N", "fields": "val: 14", "pointerFields": ["back", "front"] },
+    
+    { "type": "orb", "position": [1.5,0,-1], "label": "c-K", "fields": "val: 2", "pointerFields": ["back", "down", "front"] },
+    { "type": "orb", "position": [2.5,0,-1], "label": "c-L", "fields": "val: 6", "pointerFields": ["back", "down", "front"] },
+    { "type": "orb", "position": [3.5,0,-1], "label": "c-M", "fields": "val: 10", "pointerFields": ["back", "down", "front"] },
+    { "type": "orb", "position": [4.5,0,-1], "label": "c-N", "fields": "val: 14", "pointerFields": ["back", "down", "front"] },
+
+    { "type": "orb", "position": [1.5,-1,-1], "label": "t-K", "fields": "val: 2" },
+    { "type": "orb", "position": [2.5,-1,-1], "label": "t-L", "fields": "val: 6" },
+    { "type": "orb", "position": [3.5,-1,-1], "label": "t-M", "fields": "val: 10" },
+    { "type": "orb", "position": [4.5,-1,-1], "label": "t-N", "fields": "val: 14" },
+
 
     { "type": "ForcePut", "from": "c-H:left", "to": "c-I" },
     { "type": "ForcePut", "from": "c-H:right", "to": "c-J" },
@@ -45,6 +52,12 @@
     { "type": "ForcePut", "from": "c-I:right", "to": "c-L" },
     { "type": "ForcePut", "from": "c-J:left", "to": "c-M" },
     { "type": "ForcePut", "from": "c-J:right", "to": "c-N" },
+
+    { "type": "Force", "from": "c-K:down", "to": "t-K" },
+    { "type": "Force", "from": "c-L:down", "to": "t-L" },
+    { "type": "Force", "from": "c-M:down", "to": "t-M" },
+    { "type": "Force", "from": "c-N:down", "to": "t-N" },
+
 
     { "type": "box", "position": [3,2,-2], "label": "d-H", "fields": "val: 8\nnote: root\ntest: 1\ntest: 2", "pointerFields": ["left","right"] },
     { "type": "box", "position": [2,1,-2], "label": "d-I", "fields": "val: 4", "pointerFields": ["left","right"] },

@@ -142,7 +142,7 @@
             let material = new THREE.MeshStandardMaterial({ color: 0x4488aa, transparent: true, opacity: 0.3 });
             objectMaterials.set(obj.label, material);
             const mesh = new THREE.Mesh(
-                new THREE.SphereGeometry(BoxDim),
+                new THREE.SphereGeometry(BoxDim * 0.618),
                 material
             );
             mesh.position.set(...obj.position);
@@ -234,8 +234,11 @@
             return group;
         }
 
-        function makeActionArrow(type, source, target, color = 0x7788ff) {
+        function makeActionArrow(type, source, target, color = 0x0088aa, hoverOffset = -BoxDim) {
             const group = new THREE.Group();
+
+            //color = 0x0088ff;
+            if (type === "Force" || type === "ForcePut") color = 0xaa88aa;
 
             // Compute vector from source → target
             const dir = new THREE.Vector3().subVectors(target, source);
@@ -243,99 +246,88 @@
             dir.normalize();
 
             // Shaft parameters
-            let shaftRadius = 0.03;
-            let shaftLength = length;
+            let shaftRadius = 0.02;
+            if (type === "Force" || type === "ForcePut") shaftRadius = 0.05;
 
-            if (type === "Force" || type === "ForcePut") {
-                shaftRadius = 0.05; // wider for Force
-            }
+            const shaftLength = length + (hoverOffset * 1.6); // shorten shaft slightly so head hovers
+
+            // Place arrowhead with hoverOffset
+            const headPos = new THREE.Vector3().copy(target).addScaledVector(dir, hoverOffset);
 
             // Shaft geometry
-            const shaftGeo = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength - 0.1, 12);
+            const shaftGeo = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength, 12);
             const shaftMat = new THREE.MeshStandardMaterial({
                 color: color,
-                transparent: true,
-                opacity: (type === "Force" || type === "ForcePut") ? 0.3 : 0.7
+                transparent: true || (type === "Force" || type === "ForcePut"),
+                opacity: (type === "Force" || type === "ForcePut") ? 0.2 : 0.6
             });
             const shaftMesh = new THREE.Mesh(shaftGeo, shaftMat);
 
-            // Align shaft along dir, midpoint at center
-            const mid = new THREE.Vector3().addVectors(source, target).multiplyScalar(0.5);
+            // Shaft midpoint
+            const mid = new THREE.Vector3().addVectors(source, headPos).multiplyScalar(0.5);
             shaftMesh.position.copy(mid);
-
-            shaftMesh.quaternion.setFromUnitVectors(
-                new THREE.Vector3(0, 1, 0), // default cylinder up
-                dir
-            );
-
+            shaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
             group.add(shaftMesh);
 
-            // Helper function to make a cone arrowhead
+            // Helper functions
             function makeCone(radius = 0.06, height = 0.12) {
                 const coneGeo = new THREE.ConeGeometry(radius, height, 12);
                 const coneMat = new THREE.MeshStandardMaterial({ color: color });
                 const coneMesh = new THREE.Mesh(coneGeo, coneMat);
                 return coneMesh;
             }
-
-            // Helper function to make a double pyramid (Put)
             function makeDoublePyramid(radius = 0.06, height = 0.12) {
                 const cone1 = makeCone(radius, height);
                 const cone2 = makeCone(radius, height);
-                cone2.rotateX(Math.PI); // invert second cone
-                const group = new THREE.Group();
+                cone2.rotateX(Math.PI);
+                const g = new THREE.Group();
                 cone1.position.y = height / 2;
                 cone2.position.y = -height / 2;
-                group.add(cone1);
-                group.add(cone2);
-                return group;
+                g.add(cone1);
+                g.add(cone2);
+                return g;
             }
 
-            // Add arrowheads
             if (type === "Get") {
                 const cone = makeCone();
-                cone.position.copy(target);
+                cone.position.copy(headPos);
                 cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 group.add(cone);
             } else if (type === "Put") {
                 const dp = makeDoublePyramid();
-                dp.position.copy(target);
+                dp.position.copy(headPos);
                 dp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 group.add(dp);
             } else if (type === "Force") {
                 const cone = makeCone();
-                cone.position.copy(target);
+                cone.position.copy(headPos);
                 cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 group.add(cone);
 
-                // Inner shaft
-                const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength - 0.1, 12);
+                const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12);
                 const innerShaftMat = new THREE.MeshStandardMaterial({ color: color });
                 const innerShaftMesh = new THREE.Mesh(innerShaftGeo, innerShaftMat);
                 innerShaftMesh.position.copy(mid);
                 innerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 group.add(innerShaftMesh);
             } else if (type === "ForcePut") {
-                // Force shaft with inner shaft
                 const coneForce = makeCone();
                 const conePut = makeDoublePyramid();
-                coneForce.position.copy(target);
-                conePut.position.copy(target);
+                coneForce.position.copy(headPos);
+                conePut.position.copy(headPos);
                 coneForce.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 conePut.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 group.add(coneForce);
                 group.add(conePut);
 
-                // Outer Force shaft
-                const outerShaftGeo = new THREE.CylinderGeometry(0.05, 0.05, shaftLength - 0.1, 12);
+                const outerShaftGeo = new THREE.CylinderGeometry(0.05, 0.05, shaftLength, 12);
                 const outerShaftMat = new THREE.MeshStandardMaterial({ color: color, transparent: true, opacity: 0.3 });
                 const outerShaftMesh = new THREE.Mesh(outerShaftGeo, outerShaftMat);
                 outerShaftMesh.position.copy(mid);
                 outerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 group.add(outerShaftMesh);
 
-                // Inner shaft
-                const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength - 0.1, 12);
+                const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12);
                 const innerShaftMat = new THREE.MeshStandardMaterial({ color: color });
                 const innerShaftMesh = new THREE.Mesh(innerShaftGeo, innerShaftMat);
                 innerShaftMesh.position.copy(mid);
@@ -345,7 +337,6 @@
 
             return group;
         }
-
         const data = await fetch('./scene.json').then(r => r.json());
 
         for (const obj of data.objects) {
