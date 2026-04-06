@@ -84,7 +84,7 @@
             //if (isSprite) {
             //    let material = new THREE.SpriteMaterial({ map: texture });
             //    result = new THREE.Sprite(material);
-           // }
+            // }
             return { texture, aspect };
         }
         function createBox(obj) {
@@ -234,6 +234,118 @@
             return group;
         }
 
+        function makeActionArrow(type, source, target, color = 0x7788ff) {
+            const group = new THREE.Group();
+
+            // Compute vector from source → target
+            const dir = new THREE.Vector3().subVectors(target, source);
+            const length = dir.length();
+            dir.normalize();
+
+            // Shaft parameters
+            let shaftRadius = 0.03;
+            let shaftLength = length;
+
+            if (type === "Force" || type === "ForcePut") {
+                shaftRadius = 0.05; // wider for Force
+            }
+
+            // Shaft geometry
+            const shaftGeo = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength - 0.1, 12);
+            const shaftMat = new THREE.MeshStandardMaterial({
+                color: color,
+                transparent: true,
+                opacity: (type === "Force" || type === "ForcePut") ? 0.3 : 0.7
+            });
+            const shaftMesh = new THREE.Mesh(shaftGeo, shaftMat);
+
+            // Align shaft along dir, midpoint at center
+            const mid = new THREE.Vector3().addVectors(source, target).multiplyScalar(0.5);
+            shaftMesh.position.copy(mid);
+
+            shaftMesh.quaternion.setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0), // default cylinder up
+                dir
+            );
+
+            group.add(shaftMesh);
+
+            // Helper function to make a cone arrowhead
+            function makeCone(radius = 0.06, height = 0.12) {
+                const coneGeo = new THREE.ConeGeometry(radius, height, 12);
+                const coneMat = new THREE.MeshStandardMaterial({ color: color });
+                const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+                return coneMesh;
+            }
+
+            // Helper function to make a double pyramid (Put)
+            function makeDoublePyramid(radius = 0.06, height = 0.12) {
+                const cone1 = makeCone(radius, height);
+                const cone2 = makeCone(radius, height);
+                cone2.rotateX(Math.PI); // invert second cone
+                const group = new THREE.Group();
+                cone1.position.y = height / 2;
+                cone2.position.y = -height / 2;
+                group.add(cone1);
+                group.add(cone2);
+                return group;
+            }
+
+            // Add arrowheads
+            if (type === "Get") {
+                const cone = makeCone();
+                cone.position.copy(target);
+                cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                group.add(cone);
+            } else if (type === "Put") {
+                const dp = makeDoublePyramid();
+                dp.position.copy(target);
+                dp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                group.add(dp);
+            } else if (type === "Force") {
+                const cone = makeCone();
+                cone.position.copy(target);
+                cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                group.add(cone);
+
+                // Inner shaft
+                const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength - 0.1, 12);
+                const innerShaftMat = new THREE.MeshStandardMaterial({ color: color });
+                const innerShaftMesh = new THREE.Mesh(innerShaftGeo, innerShaftMat);
+                innerShaftMesh.position.copy(mid);
+                innerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                group.add(innerShaftMesh);
+            } else if (type === "ForcePut") {
+                // Force shaft with inner shaft
+                const coneForce = makeCone();
+                const conePut = makeDoublePyramid();
+                coneForce.position.copy(target);
+                conePut.position.copy(target);
+                coneForce.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                conePut.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                group.add(coneForce);
+                group.add(conePut);
+
+                // Outer Force shaft
+                const outerShaftGeo = new THREE.CylinderGeometry(0.05, 0.05, shaftLength - 0.1, 12);
+                const outerShaftMat = new THREE.MeshStandardMaterial({ color: color, transparent: true, opacity: 0.3 });
+                const outerShaftMesh = new THREE.Mesh(outerShaftGeo, outerShaftMat);
+                outerShaftMesh.position.copy(mid);
+                outerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                group.add(outerShaftMesh);
+
+                // Inner shaft
+                const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength - 0.1, 12);
+                const innerShaftMat = new THREE.MeshStandardMaterial({ color: color });
+                const innerShaftMesh = new THREE.Mesh(innerShaftGeo, innerShaftMat);
+                innerShaftMesh.position.copy(mid);
+                innerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                group.add(innerShaftMesh);
+            }
+
+            return group;
+        }
+
         const data = await fetch('./scene.json').then(r => r.json());
 
         for (const obj of data.objects) {
@@ -249,6 +361,18 @@
                 const adjustedTarget = target.position.clone().add(new THREE.Vector3(0, BoxDim / 2, 0));
                 const mesh = createPointer(from, adjustedTarget);
                 scene.add(mesh);
+            }
+            else if (obj.type == "Get" || obj.type == "Put" || obj.type == "Force" || obj.type == "ForcePut") {
+                const from = pointerDotsByKey.get(obj.from);
+                const target = nodesByLabel.get(obj.to);
+                if (!from || !target) { console.error("error connecting: " + obj); continue };
+                const mesh = makeActionArrow(obj.type, from, target.position);
+                scene.add(mesh)
+
+            }
+            else if (obj.type === "box" || obj.type === "orb") { /* already handled */ }
+            else {
+                console.error("do not recognize this object type: " + obj.type);
             }
         }
 
@@ -272,12 +396,12 @@
             }
         });
 
-        
+
         var hoverNode = null;
 
         // an object to expose state to the console, set whenever hoverNode is set or reset, but never cleared after the hovering is gone, between hovers.
         var lastHoverNode = { lastHoverNode: null };
-        
+
         var frames = 0;
 
         window.addEventListener('mousemove', e => {

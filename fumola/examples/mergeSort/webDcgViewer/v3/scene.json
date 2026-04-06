@@ -31,20 +31,51 @@
     { "type": "pointer", "from": "J:right", "to": "N" },
 
 
-    { "type": "orb", "position": [3,2,-1], "label": "c-H", "fields": "val: 8\nnote: root\ntest: 1\ntest: 2", "pointerFields": ["left","right"] },
-    { "type": "orb", "position": [2,1,-1], "label": "c-I", "fields": "val: 4", "pointerFields": ["left","right"] },
-    { "type": "orb", "position": [4,1,-1], "label": "c-J", "fields": "val: 12", "pointerFields": ["left","right"] },
-    { "type": "orb", "position": [1.5,0,-1], "label": "c-K", "fields": "val: 2", "pointerFields": [] },
-    { "type": "orb", "position": [2.5,0,-1], "label": "c-L", "fields": "val: 6", "pointerFields": [] },
-    { "type": "orb", "position": [3.5,0,-1], "label": "c-M", "fields": "val: 10", "pointerFields": [] },
-    { "type": "orb", "position": [4.5,0,-1], "label": "c-N", "fields": "val: 14", "pointerFields": [] },
+    { "type": "orb", "position": [3,2,-1], "label": "c-H", "fields": "val: 8\nnote: root\ntest: 1\ntest: 2", "pointerFields": ["back","left","right","front"] },
+    { "type": "orb", "position": [2,1,-1], "label": "c-I", "fields": "val: 4", "pointerFields": ["back", "left","right","front"] },
+    { "type": "orb", "position": [4,1,-1], "label": "c-J", "fields": "val: 12", "pointerFields": ["back", "left","right", "front"] },
+    { "type": "orb", "position": [1.5,0,-1], "label": "c-K", "fields": "val: 2", "pointerFields": ["back", "front"] },
+    { "type": "orb", "position": [2.5,0,-1], "label": "c-L", "fields": "val: 6", "pointerFields": ["back", "front"] },
+    { "type": "orb", "position": [3.5,0,-1], "label": "c-M", "fields": "val: 10", "pointerFields": ["back", "front"] },
+    { "type": "orb", "position": [4.5,0,-1], "label": "c-N", "fields": "val: 14", "pointerFields": ["back", "front"] },
 
-    { "type": "pointer", "from": "c-H:left", "to": "c-I" },
-    { "type": "pointer", "from": "c-H:right", "to": "c-J" },
-    { "type": "pointer", "from": "c-I:left", "to": "c-K" },
-    { "type": "pointer", "from": "c-I:right", "to": "c-L" },
-    { "type": "pointer", "from": "c-J:left", "to": "c-M" },
-    { "type": "pointer", "from": "c-J:right", "to": "c-N" }
+    { "type": "ForcePut", "from": "c-H:left", "to": "c-I" },
+    { "type": "ForcePut", "from": "c-H:right", "to": "c-J" },
+    { "type": "ForcePut", "from": "c-I:left", "to": "c-K" },
+    { "type": "ForcePut", "from": "c-I:right", "to": "c-L" },
+    { "type": "ForcePut", "from": "c-J:left", "to": "c-M" },
+    { "type": "ForcePut", "from": "c-J:right", "to": "c-N" },
+
+    { "type": "box", "position": [3,2,-2], "label": "d-H", "fields": "val: 8\nnote: root\ntest: 1\ntest: 2", "pointerFields": ["left","right"] },
+    { "type": "box", "position": [2,1,-2], "label": "d-I", "fields": "val: 4", "pointerFields": ["left","right"] },
+    { "type": "box", "position": [4,1,-2], "label": "d-J", "fields": "val: 12", "pointerFields": ["left","right"] },
+    { "type": "box", "position": [1.5,0,-2], "label": "d-K", "fields": "val: 2", "pointerFields": [] },
+    { "type": "box", "position": [2.5,0,-2], "label": "d-L", "fields": "val: 6", "pointerFields": [] },
+    { "type": "box", "position": [3.5,0,-2], "label": "d-M", "fields": "val: 10", "pointerFields": [] },
+    { "type": "box", "position": [4.5,0,-2], "label": "d-N", "fields": "val: 14", "pointerFields": [] },
+
+    { "type": "pointer", "from": "d-H:left", "to": "d-I" },
+    { "type": "pointer", "from": "d-H:right", "to": "d-J" },
+    { "type": "pointer", "from": "d-I:left", "to": "d-K" },
+    { "type": "pointer", "from": "d-I:right", "to": "d-L" },
+    { "type": "pointer", "from": "d-J:left", "to": "d-M" },
+    { "type": "pointer", "from": "d-J:right", "to": "d-N" },
+
+    { "type": "Put", "from": "c-H:front", "to": "d-H" },
+    { "type": "Put", "from": "c-I:front", "to": "d-I" },
+    { "type": "Put", "from": "c-J:front", "to": "d-J" },
+    { "type": "Put", "from": "c-K:front", "to": "d-K" },
+    { "type": "Put", "from": "c-L:front", "to": "d-L" },
+    { "type": "Put", "from": "c-M:front", "to": "d-M" },
+    { "type": "Put", "from": "c-N:front", "to": "d-N" },
+
+    { "type": "Get", "from": "c-H:back", "to": "H" },
+    { "type": "Get", "from": "c-I:back", "to": "I" },
+    { "type": "Get", "from": "c-J:back", "to": "J" },
+    { "type": "Get", "from": "c-K:back", "to": "K" },
+    { "type": "Get", "from": "c-L:back", "to": "L" },
+    { "type": "Get", "from": "c-M:back", "to": "M" },
+    { "type": "Get", "from": "c-N:back", "to": "N" }
 
 
 ]
