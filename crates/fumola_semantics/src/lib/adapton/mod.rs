@@ -45,6 +45,7 @@ pub enum Error {
     TypeMismatch(u32), // gives line number.
     UndefinedNow(Pointer),
     Unreachable,
+    UnreachableForceEnd,
     DanglingPointer(Space),
     CannotPutReadOnlyReservedSymbol(ReservedSymbol),
     CannotPutFutureReservedSymbol(Symbol_),

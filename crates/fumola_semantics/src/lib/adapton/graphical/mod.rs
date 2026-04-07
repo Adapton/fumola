@@ -179,6 +179,8 @@ impl GraphicalState {
                 if m0.0 < m.0 {
                     latest = Some((m, n));
                 }
+            } else {
+                latest = Some((m, n));
             }
         }
         latest
@@ -370,7 +372,7 @@ impl GraphicalState {
 impl CacheState for GraphicalState {
     fn new() -> Self {
         GraphicalState {
-            next_edge_id: EdgeId(BigUint::from(0 as usize)),
+            next_edge_id: EdgeId(BigUint::from(1001 as usize)),
             meta_time: MetaTime(BigUint::from(0 as usize)),
             space_time: HashMap::new(),
             time_space: HashMap::new(),
@@ -494,7 +496,7 @@ impl CacheState for GraphicalState {
         let trace = self.trace.clone();
         let (_, node) = self
             .get_node_mut(&self.current_node.0.clone(), &self.now())
-            .ok_or(Error::Unreachable)?;
+            .ok_or(Error::UnreachableForceEnd)?;
         if !settings.force_end_forgets_result {
             node.set_cache_value(value, trace)?;
         }
