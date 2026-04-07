@@ -481,6 +481,7 @@ impl CacheState for GraphicalState {
         counts: &mut Counts,
         pointer: Pointer,
     ) -> Res<ForceBeginResult> {
+        self.meta_time.incr();
         let (node_id, node) = self.get_node(&pointer)?;
         let node_ = node.clone();
         if let Node::Thunk(tc) = node_ {

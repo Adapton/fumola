@@ -218,7 +218,7 @@ module {
                                     action=#putForce;
                                     dfs;
                                     value=edgeInfo.value;
-                                    metaTimes;
+                                    metaTimes=(prevEdge!.metaTimes.0, metaTimes.1);
                                 }
                             } else { 
                                 let edge = {
