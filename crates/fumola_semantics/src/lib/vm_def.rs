@@ -217,7 +217,7 @@ fn path_base(path: &String) -> String {
 pub mod def {
 
     use fumola_syntax::ast;
-    use log::{debug, info};
+    use log::debug;
 
     use super::*;
     use crate::{
@@ -420,7 +420,7 @@ pub mod def {
                             .back()
                             .map(|m| m.local_path.clone());
                         let (_, y) = dec_field_kind_and_id(df);
-                        info!("{}.{}", &file.clone().unwrap(), y);
+                        debug!("{}.{}", &file.clone().unwrap(), y);
                         let ctx_id = active.defs().active_context();
                         let defs = active.defs().clone();
                         let ctx = defs.map.get(&ctx_id).unwrap().clone();

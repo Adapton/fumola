@@ -36,7 +36,8 @@ pub struct ThunkNode {
 }
 
 pub type SpaceTime = HashMap<Space, NodesByTime>;
-pub type NodesByTime = HashMap<(Time, MetaTime), Node>;
+pub type NodesByTime = HashMap<Time, NodesByMetaTime>;
+pub type NodesByMetaTime = HashMap<MetaTime, Node>;
 
 pub type TimeSpace = HashMap<Time, NodesBySpace>;
 pub type NodesBySpace = HashMap<(Space, MetaTime), Node>;
@@ -76,6 +77,12 @@ pub struct Frame {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MetaTime(pub BigUint);
 
+impl MetaTime {
+    pub fn incr(&mut self) {
+        self.0 = self.0.clone().add(1 as usize);
+    }
+}
+
 // the full identity of a node includes a Time and MetaTime.
 pub type NodeId = (Space, Time, MetaTime);
 
@@ -90,6 +97,7 @@ pub struct Edge {
     pub source: NodeId,
     pub target: NodeId,
     pub action: Action,
+    pub meta_time: MetaTime,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -145,13 +153,6 @@ impl GraphicalState {
         }
         self.space_time.get_mut(p).unwrap() // always succeeds, because of check above.
     }
-    fn get_node_by_time<'a>(&'a mut self, p: &Pointer) -> &'a NodesByTime {
-        let not_exists = self.space_time.get(p) == None;
-        if not_exists {
-            assert_eq!(self.space_time.insert(p.clone(), HashMap::new()), None);
-        }
-        self.space_time.get(p).unwrap()
-    }
     fn get_node_by_space<'a>(&'a mut self, t: &Time) -> &'a NodesBySpace {
         let not_exists = self.time_space.get(t) == None;
         if not_exists {
@@ -162,10 +163,25 @@ impl GraphicalState {
     fn root_node() -> NodeId {
         (Space::Here, Time::Now, MetaTime(BigUint::from(0u64)))
     }
-    fn get_node_mut<'a>(&'a mut self, p: &Pointer, t: &Time) -> Option<&'a mut Node> {
-        let meta_time = self.meta_time.clone();
-        self.get_node_by_time_mut(p)
-            .get_mut(&(t.clone(), meta_time))
+    fn get_node_mut<'a>(
+        &'a mut self,
+        p: &Pointer,
+        t: &Time,
+    ) -> Option<(&'a MetaTime, &'a mut Node)> {
+        let res = self.get_node_by_time_mut(p).get_mut(t);
+        if res == None {
+            return None;
+        };
+        let res = res.unwrap();
+        let mut latest: Option<(&MetaTime, &'a mut Node)> = None;
+        for (m, n) in res.iter_mut() {
+            if let Some((m0, _)) = latest {
+                if m0.0 < m.0 {
+                    latest = Some((m, n));
+                }
+            }
+        }
+        latest
     }
     fn current_node(&self) -> NodeId {
         self.current_node.clone()
@@ -181,7 +197,7 @@ impl GraphicalState {
             _ => Node::NonThunk(value),
         }
     }
-    fn new_edge(&mut self, action: Action, target: NodeId) -> Res<EdgeId> {
+    fn new_edge_helper(&mut self, action: Action, target: NodeId) -> Res<EdgeId> {
         let id = self.next_edge_id.clone();
         self.next_edge_id = self.next_edge_id.next();
         self.trace.push_back(id.clone());
@@ -197,20 +213,23 @@ impl GraphicalState {
                     .insert(target.clone(), vector!(id.clone()));
             }
         };
+        let meta_time = self.meta_time.clone();
         self.edges.insert(
             id.clone(),
             Edge {
                 source,
                 target,
                 action,
+                meta_time,
             },
         );
         Ok(id)
     }
     fn new_edge_to_pointer(&mut self, action: Action, target: Pointer) -> Res<EdgeId> {
         let time = self.time.clone();
+        self.meta_time.incr();
         let meta_time = self.meta_time.clone();
-        let edge_id = self.new_edge(action, (target, time, meta_time))?;
+        let edge_id = self.new_edge_helper(action, (target, time, meta_time))?;
         Ok(edge_id)
     }
     fn push_stack(&mut self, frame_kind: FrameKind) {
@@ -294,26 +313,39 @@ impl GraphicalState {
     // and the boilerplate for Serialize/Deserialize for it)
     fn get_node<'a>(&'a self, pointer: &Pointer) -> Res<(NodeId, &'a Node)> {
         if let Some(nodes_by_time) = self.space_time.get(pointer) {
-            if let Some(node) = nodes_by_time.get(&(self.time.clone(), self.meta_time.clone())) {
-                let node_id = (pointer.clone(), self.time.clone(), self.meta_time.clone());
-                Ok((node_id, node))
+            if let Some(nodes) = nodes_by_time.get(&self.time) {
+                let mut latest: Option<(&MetaTime, &'a Node)> = None;
+                for (m, n) in nodes.iter() {
+                    if let Some((m0, _)) = latest {
+                        if m0.0 <= m.0 {
+                            latest = Some((m, n));
+                        }
+                    } else {
+                        latest = Some((m, n))
+                    }
+                }
+                let latest = latest.unwrap();
+                let node_id = (pointer.clone(), self.time.clone(), latest.0.clone());
+                Ok((node_id, latest.1))
             } else {
                 let mut time = None;
                 let mut meta_time = None;
                 let mut node = None;
-                for ((time_, meta_time_), node_) in nodes_by_time.iter() {
-                    if &self.time >= time_ && time == None {
-                        // Initialize with a viable node's time.
-                        time = Some(time_);
-                        meta_time = Some(meta_time_);
-                        node = Some(node_);
-                    } else if let Some(t) = time {
-                        // This node's time is closer to the current moment.
-                        // It shadows the earlier node we found.
-                        if t < time_ && time_ <= &self.time {
+                for (time_, nodes_) in nodes_by_time.iter() {
+                    for (meta_time_, node_) in nodes_.iter() {
+                        if &self.time >= time_ && time == None {
+                            // Initialize with a viable node's time.
                             time = Some(time_);
                             meta_time = Some(meta_time_);
                             node = Some(node_);
+                        } else if let Some(t) = time {
+                            // This node's time is closer to the current moment.
+                            // It shadows the earlier node we found.
+                            if t < time_ && time_ <= &self.time {
+                                time = Some(time_);
+                                meta_time = Some(meta_time_);
+                                node = Some(node_);
+                            }
                         }
                     }
                 }
@@ -364,29 +396,43 @@ impl CacheState for GraphicalState {
         value: Value_,
         beh: PutBeh,
     ) -> Res<()> {
-        let time = self.time.clone();
-        let meta_time = self.meta_time.clone();
         let space = self.space.clone();
-        let nodes = self.get_node_by_time(&pointer);
-        let nodes_orig_len = nodes.len();
         let new_node = Self::new_node(space, value.clone());
         let is_thunk = new_node.is_thunk();
-        let nodes = nodes.update((time.clone(), meta_time.clone()), new_node);
+        self.meta_time.incr();
+        let mut node_by_meta_time0 = HashMap::new();
+        node_by_meta_time0.insert(self.meta_time.clone(), new_node);
+        let nodes_by_time = self.space_time.get(&pointer);
+        match nodes_by_time {
+            Some(nodes_by_time) => {
+                self.space_time = self.space_time.update(
+                    pointer.clone(),
+                    nodes_by_time.update_with(self.time.clone(), node_by_meta_time0, |old, new| {
+                        old.union(new)
+                    }),
+                );
+            }
+            None => {
+                self.space_time = self.space_time.update(
+                    pointer.clone(),
+                    HashMap::new().update(self.time.clone(), node_by_meta_time0),
+                )
+            }
+        };
         if beh == PutBeh::Put {
-            if nodes.len() > nodes_orig_len {
-                counts.cells += 1;
-                if is_thunk {
-                    counts.thunk_cells += 1
-                } else {
-                    counts.non_thunk_cells += 1;
-                }
+            counts.cells += 1;
+            if is_thunk {
+                counts.thunk_cells += 1
+            } else {
+                counts.non_thunk_cells += 1;
             }
             let put_action = Action::Put(value.clone());
-            let _ = self.new_edge_to_pointer(put_action, pointer.clone());
+            let target = (pointer.clone(), self.time.clone(), self.meta_time.clone());
+            let _ = self.new_edge_helper(put_action, target);
         };
-        self.space_time.insert(pointer, nodes);
         Ok(())
     }
+
     fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_> {
         let (_, node) = self.get_node(&pointer)?;
         let value = node.get_value()?;
@@ -446,7 +492,7 @@ impl CacheState for GraphicalState {
     }
     fn force_end(&mut self, settings: &Settings, value: Value_) -> Res<()> {
         let trace = self.trace.clone();
-        let node = self
+        let (_, node) = self
             .get_node_mut(&self.current_node.0.clone(), &self.now())
             .ok_or(Error::Unreachable)?;
         if !settings.force_end_forgets_result {

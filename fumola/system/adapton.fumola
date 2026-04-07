@@ -35,6 +35,7 @@ module {
             source : NodeId;
             target : NodeId;
             action : Action;
+            metaTime : MetaTime;
         };
 
         public type NodeInfo = {
@@ -49,14 +50,15 @@ module {
       { 
         action: Action; 
         putValue: ?Any; // TODO -- distinguish thunks and non-thunks
-        forcedThunk: ?Thunk<A>
+        forcedThunk: ?Thunk<A>;
+        metaTime: MetaTime;
       } 
     {
         switch (edge.action) {
 
-            case(#put(value)) {{action=#put; value; forcedThunk=null}};
-            case(#get(value)) {{action=#get; value; forcedThunk=null}};
-            case(#force_(t, value)) {{action=#force_; value; forcedThunk=?t; value}};
+            case(#put(value)) {{action=#put; value; forcedThunk=null; metaTime=edge.metaTime}};
+            case(#get(value)) {{action=#get; value; forcedThunk=null; metaTime=edge.metaTime}};
+            case(#force_(t, value)) {{action=#force_; value; forcedThunk=?t; value; metaTime=edge.metaTime}};
         }
     };
 
@@ -98,6 +100,7 @@ module {
             dfs : ?ShowDFS;
             forcedThunk : ?Thunk<Any>;
             value : Any;
+            metaTime : MetaTime;
         };
         //
         // Just the "tag" of the action, where the other action information
@@ -143,7 +146,7 @@ module {
         };
 
         public func edgeIntoText(edge : ShowEdge, indent : Nat) : Text {
-            indentText(indent) # "├" # (
+            indentText(indent) # "├(" # (debug_show (edge.metaTime)) # ")" # (
             switch (edge.dfs) {
                 case null {
                     actionIntoUnicode(edge.action) # 
@@ -196,6 +199,7 @@ module {
                                 // visited.insert(target);
                                 dfs := ? showDFSRec(actionTarget /*, visited */);
                             };
+                            let metaTime = edgeInfo.metaTime;
                             if ( 
                                 prevEdge != null and
                                 prevEdge!.action == #put and 
@@ -205,12 +209,14 @@ module {
                                     action=#putForce;
                                     dfs;
                                     value=edgeInfo.value;
+                                    metaTime;
                                 }
                             } else { 
                                 let edge = {
                                     action=edgeInfo.action;
                                     actionTarget;
                                     dfs;
+                                    metaTime;
                                     value=edgeInfo.value;
                                 };
                                 edges #= [ edge ];
