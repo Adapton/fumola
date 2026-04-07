@@ -1,6 +1,7 @@
 use crate::Shared;
 use crate::value::{Closed, Symbol, Symbol_, ThunkBody, Value_};
 use fumola_syntax::ast::Exp_;
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
@@ -55,7 +56,27 @@ pub enum Error {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ForceBeginResult {
     CacheMiss(ThunkBody),
-    CacheHit(Value_),
+    CacheHit(MetaTime, Value_),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct MetaTime(pub BigUint);
+use std::ops::Add;
+
+impl MetaTime {
+    pub fn new() -> Self {
+        MetaTime(BigUint::from(0 as usize))
+    }
+    pub fn incr(&mut self) {
+        self.0 = self.0.clone().add(1 as usize);
+    }
+    pub fn pair(begin: Option<Self>, end: Self) -> (Self, Self) {
+        if let Some(begin) = begin {
+            (begin, end)
+        } else {
+            (end.clone(), end)
+        }
+    }
 }
 
 pub type Res<Ok> = Result<Ok, Error>;

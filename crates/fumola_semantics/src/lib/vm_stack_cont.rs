@@ -731,7 +731,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             if let Value::AdaptonPointer(ref p) = *v {
                 let force_begin_result = active.adapton().force_begin(p.clone())?;
                 match force_begin_result {
-                    ForceBeginResult::CacheHit(v) => {
+                    ForceBeginResult::CacheHit(_, v) => {
                         *active.cont() = Cont::Value_(v);
                         Ok(Step {})
                     }

@@ -1,5 +1,5 @@
 use crate::adapton::state::{CacheState, Counts, PutBeh, Settings};
-use crate::adapton::{Error, ForceBeginResult, Navigation, Pointer, Res, Space, Time};
+use crate::adapton::{Error, ForceBeginResult, MetaTime, Navigation, Pointer, Res, Space, Time};
 
 use crate::ToMotoko;
 use crate::value::{Symbol_, ThunkBody, Value, Value_};
@@ -259,7 +259,7 @@ impl CacheState for SimpleState {
                 && !settings.force_begin_always_misses
             {
                 counts.force_begin_cache_hit += 1;
-                Ok(ForceBeginResult::CacheHit(cache_value))
+                Ok(ForceBeginResult::CacheHit(MetaTime::new(), cache_value))
             } else {
                 counts.force_begin_cache_miss += 1;
                 self.push_stack();

@@ -1,11 +1,9 @@
 use fumola_syntax::ast::{Id, Mut};
 use fumola_syntax::shared::Share;
 
-use crate::adapton::graphical::{
-    Action, Edge, EdgeId, MetaTime, Node, NodeId, NodeInfo, ThunkNode,
-};
+use crate::adapton::graphical::{Action, Edge, EdgeId, Node, NodeId, NodeInfo, ThunkNode};
 use crate::adapton::simple::{Cell, ThunkCell};
-use crate::adapton::{Space, Time};
+use crate::adapton::{MetaTime, Space, Time};
 use crate::{Value, Value_, value::ThunkBody};
 use im_rc::{Vector, vector};
 
@@ -96,7 +94,7 @@ impl PeekValue for Edge {
                 ("source", self.source.into_value_()),
                 ("target", self.target.into_value_()),
                 ("action", self.action.into_value_()),
-                ("metaTime", self.meta_time.into_value_()),
+                ("metaTimes", self.meta_times.into_value_()),
             ]
             .iter(),
         )
