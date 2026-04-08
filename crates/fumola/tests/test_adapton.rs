@@ -39,7 +39,7 @@ fn force_simple_cache_hit() {
 #[test]
 fn peek_cell_some_result() {
     assert__("prim \"adaptonReset\"(#simple); let p = 1 := thunk { }; force(p); let node = (prim \"adaptonPeekCell\" p)!; switch(node){ case(#thunk_(t)){t.result} }", "?()");
-    assert__("let p = 1 := thunk { }; force(p); let node = (prim \"adaptonPeekCell\" p)!.node; switch(node){ case(#thunk_(t)){t.result} }", "?(2, ())")
+    assert__("let p = 1 := thunk { }; force(p); let node = (prim \"adaptonPeekCell\" p)!.node; switch(node){ case(#thunk_(t)){t.result} }", "?(3, ())")
 }
 
 #[test]
@@ -252,4 +252,24 @@ assert ((@ cell) == ?1)
 "#,
         "()",
     )
+}
+
+#[test]
+fn test_events() {
+    assert__(
+        r#"
+    force (1 := thunk { force (2 := thunk { 44 }) });
+    (switch (@(`adapton(`state))) { case (#Graphical(g)) g }).events"#,
+        r#"
+    [
+        {event = #AddEdge([1001]); meta_time = [1]},
+        {event = #ForceBegin(#Symbol(#Nat(1)), #Now, [1]); meta_time = [2]},
+        {event = #AddEdge([1002]); meta_time = [3]},
+        {event = #ForceBegin(#Symbol(#Nat(2)), #Now, [3]); meta_time = [4]},
+        {event = #AddEdge([1003]); meta_time = [5]},
+        {event = #ForceEnd((#Symbol(#Nat(2)), #Now, [3]), [1003]); meta_time = [5]},
+        {event = #AddEdge([1004]); meta_time = [6]},
+        {event = #ForceEnd((#Symbol(#Nat(1)), #Now, [1]), [1004]); meta_time = [6]}
+    ]"#,
+    );
 }
