@@ -464,6 +464,7 @@ impl CacheState for GraphicalState {
             }
             let put_action = Action::Put(value.clone());
             let target = (pointer.clone(), self.time.clone(), self.meta_time.clone());
+            self.event(Event::AddNode(target.clone()));
             let edge_id = self.new_edge_helper(put_action, target, None)?;
             self.event(Event::AddEdge(edge_id));
         };
