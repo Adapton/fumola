@@ -1,9 +1,10 @@
+use crate::adapton::peek_value::PeekValue;
 use crate::adapton::state::{CacheState, Counts, PutBeh, Settings};
 use crate::adapton::{Error, ForceBeginResult, MetaTime, Navigation, Pointer, Res, Space, Time};
 
 use crate::ToMotoko;
 use crate::value::{Symbol_, ThunkBody, Value, Value_};
-use im_rc::{HashMap, Vector};
+use im_rc::{HashMap, Vector, vector};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -320,5 +321,10 @@ impl CacheState for SimpleState {
                 .to_motoko_shared()
                 .map_err(|_| Error::Unreachable),
         }
+    }
+
+    fn peek_events(&mut self) -> Res<Value_> {
+        let empty: Vector<Value_> = vector!();
+        Ok(empty.into_value_())
     }
 }

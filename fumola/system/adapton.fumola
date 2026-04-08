@@ -11,7 +11,19 @@ module {
     ///
     public module PeekInfo {
 
+        public type Events = [Event];
+        public type Event = {
+            #addNode : NodeId;
+            #addEdge : EdgeId;
+            #removeEdge : EdgeId;
+            #forceBegin : NodeId;
+            #forceEnd : (NodeId, EdgeId);
+        };
         public type MetaTime = Nat;
+        public type Node = {
+            #nonThunk : Any;
+            #thunk_ : ThunkNode;
+        };
         public type Time = { #time : Symbol };
         public type Space = { #space : Symbol };
         public type Pointer = Space;
@@ -67,6 +79,10 @@ module {
 
     public func peekInfo(p : Pointer) : ?PeekInfo.NodeInfo {
         prim "adaptonPeekCell" p
+    };
+
+    public func peekEvents() : PeekInfo.Events {
+        prim "adaptonPeekEvents" ()
     };
 
     public module DFS {

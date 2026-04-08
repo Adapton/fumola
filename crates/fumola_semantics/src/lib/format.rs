@@ -308,6 +308,7 @@ impl ToDoc for PrimFunction {
             PrimFunction::AdaptonPointer => str("\"adaptonPointer\""),
             PrimFunction::AdaptonPeek => str("\"adaptonPeek\""),
             PrimFunction::AdaptonPeekCell => str("\"adaptonPeekCell\""),
+            PrimFunction::AdaptonPeekEvents => str("\"adaptonPeekEvents\""),
             PrimFunction::AdaptonPoke => str("\"adaptonPoke\""),
             PrimFunction::ReifyCore => todo!(),
             PrimFunction::ReflectCore => todo!(),

@@ -37,6 +37,7 @@ pub trait AdaptonState {
     fn navigate_end(&mut self) -> Res<()>;
     fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>>;
     fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_>;
+    fn peek_events(&mut self) -> Res<Value_>;
     fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()>;
 }
 

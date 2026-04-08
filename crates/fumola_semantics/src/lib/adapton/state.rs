@@ -105,6 +105,7 @@ pub trait CacheState {
     fn navigate_end(&mut self) -> Res<()>;
     fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>>;
     fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_>;
+    fn peek_events(&mut self) -> Res<Value_>;
 }
 
 impl State {
@@ -293,6 +294,13 @@ impl AdaptonState for State {
         match &mut self.inner {
             InnerState::Simple(s) => s.peek_cell(pointer),
             InnerState::Graphical(g) => g.peek_cell(pointer),
+        }
+    }
+
+    fn peek_events(&mut self) -> Res<Value_> {
+        match &mut self.inner {
+            InnerState::Simple(s) => s.peek_events(),
+            InnerState::Graphical(g) => g.peek_events(),
         }
     }
 

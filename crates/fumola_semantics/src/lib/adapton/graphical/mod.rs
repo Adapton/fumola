@@ -1,6 +1,7 @@
 use crate::ToMotoko;
 use crate::Value;
 use crate::adapton::MetaTime;
+use crate::adapton::peek_value::PeekValue;
 use crate::adapton::state::PutBeh;
 use crate::adapton::state::{CacheState, Counts, Settings};
 use crate::adapton::{Error, ForceBeginResult, Navigation, Pointer, Res, Space, Time};
@@ -12,8 +13,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Event {
-    AddEdge(EdgeId),
     AddNode(NodeId),
+    AddEdge(EdgeId),
     RemoveEdge(EdgeId),
     ForceBegin(NodeId),
     ForceEnd(NodeId, EdgeId),
@@ -608,5 +609,10 @@ impl CacheState for GraphicalState {
                 .to_motoko_shared()
                 .map_err(|_| Error::Unreachable),
         }
+    }
+
+    fn peek_events(&mut self) -> Res<Value_> {
+        let empty: Vector<Value_> = vector!();
+        Ok(empty.into_value_())
     }
 }
