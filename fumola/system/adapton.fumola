@@ -20,10 +20,7 @@ module {
             #forceEnd : (NodeId, EdgeId);
         };
         public type MetaTime = Nat;
-        public type Node = {
-            #nonThunk : Any;
-            #thunk_ : ThunkNode;
-        };
+       
         public type Time = { #time : Symbol };
         public type Space = { #space : Symbol };
         public type Pointer = Space;
