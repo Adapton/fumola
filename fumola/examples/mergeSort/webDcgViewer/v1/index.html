@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>DCG Viewer</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+
+<body>
+  <script type="module">
+
+    import * as THREE from 'https://esm.sh/three@0.160.0';
+    import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+
+    // Scene setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xffffff);
+
+    const nodesByLabel = new Map();
+    const edgesByLabel = new Map();
+
+    const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
+    camera.position.set(4, 4, 6);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+
+    controls.rotateSpeed = 0.8;
+    controls.zoomSpeed = 0.8;
+    controls.panSpeed = 0.8;
+
+    // Light
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(5, 5, 5);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0xffffff));
+
+    // Load JSON
+    const data = await fetch('./scene2.json').then(r => r.json());
+
+    function createArrow(from, to, labelText) {
+      const start = new THREE.Vector3(...from);
+      const end = new THREE.Vector3(...to);
+
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
+      const dirNorm = direction.clone().normalize();
+
+      const material = new THREE.MeshStandardMaterial({ color: 0x00ffff });
+
+      // --- parameters ---
+
+      const coneLength = 0.6;   // bigger
+      const coneRadius = 0.2;   // wider
+
+      // const coneLength = 0.3;
+      const shaftLength = Math.max(0.001, length - coneLength);
+
+      // --- shaft (cylinder) ---
+      const cylinderGeom = new THREE.CylinderGeometry(0.05, 0.05, shaftLength, 12);
+      const cylinder = new THREE.Mesh(cylinderGeom, material);
+
+      // midpoint of shaft
+      const shaftMid = start.clone().addScaledVector(dirNorm, shaftLength / 2);
+      cylinder.position.copy(shaftMid);
+
+      // orient cylinder (Y axis → direction)
+      cylinder.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        dirNorm
+      );
+
+      // --- arrowhead (cone) ---
+      //const coneGeom = new THREE.ConeGeometry(0.1, coneLength, 12);
+      const coneGeom = new THREE.ConeGeometry(coneRadius, coneLength, 16);
+      const cone = new THREE.Mesh(coneGeom, material);
+
+      // position cone so its TIP is exactly at `end`
+      // cone is centered, so shift back by half its length
+      const coneCenter = end.clone().addScaledVector(dirNorm, -coneLength / 2);
+      cone.position.copy(coneCenter);
+
+      cone.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        dirNorm
+      );
+
+      const up = new THREE.Vector3(0, 1, 0);
+      const quat = new THREE.Quaternion().setFromUnitVectors(up, dirNorm);
+
+      cylinder.quaternion.copy(quat);
+      cone.quaternion.copy(quat);
+
+      const label = makeTextSprite(labelText);
+
+      label.position.copy(shaftMid).add(new THREE.Vector3(0.25, 0.5, 0));
+
+      // group them together
+      const group = new THREE.Group();
+      group.add(cylinder);
+      group.add(label);
+      group.add(cone);
+
+      return group;
+    }
+
+    function makeTextSprite(text) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      const fontSize = 64;
+      ctx.font = `${fontSize}px Arial`;
+
+      // measure text
+      const textWidth = ctx.measureText(text).width;
+
+      canvas.width = textWidth + 20;
+      canvas.height = fontSize + 20;
+
+      // redraw after resize
+      ctx.font = `${fontSize}px Arial`;
+      ctx.fillStyle = 'black';
+      ctx.fillText(text, 10, fontSize);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+
+      const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true
+      });
+
+      const sprite = new THREE.Sprite(material);
+
+      // scale so it's visible in world space
+      const scale = 0.5;
+      sprite.scale.set(scale * canvas.width / canvas.height, scale, 1);
+
+      return sprite;
+    }
+
+    function createCylinder(from, to) {
+      const start = new THREE.Vector3(...from);
+      const end = new THREE.Vector3(...to);
+
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
+
+      const geometry = new THREE.CylinderGeometry(0.05, 0.05, length, 12);
+      const material = new THREE.MeshStandardMaterial({ color: 0x00ffff });
+
+      const cylinder = new THREE.Mesh(geometry, material);
+
+      // position
+      const midpoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+      cylinder.position.copy(midpoint);
+
+      // orientation
+      cylinder.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.clone().normalize()
+      );
+
+      return cylinder;
+    }
+
+    function createPointer(from, to) {
+      const start = new THREE.Vector3(...from);
+      const end = to.clone();
+
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
+      const dirNorm = direction.clone().normalize();
+
+      const group = new THREE.Group();
+
+      // --- parameters (small!) ---
+      const dotRadius = 0.05;
+      const shaftRadius = 0.01;
+      const coneLength = 0.08;
+      const coneRadius = 0.03;
+
+      const material = new THREE.MeshStandardMaterial({ color: 0x000000 });
+
+      // --- dot ---
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(dotRadius, 12, 12),
+        material
+      );
+      dot.position.copy(start);
+      group.add(dot);
+
+      // --- shaft ---
+      const shaftLength = Math.max(0.001, length - coneLength);
+
+      const cylinder = new THREE.Mesh(
+        new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength, 8),
+        material
+      );
+
+      const shaftMid = start.clone().addScaledVector(dirNorm, shaftLength / 2);
+      cylinder.position.copy(shaftMid);
+
+      const up = new THREE.Vector3(0, 1, 0);
+      const quat = new THREE.Quaternion().setFromUnitVectors(up, dirNorm);
+      cylinder.quaternion.copy(quat);
+
+      group.add(cylinder);
+
+      // --- arrowhead ---
+      const cone = new THREE.Mesh(
+        new THREE.ConeGeometry(coneRadius, coneLength, 8),
+        material
+      );
+
+      const coneCenter = end.clone().addScaledVector(dirNorm, -coneLength / 2);
+      cone.position.copy(coneCenter);
+      cone.quaternion.copy(quat);
+
+      group.add(cone);
+
+      return group;
+    }
+
+    for (const obj of data.objects) {
+      let mesh;
+
+      if (obj.type === 'sphere') {
+        mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(0.2, 16, 16),
+          new THREE.MeshStandardMaterial({ color: 0x44aa88 })
+        );
+        mesh.position.set(...obj.position);
+
+        if (obj.label) {
+          const label = makeTextSprite(obj.label);
+
+          // position slightly above object
+          const basePos = mesh.position.clone();
+          label.position.copy(basePos).add(new THREE.Vector3(0, 0.5, 0));
+
+          scene.add(label);
+        }
+      }
+
+      if (obj.type === 'box') {
+        mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(0.3, 0.3, 0.3),
+          new THREE.MeshStandardMaterial({ color: 0x44aa88 })
+        );
+        mesh.position.set(...obj.position);
+
+        if (obj.label) {
+          const label = makeTextSprite(obj.label);
+
+          // position slightly above object
+          const basePos = mesh.position.clone();
+          label.position.copy(basePos).add(new THREE.Vector3(0, 0.5, 0));
+
+          scene.add(label);
+        }
+      }
+
+      if (obj.type == "arrow") {
+        mesh = createArrow(obj.from, obj.to, obj.label);
+      }
+
+      if (obj.type === 'pointer') {
+        const targetMesh = nodesByLabel.get(obj.toLabel);
+
+        if (!targetMesh) {
+          console.warn("Missing target:", obj.toLabel);
+          continue;
+        }
+
+        mesh = createPointer(obj.from, targetMesh.position);
+      }
+
+      scene.add(mesh);
+
+      // index by label
+      if (obj.label) {
+        if (obj.type === 'arrow') {
+          edgesByLabel.set(obj.label, mesh);
+        } else {
+          nodesByLabel.set(obj.label, mesh);
+        }
+      }
+    }
+
+    // Animate
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // Resize
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    function focusPosition(targetPos) {
+      const offset = new THREE.Vector3(2, 2, 3); // camera offset
+
+      // move camera
+      camera.position.copy(targetPos).add(offset);
+
+      // set orbit target
+      controls.target.copy(targetPos);
+
+      controls.update();
+    }
+
+    function focusNode(label) {
+      const mesh = nodesByLabel.get(label);
+      if (!mesh) {
+        console.warn("No node:", label);
+        return;
+      }
+
+      focusPosition(mesh.position);
+
+      // optional highlight
+      mesh.material.emissive = new THREE.Color(0x3333ff);
+    }
+
+    function focusEdge(label) {
+      const mesh = edgesByLabel.get(label);
+      if (!mesh) {
+        console.warn("No edge:", label);
+        return;
+      }
+
+      const pos = mesh.position; // midpoint of cylinder
+      focusPosition(pos);
+
+      // optional highlight
+      mesh.material.emissive = new THREE.Color(0xff3333);
+    }
+
+
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    window.app = {
+      focusPosition,
+      nodesByLabel,
+      edgesByLabel,
+      data,
+      scene,
+      camera,
+      renderer,
+      controls
+    };
+
+  </script>
+</body>
+
+</html>

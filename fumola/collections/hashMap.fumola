@@ -1,0 +1,34 @@
+module {
+
+    type M<K, V> = (/* hidden */);
+
+    public func new<K,V>() : M<K,V> {
+        prim "hashMapNew" ()
+    };
+
+    public func put<K,V>(m : M<K,V>, k : K, v : V) {
+        prim "hashMapPut" (m, k, v)
+    };
+
+    public func get<K,V>(m : M<K,V>, k : V) : ?V {
+        prim "hashMapGet" (m, k)
+    };
+
+    public func remove<K, V>(m : M<K,V>, k : K) : (M<K, V>, ?V) {
+        prim "hashMapRemove" (m, k)
+    };
+
+    public module Test {
+        #[test]
+        public func testAll() {
+            let m = new();
+            let (m, old) = put(m, 1, 1);
+            assert old == null;            
+            assert (get(m, 1) == ?1);
+            let (m, old) = remove(m, 1);
+            assert old == ?1;
+            assert (m == new());
+        };
+
+    }
+}

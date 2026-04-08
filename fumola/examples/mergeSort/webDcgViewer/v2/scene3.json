@@ -1,0 +1,33 @@
+{
+  "objects": [
+    { "type": "box", "position": [-3,2,0], "label": "A" },
+    { "type": "box", "position": [-4,1,0], "label": "B" },
+    { "type": "box", "position": [-2,1,0], "label": "C" },
+    { "type": "box", "position": [-4.5,0,0], "label": "D" },
+    { "type": "box", "position": [-3.5,0,0], "label": "E" },
+    { "type": "box", "position": [-2.5,0,0], "label": "F" },
+    { "type": "box", "position": [-1.5,0,0], "label": "G" },
+
+    { "type": "pointer", "from": "A:left", "to": "B" },
+    { "type": "pointer", "from": "A:right", "to": "C" },
+    { "type": "pointer", "from": "B:left", "to": "D" },
+    { "type": "pointer", "from": "B:right", "to": "E" },
+    { "type": "pointer", "from": "C:left", "to": "F" },
+    { "type": "pointer", "from": "C:right", "to": "G" },
+
+    { "type": "record", "position": [3,2,0], "text": "(H 8 l r)", "label": "H" },
+    { "type": "record", "position": [2,1,0], "text": "(I 4 l r)", "label": "I" },
+    { "type": "record", "position": [4,1,0], "text": "(J 12 l r)", "label": "J" },
+    { "type": "record", "position": [1.5,0,0], "text": "(K 2 - -)", "label": "K" },
+    { "type": "record", "position": [2.5,0,0], "text": "(L 6 - -)", "label": "L" },
+    { "type": "record", "position": [3.5,0,0], "text": "(M 10 - -)", "label": "M" },
+    { "type": "record", "position": [4.5,0,0], "text": "(N 14 - -)", "label": "N" },
+
+    { "type": "pointer", "from": "H:left", "to": "I" },
+    { "type": "pointer", "from": "H:right", "to": "J" },
+    { "type": "pointer", "from": "I:left", "to": "K" },
+    { "type": "pointer", "from": "I:right", "to": "L" },
+    { "type": "pointer", "from": "J:left", "to": "M" },
+    { "type": "pointer", "from": "J:right", "to": "N" }
+  ]
+}

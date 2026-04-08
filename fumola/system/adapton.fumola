@@ -11,7 +11,16 @@ module {
     ///
     public module PeekInfo {
 
+        public type Events = [Event];
+        public type Event = {
+            #addNode : NodeId;
+            #addEdge : EdgeId;
+            #removeEdge : EdgeId;
+            #forceBegin : NodeId;
+            #forceEnd : (NodeId, EdgeId);
+        };
         public type MetaTime = Nat;
+       
         public type Time = { #time : Symbol };
         public type Space = { #space : Symbol };
         public type Pointer = Space;
@@ -27,14 +36,18 @@ module {
         public type ThunkNode = {
             body : Thunk<Any>;
             trace : [ EdgeId ];
-            result : ?Any;
+            result : ?(MetaTime, Any);
             space : Space;
         };
+
+        // meta time intervals (begin, end) where begin <= end.
+        public type MetaTimes = (MetaTime, MetaTime);
 
         public type Edge = {
             source : NodeId;
             target : NodeId;
             action : Action;
+            metaTimes : MetaTimes;
         };
 
         public type NodeInfo = {
@@ -49,19 +62,24 @@ module {
       { 
         action: Action; 
         putValue: ?Any; // TODO -- distinguish thunks and non-thunks
-        forcedThunk: ?Thunk<A>
+        forcedThunk: ?Thunk<A>;
+        metaTime: MetaTime;
       } 
     {
         switch (edge.action) {
 
-            case(#put(value)) {{action=#put; value; forcedThunk=null}};
-            case(#get(value)) {{action=#get; value; forcedThunk=null}};
-            case(#force_(t, value)) {{action=#force_; value; forcedThunk=?t; value}};
+            case(#put(value)) {{action=#put; value; forcedThunk=null; metaTimes=edge.metaTimes}};
+            case(#get(value)) {{action=#get; value; forcedThunk=null; metaTimes=edge.metaTimes}};
+            case(#force_(t, value)) {{action=#force_; value; forcedThunk=?t; value; metaTimes=edge.metaTimes}};
         }
     };
 
     public func peekInfo(p : Pointer) : ?PeekInfo.NodeInfo {
         prim "adaptonPeekCell" p
+    };
+
+    public func peekEvents() : PeekInfo.Events {
+        prim "adaptonPeekEvents" ()
     };
 
     public module DFS {
@@ -82,6 +100,7 @@ module {
             __nodeId : nodeId;      // using __ prefixes to promote in default print order.
             __shape : NodeShape;
             edges : [ ShowEdge ];
+            metaTimes : MetaTimes;
             value : Any;
         };
         public type NodeShape = {
@@ -98,6 +117,7 @@ module {
             dfs : ?ShowDFS;
             forcedThunk : ?Thunk<Any>;
             value : Any;
+            metaTimes : MetaTimes;
         };
         //
         // Just the "tag" of the action, where the other action information
@@ -142,8 +162,13 @@ module {
             }
         };
 
+        public func metaTimesIntoText(mts : MetaTimes) : Text {
+            if (mts.0 == mts.1) { "(" # debug_show (mts.0) # ")" }
+            else { debug_show mts }
+        };
+
         public func edgeIntoText(edge : ShowEdge, indent : Nat) : Text {
-            indentText(indent) # "├" # (
+            indentText(indent) # "├" # metaTimesIntoText(edge.metaTimes) # (
             switch (edge.dfs) {
                 case null {
                     actionIntoUnicode(edge.action) # 
@@ -196,6 +221,7 @@ module {
                                 // visited.insert(target);
                                 dfs := ? showDFSRec(actionTarget /*, visited */);
                             };
+                            let metaTimes = edgeInfo.metaTimes;
                             if ( 
                                 prevEdge != null and
                                 prevEdge!.action == #put and 
@@ -205,12 +231,14 @@ module {
                                     action=#putForce;
                                     dfs;
                                     value=edgeInfo.value;
+                                    metaTimes=(prevEdge!.metaTimes.0, metaTimes.1);
                                 }
                             } else { 
                                 let edge = {
                                     action=edgeInfo.action;
                                     actionTarget;
                                     dfs;
+                                    metaTimes;
                                     value=edgeInfo.value;
                                 };
                                 edges #= [ edge ];
