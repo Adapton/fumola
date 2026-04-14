@@ -281,7 +281,13 @@ module {
 
   public func sceneIntoJSONText( objects : [SceneObject] ) : Text {
     var objectsText = "";
+    var isFirstObject = true;
     for (o in objects.vals()) {
+      if (isFirstObject) {
+        isFirstObject := false;
+      } else {
+        objectsText #= ",\n";
+      };
       switch o {
         case (#box(fields)) {
           objectsText #= 
@@ -290,13 +296,13 @@ module {
               ", \"label\": "#(debug_show fields.label_)#
               ", \"textLines\": "#(debug_show fields.textFields)#
               ", \"pointerFields\": "#(debug_show fields.pointerFields)#
-              "},\n"
+              "}"
         };
         case (#pointer(fields)) {
           objectsText #= 
              "{ \"type\": \"pointer\", \"from\": " # (debug_show fields.from) # 
                                  ", \"to\": " # (debug_show fields.to) # 
-              "},\n"
+              "}"
         };
       }
     };
