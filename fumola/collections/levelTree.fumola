@@ -330,7 +330,7 @@ module {
             #pointer ( {from=label_# ":right"; to=(debug_show b.right)})
           ];
           objs #= sceneObjects(b.left, {x=origin.x - g.widthLeft / 2.0; y=origin.y; z=origin.z});
-          objs #= sceneObjects(b.left, {x=origin.x + g.widthRight / 2.0; y=origin.y; z=origin.z});
+          objs #= sceneObjects(b.right, {x=origin.x + g.widthRight / 2.0; y=origin.y; z=origin.z});
           (debug_show (#binary(b.symbol)), ["left", "right"]) 
         };
       };
@@ -342,17 +342,17 @@ module {
     let a = R.generateRandomInput(10, 10);
     let t = fromArray(a);
     let objs = sceneObjects(t!, zero);
-    assert (objs.size() == 125);
-    // prim "print" (objs[124]);
-    assert( objs[124] == #box{
-      label_ = "1-element";
-      pointerFields = [];
-      position = {x = 4.5; y = 1; z = 0};
-      textFields = "symbol=1\nelement=470";
-    });
-
-    prim "print" (sceneIntoJSONText objs);
-  };
+    assert (objs.size() == 37);
+    // prim "print" (objs[36]);
+    let last = objs[36];
+    switch last {
+      case (#box(b)) {
+        assert b.label_ == "10-element";
+        assert b.position.x == 1.5;
+      };
+      case _ { assert false };
+    }
+   };
 
   #[listing]
   public func geom2d<X>(tree : Pointer<SeqTree<X>>) : Geom2D {

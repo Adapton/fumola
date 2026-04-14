@@ -59,7 +59,7 @@ pub fn binop(
             (Float(f1), Float(f2)) => Ok(Float(*f1 + *f2)),
             (Float(f1), Nat(n2)) => Ok(Float(*f1 + n2.to_f64().unwrap())),
             (Nat(n1), Float(f2)) => Ok(Float(OrderedFloat(n1.to_f64().unwrap()) + *f2)),
-       
+
             // _ => nyi!(line!()),
             (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
@@ -69,7 +69,7 @@ pub fn binop(
             (Float(f1), Float(f2)) => Ok(Float(*f1 / *f2)),
             // _ => nyi!(line!()),
             (Nat(n1), Float(f2)) => {
-                let n1 : f64 =  n1.to_f64().unwrap();
+                let n1: f64 = n1.to_f64().unwrap();
                 let res = (n1 as f64) / **f2;
                 Ok(Float(OrderedFloat(res)))
             }
@@ -89,7 +89,7 @@ pub fn binop(
             (Float(f1), Float(f2)) => Ok(Float(*f1 - *f2)),
             (Float(f1), Nat(n2)) => Ok(Float(*f1 - n2.to_f64().unwrap())),
             (Nat(n1), Float(f2)) => Ok(Float(OrderedFloat(n1.to_f64().unwrap()) - *f2)),
-       
+
             // _ => nyi!(line!()),
             (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
