@@ -313,6 +313,12 @@ module {
     prim "writeFile" (symbol, sceneIntoJSONText(sceneObjects(tree, zero)))
   };
 
+  public func writeSceneFileHelper(file : Symbol, seed : Nat, size : Nat) {
+    let a = R.generateRandomInput(seed, size);
+    let t = fromArray(a);
+    writeSceneFile(file, t!)
+  };
+
   #[test]
   public func testWriteSceneFile() {
     let a = R.generateRandomInput(10, 10);
@@ -335,8 +341,8 @@ module {
             #pointer ( {from=label_# ":left"; to=(debug_show b.left)}),
             #pointer ( {from=label_# ":right"; to=(debug_show b.right)})
           ];
-          objs #= sceneObjects(b.left, {x=origin.x - g.widthLeft / 2.0; y=origin.y; z=origin.z});
-          objs #= sceneObjects(b.right, {x=origin.x + g.widthRight / 2.0; y=origin.y; z=origin.z});
+          objs #= sceneObjects(b.left, {x=origin.x - (g.widthLeft * 2.0); y=origin.y; z=origin.z});
+          objs #= sceneObjects(b.right, {x=origin.x + (g.widthRight * 2.0); y=origin.y; z=origin.z});
           (debug_show (#binary(b.symbol)), ["left", "right"]) 
         };
       };

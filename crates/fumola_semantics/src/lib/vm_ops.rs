@@ -97,6 +97,9 @@ pub fn binop(
             (Nat(n1), Nat(n2)) => Ok(Nat(n1 * n2)),
             (Int(i1), Int(i2)) => Ok(Int(i1 * i2)),
             (Float(f1), Float(f2)) => Ok(Float(*f1 * *f2)),
+            (Float(f1), Nat(n2)) => Ok(Float(*f1 * n2.to_f64().unwrap())),
+            (Nat(n1), Float(f2)) => Ok(Float(OrderedFloat(n1.to_f64().unwrap()) * *f2)),
+
             // _ => nyi!(line!()),
             (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
