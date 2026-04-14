@@ -330,7 +330,7 @@ module {
   public func sceneObjects<X>(tree : Pointer<SeqTree<X>>, origin : Vec3) : SceneObjects {
     let g = geom2d(tree);
     let label_ = (debug_show tree);
-    let position = {y = g.height; x = origin.x; z = origin.z};
+    let position = {y = g.height * 1.618; x = origin.x; z = origin.z};
     var objs = [];
     let (textFields, pointerFields) = 
       switch (@ tree) {
