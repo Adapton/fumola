@@ -570,7 +570,7 @@ impl ToDoc for Exp {
             Dot(e, s) => e.doc().append(".").append(s.doc()),
             Assign(from, to) => from.doc().append(str(" := ")).append(to.doc()),
             BinAssign(from, BinOp::Add, to) => from.doc().append(str(" += ")).append(to.doc()),
-            BinAssign(_from, _, _to) => todo!(),
+            BinAssign(from, b, to) => from.doc().append(b.doc()).append(str("=")).append(to.doc()),
             Array(m, es) => array(m, es),
             Index(e, idx) => e.doc().append("[").append(idx.doc()).append("]"),
             Function(f) => f.doc(),

@@ -276,17 +276,45 @@ module {
     #pointer : Pointer;
   };
 
+  public let zero = {x=0;y=0;z=0};
   public type Vec3 = { x : Float; y : Float; z : Float };
 
   #[listing]
   public func sceneObjects<X>(tree : Pointer<SeqTree<X>>, origin : Vec3) : SceneObjects {
-    var result = [#box];
-    let (text, pointers) = 
+    let g = geom2d(tree);
+    let label_ = (debug_show tree);
+    let position = {y = g.height; x = origin.x; z = origin.z};
+    var objs = [];
+    let (textFields, pointerFields, pointers) = 
       switch (@ tree) {
-        case (#empty) { ("#empty", []) };
-        case (#element(e)) { ("#element" # (debug_show e), []) };
-        case (#binary(b)) { ("#binary", [b.left, b.right]) };
+        case (#empty) { ("#empty", [], []) };
+        case (#element(e)) { ("symbol="#(debug_show e.symbol)#"\nelement="#(debug_show e.element), [], []) };
+        case (#binary(b)) { 
+          objs #= [
+            #pointer ( {from=label_# ":left"; to=(debug_show b.left)}),
+            #pointer ( {from=label_# ":right"; to=(debug_show b.right)})
+          ];
+          objs #= sceneObjects(b.left, {x=origin.x - g.widthLeft / 2.0; y=origin.y; z=origin.z});
+          objs #= sceneObjects(b.left, {x=origin.x + g.widthRight / 2.0; y=origin.y; z=origin.z});
+          (debug_show (#binary(b.symbol)), ["left", "right"], [b.left, b.right]) 
         };
+      };
+    [#box({label_; position; textFields; pointerFields})] # objs
+  };
+
+  #[test]
+  public func testSceneObjects() {
+    let a = R.generateRandomInput(10, 10);
+    let t = fromArray(a);
+    let objs = sceneObjects(t!, zero);
+    assert (objs.size() == 125);
+    // prim "print" (objs[124]);
+    assert( objs[124] == #box{
+      label_ = "1-element";
+      pointerFields = [];
+      position = {x = 4.5; y = 1; z = 0};
+      textFields = "symbol=1\nelement=470";
+    });
   };
 
   #[listing]
@@ -313,7 +341,7 @@ module {
     let a = R.generateRandomInput(10, 10);
     let t = fromArray(a);
     let g = geom2d(t!);
-    prim "print" g;
+    // prim "print" g;
     assert (g == 
       { height = 6;
         width = 10;
