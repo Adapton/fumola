@@ -260,7 +260,40 @@ module {
 
   };
 
-  module Tests {
+  public module Viz {
+
+  public type Geom2D = {
+    height : Nat;
+    width : Nat;
+  };
+
+  #[listing]
+  public func geom2d<X>(tree : Pointer<SeqTree<X>>) : Geom2D {
+    switch (@ tree) {
+      case (#empty) { { height=1; width=1;} };
+      case (#element(e)) { { height=1; width=1;} };
+      case (#binary(b)) {
+        let ml = geom2d(b.left);
+        let mr = geom2d(b.right);
+        { 
+          height = max(ml.height, mr.height) + 1; 
+          width = ml.width + mr.width;
+        }
+      };
+    }
+  };
+
+  #[test]
+  public func testGeom2d<X>(tree : Pointer<SeqTree<X>>) : Geom2D {
+    let a = R.generateRandomInput(10, 10);
+    let t = fromArray(a);
+    let g = geom2d(t!);
+    assert (g == { height = 6; width = 10});
+  };
+
+  }; 
+
+  public module Tests {
 
     #[test]
     func testFromIntoArray() {
