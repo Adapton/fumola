@@ -285,10 +285,10 @@ module {
     let label_ = (debug_show tree);
     let position = {y = g.height; x = origin.x; z = origin.z};
     var objs = [];
-    let (textFields, pointerFields, pointers) = 
+    let (textFields, pointerFields) = 
       switch (@ tree) {
-        case (#empty) { ("#empty", [], []) };
-        case (#element(e)) { ("symbol="#(debug_show e.symbol)#"\nelement="#(debug_show e.element), [], []) };
+        case (#empty) { ("#empty", []) };
+        case (#element(e)) { ("symbol="#(debug_show e.symbol)#"\nelement="#(debug_show e.element), []) };
         case (#binary(b)) { 
           objs #= [
             #pointer ( {from=label_# ":left"; to=(debug_show b.left)}),
@@ -296,7 +296,7 @@ module {
           ];
           objs #= sceneObjects(b.left, {x=origin.x - g.widthLeft / 2.0; y=origin.y; z=origin.z});
           objs #= sceneObjects(b.left, {x=origin.x + g.widthRight / 2.0; y=origin.y; z=origin.z});
-          (debug_show (#binary(b.symbol)), ["left", "right"], [b.left, b.right]) 
+          (debug_show (#binary(b.symbol)), ["left", "right"]) 
         };
       };
     [#box({label_; position; textFields; pointerFields})] # objs
