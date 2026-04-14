@@ -661,7 +661,7 @@ impl ToDoc for Exp {
                 },
                 "}",
             ),
-            DebugShow(_) => todo!(),
+            DebugShow(e) => kwd("debug_show").append(e.doc()),
             Async(_) => todo!(),
             AsyncStar(_) => todo!(),
             AwaitStar(_) => todo!(),

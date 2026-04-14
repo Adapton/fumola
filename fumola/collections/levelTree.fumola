@@ -265,18 +265,43 @@ module {
   public type Geom2D = {
     height : Nat;
     width : Nat;
+    widthLeft : Nat;
+    widthRight : Nat;
+  };
+
+  public type SceneObject = {
+    #orb : Orb;
+    #box : Box;
+    #action : Action;
+    #pointer : Pointer;
+  };
+
+  public type Vec3 = { x : Float; y : Float; z : Float };
+
+  #[listing]
+  public func sceneObjects<X>(tree : Pointer<SeqTree<X>>, origin : Vec3) : SceneObjects {
+    var result = [#box];
+    let (text, pointers) = 
+      switch (@ tree) {
+        case (#empty) { ("#empty", []) };
+        case (#element(e)) { ("#element" # (debug_show e), []) };
+        case (#binary(b)) { ("#binary", [b.left, b.right]) };
+        };
   };
 
   #[listing]
   public func geom2d<X>(tree : Pointer<SeqTree<X>>) : Geom2D {
+    let oneUnit = { height=1; width=1; widthLeft=0.5; widthRight=0.5};
     switch (@ tree) {
-      case (#empty) { { height=1; width=1;} };
-      case (#element(e)) { { height=1; width=1;} };
+      case (#empty) { oneUnit };
+      case (#element(e)) { oneUnit };
       case (#binary(b)) {
         let ml = geom2d(b.left);
         let mr = geom2d(b.right);
         { 
           height = max(ml.height, mr.height) + 1; 
+          widthLeft = ml.width;
+          widthRight = mr.width;
           width = ml.width + mr.width;
         }
       };
@@ -288,7 +313,12 @@ module {
     let a = R.generateRandomInput(10, 10);
     let t = fromArray(a);
     let g = geom2d(t!);
-    assert (g == { height = 6; width = 10});
+    prim "print" g;
+    assert (g == 
+      { height = 6;
+        width = 10;
+        widthLeft = 8;
+        widthRight = 2 });
   };
 
   }; 
