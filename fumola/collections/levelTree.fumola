@@ -279,6 +279,41 @@ module {
   public let zero = {x=0;y=0;z=0};
   public type Vec3 = { x : Float; y : Float; z : Float };
 
+  public func sceneIntoJSONText( objects : [SceneObject] ) : Text {
+    var objectsText = "";
+    for (o in objects.vals()) {
+      switch o {
+        case (#box(fields)) {
+          objectsText #= 
+              "{ \"type\": \"box\""#
+              ", \"position\": "#(debug_show [fields.position.x, fields.position.y, fields.position.z])#
+              ", \"label\": "#(debug_show fields.label_)#
+              ", \"textLines\": "#(debug_show fields.textFields)#
+              ", \"pointerFields\": "#(debug_show fields.pointerFields)#
+              "},\n"
+        };
+        case (#pointer(fields)) {
+          objectsText #= 
+             "{ \"type\": \"pointer\", \"from\": " # (debug_show fields.from) # 
+                                 ", \"to\": " # (debug_show fields.to) # 
+              "},\n"
+        };
+      }
+    };
+    "{ \"objects\" : [\n" # objectsText # "\n] }"
+  };
+
+  public func writeSceneFile<X>(symbol : Symbol, tree : Pointer<SeqTree<X>>) {
+    prim "writeFile" (symbol, sceneIntoJSONText(sceneObjects(tree, zero)))
+  };
+
+  #[test]
+  public func testWriteSceneFile() {
+    let a = R.generateRandomInput(10, 10);
+    let t = fromArray(a);
+    writeSceneFile(`testWriteSceneFile, t!)
+  };
+
   #[listing]
   public func sceneObjects<X>(tree : Pointer<SeqTree<X>>, origin : Vec3) : SceneObjects {
     let g = geom2d(tree);
@@ -315,6 +350,8 @@ module {
       position = {x = 4.5; y = 1; z = 0};
       textFields = "symbol=1\nelement=470";
     });
+
+    prim "print" (sceneIntoJSONText objs);
   };
 
   #[listing]
