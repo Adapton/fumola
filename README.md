@@ -1,6 +1,7 @@
 # `fumola`
 
-<img width="664" height="627" alt="image" src="https://github.com/user-attachments/assets/33d98551-98c9-4015-85a3-cb6c12ede392" />
+<img width="3771" height="1492" alt="image" src="https://github.com/user-attachments/assets/3518f126-20f3-41e0-ba90-75154a11cc6d" />
+
 
 ## Contributing
 
