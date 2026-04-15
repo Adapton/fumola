@@ -342,7 +342,7 @@ module {
             #pointer ( {from=label_# ":right"; to=(debug_show b.right)})
           ];
           assert (g.width == (g.widthLeft + g.widthRight));
-          objs #= sceneObjects(b.left, {origin with x=origin.x - (g.widthRight * 0.5)});
+          objs #= sceneObjects(b.left, {x=origin.x - (g.widthRight * 0.5); y=origin.y; z=origin.z});
           objs #= sceneObjects(b.right, {x=origin.x + (g.widthLeft * 0.5); y=origin.y; z=origin.z});
           (debug_show (#binary(b.symbol)), ["left", "right"]) 
         };
