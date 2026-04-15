@@ -42,7 +42,7 @@
         const objectMaterials = new Map();
 
 
-        function makeTextTexture(text, type = "prettyFields", isSprite = false) {
+        function makeTextTexture(text, type = "textLines", isSprite = false) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
 
@@ -109,7 +109,7 @@
             scene.add(labelMesh);
 
             const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim));
-            const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.fields || "", "prettyFields");
+            const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.textLines || "", "textLines");
             const fieldMesh = new THREE.Mesh(
                 new THREE.PlaneGeometry(0.5, 0.5 * fieldAspect),
                 new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: true, alphaTest: 0.1 })
@@ -160,7 +160,7 @@
             scene.add(labelMesh);
 
             const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim));
-            const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.fields || "", "prettyFields");
+            const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.fields || "", "textLines");
             const fieldMesh = new THREE.Mesh(
                 new THREE.PlaneGeometry(0.5, 0.5 * fieldAspect),
                 new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: true, alphaTest: 0.1 })
