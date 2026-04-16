@@ -83,7 +83,8 @@ module {
     };
 
     public module Viz {
-
+        public type Vec3 = { x : Float; y : Float; z : Float };
+        public let zero = { x = 0.0; y = 0.0; z =0.0 };
         public type SceneObject = {
             #orb : LabeledObject;
             #box : LabeledObject;

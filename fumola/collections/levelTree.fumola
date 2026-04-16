@@ -270,48 +270,8 @@ module {
     widthRight : Nat;
   };
 
-  public type SceneObject = {
-    #orb : Orb;
-    #box : Box;
-    #action : Action;
-    #pointer : Pointer;
-  };
-
-  public let zero = {x=0;y=0;z=0};
-  public type Vec3 = { x : Float; y : Float; z : Float };
-
-  public func sceneIntoJSONText( objects : [SceneObject] ) : Text {
-    var objectsText = "";
-    var isFirstObject = true;
-    for (o in objects.vals()) {
-      if (isFirstObject) {
-        isFirstObject := false;
-      } else {
-        objectsText #= ",\n";
-      };
-      switch o {
-        case (#box(fields)) {
-          objectsText #= 
-              "{ \"type\": \"box\""#
-              ", \"position\": "#(debug_show [fields.position.x, fields.position.y, fields.position.z])#
-              ", \"label\": "#(debug_show fields.label_)#
-              ", \"textLines\": "#(debug_show fields.textFields)#
-              ", \"pointerFields\": "#(debug_show fields.pointerFields)#
-              "}"
-        };
-        case (#pointer(fields)) {
-          objectsText #= 
-             "{ \"type\": \"pointer\", \"from\": " # (debug_show fields.from) # 
-                                 ", \"to\": " # (debug_show fields.to) # 
-              "}"
-        };
-      }
-    };
-    "{ \"objects\" : [\n" # objectsText # "\n] }"
-  };
-
   public func writeSceneFile<X>(symbol : Symbol, tree : Pointer<SeqTree<X>>) {
-    prim "writeFile" (symbol, A.Viz.sceneIntoJSONText(sceneObjects(tree, zero)))
+    prim "writeFile" (symbol, A.Viz.sceneIntoJSONText(sceneObjects(tree, A.Viz.zero)))
   };
 
   public func writeSceneFileHelper(file : Symbol, seed : Nat, size : Nat) {
@@ -355,7 +315,7 @@ module {
   public func testSceneObjects() {
     let a = R.generateRandomInput(10, 10);
     let t = fromArray(a);
-    let objs = sceneObjects(t!, zero);
+    let objs = sceneObjects(t!, A.Viz.zero);
     assert (objs.size() == 37);
     // prim "print" (objs[36]);
     let last = objs[36];
