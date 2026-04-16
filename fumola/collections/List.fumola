@@ -22,11 +22,11 @@ public func testFromIter() {
     let list = fromIter([(1,1), (2,2), (3,3)].vals());
     assert (list!.symbol == 1);
     assert (list!.element == 1);
-    //assert (list!.next!.symbol == 2);
-    //assert (list!.next!.element == 2);
-    //assert (list!.next!.next!.symbol == 3);
-    //assert (list!.next!.next!.element == 3);
-    //assert (list!.next!.next!.next == null);
+    assert (@ (list!.next))!.symbol == 2;
+    assert (@ (list!.next))!.element == 2;
+    assert (@ (((@ (list!.next))!).next))!.symbol == 3;
+    assert (@ (((@ (list!.next))!).next))!.element == 3;
+    assert ((@ ((@ ((@ (list!.next))!.next))!.next)) == null);
 };
 
 }
