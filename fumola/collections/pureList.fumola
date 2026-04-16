@@ -4,7 +4,7 @@ module {
 public type List<X> = ?{
   element : X;
   symbol : Symbol;
-  next : Pointer<List<X>>;
+  next : List<X>;
 };
 
 #[listing]
@@ -12,7 +12,7 @@ public func fromIter(iter : Iter<(Symbol, X)>) : List<X> {
     switch (iter.next()) {
         case null null;
         case (?(symbol, element)) {
-            ?{symbol; element; next = symbol := fromIter(iter)}
+            ?{symbol; element; next = fromIter(iter)}
         }
     } 
 };
@@ -22,11 +22,11 @@ public func testFromIter() {
     let list = fromIter([(1,1), (2,2), (3,3)].vals());
     assert (list!.symbol == 1);
     assert (list!.element == 1);
-    //assert (list!.next!.symbol == 2);
-    //assert (list!.next!.element == 2);
-    //assert (list!.next!.next!.symbol == 3);
-    //assert (list!.next!.next!.element == 3);
-    //assert (list!.next!.next!.next == null);
+    assert (list!.next!.symbol == 2);
+    assert (list!.next!.element == 2);
+    assert (list!.next!.next!.symbol == 3);
+    assert (list!.next!.next!.element == 3);
+    assert (list!.next!.next!.next == null);
 };
 
 }
