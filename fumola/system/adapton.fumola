@@ -82,6 +82,53 @@ module {
         prim "adaptonPeekEvents" ()
     };
 
+    public module Viz {
+
+        public type SceneObject = {
+            #orb : LabeledObject;
+            #box : LabeledObject;
+            #action : Action;
+            #pointer : Edge;
+        };
+
+        public type LabeledObject = { label_ : Label; position : Vec3; textFields : Text; pointerFields : [Text]};
+        public type Label = Text;
+        public type Edge = { from : Label ; to : Label };
+        public type Pointer = Edge;
+        public type Action = { actionType: ActionType; from: Label; to:Label } /* and Edge */ ;
+        public type ActionType = { #get ; #put ; #force_ ; #forcePut };
+
+        public func sceneIntoJSONText( objects : [SceneObject] ) : Text {
+            var objectsText = "";
+            var isFirstObject = true;
+            for (o in objects.vals()) {
+                if (isFirstObject) {
+                    isFirstObject := false;
+                } else {
+                    objectsText #= ",\n";
+                };
+                switch o {
+                case (#box(fields)) {
+                    objectsText #= 
+                    "{ \"type\": \"box\""#
+                    ", \"position\": "#(debug_show [fields.position.x, fields.position.y, fields.position.z])#
+                    ", \"label\": "#(debug_show fields.label_)#
+                    ", \"textLines\": "#(debug_show fields.textFields)#
+                    ", \"pointerFields\": "#(debug_show fields.pointerFields)#
+                    "}"
+                };
+                case (#pointer(fields)) {
+                    objectsText #= 
+                    "{ \"type\": \"pointer\", \"from\": " # (debug_show fields.from) # 
+                    ", \"to\": " # (debug_show fields.to) # 
+                    "}"
+                }
+                };
+            };
+            "{ \"objects\" : [\n" # objectsText # "\n] }"
+        };
+    };
+
     public module DFS {
         //
         // DFS representation for printing on terminals,
