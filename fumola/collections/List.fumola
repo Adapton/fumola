@@ -4,8 +4,10 @@ module {
 public type List<X> = ?{
   element : X;
   symbol : Symbol;
-  next : Pointer<List<X>>;
+  next : List_<X>;
 };
+
+public type List_<X> = Pointer<List<X>>;
 
 #[listing]
 public func fromIter(iter : Iter<(Symbol, X)>) : List<X> {

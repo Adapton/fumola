@@ -1,4 +1,5 @@
 import pureList "pureList";
+import List "List";
 import LazyList "LazyList";
 import R "randomInput";
 import A "adapton";
@@ -148,7 +149,7 @@ module {
   };
 
   #[listing]
-  public func fromPureList<X>(list : List<X>) : ?SeqTree_<X> {
+  public func fromPureList<X>(list : PureList<X>) : ?SeqTree_<X> {
     do ? {
       let {symbol; element; next} = list!;
       let level = prim "symbolLevel" symbol;
@@ -159,7 +160,7 @@ module {
   };
 
   #[listing]
-  func fromPureListRec<X>(list : List<X>, left : SeqTree_<X>, parentLevel : ?Nat) : (SeqTree_<X>, List<X>) {
+  func fromPureListRec<X>(list : PureList<X>, left : SeqTree_<X>, parentLevel : ?Nat) : (SeqTree_<X>, PureList<X>) {
     switch list {
       case null (left, null);
       case (?{symbol; element; next}) {
@@ -174,6 +175,43 @@ module {
         }
       };
     }
+  };
+
+
+  #[listing]
+  public func fromList<X>(list : List<X>) : ?SeqTree_<X> {
+    do ? {
+      let {symbol; element; next} = list!;
+      let level = prim "symbolLevel" symbol;
+      let nilList = `() := null;
+      let (tree, nilList_) = fromListRec(next, symbol-`element := #element {symbol; element}, null, nilList);
+      assert (nilList == nilList_);
+      tree
+    }
+  };
+
+  #[listing]
+  func fromListRec<X>(list : List_<X>, left : SeqTree_<X>, parentLevel : ?Nat, nil : List_) : (SeqTree_<X>, List_<X>) {
+    switch (@ list) {
+      case null (left, nil);
+      case (?{symbol; element; next}) {
+        let level = prim "symbolLevel" symbol;
+        if (levelLte(level, parentLevel)) {
+          let rightLeft = symbol-`element := #element {symbol; element};
+          let (right, next) = force (symbol-`rec1 := thunk { fromListRec(next, rightLeft, ?level, nil) });
+          let left = symbol-`binary := #binary {symbol; level; left; right};
+          force ( symbol-`rec2 := thunk { fromListRec(next, left, parentLevel, nil) } );
+        } else {
+          (left, list)
+        }
+      };
+    }
+  };
+
+  #[test]
+  public func testFromList() {
+    let array = R.generateRandomInput(10, 10);
+    fromList(List.fromIter(array.vals()))
   };
 
   #[listing]
