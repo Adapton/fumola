@@ -5,7 +5,7 @@
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Programming Languages"],
   "main": "./out/extension.js",
-  "activationEvents": ["*"],
+  "activationEvents": [],
   "contributes": {
     "languages": [
       {

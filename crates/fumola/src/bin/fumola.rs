@@ -292,6 +292,12 @@ fn post_eval(state: &mut State, result: Result<Value_, Error>) {
     state.semantic_state.debug_print_out = im_rc::vector::Vector::new();
     for (path, content) in state.semantic_state.output_files.iter() {
         let path_string = format_one_line(path).replace("`", "");
+        if path_string.ends_with("fumola-func-listing") || path_string.ends_with("fumola-type-listing") {
+            // By default, do not create these listing files.
+            // TO DO -- add a CLI flag back to help (1) turn this feature on and 
+            // (2) give an explicit output path, not merely the original source path.
+            continue;
+        };
         let content = content.to_string();
         debug!(
             "writing file `{}` with \"{}\"",

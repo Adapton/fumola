@@ -31,4 +31,31 @@ public func testFromIter() {
     assert ((@ ((@ ((@ (list!.next))!.next))!.next)) == null);
 };
 
+
+// TODO -- adapt this code for this List type (not a binary tree)
+#[listing]
+public func sceneObjects<X>(list : Pointer<SeqTree<X>>, origin : Vec3) : SceneObjects {
+    let g = geom2d(tree);
+    let label_ = (debug_show tree);
+    let position = {y = g.height * 1.618; x = origin.x; z = origin.z};
+    var objs = [];
+    let (textFields, pointerFields) = 
+      switch (@ tree) {
+        case (#empty) { ("#empty", []) };
+        case (#element(e)) { ("#element\n\tsymbol="#(debug_show e.symbol)#"\n\telement="#(debug_show e.element), []) };
+        case (#binary(b)) { 
+          objs #= [
+            #pointer ( {from=label_# ":left"; to=(debug_show b.left)}),
+            #pointer ( {from=label_# ":right"; to=(debug_show b.right)})
+          ];
+          assert (g.width == (g.widthLeft + g.widthRight));
+          objs #= sceneObjects(b.left, {x=origin.x - (g.widthRight * 0.5); y=origin.y; z=0.0 + origin.z - 1.0});
+          objs #= sceneObjects(b.right, {x=origin.x + (g.widthLeft * 0.5); y=origin.y; z=0.0 + origin.z + 1.0});
+          ("#binary\n\tsymbol=" # (debug_show b.symbol) # "\n\tlevel=" # (debug_show b.level), ["left", "right"]) 
+        };
+      };
+    [#box({label_; position; textFields; pointerFields})] # objs
+};
+
+
 }

@@ -24,8 +24,15 @@
   "match": 
   "#\\[listing[^\\]]*\\]"
       }    
-  ]
-  },
+    ,
+      {
+  "name": "meta.decorator.test.fumola",
+  "match": 
+  "#\\[test[^\\]]*\\]"
+      }    
+  
+    ]
+},
 
   "punctuation": {
     "patterns": [

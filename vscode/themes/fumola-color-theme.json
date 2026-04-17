@@ -2,7 +2,7 @@
   "name": "Fumola Dark",
   "type": "dark",
   "colors": {
-    "editor.background": "#1e1e1e",
+    "editor.background": "#000000",
     "editor.foreground": "#d4d4d4"
   },
   "tokenColors": [
@@ -33,6 +33,14 @@
       "scope": "meta.decorator.listing.fumola",
       "settings": {
         "foreground": "#C586C0",
+        "fontStyle": "bold"
+      }
+    },
+
+    {
+      "scope": "meta.decorator.test.fumola",
+      "settings": {
+        "foreground": "#b0ccb0",
         "fontStyle": "bold"
       }
     },
