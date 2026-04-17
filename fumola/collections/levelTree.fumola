@@ -167,9 +167,9 @@ module {
         let level = prim "symbolLevel" symbol;
         if (levelLte(level, parentLevel)) {
           let rightLeft = symbol-`element := #element {symbol; element};
-          let (right, next) = force (symbol-`rec1 := thunk { fromPureListRec(next, rightLeft, ?level) });
+          let (right, next) = fromPureListRec(next, rightLeft, ?level);
           let left = symbol-`binary := #binary {symbol; level; left; right};
-          force ( symbol-`rec2 := thunk { fromPureListRec(next, left, parentLevel) } );
+          fromPureListRec(next, left, parentLevel)
         } else {
           (left, list)
         }
