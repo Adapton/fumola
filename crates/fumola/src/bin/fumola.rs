@@ -292,9 +292,11 @@ fn post_eval(state: &mut State, result: Result<Value_, Error>) {
     state.semantic_state.debug_print_out = im_rc::vector::Vector::new();
     for (path, content) in state.semantic_state.output_files.iter() {
         let path_string = format_one_line(path).replace("`", "");
-        if path_string.ends_with("fumola-func-listing") || path_string.ends_with("fumola-type-listing") {
+        if path_string.ends_with("fumola-func-listing")
+            || path_string.ends_with("fumola-type-listing")
+        {
             // By default, do not create these listing files.
-            // TO DO -- add a CLI flag back to help (1) turn this feature on and 
+            // TO DO -- add a CLI flag back to help (1) turn this feature on and
             // (2) give an explicit output path, not merely the original source path.
             continue;
         };
@@ -367,18 +369,28 @@ fn report_error(state: &mut State, error: fumola::Error) {
     eprintln!("");
     error!("{:?}", error);
     eprintln!("");
+
+    eprintln!("Current continuation is");
     eprintln!(
         "[{:_>17}]: {}",
         &format!("{}", cont_source),
+        // TO DO -- create ToDoc implementation for continuations,
+        // to make them readable on the terminal during debugging.
         truncate_debug(&cont, 63)
     );
     if let Ok(stack) = state.semantic_state.agent_stack() {
+        eprintln!("");
+        let frames_len = stack.len();
+        eprintln!("Non-empty stack ({} frames total):", frames_len);
+        let mut frame_idx = 0;
         for frame in stack.iter() {
             eprintln!(
-                "[{:_>17}]: {}",
+                "{:>3} [{:_>17}]: {}",
+                frames_len - frame_idx,
                 &format!("{}", &frame.source),
                 truncate_debug(&frame.cont, 63)
             );
+            frame_idx += 1;
         }
     } else {
         error!("(No stack available to print)\n{:?}", error);
