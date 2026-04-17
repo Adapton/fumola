@@ -1,0 +1,47 @@
+{
+  "name": "Fumola Dark",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#1e1e1e",
+    "editor.foreground": "#d4d4d4"
+  },
+  "tokenColors": [
+    {
+      "scope": "comment",
+      "settings": {
+        "foreground": "#6A9955",
+        "fontStyle": "italic"
+      }
+    },
+
+    {
+      "scope": "string",
+      "settings": {
+        "foreground": "#CE9178"
+      }
+    },
+
+    {
+      "scope": "keyword.control.fumola",
+      "settings": {
+        "foreground": "#569CD6",
+        "fontStyle": "bold"
+      }
+    },
+
+    {
+      "scope": "meta.decorator.listing.fumola",
+      "settings": {
+        "foreground": "#C586C0",
+        "fontStyle": "bold"
+      }
+    },
+
+    {
+      "scope": "punctuation.terminator",
+      "settings": {
+        "foreground": "#9999dd"
+      }
+    }
+  ]
+}

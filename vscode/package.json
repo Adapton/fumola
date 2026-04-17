@@ -1,0 +1,43 @@
+{
+  "name": "fumola",
+  "displayName": "Fumola Language Support",
+  "version": "0.0.1",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Programming Languages"],
+  "main": "./out/extension.js",
+  "activationEvents": ["*"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "fumola",
+        "aliases": ["Fumola", "fumola"],
+        "extensions": [".fumola"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "fumola",
+        "scopeName": "source.fumola",
+        "path": "./syntaxes/fumola.tmLanguage.json"
+      }
+    ],
+  "themes": [
+    {
+      "label": "Fumola Dark",
+      "uiTheme": "hc-black",
+      "path": "./themes/fumola-color-theme.json"
+    }
+  ]
+  },
+
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -w"
+  },
+
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/vscode": "^1.85.0"
+  }
+}

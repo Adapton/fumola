@@ -1,0 +1,56 @@
+{
+  "scopeName": "source.fumola",
+  "patterns": [
+  { "include": "#comments" },
+  { "include": "#strings" },
+  { "include": "#decorators" },
+  { "include": "#keywords" },
+  { "include": "#punctuation" }
+  ],
+  "repository": {
+  "keywords": {
+    "patterns": [
+      {
+        "name": "keyword.control.fumola",
+        "match": "\\b(module|let|import|type|public|force|func|switch|case|prim|if|else|var|for|do|assert)\\b"
+      }
+    ]
+  },
+
+  "decorators": {
+    "patterns": [
+      {
+  "name": "meta.decorator.listing.fumola",
+  "match": 
+  "#\\[listing[^\\]]*\\]"
+      }    
+  ]
+  },
+
+  "punctuation": {
+    "patterns": [
+      {
+        "name": "punctuation.terminator.fumola",
+        "match": ";"
+      }
+    ]
+  },
+   "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.fumola",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.fumola",
+          "begin": "\"",
+          "end": "\""
+        }
+      ]
+    }
+  }
+}
