@@ -13,14 +13,12 @@
         "fontStyle": "italic"
       }
     },
-
     {
       "scope": "string",
       "settings": {
         "foreground": "#CE9178"
       }
     },
-
     {
       "scope": "keyword.control.fumola",
       "settings": {
@@ -28,7 +26,6 @@
         "fontStyle": "bold"
       }
     },
-
     {
       "scope": "meta.decorator.listing.fumola",
       "settings": {
@@ -36,7 +33,6 @@
         "fontStyle": "bold"
       }
     },
-
     {
       "scope": "meta.decorator.test.fumola",
       "settings": {
@@ -44,7 +40,22 @@
         "fontStyle": "bold"
       }
     },
-
+    {
+      "name": "Fumola Symbol (Quoted Identifier)",
+      "scope": "entity.name.symbol.fumola",
+      "settings": {
+        "foreground": "#a086a5",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Fumola Variant Tag",
+      "scope": "entity.name.tag.variant.fumola",
+      "settings": {
+        "foreground": "#a586a0",
+        "fontStyle": "bold"
+      }
+    },
     {
       "scope": "punctuation.terminator",
       "settings": {

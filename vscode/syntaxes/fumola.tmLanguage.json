@@ -1,48 +1,74 @@
 {
   "scopeName": "source.fumola",
   "patterns": [
-  { "include": "#comments" },
-  { "include": "#strings" },
-  { "include": "#decorators" },
-  { "include": "#keywords" },
-  { "include": "#punctuation" }
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#decorators"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#punctuation"
+    },
+    {
+      "include": "#variantTags"
+    },
+    {
+      "include": "#symbols"
+    }
   ],
   "repository": {
-  "keywords": {
-    "patterns": [
-      {
-        "name": "keyword.control.fumola",
-        "match": "\\b(module|let|import|type|public|force|func|switch|case|prim|if|else|var|for|do|assert)\\b"
-      }
-    ]
-  },
-
-  "decorators": {
-    "patterns": [
-      {
-  "name": "meta.decorator.listing.fumola",
-  "match": 
-  "#\\[listing[^\\]]*\\]"
-      }    
-    ,
-      {
-  "name": "meta.decorator.test.fumola",
-  "match": 
-  "#\\[test[^\\]]*\\]"
-      }    
-  
-    ]
-},
-
-  "punctuation": {
-    "patterns": [
-      {
-        "name": "punctuation.terminator.fumola",
-        "match": ";"
-      }
-    ]
-  },
-   "comments": {
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.fumola",
+          "match": "\\b(module|let|import|type|public|force|func|switch|case|prim|if|else|var|for|in|do|assert|goto|space|time|debug_show)\\b"
+        }
+      ]
+    },
+    "variantTags": {
+      "patterns": [
+        {
+          "name": "entity.name.tag.variant.fumola",
+          "match": "#[A-Za-z_][A-Za-z0-9_]*"
+        }
+      ]
+    },
+    "symbols": {
+      "patterns": [
+        {
+          "name": "entity.name.symbol.fumola",
+          "match": "`[A-Za-z_][A-Za-z0-9_]*"
+        }
+      ]
+    },
+    "decorators": {
+      "patterns": [
+        {
+          "name": "meta.decorator.listing.fumola",
+          "match": "#\\[listing[^\\]]*\\]"
+        },
+        {
+          "name": "meta.decorator.test.fumola",
+          "match": "#\\[test[^\\]]*\\]"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.terminator.fumola",
+          "match": ";"
+        }
+      ]
+    },
+    "comments": {
       "patterns": [
         {
           "name": "comment.line.double-slash.fumola",
