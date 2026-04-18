@@ -1,0 +1,167 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>DCG Viewer</title>
+<style>
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: monospace;
+}
+
+#app {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* LEFT SIDEBAR */
+#sidebar {
+  width: 33%;
+  min-width: 220px;
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #333;
+}
+
+/* DRAG HANDLE */
+#divider {
+  width: 5px;
+  cursor: col-resize;
+  background: #222;
+}
+
+/* RIGHT 3D VIEW */
+#viewport {
+  flex: 1;
+  background: black;
+}
+
+/* PANELS */
+.panel {
+  border-bottom: 1px solid #333;
+  overflow: auto;
+}
+
+.panel-header {
+  background: #111;
+  color: #ccc;
+  padding: 6px;
+  cursor: pointer;
+}
+
+.panel-body {
+  padding: 6px;
+  color: #ddd;
+  font-size: 12px;
+  max-height: 200px;
+  overflow: auto;
+}
+
+/* clickable timestamps */
+.ts {
+  color: #6cf;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.ts.selected {
+  background: #333;
+}
+</style>
+</head>
+
+<body>
+<div id="app">
+
+  <div id="sidebar">
+
+    <div class="panel" id="infoPanel">
+      <div class="panel-header">Info</div>
+      <div class="panel-body">
+        <div>Scene / Selection</div>
+        <div>ts: <span class="ts" onclick="onTimestamp(1)">1</span></div>
+      </div>
+    </div>
+
+    <div class="panel" id="outlinePanel">
+      <div class="panel-header">Outline</div>
+      <div class="panel-body">
+        DFS:
+        <div><span class="ts" onclick="onTimestamp(2)">2</span> node A</div>
+        <div><span class="ts" onclick="onTimestamp(3)">3</span> node B</div>
+      </div>
+    </div>
+
+    <div class="panel" id="eventsPanel">
+      <div class="panel-header">Events</div>
+      <div class="panel-body" id="events">
+        <div><span class="ts" onclick="onTimestamp(1)">1</span> create root</div>
+        <div><span class="ts" onclick="onTimestamp(2)">2</span> insert left</div>
+        <div><span class="ts" onclick="onTimestamp(3)">3</span> insert right</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="divider"></div>
+  <div id="viewport"></div>
+
+</div>
+
+<script>
+let selectedTimestamps = new Set();
+
+function onTimestamp(ts) {
+  if (selectedTimestamps.has(ts)) {
+    selectedTimestamps.delete(ts);
+  } else {
+    selectedTimestamps.add(ts);
+  }
+
+  document.querySelectorAll(".ts").forEach(el => {
+    const v = parseInt(el.textContent);
+    el.classList.toggle("selected", selectedTimestamps.has(v));
+  });
+
+  focusTimestamp(ts);
+}
+
+function focusTimestamp(ts) {
+  console.log("focus timestamp:", ts);
+  // hook:
+  // - filter DCG nodes
+  // - highlight edges
+  // - jump outline selection
+  // - update camera if desired
+}
+
+/* sidebar resize */
+const divider = document.getElementById("divider");
+const sidebar = document.getElementById("sidebar");
+
+let dragging = false;
+
+divider.addEventListener("mousedown", () => dragging = true);
+window.addEventListener("mouseup", () => dragging = false);
+
+window.addEventListener("mousemove", (e) => {
+  if (!dragging) return;
+  const newWidth = e.clientX;
+  sidebar.style.width = newWidth + "px";
+});
+</script>
+
+<!-- THREE.JS HOOK POINT -->
+<script>
+const viewport = document.getElementById("viewport");
+
+// your existing Three.js code goes here
+// scene, camera, renderer attach to viewport
+</script>
+
+</body>
+</html>
