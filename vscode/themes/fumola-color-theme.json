@@ -16,7 +16,8 @@
     {
       "scope": "string",
       "settings": {
-        "foreground": "#CE9178"
+        "foreground": "#c87e60",
+        "fontStyle" : "italic"
       }
     },
     {
@@ -49,6 +50,14 @@
       }
     },
     {
+      "name": "Fumola Builtin Identifier",
+      "scope": "entity.builtin.fumola",
+      "settings": {
+        "foreground": "#a086a5",
+        "fontStyle": "bold"
+      }
+    },
+    {
       "name": "Fumola Variant Tag",
       "scope": "entity.name.tag.variant.fumola",
       "settings": {
@@ -57,9 +66,33 @@
       }
     },
     {
-      "scope": "punctuation.terminator",
+      "scope": "keyword.operator.sequence.fumola",
       "settings": {
         "foreground": "#9999dd"
+      }
+    },
+    {
+      "scope": "keyword.operator.definition.fumola",
+      "settings": {
+        "foreground": "#9999dd"
+      }
+    },
+    {
+      "scope": "keyword.operator.logical.fumola",
+      "settings": {
+        "foreground": "#9999dd"
+      }
+    },
+    {
+      "scope": "keyword.operator.assignment.fumola",
+      "settings": {
+        "foreground": "#ffaaaa"
+      }
+    },
+    {
+      "scope": "keyword.operator.get.fumola",
+      "settings": {
+        "foreground": "#ffaaaa"
       }
     }
   ]

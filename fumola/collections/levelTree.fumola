@@ -112,7 +112,8 @@ module {
 
     prim "print" (debug_show (intoArray(left), intoArray(right)));
 
-    append_(genSymsFrom(`x, 0), left, right)
+    let out = append_(genSymsFrom(`x, 0), left, right);
+    prim "print" out;
   };
 
   // TO DO -- clean this up by giving a static-time phase for
@@ -418,29 +419,6 @@ module {
       let input = R.generateRandomInput(10, 10);
       let tree = fromArray(input);
       assert Index.size(tree) == 10;
-    };
-
-    #[test]
-    func testInsert() {
-      let input = R.generateRandomInput(10, 10);
-      let tree = fromArray(input);
-
-      // TO DO
-    };
-
-    #[test]
-    func testRemove() {
-      // TO DO
-    };
-
-    #[test]
-    func testReplace() {
-
-    };
-
-    #[test]
-    func shouldPass() {
-      assert true
     };
 
   }

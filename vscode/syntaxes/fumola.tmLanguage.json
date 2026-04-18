@@ -29,6 +29,26 @@
         {
           "name": "keyword.control.fumola",
           "match": "\\b(module|let|import|type|public|force|func|switch|case|prim|if|else|var|for|in|do|assert|goto|space|time|debug_show)\\b"
+        },
+        {
+          "name": "keyword.operator.assignment.fumola",
+          "match": "(:=|\\+=|#=|-=|\\*=|/=)"
+        },
+        {
+          "name": "keyword.operator.logical.fumola",
+          "match": "(==|<=|>=|<|>)"
+        },
+        {
+          "name": "keyword.operator.definition.fumola",
+          "match": "="
+        },
+        {
+          "name": "keyword.operator.sequence.fumola",
+          "match": ";"
+        },
+        {
+          "name": "keyword.operator.get.fumola",
+          "match": "@"
         }
       ]
     },
@@ -45,6 +65,10 @@
         {
           "name": "entity.name.symbol.fumola",
           "match": "`[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "name": "entity.builtin.fumola",
+          "match": "@[A-Za-z_][A-Za-z0-9_]*"
         }
       ]
     },
@@ -62,10 +86,6 @@
     },
     "punctuation": {
       "patterns": [
-        {
-          "name": "punctuation.terminator.fumola",
-          "match": ";"
-        }
       ]
     },
     "comments": {
