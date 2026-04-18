@@ -1,167 +1,707 @@
 <!doctype html>
 <html>
+
 <head>
-<meta charset="utf-8"/>
-<title>DCG Viewer</title>
-<style>
-html, body {
-  margin: 0;
-  height: 100%;
-  overflow: hidden;
-  font-family: monospace;
-}
+    <meta charset="utf-8" />
+    <title>DCG Viewer</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+            font-family: monospace;
+            background: #000;
+            color: #cfd8ff;
+        }
 
-#app {
-  display: flex;
-  height: 100vh;
-  width: 100vw;
-}
+        #app {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
 
-/* LEFT SIDEBAR */
-#sidebar {
-  width: 33%;
-  min-width: 220px;
-  max-width: 70%;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid #333;
-}
+        /* SIDEBAR */
+        #sidebar {
+            width: 13%;
+            min-width: 220px;
+            max-width: 77%;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #222;
+            background: #000;
+        }
 
-/* DRAG HANDLE */
-#divider {
-  width: 5px;
-  cursor: col-resize;
-  background: #222;
-}
+        /* DIVIDER */
+        #divider {
+            width: 5px;
+            cursor: col-resize;
+            background: #111;
+        }
 
-/* RIGHT 3D VIEW */
-#viewport {
-  flex: 1;
-  background: black;
-}
+        /* VIEWPORT */
+        #viewport {
+            flex: 1;
+            background: #000;
+        }
 
-/* PANELS */
-.panel {
-  border-bottom: 1px solid #333;
-  overflow: auto;
-}
+        /* PANELS */
+        .panel {
+            border-bottom: 1px solid #222;
+            overflow: auto;
+        }
 
-.panel-header {
-  background: #111;
-  color: #ccc;
-  padding: 6px;
-  cursor: pointer;
-}
+        .panel-header {
+            background: #050505;
+            color: #a8b4ff;
+            padding: 6px;
+            cursor: pointer;
+        }
 
-.panel-body {
-  padding: 6px;
-  color: #ddd;
-  font-size: 12px;
-  max-height: 200px;
-  overflow: auto;
-}
+        .panel-header#titlePanel {
+            background: #050505;
+            color: #a8b4ff;
+            padding: 6px;
+            cursor: pointer;
+            font-size: larger;
+        }
 
-/* clickable timestamps */
-.ts {
-  color: #6cf;
-  cursor: pointer;
-  text-decoration: underline;
-}
+        .panel-body {
+            padding: 6px;
+            font-size: 12px;
+            color: #cfd8ff;
+        }
 
-.ts.selected {
-  background: #333;
-}
-</style>
+        /* META TIMESTAMPS */
+        .ts {
+            color: #7fd1ff;
+            /* pastel cyan */
+            cursor: pointer;
+        }
+
+        .ts.selected {
+            color: #ffb3d1;
+            /* pastel pink highlight */
+            background: #111;
+        }
+
+        /* subtle hover */
+        .ts:hover {
+            color: #b7a6ff;
+        }
+    </style>
 </head>
 
 <body>
-<div id="app">
+    <div id="app">
 
-  <div id="sidebar">
+        <div id="sidebar">
 
-    <div class="panel" id="infoPanel">
-      <div class="panel-header">Info</div>
-      <div class="panel-body">
-        <div>Scene / Selection</div>
-        <div>ts: <span class="ts" onclick="onTimestamp(1)">1</span></div>
-      </div>
+            <div class="panel">
+                <div class="panel-header" id="titlePanel">DCG Scene Player</div>
+            </div>
+
+            <div class="panel" id="infoPanel">
+                <div class="panel-header">Info</div>
+                <div class="panel-body">
+                    <div>Scene / Selection</div>
+                </div>
+            </div>
+
+            <div class="panel" id="outlinePanel">
+                <div class="panel-header">Outline</div>
+                <div class="panel-body">
+                    DFS:
+                    <div><span class="ts" onclick="onTimestamp(2)">2</span> node A</div>
+                    <div><span class="ts" onclick="onTimestamp(3)">3</span> node B</div>
+                </div>
+            </div>
+
+            <div class="panel" id="eventsPanel">
+                <div class="panel-header">Events</div>
+                <div class="panel-body" id="events">
+                    <div><span class="ts" onclick="onTimestamp(1)">1</span> create root</div>
+                    <div><span class="ts" onclick="onTimestamp(2)">2</span> insert left</div>
+                    <div><span class="ts" onclick="onTimestamp(3)">3</span> insert right</div>
+                </div>
+            </div>
+
+        </div>
+
+        <div id="divider"></div>
+        <div id="viewport"></div>
+
     </div>
 
-    <div class="panel" id="outlinePanel">
-      <div class="panel-header">Outline</div>
-      <div class="panel-body">
-        DFS:
-        <div><span class="ts" onclick="onTimestamp(2)">2</span> node A</div>
-        <div><span class="ts" onclick="onTimestamp(3)">3</span> node B</div>
-      </div>
-    </div>
+    <script>
+        let selectedTimestamps = new Set();
 
-    <div class="panel" id="eventsPanel">
-      <div class="panel-header">Events</div>
-      <div class="panel-body" id="events">
-        <div><span class="ts" onclick="onTimestamp(1)">1</span> create root</div>
-        <div><span class="ts" onclick="onTimestamp(2)">2</span> insert left</div>
-        <div><span class="ts" onclick="onTimestamp(3)">3</span> insert right</div>
-      </div>
-    </div>
+        function onTimestamp(ts) {
+            if (selectedTimestamps.has(ts)) {
+                selectedTimestamps.delete(ts);
+            } else {
+                selectedTimestamps.add(ts);
+            }
 
-  </div>
+            document.querySelectorAll(".ts").forEach(el => {
+                const v = parseInt(el.dataset.ts);
+                el.classList.toggle("selected", selectedTimestamps.has(v));
+            });
 
-  <div id="divider"></div>
-  <div id="viewport"></div>
+            focusTimestamp(ts);
+        }
 
-</div>
+        function focusTimestamp(ts) {
+            console.log("focus timestamp:", ts);
+            // hook:
+            // - filter DCG nodes
+            // - highlight edges
+            // - jump outline selection
+            // - update camera if desired
+        }
 
-<script>
-let selectedTimestamps = new Set();
+        /* sidebar resize */
+        const divider = document.getElementById("divider");
+        const sidebar = document.getElementById("sidebar");
 
-function onTimestamp(ts) {
-  if (selectedTimestamps.has(ts)) {
-    selectedTimestamps.delete(ts);
-  } else {
-    selectedTimestamps.add(ts);
-  }
+        let dragging = false;
 
-  document.querySelectorAll(".ts").forEach(el => {
-    const v = parseInt(el.textContent);
-    el.classList.toggle("selected", selectedTimestamps.has(v));
-  });
+        divider.addEventListener("mousedown", () => dragging = true);
+        window.addEventListener("mouseup", () => dragging = false);
 
-  focusTimestamp(ts);
+        window.addEventListener("mousemove", (e) => {
+            if (!dragging) return;
+            const newWidth = e.clientX;
+            sidebar.style.width = newWidth + "px";
+        });
+    </script>
+
+    <script type="module">
+        import * as THREE from 'https://esm.sh/three@0.160.0';
+        import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+
+        const BoxDim = 0.23;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        // const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
+
+        const camera = new THREE.PerspectiveCamera(
+            60,
+            1,
+            0.1,
+            1000
+        );
+
+        camera.position.set(6, 4, 8);
+
+        const viewport = document.getElementById("viewport");
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+        viewport.appendChild(renderer.domElement);
+
+
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff));
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(5, 5, 5);
+        scene.add(light);
+
+        const nodesByLabel = new Map();
+        const labelsByNode = new Map();
+        const pointerDotsByKey = new Map();
+
+        const objectMaterials = new Map();
+
+
+        function makeTextTexture(text, type = "textLines", isSprite = false) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            const fontSize = 48;
+            const lineHeight = fontSize * 1.2;
+            const padding = 20;
+
+            ctx.font = `${fontSize}px monospace`;
+
+            const lines = text.split('\n');
+            const maxWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
+
+            canvas.width = maxWidth + padding * 2;
+            canvas.height = lineHeight * lines.length + padding * 2;
+
+            ctx.font = `${fontSize}px monospace`;
+
+            if (type === "pointerSymbol") {
+                ctx.fillStyle = '#123';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.strokeStyle = '#888';
+                ctx.strokeRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'white';
+            } else {
+                ctx.fillStyle = 'rgba(0,0,0,1)';
+            }
+
+            lines.forEach((line, i) => {
+                ctx.fillText(line, padding, padding + (i + 1) * lineHeight - (lineHeight - fontSize));
+            });
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            texture.minFilter = THREE.LinearFilter;
+
+            const aspect = canvas.height / canvas.width;
+
+            //var result = texture;
+            //if (isSprite) {
+            //    let material = new THREE.SpriteMaterial({ map: texture });
+            //    result = new THREE.Sprite(material);
+            // }
+            return { texture, aspect };
+        }
+        function createBox(obj) {
+            let material = new THREE.MeshStandardMaterial({ color: 0xaa8844, transparent: true, opacity: 0.2 });
+            objectMaterials.set(obj.label, material);
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(BoxDim, BoxDim, BoxDim),
+                material
+            );
+            mesh.position.set(...obj.position);
+            scene.add(mesh);
+            nodesByLabel.set(obj.label, mesh);
+            labelsByNode.set(mesh, obj.label);
+
+            const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim));
+            const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
+            const labelMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.1, 0.1 * aspect),
+                new THREE.MeshBasicMaterial({ map: texture, transparent: false })
+            );
+            labelMesh.position.copy(labelAnchor);
+            scene.add(labelMesh);
+
+            const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim));
+            const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.textLines || "", "textLines");
+            const fieldMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.5, 0.5 * fieldAspect),
+                new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: true, alphaTest: 0.1 })
+            );
+            fieldMesh.position.copy(fieldsAnchor);
+            scene.add(fieldMesh);
+
+            const dots = [];
+            if (obj.pointerFields) {
+                const spacing = 0.1;
+                const startX = mesh.position.x - (obj.pointerFields.length - 1) * spacing / 2;
+                const y = mesh.position.y - 0.17;
+                const z = mesh.position.z;
+                obj.pointerFields.forEach((fname, i) => {
+                    const dot = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.03, 12, 12),
+                        new THREE.MeshStandardMaterial({ color: 0x000000 })
+                    );
+                    dot.position.set(startX + i * spacing, y, z);
+                    scene.add(dot);
+                    dots.push(dot);
+                    pointerDotsByKey.set(obj.label + ":" + fname, dot.position);
+                });
+            }
+
+            return mesh;
+        }
+
+        function createOrb(obj) {
+            let material = new THREE.MeshStandardMaterial({ color: 0x4488aa, transparent: true, opacity: 0.3 });
+            objectMaterials.set(obj.label, material);
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(BoxDim * 0.618),
+                material
+            );
+            mesh.position.set(...obj.position);
+            scene.add(mesh);
+            nodesByLabel.set(obj.label, mesh);
+            labelsByNode.set(mesh, obj.label);
+
+            const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim));
+            const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
+            const labelMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.1, 0.1 * aspect),
+                new THREE.MeshBasicMaterial({ map: texture, transparent: false })
+            );
+            labelMesh.position.copy(labelAnchor);
+            scene.add(labelMesh);
+
+            const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim));
+            const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.fields || "", "textLines");
+            const fieldMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.5, 0.5 * fieldAspect),
+                new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: true, alphaTest: 0.1 })
+            );
+            fieldMesh.position.copy(fieldsAnchor);
+            scene.add(fieldMesh);
+
+            const dots = [];
+            if (obj.pointerFields) {
+                const spacing = 0.1;
+                const startX = mesh.position.x - (obj.pointerFields.length - 1) * spacing / 2;
+                const y = mesh.position.y - 0.17;
+                const z = mesh.position.z;
+                obj.pointerFields.forEach((fname, i) => {
+                    const dot = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.03, 12, 12),
+                        new THREE.MeshStandardMaterial({ color: 0x000000 })
+                    );
+                    dot.position.set(startX + i * spacing, y, z);
+                    scene.add(dot);
+                    dots.push(dot);
+                    pointerDotsByKey.set(obj.label + ":" + fname, dot.position);
+                });
+            }
+
+            return mesh;
+        }
+
+
+        function computeEdgeFrame(a, b) {
+            const dir = new THREE.Vector3().subVectors(b, a);
+            const len = dir.length();
+            const n = dir.clone().normalize();
+            const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
+            return { dirNorm: n, length: len, quat };
+        }
+
+        function createPointer(from, to) {
+            const start = from.clone();
+            const end = to.clone();
+            const { dirNorm, length, quat } = computeEdgeFrame(start, end);
+
+            const group = new THREE.Group();
+
+            const dot = new THREE.Mesh(
+                new THREE.SphereGeometry(0.04, 12, 12),
+                new THREE.MeshStandardMaterial({ color: 0x000000 })
+            );
+            dot.position.copy(start);
+            group.add(dot);
+
+            const shaftLen = Math.max(0.001, length - 0.08);
+            const shaft = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.01, 0.01, shaftLen, 8),
+                new THREE.MeshStandardMaterial({ color: 0x000000 })
+            );
+            const mid = start.clone().addScaledVector(dirNorm, shaftLen / 2);
+            shaft.position.copy(mid);
+            shaft.quaternion.copy(quat);
+            group.add(shaft);
+
+            const cone = new THREE.Mesh(
+                new THREE.ConeGeometry(0.03, 0.08, 8),
+                new THREE.MeshStandardMaterial({ color: 0x000000 })
+            );
+            const center = end.clone().addScaledVector(dirNorm, -0.04);
+            cone.position.copy(center);
+            cone.quaternion.copy(quat);
+            group.add(cone);
+
+            return group;
+        }
+
+        function makeActionArrow(type, source, target, color = 0x0088aa, hoverOffset = -BoxDim) {
+            const group = new THREE.Group();
+
+            //color = 0x0088ff;
+            if (type === "Force" || type === "ForcePut") color = 0xaa88aa;
+
+            // Compute vector from source → target
+            const dir = new THREE.Vector3().subVectors(target, source);
+            const length = dir.length();
+            dir.normalize();
+
+            // Shaft parameters
+            let shaftRadius = 0.02;
+            if (type === "Force" || type === "ForcePut") shaftRadius = 0.05;
+
+            const shaftLength = length + (hoverOffset * 1.6); // shorten shaft slightly so head hovers
+
+            // Place arrowhead with hoverOffset
+            const headPos = new THREE.Vector3().copy(target).addScaledVector(dir, hoverOffset);
+
+            // Shaft geometry
+            const shaftGeo = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength, 12);
+            const shaftMat = new THREE.MeshStandardMaterial({
+                color: color,
+                transparent: true || (type === "Force" || type === "ForcePut"),
+                opacity: (type === "Force" || type === "ForcePut") ? 0.2 : 0.6
+            });
+            const shaftMesh = new THREE.Mesh(shaftGeo, shaftMat);
+
+            // Shaft midpoint
+            const mid = new THREE.Vector3().addVectors(source, headPos).multiplyScalar(0.5);
+            shaftMesh.position.copy(mid);
+            shaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+            group.add(shaftMesh);
+
+            // Helper functions
+            function makeCone(radius = 0.06, height = 0.12) {
+                const coneGeo = new THREE.ConeGeometry(radius, height, 12);
+                const coneMat = new THREE.MeshStandardMaterial({ color: color });
+                const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+                return coneMesh;
+            }
+            function makeDoublePyramid(radius = 0.06, height = 0.12) {
+                const cone1 = makeCone(radius, height);
+                const cone2 = makeCone(radius, height);
+                cone2.rotateX(Math.PI);
+                const g = new THREE.Group();
+                cone1.position.y = height / 2;
+                cone2.position.y = -height / 2;
+                g.add(cone1);
+                g.add(cone2);
+                return g;
+            }
+
+            if (type === "Get") {
+                const cone = makeCone();
+                cone.position.copy(headPos);
+                cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                group.add(cone);
+            } else if (type === "Put") {
+                const dp = makeDoublePyramid();
+                dp.position.copy(headPos);
+                dp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                group.add(dp);
+            } else if (type === "Force") {
+                const cone = makeCone();
+                cone.position.copy(headPos);
+                cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                group.add(cone);
+
+                const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12);
+                const innerShaftMat = new THREE.MeshStandardMaterial({ color: color });
+                const innerShaftMesh = new THREE.Mesh(innerShaftGeo, innerShaftMat);
+                innerShaftMesh.position.copy(mid);
+                innerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                group.add(innerShaftMesh);
+            } else if (type === "ForcePut") {
+                const coneForce = makeCone();
+                const conePut = makeDoublePyramid();
+                coneForce.position.copy(headPos);
+                conePut.position.copy(headPos);
+                coneForce.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                conePut.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                group.add(coneForce);
+                group.add(conePut);
+
+                const outerShaftGeo = new THREE.CylinderGeometry(0.05, 0.05, shaftLength, 12);
+                const outerShaftMat = new THREE.MeshStandardMaterial({ color: color, transparent: true, opacity: 0.3 });
+                const outerShaftMesh = new THREE.Mesh(outerShaftGeo, outerShaftMat);
+                outerShaftMesh.position.copy(mid);
+                outerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                group.add(outerShaftMesh);
+
+                const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12);
+                const innerShaftMat = new THREE.MeshStandardMaterial({ color: color });
+                const innerShaftMesh = new THREE.Mesh(innerShaftGeo, innerShaftMat);
+                innerShaftMesh.position.copy(mid);
+                innerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                group.add(innerShaftMesh);
+            }
+
+            return group;
+        }
+        const data = await fetch('./scene.json').then(r => r.json());
+
+        for (const obj of data.objects) {
+            if (obj.type === "box") createBox(obj);
+            if (obj.type === "orb") createOrb(obj);
+        }
+
+        for (const obj of data.objects) {
+            if (obj.type === "pointer") {
+                const from = pointerDotsByKey.get(obj.from);
+                const target = nodesByLabel.get(obj.to);
+                if (!from || !target) continue;
+                const adjustedTarget = target.position.clone().add(new THREE.Vector3(0, BoxDim / 2, 0));
+                const mesh = createPointer(from, adjustedTarget);
+                scene.add(mesh);
+            }
+            else if (obj.type == "Get" || obj.type == "Put" || obj.type == "Force" || obj.type == "ForcePut") {
+                const from = pointerDotsByKey.get(obj.from);
+                const target = nodesByLabel.get(obj.to);
+                if (!from || !target) { console.error("error connecting: " + obj); continue };
+                const mesh = makeActionArrow(obj.type, from, target.position);
+                scene.add(mesh)
+
+            }
+            else if (obj.type === "box" || obj.type === "orb") { /* already handled */ }
+            else {
+                console.error("do not recognize this object type: " + obj.type);
+            }
+        }
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let camTargetPos = null;
+        let camTargetLook = null;
+        const transitionDuration = 1.3;
+        let transitionStart = 0;
+
+function getMouseNDC(event) {
+  const rect = viewport.getBoundingClientRect();
+
+  return {
+    x: ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    y: -((event.clientY - rect.top) / rect.height) * 2 + 1
+  };
 }
 
-function focusTimestamp(ts) {
-  console.log("focus timestamp:", ts);
-  // hook:
-  // - filter DCG nodes
-  // - highlight edges
-  // - jump outline selection
-  // - update camera if desired
-}
+        window.addEventListener('click', e => {
+            const pos = getMouseNDC(e);            
+            mouse.x = pos.x;
+            mouse.y = pos.y;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects([...nodesByLabel.values()]);
+            if (intersects.length) {
+                const m = intersects[0].object;
+                camTargetPos = m.position.clone().add(new THREE.Vector3(0, 0, 2.3));
+                camTargetLook = m.position.clone();
+                transitionStart = performance.now() / 1000;
+            }
+        });
 
-/* sidebar resize */
-const divider = document.getElementById("divider");
-const sidebar = document.getElementById("sidebar");
 
-let dragging = false;
+        var hoverNode = null;
 
-divider.addEventListener("mousedown", () => dragging = true);
-window.addEventListener("mouseup", () => dragging = false);
+        // an object to expose state to the console, set whenever hoverNode is set or reset, but never cleared after the hovering is gone, between hovers.
+        var lastHoverNode = { lastHoverNode: null };
 
-window.addEventListener("mousemove", (e) => {
-  if (!dragging) return;
-  const newWidth = e.clientX;
-  sidebar.style.width = newWidth + "px";
-});
-</script>
+        var frames = 0;
 
-<!-- THREE.JS HOOK POINT -->
-<script>
-const viewport = document.getElementById("viewport");
+        window.addEventListener('mousemove', e => {
+            const pos = getMouseNDC(e);            
+            mouse.x = pos.x;
+            mouse.y = pos.y;
+        });
 
-// your existing Three.js code goes here
-// scene, camera, renderer attach to viewport
-</script>
+        function animate() {
+            frames++;
+
+            const now = performance.now() / 1000;
+            if (camTargetPos) {
+                const t = Math.min((now - transitionStart) / transitionDuration, 1);
+                camera.position.lerpVectors(camera.position, camTargetPos, t);
+                controls.target.lerpVectors(controls.target, camTargetLook, t);
+                if (t >= 1) camTargetPos = null;
+            }
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects([...nodesByLabel.values()]);
+
+            function cancelHoverNode() {
+                const DEBUG = false;
+                if (!hoverNode) {
+                    console.error("no hoverNode to cancel")
+                    return
+                }
+                let label = labelsByNode.get(hoverNode);
+                if (label) {
+                    DEBUG && console.log("old hover node was " + label);
+                    let material = objectMaterials.get(label);
+                    DEBUG && console.log("  current material uuid is " + hoverNode.material.uuid);
+                    DEBUG && console.log("  original material uuid was " + material.uuid);
+                    hoverNode.material = material.clone();
+                    DEBUG && console.log("  restored, and cloned original as " + material.uuid);
+                    hoverNode = null;
+                } else {
+                    DEBUG && console.log("cancelHoverNode() failed to find label.  Internal error.")
+                }
+            }
+
+            if (intersects.length) {
+                const DEBUG = false;
+                if (hoverNode !== intersects[0].object) {
+                    if (hoverNode) { cancelHoverNode() };
+
+                    hoverNode = intersects[0].object;
+                    lastHoverNode.lastHoverNode = hoverNode;
+                    DEBUG && console.log("new hover node is " + labelsByNode.get(hoverNode));
+                    DEBUG && console.log("   material uuid was " + hoverNode.material.uuid);
+
+                    hoverNode.material = hoverNode.material.clone();
+                    DEBUG && console.log("   material uuid is  " + hoverNode.material.uuid);
+                    hoverNode.material.opacity = 0.618;
+                }
+            }
+            else {
+                if (hoverNode) {
+                    cancelHoverNode()
+                }
+            }
+            controls.update();
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+
+
+        function onResize() {
+            const width = viewport.clientWidth;
+            const height = viewport.clientHeight;
+
+            renderer.setSize(width, height);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+        }
+
+        window.addEventListener("resize", onResize);
+
+        renderer.setPixelRatio(window.devicePixelRatio);
+        viewport.appendChild(renderer.domElement);
+
+
+        function resizeRendererToViewport() {
+            const width = viewport.clientWidth;
+            const height = viewport.clientHeight;
+
+            renderer.setSize(width, height, false);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+        }
+
+        // React to ANY layout change (sidebar drag, panel collapse, etc.)
+        const ro = new ResizeObserver(() => {
+            resizeRendererToViewport();
+        });
+
+        ro.observe(viewport);
+
+        // initial size
+        resizeRendererToViewport();
+
+
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        window.app = {
+            frames,
+            lastHoverNode,
+            objectMaterials,
+            nodesByLabel,
+            labelsByNode,
+            data,
+            scene,
+            camera,
+            renderer,
+            controls
+        };
+
+    </script>
 
 </body>
+
 </html>
