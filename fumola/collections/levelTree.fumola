@@ -360,7 +360,8 @@ module {
     switch last {
       case (#box(b)) {
         assert b.label_ == "10-element";
-        // assert b.position.x == 1.5;
+        assert (b.position == {x=4.5;y=1.618;z=2.0});
+        assert (b.textFields == "#element\n\tsymbol=10\n\telement=545");
       };
       case _ { assert false };
     }
