@@ -121,30 +121,40 @@ module {
 
         let t = 2 := thunk { p := 0 };
         let tId = (space(2), now(), 2);
-        let pId_ = (space(2), now(), 2);
+        let pId_ = (space(1), now(), 4);
         
         let evs = peekEvents();
         assert (evs.size() == 4);
-        assert (evs[2] == {event = #addNode(tId); metaTime = 2});
+        assert (evs[2] == { event = #addNode(tId);           metaTime = 2});
         assert (evs[3] == { event = #addEdge(#edgeId(1002)); metaTime = 2});
 
         assert((force(t)) == p);
 
         let evs = peekEvents();
-        prim "print" (evs.size());
-        var count = 0;
-        for (ev in evs.vals()) {
-            prim "print" (debug_show (count, ev));
-            count += 1;
-        };
     
         assert (evs.size() == 9);
-        assert (evs[4] == {event = #forceBegin(tId); metaTime = 3});
-        // evs[5] -- to do
+        assert (evs[4] == { event = #forceBegin(tId);        metaTime = 3});
+        assert (evs[5] == { event = #addNode(pId_);          metaTime = 4});
         assert (evs[6] == { event = #addEdge(#edgeId(1003)); metaTime = 4});
-        // evs[7] -- to do 
+        assert (evs[7] == { event = #addEdge(#edgeId(1004)); metaTime = 5});
         assert (evs[8] == { event = #forceEnd(tId, #edgeId(1004)); metaTime = 5});
     
+        assert((force(t)) == p);
+
+        let evs = peekEvents();
+
+        assert (evs.size() == 11);
+        assert (evs[9] == {event = #forceBegin(tId); metaTime = 6});
+        assert (evs[10] == {event = #forceEnd((tId, #edgeId(1005))); metaTime = 6});
+
+        if false {
+            prim "print" (evs.size());
+            var count = 0;
+            for (ev in evs.vals()) {
+                prim "print" (debug_show (count, ev));
+                count += 1;
+            }
+        };
     };
 
     public module Viz {
