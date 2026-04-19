@@ -39,7 +39,7 @@ fn force_simple_cache_hit() {
 #[test]
 fn peek_cell_some_result() {
     assert__("prim \"adaptonReset\"(#simple); let p = 1 := thunk { }; force(p); let node = (prim \"adaptonPeekCell\" p)!; switch(node){ case(#thunk_(t)){t.result} }", "?()");
-    assert__("let p = 1 := thunk { }; force(p); let node = (prim \"adaptonPeekCell\" p)!.node; switch(node){ case(#thunk_(t)){t.result} }", "?()")
+    assert__("let p = 1 := thunk { }; force(p); let node = (prim \"adaptonPeekCell\" p)!.node; switch(node){ case(#thunk_(t)){t.result} }", "?(3, ())")
 }
 
 #[test]

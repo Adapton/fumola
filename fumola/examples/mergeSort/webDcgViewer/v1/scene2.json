@@ -1,0 +1,45 @@
+{
+  "objects": [
+    {
+      "type": "sphere",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "label": "t"
+    },
+    {
+      "type": "box",
+      "position": [
+        2,
+        0,
+        0
+      ],
+      "label": "x"
+    },
+    {
+      "type": "arrow",
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        2,
+        0,
+        0
+      ],
+      "label": "put(1)"
+    },
+    {
+      "type": "pointer",
+      "from": [
+        3,
+        3,
+        3
+      ],
+      "toLabel": "x"
+    }
+  ]
+}

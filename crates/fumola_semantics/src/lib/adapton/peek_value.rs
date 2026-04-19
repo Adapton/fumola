@@ -2,10 +2,10 @@ use fumola_syntax::ast::{Id, Mut};
 use fumola_syntax::shared::Share;
 
 use crate::adapton::graphical::{
-    Action, Edge, EdgeId, MetaTime, Node, NodeId, NodeInfo, ThunkNode,
+    Action, Edge, EdgeId, Event, EventItem, Node, NodeInfo, ThunkNode,
 };
 use crate::adapton::simple::{Cell, ThunkCell};
-use crate::adapton::{Space, Time};
+use crate::adapton::{MetaTime, Space, Time};
 use crate::{Value, Value_, value::ThunkBody};
 use im_rc::{Vector, vector};
 
@@ -72,7 +72,7 @@ impl<X: PeekValue, Y: PeekValue> PeekValue for (X, Y) {
     }
 }
 
-impl PeekValue for NodeId {
+impl<X: PeekValue, Y: PeekValue, Z: PeekValue> PeekValue for (X, Y, Z) {
     fn into_value_(self) -> Value_ {
         Value::Tuple(vector!(
             self.0.into_value_(),
@@ -96,6 +96,7 @@ impl PeekValue for Edge {
                 ("source", self.source.into_value_()),
                 ("target", self.target.into_value_()),
                 ("action", self.action.into_value_()),
+                ("metaTimes", self.meta_times.into_value_()),
             ]
             .iter(),
         )
@@ -181,5 +182,32 @@ impl<T: PeekValue> PeekValue for Option<T> {
 impl PeekValue for ThunkBody {
     fn into_value_(self) -> Value_ {
         Value::Thunk(self).share()
+    }
+}
+
+impl PeekValue for EventItem {
+    fn into_value_(self) -> Value_ {
+        Value::object_from(
+            [
+                ("metaTime", self.meta_time.into_value_()),
+                ("event", self.event.into_value_()),
+            ]
+            .iter(),
+        )
+        .share()
+    }
+}
+
+impl PeekValue for Event {
+    fn into_value_(self) -> Value_ {
+        match self {
+            Event::AddNode(v) => variant("addNode", v.into_value_()),
+            Event::AddEdge(edge_id) => variant("addEdge", edge_id.into_value_()),
+            Event::RemoveEdge(edge_id) => variant("removeEdge", edge_id.into_value_()),
+            Event::ForceBegin(node_id) => variant("forceBegin", node_id.into_value_()),
+            Event::ForceEnd(node_id, edge_id) => {
+                variant("forceEnd", (node_id, edge_id).into_value_())
+            }
+        }
     }
 }

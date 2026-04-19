@@ -11,12 +11,24 @@ module {
     ///
     public module PeekInfo {
 
+        public type Events = [Event];
+        public type Event = {
+            #addNode : NodeId;
+            #addEdge : EdgeId;
+            #removeEdge : EdgeId;
+            #forceBegin : NodeId;
+            #forceEnd : (NodeId, EdgeId);
+        };
         public type MetaTime = Nat;
-        public type Time = { #time : Symbol };
-        public type Space = { #space : Symbol };
+       
+        public type Time = { #time : Symbol }; // --- TO DO
+        public type Space = { #space : Symbol }; // --- TO DO
         public type Pointer = Space;
 
-        public type NodeId = { #nodeId : (Pointer, Time, MetaTime) };
+        // TO DO --
+        // public type NodeId = { #nodeId : (Pointer, Time, MetaTime) };
+        public type NodeId = (Space, Time, MetaTime);
+       
         public type EdgeId = { #edgeId : Nat };
 
         public type Node = {
@@ -27,14 +39,18 @@ module {
         public type ThunkNode = {
             body : Thunk<Any>;
             trace : [ EdgeId ];
-            result : ?Any;
+            result : ?(MetaTime, Any);
             space : Space;
         };
+
+        // meta time intervals (begin, end) where begin <= end.
+        public type MetaTimes = (MetaTime, MetaTime);
 
         public type Edge = {
             source : NodeId;
             target : NodeId;
             action : Action;
+            metaTimes : MetaTimes;
         };
 
         public type NodeInfo = {
@@ -49,19 +65,144 @@ module {
       { 
         action: Action; 
         putValue: ?Any; // TODO -- distinguish thunks and non-thunks
-        forcedThunk: ?Thunk<A>
+        forcedThunk: ?Thunk<A>;
+        metaTime: MetaTime;
       } 
     {
         switch (edge.action) {
 
-            case(#put(value)) {{action=#put; value; forcedThunk=null}};
-            case(#get(value)) {{action=#get; value; forcedThunk=null}};
-            case(#force_(t, value)) {{action=#force_; value; forcedThunk=?t; value}};
+            case(#put(value)) {{action=#put; value; forcedThunk=null; metaTimes=edge.metaTimes}};
+            case(#get(value)) {{action=#get; value; forcedThunk=null; metaTimes=edge.metaTimes}};
+            case(#force_(t, value)) {{action=#force_; value; forcedThunk=?t; value; metaTimes=edge.metaTimes}};
         }
     };
 
     public func peekInfo(p : Pointer) : ?PeekInfo.NodeInfo {
         prim "adaptonPeekCell" p
+    };
+
+    #[test]
+    func testPeekInfo() {
+        let p = 1 := 1;
+        prim "print" (debug_show (peekInfo(p)))
+
+        // TO DO
+    };
+
+    public func peekEvents() : PeekInfo.Events {
+        prim "adaptonPeekEvents" ()
+    };
+
+    public func now() : Time {
+        prim "adaptonNow" ()
+    };
+
+    public func here() : Space {
+        prim "adaptonHere" ()
+    };
+
+    public func space(s : Symbol) : Space {
+        prim "adaptonSpace" s
+    };
+
+    #[test]
+    func testSpace() {
+        assert (debug_show(space(`x)) == "@adaptonSpace (x)")
+    };
+
+    #[test]
+    func testPeekEvents() {       
+        let p = 1 := 1;
+        let pId = (space(1), now(), 1);
+        let evs = peekEvents();
+        assert (evs.size() == 2);
+        assert (evs[0] == { event = #addNode(pId); metaTime = 1});
+        assert (evs[1] == { event = #addEdge(#edgeId(1001)); metaTime = 1});
+
+        let t = 2 := thunk { p := 0 };
+        let tId = (space(2), now(), 2);
+        let pId_ = (space(1), now(), 4);
+        
+        let evs = peekEvents();
+        assert (evs.size() == 4);
+        assert (evs[2] == { event = #addNode(tId);           metaTime = 2});
+        assert (evs[3] == { event = #addEdge(#edgeId(1002)); metaTime = 2});
+
+        assert((force(t)) == p);
+
+        let evs = peekEvents();
+    
+        assert (evs.size() == 9);
+        assert (evs[4] == { event = #forceBegin(tId);        metaTime = 3});
+        assert (evs[5] == { event = #addNode(pId_);          metaTime = 4});
+        assert (evs[6] == { event = #addEdge(#edgeId(1003)); metaTime = 4});
+        assert (evs[7] == { event = #addEdge(#edgeId(1004)); metaTime = 5});
+        assert (evs[8] == { event = #forceEnd(tId, #edgeId(1004)); metaTime = 5});
+    
+        assert((force(t)) == p);
+
+        let evs = peekEvents();
+
+        assert (evs.size() == 11);
+        assert (evs[9] == {event = #forceBegin(tId); metaTime = 6});
+        assert (evs[10] == {event = #forceEnd((tId, #edgeId(1005))); metaTime = 6});
+
+        if false {
+            prim "print" (evs.size());
+            var count = 0;
+            for (ev in evs.vals()) {
+                prim "print" (debug_show (count, ev));
+                count += 1;
+            }
+        };
+    };
+
+    public module Viz {
+        public type Vec3 = { x : Float; y : Float; z : Float };
+        public let zero = { x = 0.0; y = 0.0; z =0.0 };
+        public type SceneObject = {
+            #orb : LabeledObject;
+            #box : LabeledObject;
+            #action : Action;
+            #pointer : Edge;
+        };
+
+        public type LabeledObject = { label_ : Label; position : Vec3; textFields : Text; pointerFields : [Text]};
+        public type Label = Text;
+        public type Edge = { from : Label ; to : Label };
+        public type Pointer = Edge;
+        public type Action = { actionType: ActionType; from: Label; to:Label } /* and Edge */ ;
+        public type ActionType = { #get ; #put ; #force_ ; #forcePut };
+
+        public func sceneIntoJSONText( objects : [SceneObject] ) : Text {
+            var objectsText = "";
+            var isFirstObject = true;
+            for (o in objects.vals()) {
+                if (isFirstObject) {
+                    isFirstObject := false;
+                } else {
+                    objectsText #= ",\n";
+                };
+                switch o {
+                case (#box(fields)) {
+                    objectsText #= 
+                    "{ \"type\": \"box\""#
+                    ", \"position\": "#(debug_show [fields.position.x, fields.position.y, fields.position.z])#
+                    ", \"label\": "#(debug_show fields.label_)#
+                    ", \"textLines\": "#(debug_show fields.textFields)#
+                    ", \"pointerFields\": "#(debug_show fields.pointerFields)#
+                    "}"
+                };
+                case (#pointer(fields)) {
+                    objectsText #= 
+                    "{ \"type\": \"pointer\", \"from\": " # (debug_show fields.from) # 
+                    ", \"to\": " # (debug_show fields.to) # 
+                    "}"
+                }
+                };
+            };
+            "{ \"objects\" : [\n" # objectsText # "\n] }"
+        };
     };
 
     public module DFS {
@@ -82,6 +223,7 @@ module {
             __nodeId : nodeId;      // using __ prefixes to promote in default print order.
             __shape : NodeShape;
             edges : [ ShowEdge ];
+            metaTimes : MetaTimes;
             value : Any;
         };
         public type NodeShape = {
@@ -98,6 +240,7 @@ module {
             dfs : ?ShowDFS;
             forcedThunk : ?Thunk<Any>;
             value : Any;
+            metaTimes : MetaTimes;
         };
         //
         // Just the "tag" of the action, where the other action information
@@ -142,8 +285,13 @@ module {
             }
         };
 
+        public func metaTimesIntoText(mts : MetaTimes) : Text {
+            if (mts.0 == mts.1) { "(" # debug_show (mts.0) # ")" }
+            else { debug_show mts }
+        };
+
         public func edgeIntoText(edge : ShowEdge, indent : Nat) : Text {
-            indentText(indent) # "├" # (
+            indentText(indent) # "├" # metaTimesIntoText(edge.metaTimes) # (
             switch (edge.dfs) {
                 case null {
                     actionIntoUnicode(edge.action) # 
@@ -196,6 +344,7 @@ module {
                                 // visited.insert(target);
                                 dfs := ? showDFSRec(actionTarget /*, visited */);
                             };
+                            let metaTimes = edgeInfo.metaTimes;
                             if ( 
                                 prevEdge != null and
                                 prevEdge!.action == #put and 
@@ -205,12 +354,14 @@ module {
                                     action=#putForce;
                                     dfs;
                                     value=edgeInfo.value;
+                                    metaTimes=(prevEdge!.metaTimes.0, metaTimes.1);
                                 }
                             } else { 
                                 let edge = {
                                     action=edgeInfo.action;
                                     actionTarget;
                                     dfs;
+                                    metaTimes;
                                     value=edgeInfo.value;
                                 };
                                 edges #= [ edge ];

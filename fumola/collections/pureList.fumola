@@ -1,0 +1,32 @@
+module {
+
+#[listing(33)]
+public type List<X> = ?{
+  element : X;
+  symbol : Symbol;
+  next : List<X>;
+};
+
+#[listing]
+public func fromIter(iter : Iter<(Symbol, X)>) : List<X> {
+    switch (iter.next()) {
+        case null null;
+        case (?(symbol, element)) {
+            ?{symbol; element; next = fromIter(iter)}
+        }
+    } 
+};
+
+#[test]
+public func testFromIter() {
+    let list = fromIter([(1,1), (2,2), (3,3)].vals());
+    assert (list!.symbol == 1);
+    assert (list!.element == 1);
+    assert (list!.next!.symbol == 2);
+    assert (list!.next!.element == 2);
+    assert (list!.next!.next!.symbol == 3);
+    assert (list!.next!.next!.element == 3);
+    assert (list!.next!.next!.next == null);
+};
+
+}
