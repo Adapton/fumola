@@ -22,8 +22,8 @@ pub enum Event {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct EventItem {
-    meta_time: MetaTime,
-    event: Event,
+    pub meta_time: MetaTime,
+    pub event: Event,
 }
 
 /// Node and its incident edges
@@ -612,7 +612,6 @@ impl CacheState for GraphicalState {
     }
 
     fn peek_events(&mut self) -> Res<Value_> {
-        let empty: Vector<Value_> = vector!();
-        Ok(empty.into_value_())
+        Ok(self.events.clone().into_value_())
     }
 }

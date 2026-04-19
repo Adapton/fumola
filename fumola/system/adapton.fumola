@@ -78,8 +78,61 @@ module {
         prim "adaptonPeekCell" p
     };
 
+    #[test]
+    func testPeekInfo() {
+        let p = 1 := 1;
+        prim "print" (debug_show (peekInfo(p)))
+
+        // TO DO
+    };
+
     public func peekEvents() : PeekInfo.Events {
         prim "adaptonPeekEvents" ()
+    };
+
+    public func now() : Time {
+        prim "adaptonNow" ()
+    };
+
+    public func here() : Space {
+        prim "adaptonHere" ()
+    };
+
+    public func space(s : Symbol) : Space {
+        prim "adaptonSpace" s
+    };
+
+    #[test]
+    func testSpace() {
+        assert (debug_show(space(`x)) == "@adaptonSpace (x)")
+    };
+
+    #[test]
+    func testPeekEvents() {       
+        let p = 1 := 1;
+        let pId = (space(1), now(), 1);
+        let evs = peekEvents();
+        assert (evs.size() == 2);
+        assert (evs[0] == { event = #addNode(pId); metaTime = 1});
+        assert (evs[1] == { event = #addEdge(#edgeId(1001)); metaTime = 1});
+
+        let t = 2 := thunk { p };
+        let tId = (space(2), now(), 2);
+        
+        let evs = peekEvents();
+        assert (evs.size() == 4);
+        assert (evs[2] == {event = #addNode(tId); metaTime = 2});
+        assert (evs[3] == { event = #addEdge(#edgeId(1002)); metaTime = 2});
+
+        assert((force(t)) == p);
+
+        let evs = peekEvents();
+    
+        assert (evs.size() == 7);
+        assert (evs[4] == {event = #forceBegin(tId); metaTime = 3});
+        assert (evs[5] == { event = #addEdge(#edgeId(1003)); metaTime = 4});
+        assert (evs[6] == { event = #forceEnd(tId, #edgeId(1003)); metaTime = 4});
+    
     };
 
     public module Viz {
