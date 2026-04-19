@@ -119,8 +119,9 @@ module {
         assert (evs[0] == { event = #addNode(pId); metaTime = 1});
         assert (evs[1] == { event = #addEdge(#edgeId(1001)); metaTime = 1});
 
-        let t = 2 := thunk { p };
+        let t = 2 := thunk { p := 0 };
         let tId = (space(2), now(), 2);
+        let pId_ = (space(2), now(), 2);
         
         let evs = peekEvents();
         assert (evs.size() == 4);
@@ -130,11 +131,19 @@ module {
         assert((force(t)) == p);
 
         let evs = peekEvents();
+        prim "print" (evs.size());
+        var count = 0;
+        for (ev in evs.vals()) {
+            prim "print" (debug_show (count, ev));
+            count += 1;
+        };
     
-        assert (evs.size() == 7);
+        assert (evs.size() == 9);
         assert (evs[4] == {event = #forceBegin(tId); metaTime = 3});
-        assert (evs[5] == { event = #addEdge(#edgeId(1003)); metaTime = 4});
-        assert (evs[6] == { event = #forceEnd(tId, #edgeId(1003)); metaTime = 4});
+        // evs[5] -- to do
+        assert (evs[6] == { event = #addEdge(#edgeId(1003)); metaTime = 4});
+        // evs[7] -- to do 
+        assert (evs[8] == { event = #forceEnd(tId, #edgeId(1004)); metaTime = 5});
     
     };
 

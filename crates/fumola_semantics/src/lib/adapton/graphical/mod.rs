@@ -522,7 +522,8 @@ impl CacheState for GraphicalState {
                 counts.force_begin_cache_hit += 1;
                 // TODO -- clean.
                 let action = node.clone().force_action()?;
-                self.new_edge_to_pointer(action, pointer, None)?;
+                let edge_id = self.new_edge_to_pointer(action, pointer, None)?;
+                self.event(Event::ForceEnd(node_id.clone(), edge_id));
                 Ok(ForceBeginResult::CacheHit(cache_value.0, cache_value.1))
             } else {
                 counts.force_begin_cache_miss += 1;
