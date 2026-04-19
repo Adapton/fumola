@@ -21,11 +21,14 @@ module {
         };
         public type MetaTime = Nat;
        
-        public type Time = { #time : Symbol };
-        public type Space = { #space : Symbol };
+        public type Time = { #time : Symbol }; // --- TO DO
+        public type Space = { #space : Symbol }; // --- TO DO
         public type Pointer = Space;
 
-        public type NodeId = { #nodeId : (Pointer, Time, MetaTime) };
+        // TO DO --
+        // public type NodeId = { #nodeId : (Pointer, Time, MetaTime) };
+        public type NodeId = (Space, Time, MetaTime);
+       
         public type EdgeId = { #edgeId : Nat };
 
         public type Node = {
