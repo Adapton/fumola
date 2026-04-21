@@ -13,7 +13,7 @@ fn test_events() {
     assert_(
         r#"
     force (1 := thunk { force (2 := thunk { 44 }) });
-    (switch (@(`adapton(`state))) { case (#Graphical(g)) g }).events"#,
+    (switch (@(`adapton(`state))) { case (#Graphical(g)) g }).history.events"#,
         r#"
     [
         {event = #AddNode(#Symbol(#Nat(1)), #Now, [1]); meta_time = [1]},
