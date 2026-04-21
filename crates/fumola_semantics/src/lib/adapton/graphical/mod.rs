@@ -79,6 +79,10 @@ pub struct GraphicalState {
     pub trace: Vector<EdgeId>,
     pub space: Space,
     pub time: Time,
+
+    // History is only an output structure; not used algorithmically by GraphicalState.
+    // Imposes at worst O(1) logging overhead to any operation.
+    // Eventually, offer a flag to toggle it off, for maximum performance.
     pub history: History,
 }
 
