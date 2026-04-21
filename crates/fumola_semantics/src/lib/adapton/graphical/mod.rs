@@ -21,7 +21,7 @@ pub enum Event {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct EventItem {
+pub struct EventHistoryItem {
     pub meta_time: MetaTime,
     pub event: Event,
 }
@@ -34,6 +34,13 @@ pub struct NodeInfo {
     pub incoming_edges: Vector<(EdgeId, Edge)>,
     /// The edges where this node is the source, in node's trace order.
     pub outgoing_edges: Vector<(EdgeId, Edge)>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct NodeHistoryItem {
+    pub meta_time: MetaTime,
+    pub node_id: NodeId,
+    pub node: Node,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -72,7 +79,24 @@ pub struct GraphicalState {
     pub trace: Vector<EdgeId>,
     pub space: Space,
     pub time: Time,
-    pub events: Vector<EventItem>,
+    pub history: History,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct History {
+    pub events: Vector<EventHistoryItem>,
+    pub nodes: Vector<NodeHistoryItem>,
+    pub edges: Vector<EdgeHistoryItem>,
+}
+
+impl History {
+    pub fn new() -> Self {
+        History {
+            events: Vector::new(),
+            nodes: Vector::new(),
+            edges: Vector::new(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -107,6 +131,13 @@ pub struct Edge {
     pub target: NodeId,
     pub action: Action,
     pub meta_times: (MetaTime, MetaTime),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct EdgeHistoryItem {
+    pub meta_time: MetaTime,
+    pub edge_id: EdgeId,
+    pub edge: Edge,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -161,11 +192,27 @@ impl Node {
 }
 
 impl GraphicalState {
-    fn event(&mut self, ev: Event) {
-        self.events.push_back(EventItem {
+    fn extend_history_with_event(&mut self, ev: Event) {
+        self.history.events.push_back(EventHistoryItem {
             meta_time: self.meta_time.clone(),
             event: ev,
         });
+    }
+    fn extend_history_with_node_update(&mut self, node_id: NodeId, node: Node) {
+        self.history.nodes.push_back(NodeHistoryItem {
+            meta_time: self.meta_time.clone(),
+            node_id,
+            node,
+        });
+    }
+
+    fn extend_history_with_new_node(&mut self, p: &Pointer, t: Option<&Time>, n: &Node) {
+        let time = match t {
+            None => self.time.clone(),
+            Some(t) => t.clone(),
+        };
+        let node_id = (p.clone(), time, self.meta_time.clone());
+        self.extend_history_with_node_update(node_id, n.clone());
     }
 
     #[allow(dead_code)]
@@ -245,15 +292,18 @@ impl GraphicalState {
             }
         };
         let meta_time = self.meta_time.clone();
-        self.edges.insert(
-            id.clone(),
-            Edge {
-                source,
-                target,
-                action,
-                meta_times: MetaTime::pair(meta_time_begin, meta_time),
-            },
-        );
+        let edge = Edge {
+            source,
+            target,
+            action,
+            meta_times: MetaTime::pair(meta_time_begin, meta_time),
+        };
+        self.history.edges.push_back(EdgeHistoryItem {
+            meta_time: self.meta_time.clone(),
+            edge_id: id.clone(),
+            edge: edge.clone(),
+        });
+        self.edges.insert(id.clone(), edge);
         Ok(id)
     }
     fn new_edge_to_pointer(
@@ -417,7 +467,7 @@ impl CacheState for GraphicalState {
             space: Space::Here,
             time: Time::Now,
             current_node: Self::root_node(),
-            events: Vector::new(),
+            history: History::new(),
         }
     }
 
@@ -436,6 +486,7 @@ impl CacheState for GraphicalState {
         self.meta_time.incr();
         let space = self.space.clone();
         let new_node = Self::new_node(space, value.clone());
+        self.extend_history_with_new_node(&pointer, None, &new_node);
         let is_thunk = new_node.is_thunk();
         let mut node_by_meta_time0 = HashMap::new();
         node_by_meta_time0.insert(self.meta_time.clone(), new_node);
@@ -465,9 +516,9 @@ impl CacheState for GraphicalState {
             }
             let put_action = Action::Put(value.clone());
             let target = (pointer.clone(), self.time.clone(), self.meta_time.clone());
-            self.event(Event::AddNode(target.clone()));
+            self.extend_history_with_event(Event::AddNode(target.clone()));
             let edge_id = self.new_edge_helper(put_action, target, None)?;
-            self.event(Event::AddEdge(edge_id));
+            self.extend_history_with_event(Event::AddEdge(edge_id));
         };
         Ok(())
     }
@@ -477,7 +528,7 @@ impl CacheState for GraphicalState {
         let (_, node) = self.get_node(&pointer)?;
         let value = node.get_value()?;
         let edge_id = self.new_edge_to_pointer(Action::Get(value.clone()), pointer, None)?;
-        self.event(Event::AddEdge(edge_id));
+        self.extend_history_with_event(Event::AddEdge(edge_id));
         Ok(value)
     }
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()> {
@@ -514,7 +565,7 @@ impl CacheState for GraphicalState {
             let (i, n) = self.get_node(&pointer)?.clone();
             (i, n.clone())
         };
-        self.event(Event::ForceBegin(node_id.clone()));
+        self.extend_history_with_event(Event::ForceBegin(node_id.clone()));
         if let Node::Thunk(tc) = node.clone() {
             if let Some(cache_value) = tc.result.clone()
                 && !settings.force_begin_always_misses
@@ -523,7 +574,7 @@ impl CacheState for GraphicalState {
                 // TODO -- clean.
                 let action = node.clone().force_action()?;
                 let edge_id = self.new_edge_to_pointer(action, pointer, None)?;
-                self.event(Event::ForceEnd(node_id.clone(), edge_id));
+                self.extend_history_with_event(Event::ForceEnd(node_id.clone(), edge_id));
                 Ok(ForceBeginResult::CacheHit(cache_value.0, cache_value.1))
             } else {
                 counts.force_begin_cache_miss += 1;
@@ -548,13 +599,20 @@ impl CacheState for GraphicalState {
             node.set_cache_value(meta_time, value, trace)?;
         }
         let action = node.force_action()?;
+        if true {
+            let node_copy = node.clone();
+            let node_id = self.current_node().clone();
+            self.extend_history_with_node_update(node_id, node_copy);
+        }
         let target = self.current_node.0.clone();
         self.trace = Vector::new(); // trace was cached above. Now clear it.
         let fr = self.pop_stack()?;
         let edge_id = self.new_edge_to_pointer(action, target, Some(fr.meta_time))?;
-        self.event(Event::AddEdge(edge_id.clone()));
+        self.extend_history_with_event(Event::AddEdge(edge_id.clone()));
         match fr.kind {
-            FrameKind::Force(node_id) => self.event(Event::ForceEnd(node_id, edge_id)),
+            FrameKind::Force(node_id) => {
+                self.extend_history_with_event(Event::ForceEnd(node_id, edge_id))
+            }
             _ => unreachable!(),
         };
         Ok(())
@@ -571,9 +629,11 @@ impl CacheState for GraphicalState {
     fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()> {
         let space = self.space.clone();
         let meta_time = self.meta_time.clone();
+        let new_node = Self::new_node(space, value);
+        self.extend_history_with_new_node(&pointer, Some(&time), &new_node);
         let updated = self
             .get_node_by_space(&time)
-            .update((pointer, meta_time), Self::new_node(space, value));
+            .update((pointer, meta_time), new_node);
         self.time_space.insert(time, updated);
         Ok(())
     }
@@ -613,6 +673,6 @@ impl CacheState for GraphicalState {
     }
 
     fn peek_events(&mut self) -> Res<Value_> {
-        Ok(self.events.clone().into_value_())
+        Ok(self.history.clone().into_value_())
     }
 }

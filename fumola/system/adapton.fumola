@@ -90,7 +90,8 @@ module {
     };
 
     public func peekEvents() : PeekInfo.Events {
-        prim "adaptonPeekEvents" ()
+        let history = prim "adaptonPeekEvents" ();
+	history.events
     };
 
     public func now() : Time {

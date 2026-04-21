@@ -2,7 +2,8 @@ use fumola_syntax::ast::{Id, Mut};
 use fumola_syntax::shared::Share;
 
 use crate::adapton::graphical::{
-    Action, Edge, EdgeId, Event, EventItem, Node, NodeInfo, ThunkNode,
+    Action, Edge, EdgeHistoryItem, EdgeId, Event, EventHistoryItem, History, Node, NodeHistoryItem,
+    NodeInfo, ThunkNode,
 };
 use crate::adapton::simple::{Cell, ThunkCell};
 use crate::adapton::{MetaTime, Space, Time};
@@ -185,7 +186,7 @@ impl PeekValue for ThunkBody {
     }
 }
 
-impl PeekValue for EventItem {
+impl PeekValue for EventHistoryItem {
     fn into_value_(self) -> Value_ {
         Value::object_from(
             [
@@ -209,5 +210,47 @@ impl PeekValue for Event {
                 variant("forceEnd", (node_id, edge_id).into_value_())
             }
         }
+    }
+}
+
+impl PeekValue for History {
+    fn into_value_(self) -> Value_ {
+        Value::object_from(
+            [
+                ("events", self.events.into_value_()),
+                ("nodes", self.nodes.into_value_()),
+                ("edges", self.edges.into_value_()),
+            ]
+            .iter(),
+        )
+        .share()
+    }
+}
+
+impl PeekValue for NodeHistoryItem {
+    fn into_value_(self) -> Value_ {
+        Value::object_from(
+            [
+                ("metaTime", self.meta_time.into_value_()),
+                ("nodeId", self.node_id.into_value_()),
+                ("node", self.node.into_value_()),
+            ]
+            .iter(),
+        )
+        .share()
+    }
+}
+
+impl PeekValue for EdgeHistoryItem {
+    fn into_value_(self) -> Value_ {
+        Value::object_from(
+            [
+                ("metaTime", self.meta_time.into_value_()),
+                ("edgeId", self.edge_id.into_value_()),
+                ("edge", self.edge.into_value_()),
+            ]
+            .iter(),
+        )
+        .share()
     }
 }
