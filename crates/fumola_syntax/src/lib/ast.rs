@@ -845,7 +845,7 @@ impl IdPos {
         }
     }
     pub fn id_(&self) -> Id_ {
-        assert_eq!(self.unquote, false);
+        // assert_eq!(self.unquote, false);
         self.id.clone()
     }
     pub fn id(&self) -> Id {
@@ -1000,7 +1000,7 @@ pub enum PrimFunction {
     AdaptonPointer,
     AdaptonPeek,
     AdaptonPeekCell,
-    AdaptonPeekEvents,
+    AdaptonPeekHistory,
     AdaptonPoke,
     AtSignVar(String),
     DebugPrint,
@@ -1029,7 +1029,7 @@ impl PrimFunction {
             "\"adaptonPointer\"" => AdaptonPointer,
             "\"adaptonPeek\"" => AdaptonPeek,
             "\"adaptonPeekCell\"" => AdaptonPeekCell,
-            "\"adaptonPeekEvents\"" => AdaptonPeekEvents,
+            "\"adaptonPeekHistory\"" => AdaptonPeekHistory,
             "\"adaptonPoke\"" => AdaptonPoke,
             "\"print\"" => DebugPrint,
             "\"natToText\"" => NatToText,

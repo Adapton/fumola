@@ -9,7 +9,7 @@ mod reserved;
 use reserved::ReservedSymbol;
 
 mod graphical;
-mod peek_value;
+pub mod peek_value;
 mod simple;
 
 pub mod state;
@@ -114,6 +114,13 @@ impl Time {
             Time::Symbol(ambient) => {
                 Time::Symbol(Shared::new(Symbol::Call(ambient.clone(), symbol)))
             }
+        }
+    }
+
+    pub fn into_symbol(&self) -> Res<Symbol_> {
+        match self {
+            Time::Now => todo!(),
+            Time::Symbol(s) => Ok(s.clone()),
         }
     }
 }

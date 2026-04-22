@@ -243,7 +243,7 @@ pub fn call_prim_function<A: Active>(
                 type_mismatch!(file!(), line!())
             }
         }
-        AdaptonPeekEvents => {
+        AdaptonPeekHistory => {
             let events_value = active.adapton().peek_events()?;
             *active.cont() = cont_value_(events_value);
             Ok(Step {})
