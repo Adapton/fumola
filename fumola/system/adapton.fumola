@@ -11,7 +11,19 @@ module {
     /// graphical representation of the Adapton cache.
     ///
     public module PeekInfo {
-
+        public type History = {
+            events : Events;
+            nodes : [{
+                nodeId : NodeId;
+                metaTime: MetaTime;
+                node : Node; 
+            }];
+            edges : [{
+                edgeId : EdgeId;
+                metaTime: MetaTime;
+                edge : Edge
+            }]
+        };
         public type Events = [Event];
         public type Event = {
             #addNode : NodeId;
@@ -88,6 +100,11 @@ module {
         prim "print" (debug_show (peekInfo(p)))
 
         // TO DO
+    };
+
+    public func peekHistory() : PeekInfo.History {
+        let history = prim "adaptonPeekHistory" ();
+	    history
     };
 
     public func peekEvents() : PeekInfo.Events {
