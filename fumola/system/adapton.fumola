@@ -1,3 +1,4 @@
+import Map "hashMap";
 module {
  
     /// Adapton's structures in Fumola.
@@ -157,6 +158,34 @@ module {
             }
         };
     };
+
+    // helper code:
+    // this codifies a simple convention that works when every spatial name
+    // is unique enough to stand without its temporal or meta-temporal components.
+    public func nodeIdsByLabelFromEvents(evs : [Event]) : Map<Text, [NodeId]> {
+        var map = Map.new();
+        for (ev in evs.vals()) {
+        switch (ev.event) {
+        case (#addNode(nodeId)) {
+          let (sp, tm, mt) = nodeId;
+          let label_ = (debug_show sp.0);
+          switch (Map.get(map, label_)) {
+            case null {
+              let (map_, _) = Map.put(map, label_, [(debug_show nodeId)]);
+              map := map_;
+            };
+            case (?nodeIds) {
+              let (map_, _) = Map.put(map, label_, nodeIds # [(debug_show nodeId)]);
+              map := map_;
+            }
+          }
+        };
+        case _ {};
+        }
+        };
+        map;
+    };
+
 
     public module Viz {
         public type Vec3 = { x : Float; y : Float; z : Float };

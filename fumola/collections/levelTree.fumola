@@ -318,7 +318,7 @@ module {
     let a = R.generateRandomInput(seed, size);
     let t = fromArray(a);
     let evs = A.peekEvents();
-    let nodeIdsByLabel = nodeIdsByLabelFromEvents(evs);
+    let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(evs);
     writeSceneFile(nodeIdsByLabel, file, t!)
   };
 
@@ -327,7 +327,7 @@ module {
     let a = R.generateRandomInput(10, 10);
     let t = fromArray(a);
     let evs = A.peekEvents();
-    let nodeIdsByLabel = nodeIdsByLabelFromEvents(evs);
+    let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(evs);
     writeSceneFile(nodeIdsByLabel, `testWriteSceneFile, t!)
   };
 
@@ -356,36 +356,12 @@ module {
     [#box({label_; position; textFields; pointerFields; nodeIds})] # objs
   };
 
-  public func nodeIdsByLabelFromEvents(evs : [Event]) : Map<Text, [NodeId]> {
-    var map = Map.new();
-    for (ev in evs.vals()) {
-      switch (ev.event) {
-        case (#addNode(nodeId)) {
-          let (sp, tm, mt) = nodeId;
-          let label_ = (debug_show sp.0);
-          switch (Map.get(map, label_)) {
-            case null {
-              let (map_, _) = Map.put(map, label_, [(debug_show nodeId)]);
-              map := map_;
-            };
-            case (?nodeIds) {
-              let (map_, _) = Map.put(map, label_, nodeIds # [(debug_show nodeId)]);
-              map := map_;
-            }
-          }
-        };
-        case _ {};
-      }
-    };
-    map;
-  };
-
   #[test]
   public func testSceneObjects() {
     let a = R.generateRandomInput(10, 10);
     let t = fromArray(a);
     let evs = A.peekEvents();
-    let nodeIdsByLabel = nodeIdsByLabelFromEvents(evs);
+    let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(evs);
     let objs = sceneObjects(nodeIdsByLabel, t!, A.Viz.zero);
     assert (objs.size() == 37);
     // prim "print" (objs[36]);
