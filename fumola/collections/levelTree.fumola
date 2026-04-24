@@ -310,22 +310,18 @@ module {
     widthRight : Nat;
   };
 
-  public func writeSceneFile<X>(nodeIdsByLabel : Map<Text, [NodeIds]>, symbol : Symbol, tree : Pointer<SeqTree<X>>) {
-    let objs = sceneObjects(nodeIdsByLabel, tree, A.Viz.zero);
-    prim "writeFile" (symbol, A.Viz.sceneIntoJSONText(objs))
-  };
-
-  public func writeSceneFileHelper(file : Symbol, seed : Nat, size : Nat) {
+  public func writeSceneFile(file : Symbol, seed : Nat, size : Nat) {
     let a = R.generateRandomInput(seed, size);
     let t = fromArray(a);
     let evs = A.peekEvents();
     let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(evs);
-    writeSceneFile(nodeIdsByLabel, file, t!)
+    let objs = sceneObjects(nodeIdsByLabel, t!, A.Viz.zero);
+    prim "writeFile" (file, A.Viz.sceneIntoJSONText(objs))
   };
 
   #[test]
-  public func testWriteSceneFileHelper() {
-    writeSceneFileHelper(`testWriteSceneFile, 10, 10)
+  public func testWriteSceneFile() {
+    writeSceneFile(`testWriteSceneFile, 10, 10)
   };
 
   #[listing]
