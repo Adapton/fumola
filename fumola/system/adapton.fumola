@@ -90,8 +90,8 @@ module {
     };
 
     public func peekEvents() : PeekInfo.Events {
-        let history = prim "adaptonPeekEvents" ();
-	history.events
+        let history = prim "adaptonPeekHistory" ();
+	    history.events
     };
 
     public func now() : Time {
@@ -167,8 +167,13 @@ module {
             #action : Action;
             #pointer : Edge;
         };
-
-        public type LabeledObject = { label_ : Label; position : Vec3; textFields : Text; pointerFields : [Text]};
+        public type LabeledObject = {
+            label_ : Label;
+            nodeIds: [NodeId];
+            position : Vec3;
+            textFields : Text;
+            pointerFields : [Text]
+        };
         public type Label = Text;
         public type Edge = { from : Label ; to : Label };
         public type Pointer = Edge;
@@ -192,6 +197,7 @@ module {
                     ", \"label\": "#(debug_show fields.label_)#
                     ", \"textLines\": "#(debug_show fields.textFields)#
                     ", \"pointerFields\": "#(debug_show fields.pointerFields)#
+                    ", \"nodeIds\": " #(debug_show fields.nodeIds)#
                     "}"
                 };
                 case (#pointer(fields)) {
