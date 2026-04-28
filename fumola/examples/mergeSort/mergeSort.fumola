@@ -58,6 +58,15 @@ module {
         // to do:
         // - inputListObjects
         // - mergeSortFullDemandObjects --- we can use our own tools to anticipate how to lay these out best.
+        //    - outline of internal nodes, following geometry of input tree, but offset in space.
+        //    - each internal node either arises from a thunk calling LazyList.merge, or
+        //    - its a node that corresponds 1-1 with reducing some input tree node (the "main eager call " of lazyMergeSort).
+        //    - the "geometric data flow" is as follows:
+        //        - X-Y plane: Input tree in X-Y plane 
+        //          ==determines==> Reduction traversal position, but set back in Z, 
+        //          ==determines==> merge thunks, set further back in Z.
+        //        - Y-Z plane: Output list along Z axis
+        //          ==determines==> merge thunks "height" in the Z axis.
         let outline = A.DFS.showDFS(scene_);
         {
             components = scene.components ;
