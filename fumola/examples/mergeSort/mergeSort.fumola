@@ -55,6 +55,9 @@ module {
         let history = A.peekHistory();
         let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(history.events);
         let inputTreeObjects = Seq.Viz.sceneObjects(nodeIdsByLabel, scene.components.inputTree!, A.Viz.zero);
+        // to do:
+        // - inputListObjects
+        // - mergeSortFullDemandObjects --- we can use our own tools to anticipate how to lay these out best.
         let outline = A.DFS.showDFS(scene_);
         {
             components = scene.components ;
@@ -63,6 +66,16 @@ module {
             objects = inputTreeObjects;
             outline;
         }
+    };
+
+    #[test]
+    public func testGenerateSceneFullDemand() {
+        let scene = generateSceneFullDemand(10, 10);
+        assert scene.history.events.size() == 409;
+        assert scene.history.nodes.size() == 175;
+        assert scene.history.edges.size() == 194;
+        assert scene.objects.size() == 37; // TO DO -- Should be closer to total nodes + edges.
+        assert ((scene.outline.1).0).value!.0 == 280; // Final Meta Time.
     };
             
     public func dcg(seed : Nat, size : Nat, demand) {
