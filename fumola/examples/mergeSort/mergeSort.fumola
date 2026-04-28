@@ -1,5 +1,6 @@
 import Seq "levelTree";
 import LazyList "LazyList";
+import List "List";
 import A "adapton";
 import R "randomInput";
 
@@ -24,6 +25,45 @@ module {
                 case (?#one) `one;
                 case (?#half) `half;
             };
+
+    public func generateSceneFullDemand(seed : Nat, size : Nat) {
+        let scene_ = `scene := thunk {
+        let inputArray = R.generateRandomInput(seed, size);
+        let inputList_ = `ListFromRandomArray := thunk {
+            List.fromIter(inputArray.vals())
+        };
+        let inputList = force(inputList_);
+        let inputTree_ =
+          `LevelTreeFromList := thunk {
+            Seq.fromList(inputList);
+        };
+        let inputTree = force(inputTree_);
+        let lazySorted_ = Seq.lazyMergeSort(inputTree);
+        let sorted = LazyList.takeN_(lazySorted_, size);
+        let components = {
+            inputArray;
+            inputList_;
+            inputList;
+            inputTree_;
+            inputTree;
+            lazySorted_;
+            sorted;
+        };
+        { components }
+        };
+        let scene = force(scene_);
+        let history = A.peekHistory();
+        let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(history.events);
+        let inputTreeObjects = Seq.Viz.sceneObjects(nodeIdsByLabel, scene.components.inputTree!, A.Viz.zero);
+        let outline = A.DFS.showDFS(scene_);
+        {
+            components = scene.components ;
+            nodeIdsByLabel;
+            history;
+            objects = inputTreeObjects;
+            outline;
+        }
+    };
             
     public func dcg(seed : Nat, size : Nat, demand) {
         let inputArray = R.generateRandomInput(seed, size);

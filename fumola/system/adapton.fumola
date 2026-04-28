@@ -383,7 +383,7 @@ module {
                         #leaf({
                             nodeId = nodeInfo.nodeId;
                             shape = #thunk_;
-                            value = nodeInfo.node.result;
+                            value = t.result;
                         })
                     } else {
                         var prevEdge = null;
