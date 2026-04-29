@@ -1,0 +1,221 @@
+scene
+ ├(3, 15)══▷» ListFromRandomArray
+ ┆ ├(5)───» 10
+ ┆ ├(6)───» 9
+ ┆ ├(7)───» 8
+ ┆ ├(8)───» 7
+ ┆ ├(9)───» 6
+ ┆ ├(10)───» 5
+ ┆ ├(11)───» 4
+ ┆ ├(12)───» 3
+ ┆ ├(13)───» 2
+ ┆ ├(14)───» 1
+ ┆ ╰〜〜> ?(15, ?{element = 470; next = 1; symbol = 1})
+ ├(16, 111)══▷» LevelTreeFromList
+ ┆ ├(18)───» `()
+ ┆ ├(19)───» 1-element
+ ┆ ├(20)───> 1
+ ┆ ├(21)───» 2-element
+ ┆ ├(22, 25)══▷» 2-rec1
+ ┆ ┆ ├(24)───> 2
+ ┆ ┆ ╰〜〜> ?(25, (2-element, 2))
+ ┆ ├(26)───» 2-binary
+ ┆ ├(27, 110)══▷» 2-rec2
+ ┆ ┆ ├(29)───> 2
+ ┆ ┆ ├(30)───» 3-element
+ ┆ ┆ ├(31, 34)══▷» 3-rec1
+ ┆ ┆ ┆ ├(33)───> 3
+ ┆ ┆ ┆ ╰〜〜> ?(34, (3-element, 3))
+ ┆ ┆ ├(35)───» 3-binary
+ ┆ ┆ ├(36, 109)══▷» 3-rec2
+ ┆ ┆ ┆ ├(38)───> 3
+ ┆ ┆ ┆ ├(39)───» 4-element
+ ┆ ┆ ┆ ├(40, 43)══▷» 4-rec1
+ ┆ ┆ ┆ ┆ ├(42)───> 4
+ ┆ ┆ ┆ ┆ ╰〜〜> ?(43, (4-element, 4))
+ ┆ ┆ ┆ ├(44)───» 4-binary
+ ┆ ┆ ┆ ├(45, 108)══▷» 4-rec2
+ ┆ ┆ ┆ ┆ ├(47)───> 4
+ ┆ ┆ ┆ ┆ ├(48)───» 5-element
+ ┆ ┆ ┆ ┆ ├(49, 82)══▷» 5-rec1
+ ┆ ┆ ┆ ┆ ┆ ├(51)───> 5
+ ┆ ┆ ┆ ┆ ┆ ├(52)───» 6-element
+ ┆ ┆ ┆ ┆ ┆ ├(53, 56)══▷» 6-rec1
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(55)───> 6
+ ┆ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(56, (6-element, 6))
+ ┆ ┆ ┆ ┆ ┆ ├(57)───» 6-binary
+ ┆ ┆ ┆ ┆ ┆ ├(58, 81)══▷» 6-rec2
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(60)───> 6
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(61)───» 7-element
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(62, 65)══▷» 7-rec1
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ├(64)───> 7
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(65, (7-element, 7))
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(66)───» 7-binary
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(67, 80)══▷» 7-rec2
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ├(69)───> 7
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ├(70)───» 8-element
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ├(71, 74)══▷» 8-rec1
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ├(73)───> 8
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(74, (8-element, 8))
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ├(75)───» 8-binary
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ├(76, 79)══▷» 8-rec2
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ├(78)───> 8
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(79, (8-binary, 8))
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(80, (8-binary, 8))
+ ┆ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(81, (8-binary, 8))
+ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(82, (8-binary, 8))
+ ┆ ┆ ┆ ┆ ├(83)───» 5-binary
+ ┆ ┆ ┆ ┆ ├(84, 107)══▷» 5-rec2
+ ┆ ┆ ┆ ┆ ┆ ├(86)───> 8
+ ┆ ┆ ┆ ┆ ┆ ├(87)───» 9-element
+ ┆ ┆ ┆ ┆ ┆ ├(88, 101)══▷» 9-rec1
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(90)───> 9
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(91)───» 10-element
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(92, 95)══▷» 10-rec1
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ├(94)───> 10
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(95, (10-element, `()))
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(96)───» 10-binary
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(97, 100)══▷» 10-rec2
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ├(99)───> `()
+ ┆ ┆ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(100, (10-binary, `()))
+ ┆ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(101, (10-binary, `()))
+ ┆ ┆ ┆ ┆ ┆ ├(102)───» 9-binary
+ ┆ ┆ ┆ ┆ ┆ ├(103, 106)══▷» 9-rec2
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(105)───> `()
+ ┆ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(106, (9-binary, `()))
+ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(107, (9-binary, `()))
+ ┆ ┆ ┆ ┆ ╰〜〜> ?(108, (9-binary, `()))
+ ┆ ┆ ┆ ╰〜〜> ?(109, (9-binary, `()))
+ ┆ ┆ ╰〜〜> ?(110, (9-binary, `()))
+ ┆ ╰〜〜> ?(111, ?9-binary)
+ ├(112)───» nullThunkPointer
+ ├(113, 179)══▷» result
+ ┆ ├(115)───> 9-binary
+ ┆ ├(116, 178)══▷» 9
+ ┆ ┆ ├(118)───> 5-binary
+ ┆ ┆ ├(119, 167)══▷» 5
+ ┆ ┆ ┆ ├(121)───> 4-binary
+ ┆ ┆ ┆ ├(122, 142)══▷» 4
+ ┆ ┆ ┆ ┆ ├(124)───> 3-binary
+ ┆ ┆ ┆ ┆ ├(125, 138)══▷» 3
+ ┆ ┆ ┆ ┆ ┆ ├(127)───> 2-binary
+ ┆ ┆ ┆ ┆ ┆ ├(128, 134)══▷» 2
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(130)───> 1-element
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(131)───> 2-element
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(133)───» merge-2(2)
+ ┆ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(134, ?{element = 0; next = merge-2(2); symbol = 2})
+ ┆ ┆ ┆ ┆ ┆ ├(135)───> 3-element
+ ┆ ┆ ┆ ┆ ┆ ├(137)───» merge-3(2)
+ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(138, ?{element = 0; next = merge-3(2); symbol = 2})
+ ┆ ┆ ┆ ┆ ├(139)───> 4-element
+ ┆ ┆ ┆ ┆ ├(141)───» merge-4(2)
+ ┆ ┆ ┆ ┆ ╰〜〜> ?(142, ?{element = 0; next = merge-4(2); symbol = 2})
+ ┆ ┆ ┆ ├(143)───> 8-binary
+ ┆ ┆ ┆ ├(144, 164)══▷» 8
+ ┆ ┆ ┆ ┆ ├(146)───> 7-binary
+ ┆ ┆ ┆ ┆ ├(147, 160)══▷» 7
+ ┆ ┆ ┆ ┆ ┆ ├(149)───> 6-binary
+ ┆ ┆ ┆ ┆ ┆ ├(150, 156)══▷» 6
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(152)───> 5-element
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(153)───> 6-element
+ ┆ ┆ ┆ ┆ ┆ ┆ ├(155)───» merge-6(5)
+ ┆ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(156, ?{element = 195; next = merge-6(5); symbol = 5})
+ ┆ ┆ ┆ ┆ ┆ ├(157)───> 7-element
+ ┆ ┆ ┆ ┆ ┆ ├(159)───» merge-7(5)
+ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(160, ?{element = 195; next = merge-7(5); symbol = 5})
+ ┆ ┆ ┆ ┆ ├(161)───> 8-element
+ ┆ ┆ ┆ ┆ ├(163)───» merge-8(5)
+ ┆ ┆ ┆ ┆ ╰〜〜> ?(164, ?{element = 195; next = merge-8(5); symbol = 5})
+ ┆ ┆ ┆ ├(166)───» merge-5(2)
+ ┆ ┆ ┆ ╰〜〜> ?(167, ?{element = 0; next = merge-5(2); symbol = 2})
+ ┆ ┆ ├(168)───> 10-binary
+ ┆ ┆ ├(169, 175)══▷» 10
+ ┆ ┆ ┆ ├(171)───> 9-element
+ ┆ ┆ ┆ ├(172)───> 10-element
+ ┆ ┆ ┆ ├(174)───» merge-10(10)
+ ┆ ┆ ┆ ╰〜〜> ?(175, ?{element = 545; next = merge-10(10); symbol = 10})
+ ┆ ┆ ├(177)───» merge-9(2)
+ ┆ ┆ ╰〜〜> ?(178, ?{element = 0; next = merge-9(2); symbol = 2})
+ ┆ ╰〜〜> ?(179, ?{element = 0; next = merge-9(2); symbol = 2})
+ ├(180, 199)═══▷ merge-9(2)
+ ┆ ├(181, 196)═══▷ merge-5(2)
+ ┆ ┆ ├(182, 193)═══▷ merge-4(2)
+ ┆ ┆ ┆ ├(183, 190)═══▷ merge-3(2)
+ ┆ ┆ ┆ ┆ ├(184, 187)═══▷ merge-2(2)
+ ┆ ┆ ┆ ┆ ┆ ├(185, 186)═══▷ @adaptonSpace (nullThunkPointer)
+ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(187, ?{element = 470; next = nullThunkPointer; symbol = 1})
+ ┆ ┆ ┆ ┆ ├(189)───» merge-3(1)
+ ┆ ┆ ┆ ┆ ╰〜〜> ?(190, ?{element = 470; next = merge-3(1); symbol = 1})
+ ┆ ┆ ┆ ├(192)───» merge-4(4)
+ ┆ ┆ ┆ ╰〜〜> ?(193, ?{element = 55; next = merge-4(4); symbol = 4})
+ ┆ ┆ ├(195)───» merge-5(4)
+ ┆ ┆ ╰〜〜> ?(196, ?{element = 55; next = merge-5(4); symbol = 4})
+ ┆ ├(198)───» merge-9(4)
+ ┆ ╰〜〜> ?(199, ?{element = 55; next = merge-9(4); symbol = 4})
+ ├(200, 210)═══▷ merge-9(4)
+ ┆ ├(201, 207)═══▷ merge-5(4)
+ ┆ ┆ ├(202, 204)═══▷ merge-4(4)
+ ┆ ┆ ┆ ├(203)═══▷ @adaptonSpace (nullThunkPointer)
+ ┆ ┆ ┆ ╰〜〜> ?(204, ?{element = 470; next = merge-3(1); symbol = 1})
+ ┆ ┆ ├(206)───» merge-5(5)
+ ┆ ┆ ╰〜〜> ?(207, ?{element = 195; next = merge-5(5); symbol = 5})
+ ┆ ├(209)───» merge-9(5)
+ ┆ ╰〜〜> ?(210, ?{element = 195; next = merge-9(5); symbol = 5})
+ ├(211, 229)═══▷ merge-9(5)
+ ┆ ├(212, 226)═══▷ merge-5(5)
+ ┆ ┆ ├(213, 223)═══▷ merge-8(5)
+ ┆ ┆ ┆ ├(214, 220)═══▷ merge-7(5)
+ ┆ ┆ ┆ ┆ ├(215, 217)═══▷ merge-6(5)
+ ┆ ┆ ┆ ┆ ┆ ├(216)═══▷ @adaptonSpace (nullThunkPointer)
+ ┆ ┆ ┆ ┆ ┆ ╰〜〜> ?(217, ?{element = 1191; next = nullThunkPointer; symbol = 6})
+ ┆ ┆ ┆ ┆ ├(219)───» merge-7(7)
+ ┆ ┆ ┆ ┆ ╰〜〜> ?(220, ?{element = 777; next = merge-7(7); symbol = 7})
+ ┆ ┆ ┆ ├(222)───» merge-8(8)
+ ┆ ┆ ┆ ╰〜〜> ?(223, ?{element = 581; next = merge-8(8); symbol = 8})
+ ┆ ┆ ├(225)───» merge-5(1)
+ ┆ ┆ ╰〜〜> ?(226, ?{element = 470; next = merge-5(1); symbol = 1})
+ ┆ ├(228)───» merge-9(1)
+ ┆ ╰〜〜> ?(229, ?{element = 470; next = merge-9(1); symbol = 1})
+ ├(230, 240)═══▷ merge-9(1)
+ ┆ ├(231, 237)═══▷ merge-5(1)
+ ┆ ┆ ├(232, 234)═══▷ merge-3(1)
+ ┆ ┆ ┆ ├(233)═══▷ @adaptonSpace (nullThunkPointer)
+ ┆ ┆ ┆ ╰〜〜> ?(234, ?{element = 1192; next = nullThunkPointer; symbol = 3})
+ ┆ ┆ ├(236)───» merge-5(8)
+ ┆ ┆ ╰〜〜> ?(237, ?{element = 581; next = merge-5(8); symbol = 8})
+ ┆ ├(239)───» merge-9(10)
+ ┆ ╰〜〜> ?(240, ?{element = 545; next = merge-9(10); symbol = 10})
+ ├(241, 247)═══▷ merge-9(10)
+ ┆ ├(242, 244)═══▷ merge-10(10)
+ ┆ ┆ ├(243)═══▷ @adaptonSpace (nullThunkPointer)
+ ┆ ┆ ╰〜〜> ?(244, ?{element = 1306; next = nullThunkPointer; symbol = 9})
+ ┆ ├(246)───» merge-9(8)
+ ┆ ╰〜〜> ?(247, ?{element = 581; next = merge-9(8); symbol = 8})
+ ├(248, 258)═══▷ merge-9(8)
+ ┆ ├(249, 255)═══▷ merge-5(8)
+ ┆ ┆ ├(250, 252)═══▷ merge-8(8)
+ ┆ ┆ ┆ ├(251)═══▷ @adaptonSpace (nullThunkPointer)
+ ┆ ┆ ┆ ╰〜〜> ?(252, ?{element = 777; next = merge-7(7); symbol = 7})
+ ┆ ┆ ├(254)───» merge-5(7)
+ ┆ ┆ ╰〜〜> ?(255, ?{element = 777; next = merge-5(7); symbol = 7})
+ ┆ ├(257)───» merge-9(7)
+ ┆ ╰〜〜> ?(258, ?{element = 777; next = merge-9(7); symbol = 7})
+ ├(259, 269)═══▷ merge-9(7)
+ ┆ ├(260, 266)═══▷ merge-5(7)
+ ┆ ┆ ├(261, 263)═══▷ merge-7(7)
+ ┆ ┆ ┆ ├(262)═══▷ @adaptonSpace (nullThunkPointer)
+ ┆ ┆ ┆ ╰〜〜> ?(263, ?{element = 1191; next = nullThunkPointer; symbol = 6})
+ ┆ ┆ ├(265)───» merge-5(6)
+ ┆ ┆ ╰〜〜> ?(266, ?{element = 1191; next = merge-5(6); symbol = 6})
+ ┆ ├(268)───» merge-9(6)
+ ┆ ╰〜〜> ?(269, ?{element = 1191; next = merge-9(6); symbol = 6})
+ ├(270, 276)═══▷ merge-9(6)
+ ┆ ├(271, 273)═══▷ merge-5(6)
+ ┆ ┆ ├(272)═══▷ @adaptonSpace (nullThunkPointer)
+ ┆ ┆ ╰〜〜> ?(273, ?{element = 1192; next = nullThunkPointer; symbol = 3})
+ ┆ ├(275)───» merge-9(3)
+ ┆ ╰〜〜> ?(276, ?{element = 1192; next = merge-9(3); symbol = 3})
+ ├(277, 279)═══▷ merge-9(3)
+ ┆ ├(278)═══▷ @adaptonSpace (nullThunkPointer)
+ ┆ ╰〜〜> ?(279, ?{element = 1306; next = nullThunkPointer; symbol = 9})
+ ╰〜〜> ?(280, {components = {inputArray = [(1, 470), (2, 0), (3, 1192), (4, 55), (5, 195), (6, 1191), (7, 777), (8, 581), (9, 1306), (10, 545)]; inputList = ?{element = 470; next = 1; symbol = 1}; inputList_ = ListFromRandomArray; inputTree = ?9-binary; inputTree_ = LevelTreeFromList; lazySorted_ = result; sorted = ([(result, 2, 0), (merge-9(2), 4, 55), (merge-9(4), 5, 195), (merge-9(5), 1, 470), (merge-9(1), 10, 545), (merge-9(10), 8, 581), (merge-9(8), 7, 777), (merge-9(7), 6, 1191), (merge-9(6), 3, 1192), (merge-9(3), 9, 1306)], nullThunkPointer)}})

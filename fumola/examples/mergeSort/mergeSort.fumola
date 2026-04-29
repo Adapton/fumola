@@ -67,7 +67,12 @@ module {
         //          ==determines==> merge thunks, set further back in Z.
         //        - Y-Z plane: Output list along Z axis
         //          ==determines==> merge thunks "height" in the Z axis.
-        let outline = A.DFS.showDFS(scene_);
+        let outline = A.Outline.outline(scene_);
+        let text = A.Outline.outlineIntoText(outline);
+        prim "writeFile" (`mergeSortSceneFullDemand
+                            -`seed-seed
+                            -`size-size
+                            -`Outline-`txt, text);
         {
             components = scene.components ;
             nodeIdsByLabel;
@@ -120,8 +125,8 @@ module {
     public func writeDcgText(seed : Nat, size : Nat, demand) {
         prim "adaptonReset" ();
         let dcg = dcg(seed, size, demand);
-        let dfs = A.DFS.showDFS(dcg.sorted);
-        let text = A.DFS.dfsIntoText(dfs);
+        let outline = A.Outline.outline(dcg.sorted);
+        let text = A.Outline.outlineIntoText(outline);
         prim "writeFile" (`demand-demandSym(demand)-`size-size-`seed-seed-`DCG-`txt, text); 
     };
 

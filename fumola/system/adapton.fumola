@@ -258,12 +258,12 @@ module {
         };
     };
 
-    public module DFS {
+    public module Outline {
         //
-        // DFS representation for printing on terminals,
+        // Outline representation for printing on terminals,
         // and for generating other output file formats (Text, HTML, TikZ).
         //
-        public type DFS = {
+        public type Outline = {
             #leaf : LeafNode;
             #internal : InternalNode; 
         };
@@ -275,7 +275,7 @@ module {
 	    public type InternalNode = {
             __nodeId : nodeId;      // using __ prefixes to promote in default print order.
             __shape : NodeShape;
-            edges : [ ShowEdge ];
+            edges : [ OutlineEdge ];
             metaTimes : MetaTimes;
             value : Any;
         };
@@ -287,17 +287,17 @@ module {
         // Using the prefix "Show" to avoid confusion with
         // types of otherwise the same name.
 
-        public type ShowEdge = {
+        public type OutlineEdge = {
             action : ShowAction ;
             actionTarget : NodeId ;
-            dfs : ?ShowDFS;
+            outline : ?Outline;
             forcedThunk : ?Thunk<Any>;
             value : Any;
             metaTimes : MetaTimes;
         };
         //
         // Just the "tag" of the action, where the other action information
-        // is organized into the ShowEdge type.
+        // is organized into the OutlineEdge type.
         //
 	    public type ShowAction = {
             #put ;
@@ -314,8 +314,8 @@ module {
             }
         };
 
-        public func dfsIntoTextRec(dfs : ShowDFS, indent : Nat) : Text {
-            switch dfs {
+        public func outlineIntoTextRec(outline : Outline, indent : Nat) : Text {
+            switch outline {
                 case (#leaf(n)) { debug_show (n.nodeId.0) };
                 case (#internal(n)) {
                     var text = debug_show (prim "adaptonPointer" (n.__nodeId.0));
@@ -343,30 +343,30 @@ module {
             else { debug_show mts }
         };
 
-        public func edgeIntoText(edge : ShowEdge, indent : Nat) : Text {
+        public func edgeIntoText(edge : OutlineEdge, indent : Nat) : Text {
             indentText(indent) # "├" # metaTimesIntoText(edge.metaTimes) # (
-            switch (edge.dfs) {
+            switch (edge.outline) {
                 case null {
                     actionIntoUnicode(edge.action) # 
                     debug_show(edge.actionTarget)
                 };
-                case (?internalDFS) {
+                case (?internalOutline) {
                     actionIntoUnicode(edge.action) # 
                       /* debug_show edge.actionTarget # */
-                      dfsIntoTextRec(internalDFS, indent);
+                      outlineIntoTextRec(internalOutline, indent);
                 }
             })
         };
 
-        public func dfsIntoText(dfs : ShowDFS) : Text {
-            dfsIntoTextRec(dfs, 0) # "\n"
+        public func outlineIntoText(outline : Outline) : Text {
+            outlineIntoTextRec(outline, 0) # "\n"
         };
 
-        public func showDFS(root: Pointer) : ShowDFS {
-            showDFSRec(root /*, PointerSetObj.new()*/ )
+        public func outline(root: Pointer) : Outline {
+            outlineRec(root /*, PointerSetObj.new()*/ )
         };
 
-        public func showDFSRec(root : Pointer /*, visited : PointerSetOBj */) : ShowDFS {
+        public func outlineRec(root : Pointer /*, visited : PointerSetOBj */) : Outline {
             let nodeInfo = (peekInfo root)!;
 	        let nodeId = nodeInfo.nodeId;
             switch (nodeInfo.node) {
@@ -391,11 +391,11 @@ module {
                         for ((_, edge) in nodeInfo.outgoingEdges.vals()) {
                             let edgeInfo = edgeActionInfo(edge);
                             let actionTarget = prim "adaptonPointer" (edge.target.0);
-                            var dfs = null;
+                            var outline = null;
                             if (edgeInfo.action == #force_ 
                                 /* and not(visited.contains(target)) */ ) {
                                 // visited.insert(target);
-                                dfs := ? showDFSRec(actionTarget /*, visited */);
+                                outline := ? outlineRec(actionTarget /*, visited */);
                             };
                             let metaTimes = edgeInfo.metaTimes;
                             if ( 
@@ -405,7 +405,7 @@ module {
                                 edges[edges.size() - 1] := {
                                     actionTarget;
                                     action=#putForce;
-                                    dfs;
+                                    outline;
                                     value=edgeInfo.value;
                                     metaTimes=(prevEdge!.metaTimes.0, metaTimes.1);
                                 }
@@ -413,7 +413,7 @@ module {
                                 let edge = {
                                     action=edgeInfo.action;
                                     actionTarget;
-                                    dfs;
+                                    outline;
                                     metaTimes;
                                     value=edgeInfo.value;
                                 };
