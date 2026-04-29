@@ -30,16 +30,24 @@ module {
         let scene_ = `scene := thunk {
         let inputArray = R.generateRandomInput(seed, size);
         let inputList_ = `ListFromRandomArray := thunk {
-            List.fromIter(inputArray.vals())
+            do within space `inputList {
+                List.fromIter(inputArray.vals())
+            }
         };
         let inputList = force(inputList_);
         let inputTree_ =
           `LevelTreeFromList := thunk {
-            Seq.fromList(inputList);
+            do within space `inputTree {
+                Seq.fromList(inputList)
+            };
         };
         let inputTree = force(inputTree_);
-        let lazySorted_ = Seq.lazyMergeSort(inputTree);
-        let sorted = LazyList.takeN_(lazySorted_, size);
+        let lazySorted_ = do within space `lazyMergeSort {
+            Seq.lazyMergeSort(inputTree);
+        };
+        let sorted = do within space `forceSort {
+            LazyList.takeN_(lazySorted_, size);
+        };
         let components = {
             inputArray;
             inputList_;

@@ -117,20 +117,16 @@ module {
     prim "print" out;
   };
 
-  // TO DO -- clean this up by giving a static-time phase for
-  //          code to run certain adapton put operations (of static stuff).
-  func nullThunkPointer () = prim "adaptonPointer" `nullThunkPointer;
-
   #[listing(62)]
   public func lazyMergeSort<X>(t : ?SeqTree_<X>) : LazyList_<X> {
-    let empty = `nullThunkPointer := thunk { null };
+    let nilList = `(nilList) := thunk { null };
     if (t == null) { return empty };
     `result := thunk {
       reduceUp(
         @(t!),
         null,
         func(symbol:Symbol, element:X) : LazyList<X> {
-         ?{ symbol; element; next = nullThunkPointer() }
+         ?{ symbol; element; next = nilList }
         },
         func(symbol:Symbol, xs:LazyList<X>, ys:LazyList<X>) : LazyList<X> {
          do within space (`merge-symbol) {
@@ -185,7 +181,7 @@ module {
     do ? {
       let {symbol; element; next} = list!;
       let level = prim "symbolLevel" symbol;
-      let nilList = `() := null;
+      let nilList = `(nilList) := null;
       let (tree, nilList_) = fromListRec(next, symbol-`element := #element {symbol; element}, null, nilList);
       assert (nilList == nilList_);
       tree
