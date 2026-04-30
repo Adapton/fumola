@@ -204,7 +204,7 @@ module {
     };
 
 
-    public module Viz {
+    public module Scene {
         public type Vec3 = { x : Float; y : Float; z : Float };
         public let zero = { x = 0.0; y = 0.0; z =0.0 };
         public type SceneObject = {
@@ -226,7 +226,7 @@ module {
         public type Action = { actionType: ActionType; from: Label; to:Label } /* and Edge */ ;
         public type ActionType = { #get ; #put ; #force_ ; #forcePut };
 
-        public func sceneIntoJSONText( objects : [SceneObject] ) : Text {
+        public func objectsIntoJSONText( objects : [SceneObject] ) : Text {
             var objectsText = "";
             var isFirstObject = true;
             for (o in objects.vals()) {

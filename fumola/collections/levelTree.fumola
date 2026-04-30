@@ -297,7 +297,7 @@ module {
 
   };
 
-  public module Viz {
+  public module Scene {
 
   public type Geom2D = {
     height : Nat;
@@ -311,8 +311,8 @@ module {
     let t = fromArray(a);
     let evs = A.peekEvents();
     let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(evs);
-    let objs = sceneObjects(nodeIdsByLabel, t!, A.Viz.zero);
-    prim "writeFile" (file, A.Viz.sceneIntoJSONText(objs))
+    let objs = sceneObjects(nodeIdsByLabel, t!, A.Scene.zero);
+    prim "writeFile" (file, A.Scene.objectsIntoJSONText(objs))
   };
 
   #[test]
@@ -354,7 +354,7 @@ module {
     let t = fromArray(a);
     let evs = A.peekEvents();
     let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(evs);
-    let objs = sceneObjects(nodeIdsByLabel, t!, A.Viz.zero);
+    let objs = sceneObjects(nodeIdsByLabel, t!, A.Scene.zero);
     assert (objs.size() == 37);
     // prim "print" (objs[36]);
     let last = objs[36];
