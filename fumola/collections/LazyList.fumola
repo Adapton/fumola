@@ -43,6 +43,28 @@ module {
   };
 
   #[listing]
+  public func takeN_(l : LazyList_<X>, len : Nat) : ([(LazyList_<X>, Symbol, X)], LazyList_<X>) {
+    if (len == 0) { return ([], l) };
+    switch (force l) {
+      case null ([], l);
+      case (?lc) {
+        let (arr, last) = takeN_(lc.next, len - 1);
+        ([(l, lc.symbol, lc.element)] # arr, last)
+      }
+    }
+  };
+
+  #[test]
+  public func testTakeN_() {
+    let p3 = `p3 := thunk { null };
+    let p2 = `p2 := thunk { ?{symbol=2; element=2; next=p3}};
+    let p1 = `p1 := thunk { ?{symbol=1; element=1; next=p2}};
+    let (array, last) = takeN_(p1, 7);
+    assert array == [(p1, 1, 1), (p2, 2, 2)];
+    assert last == p3;
+  };
+
+  #[listing]
   public func takeAll(l : LazyList<X>) : [(Symbol, X)] {
     switch (force l) {
       case null [];

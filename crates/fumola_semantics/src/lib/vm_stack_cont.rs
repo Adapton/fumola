@@ -435,7 +435,46 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
                     nyi!(line!())
                 }
             }
-            _ => type_mismatch!(file!(), line!()),
+            Value::Option(payload) => {
+                if let ProjIndex::Usize(0) = i {
+                    *active.cont() = Cont::Value_(payload.clone());
+                    Ok(Step {})
+                } else {
+                    nyi!(line!())
+                }
+            }
+            Value::Variant(tag, payload) => {
+                use crate::adapton::peek_value::PeekValue;
+                if let ProjIndex::Usize(0) = i {
+                    *active.cont() =
+                        Cont::Value_(Value::QuotedAst(QuotedAst::Id(tag.clone())).share());
+                    Ok(Step {})
+                } else if let ProjIndex::Usize(1) = i {
+                    *active.cont() = Cont::Value_(payload.clone().into_value_());
+                    Ok(Step {})
+                } else {
+                    nyi!(line!())
+                }
+            }
+            Value::AdaptonSpace(s) | Value::AdaptonPointer(s) => {
+                if let ProjIndex::Usize(0) = i {
+                    *active.cont() = Cont::Value_(Value::Symbol(s.into_symbol()?).share());
+                    Ok(Step {})
+                } else {
+                    nyi!(line!())
+                }
+            }
+            Value::AdaptonTime(t) => {
+                if let ProjIndex::Usize(0) = i {
+                    *active.cont() = Cont::Value_(Value::Symbol(t.into_symbol()?).share());
+                    Ok(Step {})
+                } else {
+                    nyi!(line!())
+                }
+            }
+            _ => {
+                type_mismatch!(file!(), line!())
+            }
         },
         Dot(f) => match &*v {
             Value::Array(_mut, array) => {
@@ -731,7 +770,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             if let Value::AdaptonPointer(ref p) = *v {
                 let force_begin_result = active.adapton().force_begin(p.clone())?;
                 match force_begin_result {
-                    ForceBeginResult::CacheHit(v) => {
+                    ForceBeginResult::CacheHit(_, v) => {
                         *active.cont() = Cont::Value_(v);
                         Ok(Step {})
                     }

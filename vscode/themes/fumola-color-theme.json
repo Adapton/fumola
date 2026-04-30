@@ -1,0 +1,127 @@
+{
+  "name": "Fumola Dark",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#000000",
+    "editor.foreground": "#d4d4d4"
+  },
+  "tokenColors": [
+    {
+      "scope": "comment",
+      "settings": {
+        "foreground": "#6A9955",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "scope": "string",
+      "settings": {
+        "foreground": "#c87e60",
+        "fontStyle" : "italic"
+      }
+    },
+    {
+      "scope": "entity.builtin.null",
+      "settings": {
+        "foreground": "#c87e60",
+        "fontStyle" : "bold"
+      }
+    },
+    {
+      "scope": "entity.builtin.true",
+      "settings": {
+        "foreground": "#a782a7",
+        "fontStyle" : "bold"
+      }
+    },
+    {
+      "scope": "entity.builtin.false",
+      "settings": {
+        "foreground": "#a782a7",
+        "fontStyle" : "bold"
+      }
+    },
+    {
+      "scope": "entity.builtin.option",
+      "settings": {
+        "foreground": "#c87e60",
+        "fontStyle" : "bold"
+      }
+    },
+    {
+      "scope": "keyword.control.fumola",
+      "settings": {
+        "foreground": "#569CD6",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "scope": "meta.decorator.listing.fumola",
+      "settings": {
+        "foreground": "#C586C0",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "scope": "meta.decorator.test.fumola",
+      "settings": {
+        "foreground": "#b0ccb0",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Fumola Symbol (Quoted Identifier)",
+      "scope": "entity.name.symbol.fumola",
+      "settings": {
+        "foreground": "#a086a5",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Fumola Builtin Identifier",
+      "scope": "entity.builtin.fumola",
+      "settings": {
+        "foreground": "#a086a5",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Fumola Variant Tag",
+      "scope": "entity.name.tag.variant.fumola",
+      "settings": {
+        "foreground": "#a586a0",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "scope": "keyword.operator.sequence.fumola",
+      "settings": {
+        "foreground": "#9999dd"
+      }
+    },
+    {
+      "scope": "keyword.operator.definition.fumola",
+      "settings": {
+        "foreground": "#9999dd"
+      }
+    },
+    {
+      "scope": "keyword.operator.logical.fumola",
+      "settings": {
+        "foreground": "#9999dd"
+      }
+    },
+    {
+      "scope": "keyword.operator.assignment.fumola",
+      "settings": {
+        "foreground": "#ffaaaa"
+      }
+    },
+    {
+      "scope": "keyword.operator.get.fumola",
+      "settings": {
+        "foreground": "#ffaaaa"
+      }
+    }
+  ]
+}

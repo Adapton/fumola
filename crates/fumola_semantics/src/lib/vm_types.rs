@@ -3,7 +3,7 @@ pub use crate::value::Value_;
 use crate::value::{ActorId, ActorMethod, Symbol, Text, ValueError};
 use crate::vm_types::def::CtxId;
 use crate::{Share, Value};
-use fumola_syntax::ast::{Dec_, DecField, Exp_, Id, Id_, PrimType, Source, Span};
+use fumola_syntax::ast::{Dec_, DecField, Exp_, Id, Id_, IdPos_, PrimType, Source, Span};
 use fumola_syntax::ast::{Inst, Mut};
 use fumola_syntax::shared::FastClone;
 use im_rc::{HashMap, Vector};
@@ -597,7 +597,62 @@ pub struct Core {
 pub type OutputFiles = HashMap<Symbol, Text>;
 
 #[derive(Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
-pub struct TestSuiteItem(pub (String, def::Defs, CtxId, DecField, def::Function));
+pub struct TestSuiteItem {
+    pub file: String,
+    pub defs: def::Defs,
+    pub ctx: def::Ctx,
+    pub ctx_id: CtxId,
+    pub dec_field: DecField,
+    pub function: def::Function,
+}
+
+impl PartialOrd for TestSuiteItem {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self.file.partial_cmp(&other.file) {
+            Some(core::cmp::Ordering::Equal) => Some(core::cmp::Ordering::Equal),
+            ord => return ord,
+        }
+    }
+}
+
+fn ord_id_pos_option(left: &Option<IdPos_>, right: &Option<IdPos_>) -> std::cmp::Ordering {
+    match (left, right) {
+        (Some(id_left), Some(id_right)) => id_left.0.id().as_str().cmp(id_right.0.id().as_str()),
+        (None, None) => {
+            todo!()
+        }
+        (None, Some(_)) => std::cmp::Ordering::Less,
+        (Some(_), None) => std::cmp::Ordering::Greater,
+    }
+}
+
+fn ord_id_option(left: &Option<Id_>, right: &Option<Id_>) -> std::cmp::Ordering {
+    match (left, right) {
+        (Some(id_left), Some(id_right)) => id_left.0.as_str().cmp(id_right.0.as_str()),
+        (None, None) => std::cmp::Ordering::Equal,
+        (None, Some(_)) => std::cmp::Ordering::Less,
+        (Some(_), None) => std::cmp::Ordering::Greater,
+    }
+}
+
+impl Ord for TestSuiteItem {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        use std::cmp::Ordering::Equal;
+        let ord_function_name =
+            ord_id_pos_option(&self.function.function.name, &other.function.function.name);
+        let ord_local_id = ord_id_option(&self.ctx.local_id, &other.ctx.local_id);
+        match self.file.cmp(&other.file) {
+            Equal => {
+                if ord_local_id == Equal {
+                    ord_function_name
+                } else {
+                    ord_local_id
+                }
+            }
+            ord => ord,
+        }
+    }
+}
 
 pub type TestSuite = HashMap<TestSuiteItem, ()>;
 

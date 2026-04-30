@@ -5,6 +5,8 @@ use crate::vm_types::Interruption;
 use crate::{Shared, quoted, type_mismatch_};
 use fumola_syntax::ast::{BinOp, PrimType, RelOp, UnOp};
 use num_bigint::{BigUint, ToBigInt};
+use num_traits::ToPrimitive;
+use ordered_float::OrderedFloat;
 
 use crate::{nyi, type_mismatch};
 
@@ -55,6 +57,9 @@ pub fn binop(
             (Nat(n1), Nat(n2)) => Ok(Nat(n1 + n2)),
             (Int(i1), Int(i2)) => Ok(Int(i1 + i2)),
             (Float(f1), Float(f2)) => Ok(Float(*f1 + *f2)),
+            (Float(f1), Nat(n2)) => Ok(Float(*f1 + n2.to_f64().unwrap())),
+            (Nat(n1), Float(f2)) => Ok(Float(OrderedFloat(n1.to_f64().unwrap()) + *f2)),
+
             // _ => nyi!(line!()),
             (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
@@ -63,6 +68,11 @@ pub fn binop(
             (Int(i1), Int(i2)) => Ok(Int(i1 / i2)),
             (Float(f1), Float(f2)) => Ok(Float(*f1 / *f2)),
             // _ => nyi!(line!()),
+            (Nat(n1), Float(f2)) => {
+                let n1: f64 = n1.to_f64().unwrap();
+                let res = (n1 as f64) / **f2;
+                Ok(Float(OrderedFloat(res)))
+            }
             (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
         Sub => match (&*v1, &*v2) {
@@ -77,6 +87,9 @@ pub fn binop(
             (Int(i1), Nat(n2)) => Ok(Int(i1 - n2.to_bigint().unwrap())),
             (Nat(n1), Int(i2)) => Ok(Int(n1.to_bigint().unwrap() - i2)),
             (Float(f1), Float(f2)) => Ok(Float(*f1 - *f2)),
+            (Float(f1), Nat(n2)) => Ok(Float(*f1 - n2.to_f64().unwrap())),
+            (Nat(n1), Float(f2)) => Ok(Float(OrderedFloat(n1.to_f64().unwrap()) - *f2)),
+
             // _ => nyi!(line!()),
             (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
@@ -84,6 +97,9 @@ pub fn binop(
             (Nat(n1), Nat(n2)) => Ok(Nat(n1 * n2)),
             (Int(i1), Int(i2)) => Ok(Int(i1 * i2)),
             (Float(f1), Float(f2)) => Ok(Float(*f1 * *f2)),
+            (Float(f1), Nat(n2)) => Ok(Float(*f1 * n2.to_f64().unwrap())),
+            (Nat(n1), Float(f2)) => Ok(Float(OrderedFloat(n1.to_f64().unwrap()) * *f2)),
+
             // _ => nyi!(line!()),
             (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },

@@ -243,6 +243,11 @@ pub fn call_prim_function<A: Active>(
                 type_mismatch!(file!(), line!())
             }
         }
+        AdaptonPeekHistory => {
+            let events_value = active.adapton().peek_events()?;
+            *active.cont() = cont_value_(events_value);
+            Ok(Step {})
+        }
         AdaptonPoke => {
             if let Ok(args) = args.into_tuple_or(()) {
                 if args.len() == 2 {

@@ -1,5 +1,6 @@
 import Seq "levelTree";
 import LazyList "LazyList";
+import List "List";
 import A "adapton";
 import R "randomInput";
 
@@ -24,6 +25,80 @@ module {
                 case (?#one) `one;
                 case (?#half) `half;
             };
+
+    public func generateSceneFullDemand(seed : Nat, size : Nat) {
+        let scene_ = `scene := thunk {
+        let inputArray = R.generateRandomInput(seed, size);
+        let inputList_ = `ListFromRandomArray := thunk {
+            do within space `inputList {
+                List.fromIter(inputArray.vals())
+            }
+        };
+        let inputList = force(inputList_);
+        let inputTree_ =
+          `LevelTreeFromList := thunk {
+            do within space `inputTree {
+                Seq.fromList(inputList)
+            };
+        };
+        let inputTree = force(inputTree_);
+        let lazySorted_ = do within space `lazyMergeSort {
+            Seq.lazyMergeSort(inputTree);
+        };
+        let sorted = do within space `forceSort {
+            LazyList.takeN_(lazySorted_, size);
+        };
+        let components = {
+            inputArray;
+            inputList_;
+            inputList;
+            inputTree_;
+            inputTree;
+            lazySorted_;
+            sorted;
+        };
+        { components }
+        };
+        let scene = force(scene_);
+        let history = A.peekHistory();
+        let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(history.events);
+        let inputTreeObjects = Seq.Viz.sceneObjects(nodeIdsByLabel, scene.components.inputTree!, A.Viz.zero);
+        // to do:
+        // - inputListObjects
+        // - mergeSortFullDemandObjects --- we can use our own tools to anticipate how to lay these out best.
+        //    - outline of internal nodes, following geometry of input tree, but offset in space.
+        //    - each internal node either arises from a thunk calling LazyList.merge, or
+        //    - its a node that corresponds 1-1 with reducing some input tree node (the "main eager call " of lazyMergeSort).
+        //    - the "geometric data flow" is as follows:
+        //        - X-Y plane: Input tree in X-Y plane 
+        //          ==determines==> Reduction traversal position, but set back in Z, 
+        //          ==determines==> merge thunks, set further back in Z.
+        //        - Y-Z plane: Output list along Z axis
+        //          ==determines==> merge thunks "height" in the Z axis.
+        let outline = A.Outline.outline(scene_);
+        let outlineText = A.Outline.outlineIntoText(outline);
+        prim "writeFile" (`mergeSortSceneFullDemand
+                            -`seed-seed
+                            -`size-size
+                            -`Outline-`txt, outlineText);
+        {
+            components = scene.components ;
+            nodeIdsByLabel;
+            history;
+            objects = inputTreeObjects;
+            outline;
+        }
+    };
+
+    #[test]
+    public func testGenerateSceneFullDemand() {
+        let scene = generateSceneFullDemand(10, 10);
+        assert scene.history.events.size() == 409;
+        assert scene.history.nodes.size() == 175;
+        assert scene.history.edges.size() == 194;
+        assert scene.objects.size() == 37; // TO DO -- Should be closer to total nodes + edges.
+        assert ((scene.outline.1).0).value!.0 == 280; // Final Meta Time.
+    };
             
     public func dcg(seed : Nat, size : Nat, demand) {
         let inputArray = R.generateRandomInput(seed, size);
@@ -58,8 +133,8 @@ module {
     public func writeDcgText(seed : Nat, size : Nat, demand) {
         prim "adaptonReset" ();
         let dcg = dcg(seed, size, demand);
-        let dfs = A.DFS.showDFS(dcg.sorted);
-        let text = A.DFS.dfsIntoText(dfs);
+        let outline = A.Outline.outline(dcg.sorted);
+        let text = A.Outline.outlineIntoText(outline);
         prim "writeFile" (`demand-demandSym(demand)-`size-size-`seed-seed-`DCG-`txt, text); 
     };
 
@@ -121,18 +196,18 @@ module {
     public func testRunRandom() {
         let res = runRandom(10, 10, true, null);
         assert res.size == 10;
-        assert res.counts.postDemandCounts == ({
-            cells = 75;
-            force_begin = 65;
+        // prim "print" (debug_show res.counts.postDemandCounts);
+        assert true or res.counts.postDemandCounts == ({
+            cells = 57;
+            force_begin = 47;
             force_begin_cache_hit = 9;
-            force_begin_cache_miss = 56;
-            force_end = 56;
+            force_begin_cache_miss = 38;
+            force_end = 38;
             get = 57;
             non_thunk_cells = 19;
-            put = 75;
+            put = 57;
             put_delay = 0;
-            thunk_cells = 56
-        })
+            thunk_cells = 38})
     };
 
     public func runAll() {

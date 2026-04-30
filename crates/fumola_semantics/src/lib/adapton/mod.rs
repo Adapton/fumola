@@ -1,6 +1,7 @@
 use crate::Shared;
 use crate::value::{Closed, Symbol, Symbol_, ThunkBody, Value_};
 use fumola_syntax::ast::Exp_;
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
@@ -8,7 +9,7 @@ mod reserved;
 use reserved::ReservedSymbol;
 
 mod graphical;
-mod peek_value;
+pub mod peek_value;
 mod simple;
 
 pub mod state;
@@ -36,6 +37,7 @@ pub trait AdaptonState {
     fn navigate_end(&mut self) -> Res<()>;
     fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>>;
     fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_>;
+    fn peek_events(&mut self) -> Res<Value_>;
     fn poke(&mut self, pointer: Pointer, time: Option<Time>, value: Value_) -> Res<()>;
 }
 
@@ -45,6 +47,7 @@ pub enum Error {
     TypeMismatch(u32), // gives line number.
     UndefinedNow(Pointer),
     Unreachable,
+    UnreachableForceEnd,
     DanglingPointer(Space),
     CannotPutReadOnlyReservedSymbol(ReservedSymbol),
     CannotPutFutureReservedSymbol(Symbol_),
@@ -54,7 +57,27 @@ pub enum Error {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ForceBeginResult {
     CacheMiss(ThunkBody),
-    CacheHit(Value_),
+    CacheHit(MetaTime, Value_),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct MetaTime(pub BigUint);
+use std::ops::Add;
+
+impl MetaTime {
+    pub fn new() -> Self {
+        MetaTime(BigUint::from(0 as usize))
+    }
+    pub fn incr(&mut self) {
+        self.0 = self.0.clone().add(1 as usize);
+    }
+    pub fn pair(begin: Option<Self>, end: Self) -> (Self, Self) {
+        if let Some(begin) = begin {
+            (begin, end)
+        } else {
+            (end.clone(), end)
+        }
+    }
 }
 
 pub type Res<Ok> = Result<Ok, Error>;
@@ -91,6 +114,13 @@ impl Time {
             Time::Symbol(ambient) => {
                 Time::Symbol(Shared::new(Symbol::Call(ambient.clone(), symbol)))
             }
+        }
+    }
+
+    pub fn into_symbol(&self) -> Res<Symbol_> {
+        match self {
+            Time::Now => todo!(),
+            Time::Symbol(s) => Ok(s.clone()),
         }
     }
 }
