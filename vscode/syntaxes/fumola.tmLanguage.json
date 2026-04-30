@@ -28,7 +28,7 @@
       "patterns": [
         {
           "name": "keyword.control.fumola",
-          "match": "\\b(module|let|import|type|public|force|func|switch|case|prim|if|else|var|for|in|do|assert|goto|space|time|debug_show)\\b"
+          "match": "\\b(module|let|return|import|type|public|force|func|thunk|switch|case|prim|if|else|var|for|in|with|within|do|assert|goto|space|time|debug_show)\\b"
         },
         {
           "name": "keyword.operator.assignment.fumola",
@@ -36,7 +36,7 @@
         },
         {
           "name": "keyword.operator.logical.fumola",
-          "match": "(==|<=|>=|<|>)"
+          "match": "(==|<=|>=|<|>|\\b(not|or|and)\\b)"
         },
         {
           "name": "keyword.operator.definition.fumola",
@@ -69,6 +69,22 @@
         {
           "name": "entity.builtin.fumola",
           "match": "@[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "name": "entity.builtin.null",
+          "match": "null"
+        },
+        {
+          "name": "entity.builtin.true",
+          "match": "true"
+        },
+        {
+          "name": "entity.builtin.false",
+          "match": "false"
+        },
+        {
+          "name": "entity.builtin.option",
+          "match": "\\?"
         }
       ]
     },

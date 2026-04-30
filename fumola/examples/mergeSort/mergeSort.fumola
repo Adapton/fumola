@@ -76,11 +76,11 @@ module {
         //        - Y-Z plane: Output list along Z axis
         //          ==determines==> merge thunks "height" in the Z axis.
         let outline = A.Outline.outline(scene_);
-        let text = A.Outline.outlineIntoText(outline);
+        let outlineText = A.Outline.outlineIntoText(outline);
         prim "writeFile" (`mergeSortSceneFullDemand
                             -`seed-seed
                             -`size-size
-                            -`Outline-`txt, text);
+                            -`Outline-`txt, outlineText);
         {
             components = scene.components ;
             nodeIdsByLabel;

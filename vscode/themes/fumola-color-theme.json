@@ -21,6 +21,34 @@
       }
     },
     {
+      "scope": "entity.builtin.null",
+      "settings": {
+        "foreground": "#c87e60",
+        "fontStyle" : "bold"
+      }
+    },
+    {
+      "scope": "entity.builtin.true",
+      "settings": {
+        "foreground": "#a782a7",
+        "fontStyle" : "bold"
+      }
+    },
+    {
+      "scope": "entity.builtin.false",
+      "settings": {
+        "foreground": "#a782a7",
+        "fontStyle" : "bold"
+      }
+    },
+    {
+      "scope": "entity.builtin.option",
+      "settings": {
+        "foreground": "#c87e60",
+        "fontStyle" : "bold"
+      }
+    },
+    {
       "scope": "keyword.control.fumola",
       "settings": {
         "foreground": "#569CD6",
