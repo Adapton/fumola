@@ -403,6 +403,16 @@ module {
         public type Action = { actionType: ActionType; from: Label; to:Label } /* and Edge */ ;
         public type ActionType = { #get ; #put ; #force_ ; #forcePut };
 
+        public type Scene = {
+            objects : [ SceneObject ];
+            outline : Outline.Outline;
+            history : {
+                events : [PeekInfo.History.Event];
+                nodes : [PeekInfo.History.Node];
+                edges : [PeekInfo.History.Edge];
+            };
+        };
+
 
         public func intoJSONText( scene : Scene ) : Text {
             let objectsText = objectsIntoJSONText(scene.objects);
@@ -463,19 +473,30 @@ module {
                     case (#addNode(node_id)) {
                         objectsText #= 
                             "{ \"metaTime\":" # (debug_show ev.metaTime) # 
-                            ", \"type\": \"addNode\", \"nodeId\": " # (debug_show (debug_show node_id)) # "}"
+                            ", \"type\": \"addNode\", \"nodeId\": " # (debug_show (debug_show node_id)) #
+                            "}"
                     };
                     case (#addEdge(edge_id)) {
-                        objectsText #= "{}"
+                        objectsText #= 
+                            "{ \"metaTime\":" # (debug_show ev.metaTime) # 
+                            ", \"type\": \"addEdge\", \"edgeId\": " # (debug_show (debug_show edge_id)) #
+                            "}"
                     };
                     case (#removeEdge(edge_id)) {
                         objectsText #= "{}"
                     };
                     case (#forceBegin(node_id)) {
-                        objectsText #= "{}"
+                        objectsText #= 
+                            "{ \"metaTime\":" # (debug_show ev.metaTime) # 
+                            ", \"type\": \"forceBegin\", \"nodeId\": " # (debug_show (debug_show node_id)) #
+                            "}"
                     };
                     case (#forceEnd(node_id, edge_id)) {
-                        objectsText #= "{}"
+                        objectsText #= 
+                            "{ \"metaTime\":" # (debug_show ev.metaTime) # 
+                            ", \"type\": \"forceEnd\", \"nodeId\": " # (debug_show (debug_show node_id)) # 
+                            ", \"edgeId\": " # (debug_show (debug_show edge_id)) #
+                            "}"
                     };
                 }
             };
