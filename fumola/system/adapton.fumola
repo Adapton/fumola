@@ -226,6 +226,22 @@ module {
         public type Action = { actionType: ActionType; from: Label; to:Label } /* and Edge */ ;
         public type ActionType = { #get ; #put ; #force_ ; #forcePut };
 
+
+        public func intoJSONText( scene : Scene ) : Text {
+            let objectsText = objectsIntoJSONText(scene.objects);
+            let eventsText = eventsIntoJSONText(scene.events);
+            let outlineText = "{}";
+            let nodesText = "{}";
+            let edgesText = "{}";
+            "{ " # 
+            "\"objects\" : [\n" # objectsText # "\n],\n" #
+            "\"outline\" : [\n" # outlineText # "\n],\n" #
+            "\"events\": [\n" # eventsText # "\n],\n" #
+            "\"nodes\": [\n" # nodesText # "\n],\n" #
+            "\"edges\": [\n" # edgesText # "\n]\n" #
+            "}"
+        };
+   
         public func objectsIntoJSONText( objects : [SceneObject] ) : Text {
             var objectsText = "";
             var isFirstObject = true;
@@ -254,7 +270,39 @@ module {
                 }
                 };
             };
-            "{ \"objects\" : [\n" # objectsText # "\n] }"
+            objectsText
+        };
+
+        public func eventsIntoJSONText( events : [Event] ) : Text {
+            var objectsText = "";
+            var isFirstEntry = true;
+            for (ev in events.vals()) {
+                if (isFirstEntry) {
+                    isFirstEntry := false;
+                } else {
+                    objectsText #= ",\n";
+                };
+                switch(ev.event) {
+                    case (#addNode(node_id)) {
+                        objectsText #= 
+                            "{ \"metaTime\":" # (debug_show ev.metaTime) # 
+                            ", \"type\": \"addNode\", \"nodeId\": " # (debug_show (debug_show node_id)) # "}"
+                    };
+                    case (#addEdge(edge_id)) {
+                        objectsText #= "{}"
+                    };
+                    case (#removeEdge(edge_id)) {
+                        objectsText #= "{}"
+                    };
+                    case (#forceBegin(node_id)) {
+                        objectsText #= "{}"
+                    };
+                    case (#forceEnd(node_id, edge_id)) {
+                        objectsText #= "{}"
+                    };
+                }
+            };
+            objectsText
         };
     };
 

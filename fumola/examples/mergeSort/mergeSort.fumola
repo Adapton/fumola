@@ -81,6 +81,11 @@ module {
                             -`seed-seed
                             -`size-size
                             -`Outline-`txt, outlineText);
+        let sceneText = A.Scene.intoJSONText({ events = history.events ; objects = inputTreeObjects });
+        prim "writeFile" (`mergeSortSceneFullDemand
+                            -`seed-seed
+                            -`size-size
+                            -`Scene-`json, sceneText);
         {
             components = scene.components ;
             nodeIdsByLabel;
