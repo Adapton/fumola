@@ -62,7 +62,7 @@ module {
         let scene = force(scene_);
         let history = A.peekHistory();
         let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(history.events);
-        let inputTreeObjects = Seq.Viz.sceneObjects(nodeIdsByLabel, scene.components.inputTree!, A.Viz.zero);
+        let inputTreeObjects = Seq.Scene.sceneObjects(nodeIdsByLabel, scene.components.inputTree!, A.Scene.zero);
         // to do:
         // - inputListObjects
         // - mergeSortFullDemandObjects --- we can use our own tools to anticipate how to lay these out best.
@@ -81,6 +81,11 @@ module {
                             -`seed-seed
                             -`size-size
                             -`Outline-`txt, outlineText);
+        let sceneText = A.Scene.intoJSONText({ events = history.events ; objects = inputTreeObjects });
+        prim "writeFile" (`mergeSortSceneFullDemand
+                            -`seed-seed
+                            -`size-size
+                            -`Scene-`json, sceneText);
         {
             components = scene.components ;
             nodeIdsByLabel;
