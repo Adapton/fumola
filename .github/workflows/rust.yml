@@ -37,3 +37,7 @@ jobs:
 
       - name: Run Fumola/collections/levelTree scene visualization
         run: ./write-level-tree-scene.sh
+
+      - name: Run Fumola/collections/levelTree scene visualization
+        run: ./write-merge-sort-scene.sh
+
