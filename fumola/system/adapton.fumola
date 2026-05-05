@@ -438,7 +438,7 @@ module {
         #[test]
         func testArray() {
             let actual = fromArray([1, 2, 3], func(x) { debug_show x });
-            let expected = "[\n1,\n2,\n3]\n";
+            let expected = "[\n1,\n2,\n3\n]";
             assert actual == expected
         };
 
