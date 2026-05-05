@@ -76,12 +76,12 @@ module {
         //        - Y-Z plane: Output list along Z axis
         //          ==determines==> merge thunks "height" in the Z axis.
         let outline = A.Outline.outline(scene_);
-        let outlineText = A.Outline.outlineIntoText(outline);
+        let outlineText = A.IntoText.outline(outline);
         prim "writeFile" (`mergeSortSceneFullDemand
                             -`seed-seed
                             -`size-size
                             -`Outline-`txt, outlineText);
-        let sceneText = A.Scene.intoJSONText({ events = history.events ; objects = inputTreeObjects });
+        let sceneText = A.IntoJSON.scene({ events = history.events ; objects = inputTreeObjects });
         prim "writeFile" (`mergeSortSceneFullDemand
                             -`seed-seed
                             -`size-size
@@ -139,7 +139,7 @@ module {
         prim "adaptonReset" ();
         let dcg = dcg(seed, size, demand);
         let outline = A.Outline.outline(dcg.sorted);
-        let text = A.Outline.outlineIntoText(outline);
+        let text = A.IntoText.outline(outline);
         prim "writeFile" (`demand-demandSym(demand)-`size-size-`seed-seed-`DCG-`txt, text); 
     };
 

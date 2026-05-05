@@ -312,7 +312,8 @@ module {
     let evs = A.peekEvents();
     let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(evs);
     let objs = sceneObjects(nodeIdsByLabel, t!, A.Scene.zero);
-    prim "writeFile" (file, A.Scene.objectsIntoJSONText(objs))
+    let text = A.IntoJSON.objects(objs);
+    prim "writeFile" (file, text)
   };
 
   #[test]

@@ -190,8 +190,6 @@ module {
         };
         map;
     };
-
-
    
     public module Outline {
         //
@@ -208,7 +206,7 @@ module {
             value : Any;
         };
 	    public type InternalNode = {
-            __nodeId : nodeId;      // using __ prefixes to promote in default print order.
+            __nodeId : NodeId;      // using __ prefixes to promote in default print order.
             __shape : NodeShape;
             edges : [ OutlineEdge ];
             metaTimes : MetaTimes;
@@ -239,75 +237,6 @@ module {
             #putForce ; // same as #put ; #force_ in sequence.
             #get ;
             #force_ 
-        };
-
-        public func edgeActionInfo(edge : Edge) : { 
-            action: Action;
-            putValue: ?Any; // TODO -- distinguish thunks and non-thunks
-            forcedThunk: ?Thunk<A>;
-            metaTime: MetaTime;
-        } {
-          switch (edge.action) {
-            case(#put(value)) {{action=#put; value; forcedThunk=null; metaTimes=edge.metaTimes}};
-            case(#get(value)) {{action=#get; value; forcedThunk=null; metaTimes=edge.metaTimes}};
-            case(#force_(t, value)) {{action=#force_; value; forcedThunk=?t; value; metaTimes=edge.metaTimes}};
-            }
-        };
-
-        func indentText(n : Nat) : Text {
-            if (n == 0) { "" } else 
-            if (n == 1) { " " }  
-            else {
-            " ┆" # (indentText(n - 1))
-            }
-        };
-
-        public func outlineIntoTextRec(outline : Outline, indent : Nat) : Text {
-            switch outline {
-                case (#leaf(n)) { debug_show (n.nodeId.0) };
-                case (#internal(n)) {
-                    var text = debug_show (prim "adaptonPointer" (n.__nodeId.0));
-                    for (edge in n.edges.vals()) {
-                        text #= "\n" # (edgeIntoText(edge, indent + 1));
-                    };
-                    text # "\n" 
-                    # indentText(indent + 1)
-                    # "╰〜〜> " # (debug_show n.value)
-                }
-            }
-        };
-
-        public func actionIntoUnicode(action : ShowAction) : Text {
-            switch action {
-                case (#put)      { "───» " };
-                case (#get)      { "───> " };
-                case (#putForce) { "══▷» " };
-                case (#force_)   { "═══▷ " };
-            }
-        };
-
-        public func metaTimesIntoText(mts : MetaTimes) : Text {
-            if (mts.0 == mts.1) { "(" # debug_show (mts.0) # ")" }
-            else { debug_show mts }
-        };
-
-        public func edgeIntoText(edge : OutlineEdge, indent : Nat) : Text {
-            indentText(indent) # "├" # metaTimesIntoText(edge.metaTimes) # (
-            switch (edge.outline) {
-                case null {
-                    actionIntoUnicode(edge.action) # 
-                    debug_show(edge.actionTarget)
-                };
-                case (?internalOutline) {
-                    actionIntoUnicode(edge.action) # 
-                      /* debug_show edge.actionTarget # */
-                      outlineIntoTextRec(internalOutline, indent);
-                }
-            })
-        };
-
-        public func outlineIntoText(outline : Outline) : Text {
-            outlineIntoTextRec(outline, 0) # "\n"
         };
 
         public func outline(root: Pointer) : Outline {
@@ -378,7 +307,79 @@ module {
                     }
                 }
             }
-        }
+        };
+
+        // some helper code for re-packaging certain variant-based fields into a uniform, flat record.
+        public func edgeActionInfo(edge : Edge) : { 
+            action: Action;
+            putValue: ?Any; // TODO -- distinguish thunks and non-thunks
+            forcedThunk: ?Thunk<A>;
+            metaTime: MetaTime;
+        } {
+          switch (edge.action) {
+            case(#put(value)) {{action=#put; value; forcedThunk=null; metaTimes=edge.metaTimes}};
+            case(#get(value)) {{action=#get; value; forcedThunk=null; metaTimes=edge.metaTimes}};
+            case(#force_(t, value)) {{action=#force_; value; forcedThunk=?t; value; metaTimes=edge.metaTimes}};
+            }
+        };
+    };
+
+    public module IntoText { 
+        func indentText(n : Nat) : Text {
+            if (n == 0) { "" } else 
+            if (n == 1) { " " }  
+            else {
+            " ┆" # (indentText(n - 1))
+            }
+        };
+
+        public func outlineRec(o : Outline, indent : Nat) : Text {
+            switch o {
+                case (#leaf(n)) { debug_show (n.nodeId.0) };
+                case (#internal(n)) {
+                    var text = debug_show (prim "adaptonPointer" (n.__nodeId.0));
+                    for (edge in n.edges.vals()) {
+                        text #= "\n" # (edgeIntoText(edge, indent + 1));
+                    };
+                    text # "\n" 
+                    # indentText(indent + 1)
+                    # "╰〜〜> " # (debug_show n.value)
+                }
+            }
+        };
+
+        public func actionIntoUnicode(action : ShowAction) : Text {
+            switch action {
+                case (#put)      { "───» " };
+                case (#get)      { "───> " };
+                case (#putForce) { "══▷» " };
+                case (#force_)   { "═══▷ " };
+            }
+        };
+
+        public func metaTimesIntoText(mts : MetaTimes) : Text {
+            if (mts.0 == mts.1) { "(" # debug_show (mts.0) # ")" }
+            else { debug_show mts }
+        };
+
+        public func edgeIntoText(edge : OutlineEdge, indent : Nat) : Text {
+            indentText(indent) # "├" # metaTimesIntoText(edge.metaTimes) # (
+            switch (edge.outline) {
+                case null {
+                    actionIntoUnicode(edge.action) # 
+                    debug_show(edge.actionTarget)
+                };
+                case (?internalOutline) {
+                    actionIntoUnicode(edge.action) # 
+                      /* debug_show edge.actionTarget # */
+                      outlineRec(internalOutline, indent);
+                }
+            })
+        };
+
+        public func outline(o : Outline) : Text {
+            outlineRec(o, 0) # "\n"
+        };
     };
 
     public module Scene {
@@ -412,11 +413,35 @@ module {
                 edges : [PeekInfo.History.Edge];
             };
         };
+    };
 
 
-        public func intoJSONText( scene : Scene ) : Text {
-            let objectsText = objectsIntoJSONText(scene.objects);
-            let eventsText = eventsIntoJSONText(scene.events);
+    public module IntoJSON {
+
+        public func array<X>(a: [X], elemIntoJSON : X -> Text) : Text {
+            var result = "";
+            var isFirst = true;
+            for (elm in (a.vals())) {
+                if (isFirst) {
+                    isFirst := false;
+                } else {
+                    result #= ",\n";
+                };
+                result #= elemIntoJSON(elm);
+            };
+            result
+        };
+
+        #[test]
+        func testArray() {
+            let actual = array([1, 2, 3], func(x) { debug_show x });
+            let expected = "1,\n2,\n3";
+            assert actual == expected
+        };
+
+        public func scene( s : Scene ) : Text {
+            let objectsText = objects(s.objects);
+            let eventsText = eventsIntoJSONText(s.events);
             let outlineText = "{}";
             let nodesText = "{}";
             let edgesText = "{}";
@@ -429,10 +454,10 @@ module {
             "}"
         };
    
-        public func objectsIntoJSONText( objects : [SceneObject] ) : Text {
+        public func objects( input : [SceneObject] ) : Text {
             var objectsText = "";
             var isFirstObject = true;
-            for (o in objects.vals()) {
+            for (o in input.vals()) {
                 if (isFirstObject) {
                     isFirstObject := false;
                 } else {
