@@ -399,8 +399,6 @@ module {
     };
 
     public module Scene {
-        public type Vec3 = { x : Float; y : Float; z : Float };
-        public let zero = { x = 0.0; y = 0.0; z =0.0 };
         public type SceneObject = {
             #orb : LabeledObject;
             #box : LabeledObject;
@@ -420,6 +418,9 @@ module {
         public type Action = { actionType: ActionType; from: Label; to:Label } /* and Edge */ ;
         public type ActionType = { #get ; #put ; #force_ ; #forcePut };
 
+        public type Vec3 = { x : Float; y : Float; z : Float };
+        public let zero = { x = 0.0; y = 0.0; z =0.0 };
+     
         public type Scene = {
             objects : [ SceneObject ];
             outline : Outline.Outline;
