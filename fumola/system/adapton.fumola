@@ -3,9 +3,13 @@ module {
     /// Adapton's structures in Fumola.
     ///
     /// PeekInfo --- Fumola values that describe Adapton behavior and structures.
+    ///
     /// Outline --- A depth-first structure over PeekInfo at some root.
-    /// Scene --- A multi-dimensional structure for exporting PeekInfo to other tools.
-
+    /// IntoText --- for outline printouts that are compact, and textual.
+    ///
+    /// Scene --- A multi-dimensional structure for exporting PeekInfo to interactive tools.
+    /// IntoJSON --- for the web-based DCG Player tool.
+    ///
 
     /// PeekInfo gives the fumola value-based types for the
     /// internal state of Adapton within Fumola.
