@@ -190,12 +190,12 @@ module {
         };
         map;
     };
-   
+
+    //
+    // Outline representation for printing on terminals,
+    // and for generating other output file formats (Text, JSON, TikZ).
+    // 
     public module Outline {
-        //
-        // Outline representation for printing on terminals,
-        // and for generating other output file formats (Text, HTML, TikZ).
-        //
         public type Outline = {
             #leaf : LeafNode;
             #internal : InternalNode; 
@@ -217,7 +217,7 @@ module {
 	        #nonThunk;
 	    };
         
-        // Using the prefix "Show" to avoid confusion with
+        // Using the prefix "Outline" to avoid confusion with
         // types of otherwise the same name.
 
         public type OutlineEdge = {
@@ -240,6 +240,9 @@ module {
         };
 
         public func outline(root: Pointer) : Outline {
+            // To do -- 
+            // When we have sharing across forces, we'll need to check a "visited set"
+            // We skip that detail for now. 2026-05-05.
             outlineRec(root /*, PointerSetObj.new()*/ )
         };
 
@@ -418,7 +421,7 @@ module {
 
     public module IntoJSON {
 
-        public func array<X>(a: [X], elemIntoJSON : X -> Text) : Text {
+        public func fromArray<X>(a: [X], elemIntoJSON : X -> Text) : Text {
             var result = "";
             var isFirst = true;
             for (elm in (a.vals())) {
@@ -434,33 +437,32 @@ module {
 
         #[test]
         func testArray() {
-            let actual = array([1, 2, 3], func(x) { debug_show x });
+            let actual = fromArray([1, 2, 3], func(x) { debug_show x });
             let expected = "1,\n2,\n3";
             assert actual == expected
         };
 
-        public func objects(input : [SceneObject]) : Text {
-            array(input, object_)
+        public func fromObjects(input : [SceneObject]) : Text {
+            fromArray(input, fromObject)
         };
 
-        public func events(input : [SceneObject]) : Text {
-            array(input, event)
+        public func fromEvents(input : [SceneObject]) : Text {
+            fromArray(input, fromEvent)
         };
 
-        public func scene( s : Scene ) : Text {
-            let outlineText = "{}";
+        public func fromScene( s : Scene ) : Text {
             let nodesText = "{}";
             let edgesText = "{}";
             "{ " # 
-            "\"objects\" : [\n" # objects(s.objects) # "\n],\n" #
-            "\"outline\" : [\n" # outlineText # "\n],\n" #
-            "\"events\": [\n" # events(s.events) # "\n],\n" #
+            "\"objects\" : [\n" # fromObjects(s.objects) # "\n],\n" #
+            "\"outline\" : [\n" # fromOutline(s.outline) # "\n],\n" #
+            "\"events\": [\n" # fromEvents(s.events) # "\n],\n" #
             "\"nodes\": [\n" # nodesText # "\n],\n" #
             "\"edges\": [\n" # edgesText # "\n]\n" #
             "}"
         };
    
-        public func object_( o : Object ) : Text {
+        public func fromObject( o : Object ) : Text {
             switch o {
                 case (#box(fields)) {
                     "{ \"type\": \"box\""#
@@ -479,7 +481,7 @@ module {
             };
         };
 
-        public func event( ev : Event ) : Text {
+        public func fromEvent( ev : Event ) : Text {
                 switch(ev.event) {
                     case (#addNode(node_id)) {
                             "{ \"metaTime\":" # (debug_show ev.metaTime) # 
@@ -509,5 +511,68 @@ module {
                     };
                 }
             };
+        
+        public func fromNodeId(nodeId : NodeId) : Text {
+            debug_show (debug_show nodeId)
+        };
+
+        public func fromNodeShape(nodeShape : NodeShape) : Text {
+            debug_show (debug_show nodeShape)
+        };
+
+        public func fromShowAction(showAction : ShowAction) : Text {
+            debug_show (debug_show showAction)
+        };
+
+        public func fromOutlineEdges(outlineEdges : [OutlineEdge]) : Text {
+            fromArray(outlineEdges, fromOutlineEdge)
+        };
+
+        public func fromOutline(outline : Outline) : Text {
+            switch outline {
+                case (#leaf(leaf)) {
+                    "{ \"type\": \"outlineLeaf\" " #
+                    ", \"nodeId\":" # (fromNodeId(leaf.nodeId)) #
+                    ", \"shape\": " # (fromNodeShape(leaf.shape)) #
+                    ", \"value\": " # (debug_show leaf.value) #
+                    "}"
+
+                };
+                case (#internal(internal)) {
+                    "{ \"type\": \"outlineInternal\" " #
+                    ", \"nodeId\":" # (fromNodeId(internal.__nodeId)) #
+                    ", \"shape\": " # (fromNodeShape(internal.__shape)) #
+                    ", \"edges\": " # (fromOutlineEdges(internal.edges)) #
+                    //", \"metaTimes\": " # (fromMetaTimes(internal.metaTimes)) #
+                    ", \"value\": " # (debug_show internal.value) #
+                    "}"
+                };
+            }
+        };
+
+        public func fromOutlineOption(outline : ?Outline) : Text {
+            switch outline {
+                case null "null";
+                case (?o) { fromOutline(o) }
+            }
+        };
+
+        public func fromMetaTimes( metaTimes: MetaTimes) : Text {
+            if (metaTimes.0 == metaTimes.1) {
+                debug_show metaTimes.0
+            } else {
+                debug_show metaTimes
+            }
+        };
+
+        public func fromOutlineEdge(edge : OutlineEdge) : Text {
+            "{ \"type\": \"outlineEdge\" " #
+            ", \"action\":" # (fromShowAction(edge.action)) #
+            ", \"actionTarget\":" # (fromNodeId(edge.actionTarget)) #
+            ", \"outline\": " # (fromOutlineOption(edge.outline)) #
+            ", \"value\": " # (debug_show edge.value) #
+            ", \"metaTimes\": " # fromMetaTimes(edge.metaTimes) #
+            "}"
+        };
     };
 };
