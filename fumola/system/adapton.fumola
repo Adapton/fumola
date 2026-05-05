@@ -196,8 +196,9 @@ module {
     };
 
     //
-    // Outline representation for printing on terminals,
-    // and for generating other output file formats (Text, JSON, TikZ).
+    // Outline representation.
+    // - for generating other output file formats (Text, JSON, TikZ).
+    // - or directly inspecting within the Fumola REPL.
     // 
     public module Outline {
         public type Outline = {
@@ -225,7 +226,7 @@ module {
         // types of otherwise the same name.
 
         public type OutlineEdge = {
-            action : ShowAction ;
+            action : OutlineAction ;
             actionTarget : NodeId ;
             outline : ?Outline;
             forcedThunk : ?Thunk<Any>;
@@ -236,7 +237,7 @@ module {
         // Just the "tag" of the action, where the other action information
         // is organized into the OutlineEdge type.
         //
-	    public type ShowAction = {
+	    public type OutlineAction = {
             #put ;
             #putForce ; // same as #put ; #force_ in sequence.
             #get ;
@@ -355,7 +356,7 @@ module {
             }
         };
 
-        public func actionIntoUnicode(action : ShowAction) : Text {
+        public func actionIntoUnicode(action : OutlineAction) : Text {
             switch action {
                 case (#put)      { "───» " };
                 case (#get)      { "───> " };
@@ -524,7 +525,7 @@ module {
             debug_show (debug_show nodeShape)
         };
 
-        public func fromShowAction(showAction : ShowAction) : Text {
+        public func fromShowAction(showAction : OutlineAction) : Text {
             debug_show (debug_show showAction)
         };
 
