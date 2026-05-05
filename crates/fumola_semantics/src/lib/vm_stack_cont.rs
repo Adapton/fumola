@@ -21,7 +21,6 @@ use crate::{type_mismatch, value};
 use fumola_syntax::ast::{Cases, Exp_, Inst, Mut, Pat_, ProjIndex, QuotedAst};
 use fumola_syntax::shared::{FastClone, Share};
 use im_rc::{HashMap, Vector};
-use log::info;
 
 // continue execution using the top-most stack frame, if any.
 pub fn stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Interruption> {

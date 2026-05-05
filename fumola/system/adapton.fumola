@@ -546,7 +546,9 @@ module {
                     "{ \"type\": \"outlineInternal\" " #
                     ", \"nodeId\":" # (fromNodeId(internal.__nodeId)) #
                     ", \"shape\": " # (fromNodeShape(internal.__shape)) #
-                    ", \"edges\": " # (fromOutlineEdges(internal.edges)) #
+                    ", \"edges\":" # 
+                        (if (internal.edges.size() == 0) "" else "\n" ) #
+                        (fromOutlineEdges(internal.edges)) #
                     //", \"metaTimes\": " # (fromMetaTimes(internal.metaTimes)) #
                     ", \"value\": " # (fromAnyValue(internal.value)) #
                     "}"
@@ -557,7 +559,7 @@ module {
         public func fromOutlineOption(outline : ?Outline) : Text {
             switch outline {
                 case null "null";
-                case (?o) { fromOutline(o) }
+                case (?o) { "\n" # fromOutline(o) }
             }
         };
 
