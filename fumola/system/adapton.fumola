@@ -422,7 +422,7 @@ module {
     public module IntoJSON {
 
         public func fromArray<X>(a: [X], elemIntoJSON : X -> Text) : Text {
-            var result = "";
+            var result = "[\n";
             var isFirst = true;
             for (elm in (a.vals())) {
                 if (isFirst) {
@@ -432,13 +432,13 @@ module {
                 };
                 result #= elemIntoJSON(elm);
             };
-            result
+            result # "\n]"
         };
 
         #[test]
         func testArray() {
             let actual = fromArray([1, 2, 3], func(x) { debug_show x });
-            let expected = "1,\n2,\n3";
+            let expected = "[\n1,\n2,\n3]\n";
             assert actual == expected
         };
 
@@ -454,11 +454,11 @@ module {
             let nodesText = "{}";
             let edgesText = "{}";
             "{ " # 
-            "\"objects\" : [\n" # fromObjects(s.objects) # "\n],\n" #
-            "\"outline\" : [\n" # fromOutline(s.outline) # "\n],\n" #
-            "\"events\": [\n" # fromEvents(s.events) # "\n],\n" #
-            "\"nodes\": [\n" # nodesText # "\n],\n" #
-            "\"edges\": [\n" # edgesText # "\n]\n" #
+            "\"objects\" : \n" # fromObjects(s.objects) # "\n,\n" #
+            "\"outline\" : \n" # fromOutline(s.outline) # "\n,\n" #
+            "\"events\": \n" # fromEvents(s.events) # "\n,\n" #
+            "\"nodes\": \n" # nodesText # "\n,\n" #
+            "\"edges\": \n" # edgesText # "\n\n" #
             "}"
         };
    
@@ -528,13 +528,17 @@ module {
             fromArray(outlineEdges, fromOutlineEdge)
         };
 
+        public func fromAnyValue(v : Any) : Text {
+            debug_show (debug_show v)
+        };
+
         public func fromOutline(outline : Outline) : Text {
             switch outline {
                 case (#leaf(leaf)) {
                     "{ \"type\": \"outlineLeaf\" " #
                     ", \"nodeId\":" # (fromNodeId(leaf.nodeId)) #
                     ", \"shape\": " # (fromNodeShape(leaf.shape)) #
-                    ", \"value\": " # (debug_show leaf.value) #
+                    ", \"value\": " # (fromAnyValue(leaf.value)) #
                     "}"
 
                 };
@@ -544,7 +548,7 @@ module {
                     ", \"shape\": " # (fromNodeShape(internal.__shape)) #
                     ", \"edges\": " # (fromOutlineEdges(internal.edges)) #
                     //", \"metaTimes\": " # (fromMetaTimes(internal.metaTimes)) #
-                    ", \"value\": " # (debug_show internal.value) #
+                    ", \"value\": " # (fromAnyValue(internal.value)) #
                     "}"
                 };
             }
@@ -561,7 +565,7 @@ module {
             if (metaTimes.0 == metaTimes.1) {
                 debug_show metaTimes.0
             } else {
-                debug_show metaTimes
+                debug_show ([metaTimes.0, metaTimes.1])
             }
         };
 
@@ -570,7 +574,7 @@ module {
             ", \"action\":" # (fromShowAction(edge.action)) #
             ", \"actionTarget\":" # (fromNodeId(edge.actionTarget)) #
             ", \"outline\": " # (fromOutlineOption(edge.outline)) #
-            ", \"value\": " # (debug_show edge.value) #
+            ", \"value\": " # (fromAnyValue(edge.value)) #
             ", \"metaTimes\": " # fromMetaTimes(edge.metaTimes) #
             "}"
         };
