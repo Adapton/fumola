@@ -10,11 +10,11 @@ import Map "hashMap";
 ///
 /// - Outline --- A depth-first structure over PeekInfo at some root.
 ///
-/// - IntoText --- for outline printouts that are compact, and textual.
+/// - IntoText --- For outline printouts that are compact, and textual.
 ///
 /// - Scene --- A multi-dimensional structure for exporting into a playback tool.
 ///
-/// - IntoJSON --- JSON format web-based playback tools. 
+/// - IntoJSON --- JSON format for web-based playback tools. 
 ///                Useful line breaks for VSCode mode.
 ///
 /// ----------------------------------------------------------------------------
