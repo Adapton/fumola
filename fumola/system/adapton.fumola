@@ -1,16 +1,25 @@
 import Map "hashMap";
-module {
-    /// Adapton's structures in Fumola.
-    ///
-    /// PeekInfo --- Fumola values that describe Adapton behavior and structures.
-    ///
-    /// Outline --- A depth-first structure over PeekInfo at some root.
-    /// IntoText --- for outline printouts that are compact, and textual.
-    ///
-    /// Scene --- A multi-dimensional structure for exporting PeekInfo to interactive tools.
-    /// IntoJSON --- for the web-based DCG Player tool.
-    ///
 
+/// Adapton's structures represented within Fumola.
+///
+///    A Fumola library or algorithm can use this interface to reflect its
+/// own past behavior back to it, and process it into useful output
+/// for interactive replay (web-based DCG Player).
+///
+/// - PeekInfo --- Fumola values that describe Adapton behavior and structures.
+///
+/// - Outline --- A depth-first structure over PeekInfo at some root.
+///
+/// - IntoText --- for outline printouts that are compact, and textual.
+///
+/// - Scene --- A multi-dimensional structure for exporting into a playback tool.
+///
+/// - IntoJSON --- JSON format web-based playback tools. 
+///                Useful line breaks for VSCode mode.
+///
+/// ----------------------------------------------------------------------------
+module {
+    
     /// PeekInfo gives the fumola value-based types for the
     /// internal state of Adapton within Fumola.
     ///
