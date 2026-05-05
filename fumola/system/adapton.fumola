@@ -439,33 +439,30 @@ module {
             assert actual == expected
         };
 
+        public func objects(input : [SceneObject]) : Text {
+            array(input, object_)
+        };
+
+        public func events(input : [SceneObject]) : Text {
+            array(input, event)
+        };
+
         public func scene( s : Scene ) : Text {
-            let objectsText = objects(s.objects);
-            let eventsText = eventsIntoJSONText(s.events);
             let outlineText = "{}";
             let nodesText = "{}";
             let edgesText = "{}";
             "{ " # 
-            "\"objects\" : [\n" # objectsText # "\n],\n" #
+            "\"objects\" : [\n" # objects(s.objects) # "\n],\n" #
             "\"outline\" : [\n" # outlineText # "\n],\n" #
-            "\"events\": [\n" # eventsText # "\n],\n" #
+            "\"events\": [\n" # events(s.events) # "\n],\n" #
             "\"nodes\": [\n" # nodesText # "\n],\n" #
             "\"edges\": [\n" # edgesText # "\n]\n" #
             "}"
         };
    
-        public func objects( input : [SceneObject] ) : Text {
-            var objectsText = "";
-            var isFirstObject = true;
-            for (o in input.vals()) {
-                if (isFirstObject) {
-                    isFirstObject := false;
-                } else {
-                    objectsText #= ",\n";
-                };
-                switch o {
+        public func object_( o : Object ) : Text {
+            switch o {
                 case (#box(fields)) {
-                    objectsText #= 
                     "{ \"type\": \"box\""#
                     ", \"position\": "#(debug_show [fields.position.x, fields.position.y, fields.position.z])#
                     ", \"label\": "#(debug_show fields.label_)#
@@ -475,49 +472,36 @@ module {
                     "}"
                 };
                 case (#pointer(fields)) {
-                    objectsText #= 
                     "{ \"type\": \"pointer\", \"from\": " # (debug_show fields.from) # 
                     ", \"to\": " # (debug_show fields.to) # 
                     "}"
                 }
-                };
             };
-            objectsText
         };
 
-        public func eventsIntoJSONText( events : [Event] ) : Text {
-            var objectsText = "";
-            var isFirstEntry = true;
-            for (ev in events.vals()) {
-                if (isFirstEntry) {
-                    isFirstEntry := false;
-                } else {
-                    objectsText #= ",\n";
-                };
+        public func event( ev : Event ) : Text {
                 switch(ev.event) {
                     case (#addNode(node_id)) {
-                        objectsText #= 
                             "{ \"metaTime\":" # (debug_show ev.metaTime) # 
                             ", \"type\": \"addNode\", \"nodeId\": " # (debug_show (debug_show node_id)) #
                             "}"
                     };
                     case (#addEdge(edge_id)) {
-                        objectsText #= 
                             "{ \"metaTime\":" # (debug_show ev.metaTime) # 
                             ", \"type\": \"addEdge\", \"edgeId\": " # (debug_show (debug_show edge_id)) #
                             "}"
                     };
                     case (#removeEdge(edge_id)) {
-                        objectsText #= "{}"
+                            "{ \"metaTime\":" # (debug_show ev.metaTime) #
+                            ", \"type\": \"removeEdge\", \"edgeId\": " # (debug_show (debug_show edge_id)) #
+                            "}"
                     };
                     case (#forceBegin(node_id)) {
-                        objectsText #= 
                             "{ \"metaTime\":" # (debug_show ev.metaTime) # 
                             ", \"type\": \"forceBegin\", \"nodeId\": " # (debug_show (debug_show node_id)) #
                             "}"
                     };
                     case (#forceEnd(node_id, edge_id)) {
-                        objectsText #= 
                             "{ \"metaTime\":" # (debug_show ev.metaTime) # 
                             ", \"type\": \"forceEnd\", \"nodeId\": " # (debug_show (debug_show node_id)) # 
                             ", \"edgeId\": " # (debug_show (debug_show edge_id)) #
@@ -525,7 +509,5 @@ module {
                     };
                 }
             };
-            objectsText
-        };
     };
-}
+};
