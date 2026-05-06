@@ -97,14 +97,13 @@
         /* META TIMESTAMPS */
         .ts {
             color: #7fd1ff;
-            /* pastel cyan */
             cursor: pointer;
         }
 
-        .ts.selected {
-            color: #ffb3d1;
-            /* pastel pink highlight */
-            background: #111;
+        .ts.focused {
+            background: #dde2c8;
+            color: #111;
+            font-weight: bold;
         }
 
         /* subtle hover */
@@ -710,22 +709,35 @@
         let SCENE = null;
 
         let selectedTimestamps = new Set();
+        let selectedElements = new Set();
 
         // --- hook ---
         function onMetaTimeClick(t) {
-            console.log("focus metaTime:", t);
-            focusEvent(t);
-            focusOutline(t);
 
             if (selectedTimestamps.has(t)) {
+                false && console.log("un-focus metaTime:", t);
+
                 selectedTimestamps.delete(t);
+                let staleElements = new Set();
+                selectedElements.forEach(elm => {
+                    if (elm.metaTime == t) {
+                        staleElements.add(elm);
+                    }
+                });
+                staleElements.forEach(staleElm => {
+                    selectedElements.delete(staleElm);
+                    staleElm.classList.remove("focused");
+                })
             } else {
+                false && console.log("focus metaTime:", t);
+
                 selectedTimestamps.add(t);
+
+                focusEvent(t);
+                focusOutline(t);
             }
 
-            console.log("selected time stamps: ", selectedTimestamps);
-
-
+            false && console.log("selected time stamps: ", selectedTimestamps);
         }
 
         // --- entry point ---
@@ -744,10 +756,11 @@
 
             events.forEach(ev => {
                 const row = document.createElement("div");
-
+                //row.metaTime = ev.metaTime;
                 const ts = document.createElement("span");
                 ts.className = "ts";
                 ts.textContent = ev.metaTime;
+                ts.metaTime = ev.metaTime;
 
                 ts.onclick = () => onMetaTimeClick(ev.metaTime);
 
@@ -768,7 +781,7 @@
             span.className = "ts";
             const ts = hasNested ? (useEndTime ? e.metaTimes[1] : e.metaTimes[0]) : e.metaTimes;
             span.textContent = ts + (useEndTime ? (isAnchor ? " }" : " {") : "");
-            console.log(e.metaTimes + " " + ts);
+            // console.log(e.metaTimes + " " + ts);
             span.onclick = () => onMetaTimeClick(ts);
             if (!useEndTime || isAnchor) {
                 span.metaTime = ts;
@@ -839,15 +852,19 @@
             const rows = document.querySelectorAll("#events .ts");
 
             for (let row of rows) {
-                const value = parseInt(row.textContent, 10);
+                //console.log("row.metaTime", metaTime, row.metaTime);
 
-                if (value === metaTime) {
+                if (row.metaTime == metaTime) {
                     row.scrollIntoView({ behavior: "smooth", block: "center" });
                     row.classList.add("focused");
+                    selectedElements.add(row);
+
+
+
                     break;
                 }
             }
-            console.log("focusEvent done: " + metaTime);
+            // console.log("focusEvent done: " + metaTime);
         }
 
         function focusOutline(metaTime) {
@@ -856,7 +873,6 @@
             let first = null;
 
             for (let row of rows) {
-                console.log("row.metaTime", metaTime, row.metaTime);
                 if (row.metaTime == metaTime) {
                     first = row;
                     break;
@@ -865,8 +881,9 @@
             if (first) {
                 first.scrollIntoView({ behavior: "smooth", block: "center" });
                 first.classList.add("focused");
+                selectedElements.add(first);
             }
-            console.log("focusOutline done: " + metaTime, rows, " and first is ", first);
+            // console.log("focusOutline done: " + metaTime, rows, " and first is ", first);
         }
 
         function clearFocus() {
@@ -893,7 +910,8 @@
             camera,
             renderer,
             controls,
-            selectedTimestamps
+            selectedTimestamps,
+            selectedElements,
         };
 
     </script>
