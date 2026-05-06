@@ -470,7 +470,7 @@ module {
             "{ " # 
             "\"objects\" : \n" # fromObjects(s.objects) # "\n,\n" #
             "\"outline\" : \n" # fromOutline(s.outline) # "\n,\n" #
-            "\"events\": \n" # fromEvents(s.events) # "\n,\n" #
+            "\"events\": \n" # fromEvents(s.history.events) # "\n,\n" #
             "\"nodes\": \n" # nodesText # "\n,\n" #
             "\"edges\": \n" # edgesText # "\n\n" #
             "}"

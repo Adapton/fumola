@@ -22,7 +22,7 @@
         }
 
         #sidebar {
-            width: 13%;
+            width: 23%;
             min-width: 220px;
             max-width: 70%;
             display: flex;
@@ -769,7 +769,6 @@
         // --- OUTLINE PANEL (recursive) ---
         function renderOutline(outline) {
             const el = document.querySelector("#outlinePanel .panel-body");
-            el.innerHTML = "DFS:";
 
             function walk(node, depth = 0) {
                 if (!node) return;
@@ -779,6 +778,8 @@
 
                 const ts = extractMetaTime(node);
                 if (ts !== null) {
+                    row.dataset.metatime = String(ts);   // IMPORTANT FIX
+
                     const span = document.createElement("span");
                     span.className = "ts";
                     span.textContent = ts;
@@ -809,9 +810,55 @@
             return null;
         }
 
+        function focusEvent(metaTime) {
+            const rows = document.querySelectorAll("#events .ts");
+
+            for (let row of rows) {
+                const value = parseInt(row.textContent, 10);
+
+                if (value === metaTime) {
+                    row.scrollIntoView({ behavior: "smooth", block: "center" });
+                    row.classList.add("focused");
+                    break;
+                }
+            }
+        }
+
+        function focusOutline(metaTime) {
+            const rows = document.querySelectorAll("#outlinePanel .panel-body div");
+
+            let first = null;
+
+            for (let row of rows) {
+                if (row.dataset.metatime == metaTime) {
+                    first = row;
+                    break;
+                }
+            }
+
+            if (first) {
+                first.scrollIntoView({ behavior: "smooth", block: "center" });
+                first.classList.add("focused");
+            }
+        }
+
+        function containsMetaTime(metaTimes, t) {
+            if (Array.isArray(metaTimes)) {
+                return metaTimes.includes(t);
+            }
+            return metaTimes === t;
+        }
+
+        function clearFocus() {
+            document.querySelectorAll(".focused")
+                .forEach(el => el.classList.remove("focused"));
+        }
+
         // --- hook ---
         function onTimestamp(t) {
             console.log("focus metaTime:", t);
+            focusEvent(t);
+            focusOutline(t);
         }
 
         // expose
