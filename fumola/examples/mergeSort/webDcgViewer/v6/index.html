@@ -123,8 +123,7 @@
 
             <div class="panel" id="infoPanel">
                 <div class="panel-header">Info</div>
-                <div class="panel-body">
-                    <div>Scene / Selection</div>
+                <div class="panel-body" id="info">
                 </div>
             </div>
 
@@ -132,7 +131,7 @@
 
             <div class="panel" id="outlinePanel">
                 <div class="panel-header">Outline</div>
-                <div class="panel-body">
+                <div class="panel-body" id="outline">
                 </div>
             </div>
 
@@ -183,32 +182,6 @@
             activeSplitter = null;
             document.body.style.cursor = "default";
         });
-
-        let selectedTimestamps = new Set();
-
-        function onMetaTimeClick(ts) {
-            if (selectedTimestamps.has(ts)) {
-                selectedTimestamps.delete(ts);
-            } else {
-                selectedTimestamps.add(ts);
-            }
-
-            document.querySelectorAll(".ts").forEach(el => {
-                const v = parseInt(el.dataset.ts);
-                el.classList.toggle("selected", selectedTimestamps.has(v));
-            });
-
-            focusTimestamp(ts);
-        }
-
-        function focusTimestamp(ts) {
-            console.log("focus timestamp:", ts);
-            // hook:
-            // - filter DCG nodes
-            // - highlight edges
-            // - jump outline selection
-            // - update camera if desired
-        }
 
         /* sidebar resize */
         const divider = document.getElementById("divider");
@@ -736,6 +709,25 @@
 
         let SCENE = null;
 
+        let selectedTimestamps = new Set();
+
+        // --- hook ---
+        function onMetaTimeClick(t) {
+            console.log("focus metaTime:", t);
+            focusEvent(t);
+            focusOutline(t);
+
+            if (selectedTimestamps.has(t)) {
+                selectedTimestamps.delete(t);
+            } else {
+                selectedTimestamps.add(t);
+            }
+
+            console.log("selected time stamps: ", selectedTimestamps);
+
+
+        }
+
         // --- entry point ---
         function loadScene(json) {
             SCENE = json;
@@ -765,38 +757,43 @@
                 el.appendChild(row);
             });
         }
-        
+
+        const marginFactor = 7;
+
+
         function addMetaTimeElementForOutlineEdge(parentElm, outlineEdge, useEndTime = false, isAnchor = false, depth = 0) {
-                    const e = outlineEdge;
-                    const hasNested = typeof e.metaTimes != "number";
-                    const span = document.createElement("span");
-                    span.className = "ts";
-                    const ts = hasNested ? (useEndTime ? e.metaTimes[1] : e.metaTimes[0]) : e.metaTimes;
-                    span.textContent = ts + (useEndTime ? (isAnchor ? " }" : " {") : "");
-                    console.log(e.metaTimes + " " + ts);
-                    span.onclick = () => onMetaTimeClick(ts);
-            
-                    if (useEndTime && isAnchor) {
-                        //span.style.textDecoration = "underline";
-                        //span.style.marginLeft = 0;
-                        const div = document.createElement("div");
-                        div.style.marginLeft = (depth * 7) + "px";
-                        div.appendChild(span);
-                        parentElm.appendChild(div)
-                    } else {
-                        parentElm.appendChild(span)
-                    }
+            const e = outlineEdge;
+            const hasNested = typeof e.metaTimes != "number";
+            const span = document.createElement("span");
+            span.className = "ts";
+            const ts = hasNested ? (useEndTime ? e.metaTimes[1] : e.metaTimes[0]) : e.metaTimes;
+            span.textContent = ts + (useEndTime ? (isAnchor ? " }" : " {") : "");
+            console.log(e.metaTimes + " " + ts);
+            span.onclick = () => onMetaTimeClick(ts);
+            if (!useEndTime || isAnchor) {
+                span.metaTime = ts;
+            };
+            if (useEndTime && isAnchor) {
+                //span.style.textDecoration = "underline";
+                //span.style.marginLeft = 0;
+                const div = document.createElement("div");
+                div.style.marginLeft = (depth * 3) + "px";
+                div.appendChild(span);
+                parentElm.appendChild(div)
+            } else {
+                parentElm.appendChild(span)
+            }
         }
 
         // --- OUTLINE PANEL (recursive) ---
         function renderOutline(outline) {
-            const el = document.querySelector("#outlinePanel .panel-body");
+            const panel = document.getElementById("outline");
 
             function walk(rootElm, node, depth = 0) {
                 if (!node) return;
 
                 const div = document.createElement("div");
-                div.style.marginLeft = (depth * 7) + "px";
+                div.style.marginLeft = (depth * 3) + "px";
                 // console.log(node);
 
                 if (depth == 0) {
@@ -811,8 +808,8 @@
                     node.edges.forEach(e => {
                         let div = document.createElement("div");
                         const hasNested = typeof e.metaTimes != "number";
-               
-                        div.style.marginLeft = (depth * 7) + "px"; // ???
+
+                        div.style.marginLeft = (depth * 3) + "px"; // ???
                         addMetaTimeElementForOutlineEdge(div, e);
                         if (hasNested) {
                             div.appendChild(document.createTextNode(", "));
@@ -825,17 +822,17 @@
                         //if (hasNested) { div.appendChild(document.createTextNode(" {")) };
                         rootElm_.appendChild(div);
                         walk(rootElm_, e.outline, depth + 1)
-                        if (hasNested) { 
+                        if (hasNested) {
                             //rootElm_.appendChild(document.createTextNode(e.metaTimes[1] + " }"))
                             addMetaTimeElementForOutlineEdge(rootElm_, e, true, true, depth)
                             //rootElm_.appendChild(document.createTextNode(" }"))
                         };
                     }
                     );
-                }
+                } focusEvent
             }
 
-            walk(el, outline);
+            walk(panel, outline);
         }
 
         function focusEvent(metaTime) {
@@ -850,43 +847,31 @@
                     break;
                 }
             }
+            console.log("focusEvent done: " + metaTime);
         }
 
         function focusOutline(metaTime) {
-            const rows = document.querySelectorAll("#outlinePanel .panel-body div");
+            const rows = document.querySelectorAll("#outline .ts");
 
             let first = null;
 
             for (let row of rows) {
-                if (row.dataset.metatime == metaTime) {
+                console.log("row.metaTime", metaTime, row.metaTime);
+                if (row.metaTime == metaTime) {
                     first = row;
                     break;
                 }
             }
-
             if (first) {
                 first.scrollIntoView({ behavior: "smooth", block: "center" });
                 first.classList.add("focused");
             }
-        }
-
-        function containsMetaTime(metaTimes, t) {
-            if (Array.isArray(metaTimes)) {
-                return metaTimes.includes(t);
-            }
-            return metaTimes === t;
+            console.log("focusOutline done: " + metaTime, rows, " and first is ", first);
         }
 
         function clearFocus() {
             document.querySelectorAll(".focused")
                 .forEach(el => el.classList.remove("focused"));
-        }
-
-        // --- hook ---
-        function onMetaTimeClick(t) {
-            console.log("focus metaTime:", t);
-            focusEvent(t);
-            focusOutline(t);
         }
 
         // expose
@@ -907,7 +892,8 @@
             scene,
             camera,
             renderer,
-            controls
+            controls,
+            selectedTimestamps
         };
 
     </script>
