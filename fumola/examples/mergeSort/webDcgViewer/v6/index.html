@@ -765,6 +765,28 @@
                 el.appendChild(row);
             });
         }
+        
+        function addMetaTimeElementForOutlineEdge(parentElm, outlineEdge, useEndTime = false, isAnchor = false, depth = 0) {
+                    const e = outlineEdge;
+                    const hasNested = typeof e.metaTimes != "number";
+                    const span = document.createElement("span");
+                    span.className = "ts";
+                    const ts = hasNested ? (useEndTime ? e.metaTimes[1] : e.metaTimes[0]) : e.metaTimes;
+                    span.textContent = ts + (useEndTime ? (isAnchor ? " }" : " {") : "");
+                    console.log(e.metaTimes + " " + ts);
+                    span.onclick = () => onTimestamp(ts);
+            
+                    if (useEndTime && isAnchor) {
+                        //span.style.textDecoration = "underline";
+                        //span.style.marginLeft = 0;
+                        const div = document.createElement("div");
+                        div.style.marginLeft = (depth * 7) + "px";
+                        div.appendChild(span);
+                        parentElm.appendChild(div)
+                    } else {
+                        parentElm.appendChild(span)
+                    }
+        }
 
         // --- OUTLINE PANEL (recursive) ---
         function renderOutline(outline) {
@@ -774,20 +796,8 @@
                 if (!node) return;
 
                 const row = document.createElement("div");
-                row.style.marginLeft = (depth * 13) + "px";
+                row.style.marginLeft = (depth * 7) + "px";
                 console.log(node);
-
-                const ts = extractMetaTime(node);
-                if (ts !== null) {
-                    row.dataset.metatime = String(ts);   // IMPORTANT FIX
-
-                    const span = document.createElement("span");
-                    span.className = "ts";
-                    span.textContent = ts;
-                    span.onclick = () => onTimestamp(ts);
-                    row.appendChild(span);
-                    row.appendChild(document.createTextNode(" "));
-                }
 
                 //row.appendChild(document.createTextNode(node.shape));
                 if (depth == 0) {
@@ -799,28 +809,32 @@
                     let rootElm_ = row;
                     node.edges.forEach(e => {
                         let div = document.createElement("div");
-                        row.style.marginLeft = (depth * 7) + "px";
-                        let edgeText = document.createTextNode(e.metaTimes + " " + e.action + " " + e.actionTarget);
-                        div.appendChild(edgeText);
                         const hasNested = typeof e.metaTimes != "number";
-                        if (hasNested) { div.appendChild(document.createTextNode(" {")) };
+               
+                        div.style.marginLeft = (depth * 7) + "px"; // ???
+                        addMetaTimeElementForOutlineEdge(div, e);
+                        if (hasNested) {
+                            div.appendChild(document.createTextNode(", "));
+                            addMetaTimeElementForOutlineEdge(div, e, true)
+                        };
+                        div.appendChild(document.createTextNode(" "));
+                        let edgeText = document.createTextNode(/*e.metaTimes + " " +*/ e.action + " " + e.actionTarget);
+
+                        div.appendChild(edgeText);
+                        //if (hasNested) { div.appendChild(document.createTextNode(" {")) };
                         rootElm_.appendChild(div);
                         walk(rootElm_, e.outline, depth + 1)
-                        if (hasNested) { rootElm_.appendChild(document.createTextNode(" }")) };
+                        if (hasNested) { 
+                            //rootElm_.appendChild(document.createTextNode(e.metaTimes[1] + " }"))
+                            addMetaTimeElementForOutlineEdge(rootElm_, e, true, true, depth)
+                            //rootElm_.appendChild(document.createTextNode(" }"))
+                        };
                     }
                     );
                 }
             }
 
             walk(el, outline);
-        }
-
-        // --- META TIME EXTRACTOR (MVP heuristic) ---
-        function extractMetaTime(node) {
-            if (!node) return null;
-            if (node.metaTimes && typeof node.metaTimes === "number") return node.metaTimes;
-            if (Array.isArray(node.metaTimes)) return node.metaTimes[0] ?? null;
-            return null;
         }
 
         function focusEvent(metaTime) {
