@@ -770,11 +770,12 @@
         function renderOutline(outline) {
             const el = document.querySelector("#outlinePanel .panel-body");
 
-            function walk(node, depth = 0) {
+            function walk(rootElm, node, depth = 0) {
                 if (!node) return;
 
                 const row = document.createElement("div");
-                row.style.marginLeft = (depth * 12) + "px";
+                row.style.marginLeft = (depth * 13) + "px";
+                console.log(node);
 
                 const ts = extractMetaTime(node);
                 if (ts !== null) {
@@ -788,18 +789,29 @@
                     row.appendChild(document.createTextNode(" "));
                 }
 
-                row.appendChild(document.createTextNode(
-                    node.actionTarget || node.nodeId || node.type
-                ));
-
-                el.appendChild(row);
+                row.appendChild(document.createTextNode(node.shape));
+                if (depth == 0) {
+                    row.appendChild(document.createTextNode(node.nodeId));
+                }
+                row.appendChild(document.createTextNode("{"));
+                rootElm.appendChild(row);
 
                 if (node.edges) {
-                    node.edges.forEach(e => walk(e.outline, depth + 1));
+                    let rootElm_ = row;
+                    node.edges.forEach(e => {
+                        let div = document.createElement("div");
+                        row.style.marginLeft = (depth * 7) + "px";
+                        let edgeText = document.createTextNode(e.metaTimes + " " + e.action + " " + e.actionTarget);
+                        div.appendChild(edgeText);
+                        rootElm_.appendChild(div);
+                        walk(rootElm_, e.outline, depth + 1)
+                    }
+                    );
                 }
+                row.appendChild(document.createTextNode("}"));
             }
 
-            walk(outline);
+            walk(el, outline);
         }
 
         // --- META TIME EXTRACTOR (MVP heuristic) ---
