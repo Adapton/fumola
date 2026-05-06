@@ -789,11 +789,10 @@
                     row.appendChild(document.createTextNode(" "));
                 }
 
-                row.appendChild(document.createTextNode(node.shape));
+                //row.appendChild(document.createTextNode(node.shape));
                 if (depth == 0) {
                     row.appendChild(document.createTextNode(node.nodeId));
                 }
-                row.appendChild(document.createTextNode("{"));
                 rootElm.appendChild(row);
 
                 if (node.edges) {
@@ -803,12 +802,14 @@
                         row.style.marginLeft = (depth * 7) + "px";
                         let edgeText = document.createTextNode(e.metaTimes + " " + e.action + " " + e.actionTarget);
                         div.appendChild(edgeText);
+                        const hasNested = typeof e.metaTimes != "number";
+                        if (hasNested) { div.appendChild(document.createTextNode(" {")) };
                         rootElm_.appendChild(div);
                         walk(rootElm_, e.outline, depth + 1)
+                        if (hasNested) { rootElm_.appendChild(document.createTextNode(" }")) };
                     }
                     );
                 }
-                row.appendChild(document.createTextNode("}"));
             }
 
             walk(el, outline);
