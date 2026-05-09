@@ -1,6 +1,6 @@
 use crate::Shared;
 use crate::value::{Closed, Symbol, Symbol_, ThunkBody, Value_};
-use fumola_syntax::ast::Exp_;
+use fumola_syntax::ast::{Exp_, Id};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -119,7 +119,7 @@ impl Time {
 
     pub fn into_symbol(&self) -> Res<Symbol_> {
         match self {
-            Time::Now => todo!(),
+            Time::Now => Ok(Shared::new(Symbol::Id(Id::new("@now".to_owned())))),
             Time::Symbol(s) => Ok(s.clone()),
         }
     }

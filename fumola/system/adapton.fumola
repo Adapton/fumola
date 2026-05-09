@@ -496,38 +496,43 @@ module {
         };
 
         public func fromEvent( ev : Event ) : Text {
-                switch(ev.event) {
+                "{ \"metaTime\":" # debug_show ev.metaTime  # 
+                (switch(ev.event) {
                     case (#addNode(node_id)) {
-                            "{ \"metaTime\":" # debug_show ev.metaTime  # 
-                            ", \"type\": \"addNode\", \"nodeId\": " # (debug_show (debug_show node_id)) #
-                            "}"
+                            ", \"type\": \"addNode\", \"nodeId\": " # fromNodeId(node_id)
                     };
                     case (#addEdge(edge_id)) {
-                            "{ \"metaTime\":" # debug_show ev.metaTime # 
-                            ", \"type\": \"addEdge\", \"edgeId\": " # debug_show (debug_show edge_id) #
-                            "}"
+                            ", \"type\": \"addEdge\", \"edgeId\": " # fromEdgeId(edge_id)
                     };
                     case (#removeEdge(edge_id)) {
-                            "{ \"metaTime\":" # debug_show ev.metaTime #
-                            ", \"type\": \"removeEdge\", \"edgeId\": " # debug_show (debug_show edge_id) #
-                            "}"
+                            ", \"type\": \"removeEdge\", \"edgeId\": " # fromEdgeId(edge_id)
                     };
                     case (#forceBegin(node_id)) {
-                            "{ \"metaTime\":" # debug_show ev.metaTime # 
-                            ", \"type\": \"forceBegin\", \"nodeId\": " # debug_show (debug_show node_id) #
-                            "}"
+                            ", \"type\": \"forceBegin\", \"nodeId\": " # fromNodeId(node_id)
                     };
                     case (#forceEnd(node_id, edge_id)) {
-                            "{ \"metaTime\":" # debug_show ev.metaTime # 
-                            ", \"type\": \"forceEnd\", \"nodeId\": " # debug_show (debug_show node_id) # 
-                            ", \"edgeId\": " # debug_show (debug_show edge_id) #
-                            "}"
+                            ", \"type\": \"forceEnd\", \"nodeId\": " # fromNodeId(node_id) # 
+                            ", \"edgeId\": " # fromEdgeId(edge_id)
                     };
-                }
+                })
+                # "}"
             };
         
         public func fromNodeId(nodeId : NodeId) : Text {
-            debug_show (debug_show nodeId)
+            //debug_show (debug_show nodeId)
+            let (sp, tm, mt) = nodeId;
+            "[" # debug_show (debug_show (sp.0)) 
+            # "," # debug_show (debug_show (tm.0))
+            # "," # debug_show (debug_show mt)
+            # "]"
+        };
+
+        public func fromEdgeId(edgeId : EdgeId) : Text {
+            fromAnyValue(edgeId)
+        };
+
+        public func fromPointer(ptr : Pointer<Any>) : Text {
+            debug_show (debug_show (ptr.0))
         };
 
         public func fromNodeShape(nodeShape : NodeShape) : Text {
@@ -564,7 +569,8 @@ module {
                         (if (internal.edges.size() == 0) "" else "\n") #
                         fromOutlineEdges(internal.edges) #
                     //", \"metaTimes\": " # (fromMetaTimes(internal.metaTimes)) #
-                    ", \"value\": " # fromAnyValue(internal.value) #
+                    ", \"value\": " # (switch(internal.value){ case null "null"; case (?(_, v)) fromAnyValue(v) }) #
+                    ", \"valueMetaTime\": " # (switch(internal.value){ case null "null"; case (?(mt, _)) fromAnyValue(mt) }) #
                     "}"
                 };
             }
@@ -588,7 +594,7 @@ module {
         public func fromOutlineEdge(edge : OutlineEdge) : Text {
             "{ \"type\": \"outlineEdge\" " #
             ", \"action\":" # fromShowAction(edge.action) #
-            ", \"actionTarget\":" # fromNodeId(edge.actionTarget) #
+            ", \"actionTarget\":" # fromPointer(edge.actionTarget) #
             ", \"outline\": " # fromOutlineOption(edge.outline) #
             ", \"value\": " # fromAnyValue(edge.value) #
             ", \"metaTimes\": " # fromMetaTimes(edge.metaTimes) #
