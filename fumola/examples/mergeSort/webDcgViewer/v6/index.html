@@ -11,7 +11,7 @@
             height: 100%;
             overflow: hidden;
             font-family: monospace;
-            background: #000;
+            background: #0f0f0f;
             color: #cfd8ff;
         }
 
@@ -94,23 +94,69 @@
             flex: 0 0 auto;
         }
 
-        /* META TIMESTAMPS */
-        .ts {
+        .metaTime {
             color: #7fd1ff;
             cursor: pointer;
         }
 
-        .ts.focused {
+        .metaTime.focused {
             background: #dde2c8;
             color: #111;
             font-weight: bold;
         }
 
-        /* subtle hover */
-        .ts:hover {
-            color: #b7a6ff;
+        .metaTime:hover {
+            color: #ffffff;
         }
-    </style>
+
+        .edgeId {
+            color: #7fd1ff;
+            cursor: pointer;
+        }
+
+        .edgeId.focused {
+            background: #dde2c8;
+            color: #111;
+            font-weight: bold;
+        }
+
+        .edgeId:hover {
+            color: #ffffff;
+        }
+
+        .adaptonPointer {
+            color: #c0d7b5;
+            cursor: pointer;
+        }
+
+        .adaptonPointer.focused {
+            background: #c0d7b5;
+            color: #111;
+            font-weight: bold;
+        }
+
+        .adaptonPointer:hover {
+            color: #ffffff;
+        }
+
+
+        .nodeId {
+            color: #f3e2c2;
+            cursor: pointer;
+        }
+
+        .nodeId.focused {
+            background: #d2cbb4;
+            color: #111;
+            font-weight: bold;
+        }
+
+        .nodeId:hover {
+            color: #ffffff;
+        }
+
+
+</style>
 </head>
 
 <body>
@@ -300,7 +346,7 @@
             const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim));
             const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
             const labelMesh = new THREE.Mesh(
-                new THREE.PlaneGeometry(0.1, 0.1 * aspect),
+                new THREE.PlaneGeometry(0.7, 0.7 * aspect),
                 new THREE.MeshBasicMaterial({ map: texture, transparent: false })
             );
             labelMesh.position.copy(labelAnchor);
@@ -351,7 +397,7 @@
             const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim));
             const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
             const labelMesh = new THREE.Mesh(
-                new THREE.PlaneGeometry(0.1, 0.1 * aspect),
+                new THREE.PlaneGeometry(0.7, 0.7 * aspect),
                 new THREE.MeshBasicMaterial({ map: texture, transparent: false })
             );
             labelMesh.position.copy(labelAnchor);
@@ -749,6 +795,42 @@
         };
         loadScene(data);
 
+        function createMetaTimeElm(metaTime) {
+            const elm = document.createElement("span");
+            elm.className = "metaTime";
+            elm.textContent = metaTime;
+            elm.metaTime = metaTime;
+            elm.onclick = () => onMetaTimeClick(metaTime);
+            return elm
+        }
+
+        function createNodeIdElm(nodeId) {
+            const elm = document.createElement("span");
+            elm.className = "nodeId";
+            elm.textContent = nodeId;
+            elm.nodeId = nodeId;
+            elm.onclick = () => onNodeIdClick(ptr);
+            return elm
+        }
+
+        function createEdgeIdElm(edgeId) {
+            const elm = document.createElement("span");
+            elm.className = "edgeId";
+            elm.textContent = edgeId;
+            elm.nodeId = edgeId;
+            elm.onclick = () => onNodeIdClick(ptr);
+            return elm
+        }
+
+        function createPointerElm(ptr) {
+            const elm = document.createElement("span");
+            elm.className = "adaptonPointer";
+            elm.textContent = ptr;
+            elm.adaptonPointer = ptr;
+            elm.onclick = () => onPointerClick(ptr);
+            return elm
+        }
+
         // --- EVENTS PANEL ---
         function renderEvents(events) {
             const el = document.getElementById("events");
@@ -757,16 +839,20 @@
             events.forEach(ev => {
                 const row = document.createElement("div");
                 //row.metaTime = ev.metaTime;
-                const ts = document.createElement("span");
-                ts.className = "ts";
-                ts.textContent = ev.metaTime;
-                ts.metaTime = ev.metaTime;
-
-                ts.onclick = () => onMetaTimeClick(ev.metaTime);
-
+                const ts = createMetaTimeElm(ev.metaTime);
                 row.appendChild(ts);
-                row.appendChild(document.createTextNode(" " + ev.type));
-
+                row.appendChild(document.createTextNode(" " + ev.type + " "));
+                if (ev.type == "addNode") {
+                    row.appendChild(createNodeIdElm(ev.nodeId))
+                } else if (ev.type == "addEdge") {
+                    row.appendChild(createEdgeIdElm(ev.edgeId))
+                } else if (ev.type == "forceBegin") {
+                    row.appendChild(createNodeIdElm(ev.nodeId))
+                } else if (ev.type == "forceEnd") {
+                    row.appendChild(createNodeIdElm(ev.nodeId));
+                    row.appendChild(document.createTextNode(" "));
+                    row.appendChild(createEdgeIdElm(ev.edgeId));
+                }
                 el.appendChild(row);
             });
         }
@@ -777,14 +863,16 @@
         function addMetaTimeElementForOutlineEdge(parentElm, outlineEdge, useEndTime = false, isAnchor = false, depth = 0) {
             const e = outlineEdge;
             const hasNested = typeof e.metaTimes != "number";
-            const span = document.createElement("span");
-            span.className = "ts";
-            const ts = hasNested ? (useEndTime ? e.metaTimes[1] : e.metaTimes[0]) : e.metaTimes;
-            span.textContent = ts + (useEndTime ? (isAnchor ? " }" : " {") : "");
+            
+            const metaTime = hasNested ? (useEndTime ? e.metaTimes[1] : e.metaTimes[0]) : e.metaTimes;
             // console.log(e.metaTimes + " " + ts);
-            span.onclick = () => onMetaTimeClick(ts);
+     
+            const span = document.createElement("span");
+            span.textContent = metaTime + (useEndTime ? (isAnchor ? " }" : " {") : "");
+            span.className = "metaTime";
+            span.onclick = () => onMetaTimeClick(metaTime);
             if (!useEndTime || isAnchor) {
-                span.metaTime = ts;
+                span.metaTime = metaTime;
             };
             if (useEndTime && isAnchor) {
                 //span.style.textDecoration = "underline";
@@ -829,9 +917,9 @@
                             addMetaTimeElementForOutlineEdge(div, e, true)
                         };
                         div.appendChild(document.createTextNode(" "));
-                        let edgeText = document.createTextNode(/*e.metaTimes + " " +*/ e.action + " " + e.actionTarget);
-
+                        let edgeText = document.createTextNode(/*e.metaTimes + " " +*/ e.action + " ");
                         div.appendChild(edgeText);
+                        div.appendChild(createPointerElm(e.actionTarget));
                         //if (hasNested) { div.appendChild(document.createTextNode(" {")) };
                         rootElm_.appendChild(div);
                         walk(rootElm_, e.outline, depth + 1)
@@ -849,7 +937,7 @@
         }
 
         function focusEvent(metaTime) {
-            const rows = document.querySelectorAll("#events .ts");
+            const rows = document.querySelectorAll("#events .metaTime");
 
             for (let row of rows) {
                 //console.log("row.metaTime", metaTime, row.metaTime);
@@ -868,7 +956,7 @@
         }
 
         function focusOutline(metaTime) {
-            const rows = document.querySelectorAll("#outline .ts");
+            const rows = document.querySelectorAll("#outline .metaTime");
 
             let first = null;
 
