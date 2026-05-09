@@ -5,6 +5,47 @@
     <meta charset="utf-8" />
     <title>DCG Viewer</title>
     <style>
+        :root {
+
+            /* --- BASE --- */
+
+            --bg: #111318;
+            --bg-elev: #171a20;
+            --bg-panel: #1b1f27;
+
+            --border: #2a2f3a;
+            --border-soft: #222733;
+
+            --text: #d8dee9;
+            --text-dim: #97a2b3;
+            --text-faint: #6f7b8d;
+
+            /* --- ACCENTS --- */
+
+            --purple: #c6a0f6;
+            --blue: #8bd5ff;
+            --green: #a6da95;
+
+            --purple-dark: #8c6fd1;
+            --blue-dark: #5ca7d9;
+            --green-dark: #7fba72;
+
+            /* --- INTERACTION --- */
+
+            --hover: #252b36;
+            --active: #303848;
+
+            --shadow:
+                0 0 0 1px rgba(255, 255, 255, 0.02),
+                0 6px 18px rgba(0, 0, 0, 0.35);
+
+            font-family:
+                Inter,
+                system-ui,
+                sans-serif;
+        }
+    </style>
+    <style>
         html,
         body {
             margin: 0;
@@ -156,7 +197,102 @@
         }
 
 
-</style>
+        #sidebar {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .panel-body {
+            overflow: auto;
+            min-height: 0;
+        }
+
+
+        /*----------*/
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+
+            background: var(--bg);
+            color: var(--text);
+
+            overflow: hidden;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        #app {
+            width: 100%;
+            height: 100%;
+
+            display: flex;
+
+            background: var(--bg);
+        }
+
+        /* --- PLAYER PANEL --- */
+
+        #playerPanel {
+            flex: 0 0 auto;
+        }
+
+        .player-body {
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .player-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .player-slider-row {
+            width: 100%;
+        }
+
+        #metaSlider {
+            width: 100%;
+        }
+
+        .player-field {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .player-field label {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        .player-field input {
+            width: 60px;
+        }
+
+        .bpm-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+    </style>
 </head>
 
 <body>
@@ -188,8 +324,52 @@
                 </div>
             </div>
 
-        </div>
+            <!-- NEW PLAYER PANEL -->
 
+            <div class="panel" id="playerPanel">
+
+                <div class="panel-header">Player</div>
+
+                <div class="panel-body player-body">
+
+                    <div class="player-row">
+
+                        <button id="playPauseBtn" class="player-field">▶</button>
+
+                        <button id="stopBtn" class="player-field">■</button>
+
+                        <div class="player-field">
+                            <label>MetaTime</label>
+                            <input id="metaTimeDisplay" class="player-field" type="text" readonly value="1" />
+                        </div>
+
+                        <div class="player-field bpm-field">
+                            <label>BPM</label>
+
+                            <div class="bpm-controls">
+
+                                <button id="bpmDownBtn" class="player-field">-</button>
+
+                                <input id="bpmDisplay" type="text" class="player-field" readonly value="120" />
+
+                                <button id="bpmUpBtn" class="player-field">+</button>
+
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="player-slider-row">
+
+                        <input id="metaSlider" class="player-field" type="range" min="1" max="100" value="1" step="1" />
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
         <div id="divider"></div>
         <div id="viewport"></div>
 
@@ -248,6 +428,185 @@
         import * as THREE from 'https://esm.sh/three@0.160.0';
         import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
+        // --------------------------------
+
+        function focusEvent(metaTime) {
+            const rows = document.querySelectorAll("#events .metaTime");
+
+            for (let row of rows) {
+                //console.log("row.metaTime", metaTime, row.metaTime);
+
+                if (row.metaTime == metaTime) {
+                    row.scrollIntoView({ behavior: "smooth", block: "center" });
+                    row.classList.add("focused");
+                    selectedElements.add(row);
+
+
+
+                    break;
+                }
+            }
+            // console.log("focusEvent done: " + metaTime);
+        }
+
+        function focusOutline(metaTime) {
+            const rows = document.querySelectorAll("#outline .metaTime");
+
+            let first = null;
+
+            for (let row of rows) {
+                if (row.metaTime == metaTime) {
+                    first = row;
+                    break;
+                }
+            }
+            if (first) {
+                first.scrollIntoView({ behavior: "smooth", block: "center" });
+                first.classList.add("focused");
+                selectedElements.add(first);
+            }
+            // console.log("focusOutline done: " + metaTime, rows, " and first is ", first);
+        }
+
+        function clearFocus() {
+            document.querySelectorAll(".focused")
+                .forEach(el => el.classList.remove("focused"));
+        }
+
+        // ---------------------
+        function renderSceneAtMetaTime(t) {
+            console.log("renderSceneAtMetaTime", t);
+            focusEvent(t);
+            focusOutline(t);
+        }
+
+        // -------------------------------
+        const playerState = {
+            isPlaying: false,
+            metaTime: 1,
+            maxMetaTime: 100,
+            bpm: 120,
+            timer: null,
+        };
+
+        const slider = document.getElementById("metaSlider");
+
+        slider.min = 1;
+        slider.max = playerState.maxMetaTime;
+        slider.value = playerState.metaTime;
+
+        function renderPlayerUI() {
+
+            document.getElementById("metaTimeDisplay").value =
+                playerState.metaTime;
+
+            document.getElementById("bpmDisplay").value =
+                playerState.bpm;
+
+            document.getElementById("metaSlider").value =
+                playerState.metaTime;
+
+            document.getElementById("playPauseBtn").textContent =
+                playerState.isPlaying ? "⏸" : "▶";
+        }
+
+        function beatDurationMs() {
+            return (60 * 1000) / playerState.bpm;
+        }
+
+        function tickPlayback() {
+            if (!playerState.isPlaying) {
+                return;
+            }
+            playerState.metaTime++;
+            if (playerState.metaTime > playerState.maxMetaTime) {
+                playerState.metaTime = playerState.maxMetaTime;
+                stopPlayback();
+                return;
+            }
+            renderSceneAtMetaTime(playerState.metaTime);
+            renderPlayerUI();
+            playerState.timer = setTimeout(
+                tickPlayback,
+                beatDurationMs()
+            );
+        }
+
+        function startPlayback() {
+
+            if (playerState.isPlaying) {
+                return;
+            }
+
+            playerState.isPlaying = true;
+
+            renderPlayerUI();
+
+            tickPlayback();
+        }
+
+        function pausePlayback() {
+
+            playerState.isPlaying = false;
+
+            clearTimeout(playerState.timer);
+
+            renderPlayerUI();
+        }
+
+        function stopPlayback() {
+
+            pausePlayback();
+
+            playerState.metaTime = 1;
+
+            renderSceneAtMetaTime(playerState.metaTime);
+
+            renderPlayerUI();
+        }
+
+        document.getElementById("playPauseBtn")
+            .onclick = () => {
+
+                if (playerState.isPlaying) {
+                    pausePlayback();
+                } else {
+                    startPlayback();
+                }
+            };
+
+        document.getElementById("stopBtn")
+            .onclick = stopPlayback;
+
+        document.getElementById("bpmUpBtn")
+            .onclick = () => {
+
+                playerState.bpm += 5;
+
+                renderPlayerUI();
+            };
+
+        document.getElementById("bpmDownBtn")
+            .onclick = () => {
+
+                playerState.bpm =
+                    Math.max(5, playerState.bpm - 5);
+
+                renderPlayerUI();
+            };
+
+        document.getElementById("metaSlider")
+            .oninput = (e) => {
+
+                playerState.metaTime =
+                    Number(e.target.value);
+
+                renderSceneAtMetaTime(playerState.metaTime);
+
+                renderPlayerUI();
+            };
+
+        // --------------------------------------------------------
         const BoxDim = 0.23;
 
         const scene = new THREE.Scene();
@@ -863,10 +1222,10 @@
         function addMetaTimeElementForOutlineEdge(parentElm, outlineEdge, useEndTime = false, isAnchor = false, depth = 0) {
             const e = outlineEdge;
             const hasNested = typeof e.metaTimes != "number";
-            
+
             const metaTime = hasNested ? (useEndTime ? e.metaTimes[1] : e.metaTimes[0]) : e.metaTimes;
             // console.log(e.metaTimes + " " + ts);
-     
+
             const span = document.createElement("span");
             span.textContent = metaTime + (useEndTime ? (isAnchor ? " }" : " {") : "");
             span.className = "metaTime";
@@ -934,49 +1293,6 @@
             }
 
             walk(panel, outline);
-        }
-
-        function focusEvent(metaTime) {
-            const rows = document.querySelectorAll("#events .metaTime");
-
-            for (let row of rows) {
-                //console.log("row.metaTime", metaTime, row.metaTime);
-
-                if (row.metaTime == metaTime) {
-                    row.scrollIntoView({ behavior: "smooth", block: "center" });
-                    row.classList.add("focused");
-                    selectedElements.add(row);
-
-
-
-                    break;
-                }
-            }
-            // console.log("focusEvent done: " + metaTime);
-        }
-
-        function focusOutline(metaTime) {
-            const rows = document.querySelectorAll("#outline .metaTime");
-
-            let first = null;
-
-            for (let row of rows) {
-                if (row.metaTime == metaTime) {
-                    first = row;
-                    break;
-                }
-            }
-            if (first) {
-                first.scrollIntoView({ behavior: "smooth", block: "center" });
-                first.classList.add("focused");
-                selectedElements.add(first);
-            }
-            // console.log("focusOutline done: " + metaTime, rows, " and first is ", first);
-        }
-
-        function clearFocus() {
-            document.querySelectorAll(".focused")
-                .forEach(el => el.classList.remove("focused"));
         }
 
         // expose
