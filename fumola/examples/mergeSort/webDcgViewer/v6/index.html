@@ -72,6 +72,18 @@
             background: #000;
         }
 
+        .outline-value-text {
+            margin-left: 6px;
+            color: var(--blue-dark);
+            font-size: smaller;
+        }
+
+        .outline-value-text:hover {
+            /* font-size: larger; */
+            color: var(--blue);
+            background-color: var(--hover);
+        }
+
         .panel {
             display: flex;
             flex-direction: column;
@@ -168,6 +180,7 @@
         .adaptonPointer {
             color: #c0d7b5;
             cursor: pointer;
+            font-size: larger;
         }
 
         .adaptonPointer.focused {
@@ -262,6 +275,14 @@
             gap: 8px;
         }
 
+        .player-button {
+            padding-left: 16px;
+            padding-right: 16px;
+            padding-top: 6px;
+            padding-bottom: 6px;
+            font-size: 24px;
+        }
+
         .player-slider-row {
             width: 100%;
         }
@@ -334,9 +355,9 @@
 
                     <div class="player-row">
 
-                        <button id="playPauseBtn" class="player-field">▶</button>
+                        <button id="playPauseBtn" class="player-button">▶</button>
 
-                        <button id="stopBtn" class="player-field">■</button>
+                        <button id="stopBtn" class="player-button">■</button>
 
                         <div class="player-field">
                             <label>MetaTime</label>
@@ -1220,6 +1241,10 @@
 
         const marginFactor = 7;
 
+        function outlineMargin(depth = 0) {
+            // return (depth * 3) + "px"
+            return "9px"
+        }
 
         function addMetaTimeElementForOutlineEdge(parentElm, outlineEdge, useEndTime = false, isAnchor = false, depth = 0) {
             const e = outlineEdge;
@@ -1236,11 +1261,20 @@
                 span.metaTime = metaTime;
             };
             if (useEndTime && isAnchor) {
+                // begin time span
+                const span_ = document.createElement("span");
+                const beginMetaTime = e.metaTimes[0];
+                span_.textContent = beginMetaTime + ", ";
+                span_.className = "metaTime";
+                span_.onclick = () => onMetaTimeClick(beginMetaTime);
+              
                 //span.style.textDecoration = "underline";
                 //span.style.marginLeft = 0;
                 const div = document.createElement("div");
-                div.style.marginLeft = (depth * 3) + "px";
+                div.style.marginLeft = outlineMargin(depth);
+                div.appendChild(span_);
                 div.appendChild(span);
+       
                 parentElm.appendChild(div)
             } else {
                 parentElm.appendChild(span)
@@ -1255,7 +1289,7 @@
                 if (!node) return;
 
                 const div = document.createElement("div");
-                div.style.marginLeft = (depth * 3) + "px";
+                div.style.marginLeft = outlineMargin(depth);
                 // console.log(node);
 
                 if (depth == 0) {
@@ -1271,7 +1305,7 @@
                         let div = document.createElement("div");
                         const hasNested = typeof e.metaTimes != "number";
 
-                        div.style.marginLeft = (depth * 3) + "px"; // ???
+                        div.style.marginLeft = outlineMargin(depth); // ???
                         addMetaTimeElementForOutlineEdge(div, e);
                         if (hasNested) {
                             div.appendChild(document.createTextNode(", "));
@@ -1283,9 +1317,16 @@
                         div.appendChild(createPointerElm(e.actionTarget));
                         //if (hasNested) { div.appendChild(document.createTextNode(" {")) };
                         rootElm_.appendChild(div);
-                        walk(rootElm_, e.outline, depth + 1)
+                        walk(rootElm_, e.outline, depth + 1);
+                        
+                        const valueNode = document.createElement("span");
+                        valueNode.textContent = e.value;
+                        valueNode.className = "outline-value-text";
+                        div.appendChild(valueNode);
+                      
                         if (hasNested) {
                             //rootElm_.appendChild(document.createTextNode(e.metaTimes[1] + " }"))
+                            //addMetaTimeElementForOutlineEdge(rootElm_, e, false, true, depth)
                             addMetaTimeElementForOutlineEdge(rootElm_, e, true, true, depth)
                             //rootElm_.appendChild(document.createTextNode(" }"))
                         };

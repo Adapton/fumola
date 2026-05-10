@@ -540,7 +540,13 @@ module {
         };
 
         public func fromShowAction(showAction : OutlineAction) : Text {
-            debug_show (debug_show showAction)
+            // debug_show (debug_show showAction)
+            debug_show (switch showAction {
+                case (#get) "get";
+                case (#put) "put";
+                case (#putForce) "put,force";
+                case (#force_) "force";
+            })
         };
 
         public func fromOutlineEdges(outlineEdges : [OutlineEdge]) : Text {
