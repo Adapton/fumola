@@ -350,7 +350,7 @@
 
                                 <button id="bpmDownBtn" class="player-field">-</button>
 
-                                <input id="bpmDisplay" type="text" class="player-field" readonly value="120" />
+                                <input id="bpmDisplay" type="text" class="player-field" readonly value="520" />
 
                                 <button id="bpmUpBtn" class="player-field">+</button>
 
@@ -361,7 +361,7 @@
 
                     <div class="player-slider-row">
 
-                        <input id="metaSlider" class="player-field" type="range" min="1" max="100" value="1" step="1" />
+                        <input id="metaSlider" class="player-field" type="range" min="1" max="280" value="1" step="1" />
 
                     </div>
 
@@ -484,8 +484,8 @@
         const playerState = {
             isPlaying: false,
             metaTime: 1,
-            maxMetaTime: 100,
-            bpm: 120,
+            maxMetaTime: 280,
+            bpm: 520,
             timer: null,
         };
 
@@ -563,6 +563,8 @@
             renderSceneAtMetaTime(playerState.metaTime);
 
             renderPlayerUI();
+
+            clearFocus();
         }
 
         document.getElementById("playPauseBtn")
@@ -581,7 +583,7 @@
         document.getElementById("bpmUpBtn")
             .onclick = () => {
 
-                playerState.bpm += 5;
+                playerState.bpm += 60;
 
                 renderPlayerUI();
             };
@@ -590,7 +592,7 @@
             .onclick = () => {
 
                 playerState.bpm =
-                    Math.max(5, playerState.bpm - 5);
+                    Math.max(1, playerState.bpm - 60);
 
                 renderPlayerUI();
             };
@@ -1289,7 +1291,7 @@
                         };
                     }
                     );
-                } focusEvent
+                } 
             }
 
             walk(panel, outline);
