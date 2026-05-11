@@ -16,7 +16,7 @@
             --border: #2a2f3a;
             --border-soft: #222733;
 
-            --text: #d8dee9;
+            --text: #a1aabb;
             --text-dim: #97a2b3;
             --text-faint: #6f7b8d;
 
@@ -267,21 +267,16 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            background-color: var(--bg-panel)
         }
 
         .player-row {
             display: flex;
             align-items: center;
             gap: 8px;
+            background-color: var(--bg-panel)
         }
 
-        .player-button {
-            padding-left: 16px;
-            padding-right: 16px;
-            padding-top: 6px;
-            padding-bottom: 6px;
-            font-size: 24px;
-        }
 
         .player-slider-row {
             width: 100%;
@@ -292,20 +287,52 @@
         }
 
         .player-field {
+            padding-left: 16px;
+            padding-right: 16px;
+            padding-top: 1px;
+            padding-bottom: 1px;
+            font-size: 22px;
             display: flex;
             flex-direction: column;
             gap: 2px;
             background: var(--bg);
             color: var(--text);
+            background-color: var(--bg-panel);
+            border-radius: 3px;
+            border-color: var(--active);
+        }
+
+
+        .bpm-field {
+            font-size: 22px;
+            background: var(--bg);
+            color: var(--text);
+            background-color: var(--bg-panel);
+            border-radius: 3px;
+            border-color: var(--active);
+            min-width: 100px;
+        }
+
+        .player-button {
+            padding-left: 16px;
+            padding-right: 16px;
+            padding-top: 6px;
+            padding-bottom: 6px;
+            font-size: 24px;
+            background-color: var(--bg-elev);
+            border-radius: 3px;
+            border-color: var(--active);
+            color: var(--text);
         }
 
         .player-field label {
-            font-size: 11px;
+            font-size: 23px;
             opacity: 0.7;
+            text-align: center;
         }
 
         .player-field input {
-            width: 60px;
+            width: 160px;
         }
 
         .bpm-controls {
@@ -369,11 +396,11 @@
 
                             <div class="bpm-controls">
 
-                                <button id="bpmDownBtn" class="player-field">-</button>
+                                <button id="bpmDownBtn" class="player-button">-</button>
 
-                                <input id="bpmDisplay" type="text" class="player-field" readonly value="520" />
+                                <input id="bpmDisplay" type="text" class="bpm-field" readonly value="1337" />
 
-                                <button id="bpmUpBtn" class="player-field">+</button>
+                                <button id="bpmUpBtn" class="player-button">+</button>
 
                             </div>
                         </div>
@@ -506,7 +533,7 @@
             isPlaying: false,
             metaTime: 1,
             maxMetaTime: 280,
-            bpm: 520,
+            bpm: 1337,
             timer: null,
         };
 
@@ -613,7 +640,7 @@
             .onclick = () => {
 
                 playerState.bpm =
-                    Math.max(1, playerState.bpm - 60);
+                    Math.max(17, playerState.bpm - 60);
 
                 renderPlayerUI();
             };
