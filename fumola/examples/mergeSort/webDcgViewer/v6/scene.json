@@ -800,9 +800,750 @@
 ]
 ,
 "nodes": 
-{}
+[
+{ "metaTime":1, "nodeId": "(@adaptonSpace (scene), @adaptonTime (@now), 1)", "node": { "type": "thunk" , "body": "@thunk ({ let inputArray = R.generateRandomInput(seed, size); let inputList_ = `ListFromRandomArray := thunk { do within space `inputList{ List.fromIter(inputArray.vals()) } }; let inputList = force (inputList_); let inputTree_ = `LevelTreeFromList := thunk { do within space `inputTree{ Seq.fromList(inputList) }; }; let inputTree = force (inputTree_); let lazySorted_ = do within space `lazyMergeSort{ Seq.lazyMergeSort(inputTree); }; let sorted = do within space `forceSort{ LazyList.takeN_(lazySorted_, size); }; let components = {inputArray=inputArray; inputList_; inputList; inputTree_; inputTree; lazySorted_; sorted}; {components=components} })", "trace": [
+
+], "space": "@adaptonSpace (@here)", "result": null}},
+{ "metaTime":3, "nodeId": "(@adaptonSpace (ListFromRandomArray), @adaptonTime (@now), 3)", "node": { "type": "thunk" , "body": "@thunk ({ do within space `inputList{ List.fromIter(inputArray.vals()) } })", "trace": [
+
+], "space": "@adaptonSpace (@here)", "result": null}},
+{ "metaTime":5, "nodeId": "(@adaptonSpace (inputList(10)), @adaptonTime (@now), 5)", "node": { "type": "nonThunk" , "value": "null"}},
+{ "metaTime":6, "nodeId": "(@adaptonSpace (inputList(9)), @adaptonTime (@now), 6)", "node": { "type": "nonThunk" , "value": "?{element = 545; next = inputList(10); symbol = 10}"}},
+{ "metaTime":7, "nodeId": "(@adaptonSpace (inputList(8)), @adaptonTime (@now), 7)", "node": { "type": "nonThunk" , "value": "?{element = 1306; next = inputList(9); symbol = 9}"}},
+{ "metaTime":8, "nodeId": "(@adaptonSpace (inputList(7)), @adaptonTime (@now), 8)", "node": { "type": "nonThunk" , "value": "?{element = 581; next = inputList(8); symbol = 8}"}},
+{ "metaTime":9, "nodeId": "(@adaptonSpace (inputList(6)), @adaptonTime (@now), 9)", "node": { "type": "nonThunk" , "value": "?{element = 777; next = inputList(7); symbol = 7}"}},
+{ "metaTime":10, "nodeId": "(@adaptonSpace (inputList(5)), @adaptonTime (@now), 10)", "node": { "type": "nonThunk" , "value": "?{element = 1191; next = inputList(6); symbol = 6}"}},
+{ "metaTime":11, "nodeId": "(@adaptonSpace (inputList(4)), @adaptonTime (@now), 11)", "node": { "type": "nonThunk" , "value": "?{element = 195; next = inputList(5); symbol = 5}"}},
+{ "metaTime":12, "nodeId": "(@adaptonSpace (inputList(3)), @adaptonTime (@now), 12)", "node": { "type": "nonThunk" , "value": "?{element = 55; next = inputList(4); symbol = 4}"}},
+{ "metaTime":13, "nodeId": "(@adaptonSpace (inputList(2)), @adaptonTime (@now), 13)", "node": { "type": "nonThunk" , "value": "?{element = 1192; next = inputList(3); symbol = 3}"}},
+{ "metaTime":14, "nodeId": "(@adaptonSpace (inputList(1)), @adaptonTime (@now), 14)", "node": { "type": "nonThunk" , "value": "?{element = 0; next = inputList(2); symbol = 2}"}},
+{ "metaTime":15, "nodeId": "(@adaptonSpace (ListFromRandomArray), @adaptonTime (@now), 3)", "node": { "type": "thunk" , "body": "@thunk ({ do within space `inputList{ List.fromIter(inputArray.vals()) } })", "trace": [
+"#edgeId(1003)",
+"#edgeId(1004)",
+"#edgeId(1005)",
+"#edgeId(1006)",
+"#edgeId(1007)",
+"#edgeId(1008)",
+"#edgeId(1009)",
+"#edgeId(1010)",
+"#edgeId(1011)",
+"#edgeId(1012)"
+], "space": "@adaptonSpace (@here)", "result": [15, "?{element = 470; next = inputList(1); symbol = 1}"]}},
+{ "metaTime":16, "nodeId": "(@adaptonSpace (LevelTreeFromList), @adaptonTime (@now), 16)", "node": { "type": "thunk" , "body": "@thunk ({ do within space `inputTree{ Seq.fromList(inputList) }; })", "trace": [
+
+], "space": "@adaptonSpace (@here)", "result": null}},
+{ "metaTime":18, "nodeId": "(@adaptonSpace (inputTree(`(nilList))), @adaptonTime (@now), 18)", "node": { "type": "nonThunk" , "value": "null"}},
+{ "metaTime":19, "nodeId": "(@adaptonSpace (inputTree(1-element)), @adaptonTime (@now), 19)", "node": { "type": "nonThunk" , "value": "#element{element = 470; symbol = 1}"}},
+{ "metaTime":21, "nodeId": "(@adaptonSpace (inputTree(2-element)), @adaptonTime (@now), 21)", "node": { "type": "nonThunk" , "value": "#element{element = 0; symbol = 2}"}},
+{ "metaTime":22, "nodeId": "(@adaptonSpace (inputTree(2-rec1)), @adaptonTime (@now), 22)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":25, "nodeId": "(@adaptonSpace (inputTree(2-rec1)), @adaptonTime (@now), 22)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+"#edgeId(1020)"
+], "space": "@adaptonSpace (inputTree)", "result": [25, "(inputTree(2-element), inputList(2))"]}},
+{ "metaTime":26, "nodeId": "(@adaptonSpace (inputTree(2-binary)), @adaptonTime (@now), 26)", "node": { "type": "nonThunk" , "value": "#binary{left = inputTree(1-element); level = 64; right = inputTree(2-element); symbol = 2}"}},
+{ "metaTime":27, "nodeId": "(@adaptonSpace (inputTree(2-rec2)), @adaptonTime (@now), 27)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":30, "nodeId": "(@adaptonSpace (inputTree(3-element)), @adaptonTime (@now), 30)", "node": { "type": "nonThunk" , "value": "#element{element = 1192; symbol = 3}"}},
+{ "metaTime":31, "nodeId": "(@adaptonSpace (inputTree(3-rec1)), @adaptonTime (@now), 31)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":34, "nodeId": "(@adaptonSpace (inputTree(3-rec1)), @adaptonTime (@now), 31)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+"#edgeId(1027)"
+], "space": "@adaptonSpace (inputTree)", "result": [34, "(inputTree(3-element), inputList(3))"]}},
+{ "metaTime":35, "nodeId": "(@adaptonSpace (inputTree(3-binary)), @adaptonTime (@now), 35)", "node": { "type": "nonThunk" , "value": "#binary{left = inputTree(2-binary); level = 262144; right = inputTree(3-element); symbol = 3}"}},
+{ "metaTime":36, "nodeId": "(@adaptonSpace (inputTree(3-rec2)), @adaptonTime (@now), 36)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":39, "nodeId": "(@adaptonSpace (inputTree(4-element)), @adaptonTime (@now), 39)", "node": { "type": "nonThunk" , "value": "#element{element = 55; symbol = 4}"}},
+{ "metaTime":40, "nodeId": "(@adaptonSpace (inputTree(4-rec1)), @adaptonTime (@now), 40)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":43, "nodeId": "(@adaptonSpace (inputTree(4-rec1)), @adaptonTime (@now), 40)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+"#edgeId(1034)"
+], "space": "@adaptonSpace (inputTree)", "result": [43, "(inputTree(4-element), inputList(4))"]}},
+{ "metaTime":44, "nodeId": "(@adaptonSpace (inputTree(4-binary)), @adaptonTime (@now), 44)", "node": { "type": "nonThunk" , "value": "#binary{left = inputTree(3-binary); level = 262272; right = inputTree(4-element); symbol = 4}"}},
+{ "metaTime":45, "nodeId": "(@adaptonSpace (inputTree(4-rec2)), @adaptonTime (@now), 45)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":48, "nodeId": "(@adaptonSpace (inputTree(5-element)), @adaptonTime (@now), 48)", "node": { "type": "nonThunk" , "value": "#element{element = 195; symbol = 5}"}},
+{ "metaTime":49, "nodeId": "(@adaptonSpace (inputTree(5-rec1)), @adaptonTime (@now), 49)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":52, "nodeId": "(@adaptonSpace (inputTree(6-element)), @adaptonTime (@now), 52)", "node": { "type": "nonThunk" , "value": "#element{element = 1191; symbol = 6}"}},
+{ "metaTime":53, "nodeId": "(@adaptonSpace (inputTree(6-rec1)), @adaptonTime (@now), 53)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":56, "nodeId": "(@adaptonSpace (inputTree(6-rec1)), @adaptonTime (@now), 53)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+"#edgeId(1044)"
+], "space": "@adaptonSpace (inputTree)", "result": [56, "(inputTree(6-element), inputList(6))"]}},
+{ "metaTime":57, "nodeId": "(@adaptonSpace (inputTree(6-binary)), @adaptonTime (@now), 57)", "node": { "type": "nonThunk" , "value": "#binary{left = inputTree(5-element); level = 4224; right = inputTree(6-element); symbol = 6}"}},
+{ "metaTime":58, "nodeId": "(@adaptonSpace (inputTree(6-rec2)), @adaptonTime (@now), 58)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":61, "nodeId": "(@adaptonSpace (inputTree(7-element)), @adaptonTime (@now), 61)", "node": { "type": "nonThunk" , "value": "#element{element = 777; symbol = 7}"}},
+{ "metaTime":62, "nodeId": "(@adaptonSpace (inputTree(7-rec1)), @adaptonTime (@now), 62)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":65, "nodeId": "(@adaptonSpace (inputTree(7-rec1)), @adaptonTime (@now), 62)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+"#edgeId(1051)"
+], "space": "@adaptonSpace (inputTree)", "result": [65, "(inputTree(7-element), inputList(7))"]}},
+{ "metaTime":66, "nodeId": "(@adaptonSpace (inputTree(7-binary)), @adaptonTime (@now), 66)", "node": { "type": "nonThunk" , "value": "#binary{left = inputTree(6-binary); level = 8321; right = inputTree(7-element); symbol = 7}"}},
+{ "metaTime":67, "nodeId": "(@adaptonSpace (inputTree(7-rec2)), @adaptonTime (@now), 67)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":70, "nodeId": "(@adaptonSpace (inputTree(8-element)), @adaptonTime (@now), 70)", "node": { "type": "nonThunk" , "value": "#element{element = 581; symbol = 8}"}},
+{ "metaTime":71, "nodeId": "(@adaptonSpace (inputTree(8-rec1)), @adaptonTime (@now), 71)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":74, "nodeId": "(@adaptonSpace (inputTree(8-rec1)), @adaptonTime (@now), 71)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+"#edgeId(1058)"
+], "space": "@adaptonSpace (inputTree)", "result": [74, "(inputTree(8-element), inputList(8))"]}},
+{ "metaTime":75, "nodeId": "(@adaptonSpace (inputTree(8-binary)), @adaptonTime (@now), 75)", "node": { "type": "nonThunk" , "value": "#binary{left = inputTree(7-binary); level = 262144; right = inputTree(8-element); symbol = 8}"}},
+{ "metaTime":76, "nodeId": "(@adaptonSpace (inputTree(8-rec2)), @adaptonTime (@now), 76)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":79, "nodeId": "(@adaptonSpace (inputTree(8-rec2)), @adaptonTime (@now), 76)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+"#edgeId(1062)"
+], "space": "@adaptonSpace (inputTree)", "result": [79, "(inputTree(8-binary), inputList(8))"]}},
+{ "metaTime":80, "nodeId": "(@adaptonSpace (inputTree(7-rec2)), @adaptonTime (@now), 67)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+"#edgeId(1055)",
+"#edgeId(1056)",
+"#edgeId(1057)",
+"#edgeId(1059)",
+"#edgeId(1060)",
+"#edgeId(1061)",
+"#edgeId(1063)"
+], "space": "@adaptonSpace (inputTree)", "result": [80, "(inputTree(8-binary), inputList(8))"]}},
+{ "metaTime":81, "nodeId": "(@adaptonSpace (inputTree(6-rec2)), @adaptonTime (@now), 58)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+"#edgeId(1048)",
+"#edgeId(1049)",
+"#edgeId(1050)",
+"#edgeId(1052)",
+"#edgeId(1053)",
+"#edgeId(1054)",
+"#edgeId(1064)"
+], "space": "@adaptonSpace (inputTree)", "result": [81, "(inputTree(8-binary), inputList(8))"]}},
+{ "metaTime":82, "nodeId": "(@adaptonSpace (inputTree(5-rec1)), @adaptonTime (@now), 49)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+"#edgeId(1041)",
+"#edgeId(1042)",
+"#edgeId(1043)",
+"#edgeId(1045)",
+"#edgeId(1046)",
+"#edgeId(1047)",
+"#edgeId(1065)"
+], "space": "@adaptonSpace (inputTree)", "result": [82, "(inputTree(8-binary), inputList(8))"]}},
+{ "metaTime":83, "nodeId": "(@adaptonSpace (inputTree(5-binary)), @adaptonTime (@now), 83)", "node": { "type": "nonThunk" , "value": "#binary{left = inputTree(4-binary); level = 266240; right = inputTree(8-binary); symbol = 5}"}},
+{ "metaTime":84, "nodeId": "(@adaptonSpace (inputTree(5-rec2)), @adaptonTime (@now), 84)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":87, "nodeId": "(@adaptonSpace (inputTree(9-element)), @adaptonTime (@now), 87)", "node": { "type": "nonThunk" , "value": "#element{element = 1306; symbol = 9}"}},
+{ "metaTime":88, "nodeId": "(@adaptonSpace (inputTree(9-rec1)), @adaptonTime (@now), 88)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":91, "nodeId": "(@adaptonSpace (inputTree(10-element)), @adaptonTime (@now), 91)", "node": { "type": "nonThunk" , "value": "#element{element = 545; symbol = 10}"}},
+{ "metaTime":92, "nodeId": "(@adaptonSpace (inputTree(10-rec1)), @adaptonTime (@now), 92)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":95, "nodeId": "(@adaptonSpace (inputTree(10-rec1)), @adaptonTime (@now), 92)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+"#edgeId(1075)"
+], "space": "@adaptonSpace (inputTree)", "result": [95, "(inputTree(10-element), inputTree(`(nilList)))"]}},
+{ "metaTime":96, "nodeId": "(@adaptonSpace (inputTree(10-binary)), @adaptonTime (@now), 96)", "node": { "type": "nonThunk" , "value": "#binary{left = inputTree(9-element); level = 4162; right = inputTree(10-element); symbol = 10}"}},
+{ "metaTime":97, "nodeId": "(@adaptonSpace (inputTree(10-rec2)), @adaptonTime (@now), 97)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":100, "nodeId": "(@adaptonSpace (inputTree(10-rec2)), @adaptonTime (@now), 97)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+"#edgeId(1079)"
+], "space": "@adaptonSpace (inputTree)", "result": [100, "(inputTree(10-binary), inputTree(`(nilList)))"]}},
+{ "metaTime":101, "nodeId": "(@adaptonSpace (inputTree(9-rec1)), @adaptonTime (@now), 88)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "trace": [
+"#edgeId(1072)",
+"#edgeId(1073)",
+"#edgeId(1074)",
+"#edgeId(1076)",
+"#edgeId(1077)",
+"#edgeId(1078)",
+"#edgeId(1080)"
+], "space": "@adaptonSpace (inputTree)", "result": [101, "(inputTree(10-binary), inputTree(`(nilList)))"]}},
+{ "metaTime":102, "nodeId": "(@adaptonSpace (inputTree(9-binary)), @adaptonTime (@now), 102)", "node": { "type": "nonThunk" , "value": "#binary{left = inputTree(5-binary); level = 786433; right = inputTree(10-binary); symbol = 9}"}},
+{ "metaTime":103, "nodeId": "(@adaptonSpace (inputTree(9-rec2)), @adaptonTime (@now), 103)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+
+], "space": "@adaptonSpace (inputTree)", "result": null}},
+{ "metaTime":106, "nodeId": "(@adaptonSpace (inputTree(9-rec2)), @adaptonTime (@now), 103)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+"#edgeId(1084)"
+], "space": "@adaptonSpace (inputTree)", "result": [106, "(inputTree(9-binary), inputTree(`(nilList)))"]}},
+{ "metaTime":107, "nodeId": "(@adaptonSpace (inputTree(5-rec2)), @adaptonTime (@now), 84)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+"#edgeId(1069)",
+"#edgeId(1070)",
+"#edgeId(1071)",
+"#edgeId(1081)",
+"#edgeId(1082)",
+"#edgeId(1083)",
+"#edgeId(1085)"
+], "space": "@adaptonSpace (inputTree)", "result": [107, "(inputTree(9-binary), inputTree(`(nilList)))"]}},
+{ "metaTime":108, "nodeId": "(@adaptonSpace (inputTree(4-rec2)), @adaptonTime (@now), 45)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+"#edgeId(1038)",
+"#edgeId(1039)",
+"#edgeId(1040)",
+"#edgeId(1066)",
+"#edgeId(1067)",
+"#edgeId(1068)",
+"#edgeId(1086)"
+], "space": "@adaptonSpace (inputTree)", "result": [108, "(inputTree(9-binary), inputTree(`(nilList)))"]}},
+{ "metaTime":109, "nodeId": "(@adaptonSpace (inputTree(3-rec2)), @adaptonTime (@now), 36)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+"#edgeId(1031)",
+"#edgeId(1032)",
+"#edgeId(1033)",
+"#edgeId(1035)",
+"#edgeId(1036)",
+"#edgeId(1037)",
+"#edgeId(1087)"
+], "space": "@adaptonSpace (inputTree)", "result": [109, "(inputTree(9-binary), inputTree(`(nilList)))"]}},
+{ "metaTime":110, "nodeId": "(@adaptonSpace (inputTree(2-rec2)), @adaptonTime (@now), 27)", "node": { "type": "thunk" , "body": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "trace": [
+"#edgeId(1024)",
+"#edgeId(1025)",
+"#edgeId(1026)",
+"#edgeId(1028)",
+"#edgeId(1029)",
+"#edgeId(1030)",
+"#edgeId(1088)"
+], "space": "@adaptonSpace (inputTree)", "result": [110, "(inputTree(9-binary), inputTree(`(nilList)))"]}},
+{ "metaTime":111, "nodeId": "(@adaptonSpace (LevelTreeFromList), @adaptonTime (@now), 16)", "node": { "type": "thunk" , "body": "@thunk ({ do within space `inputTree{ Seq.fromList(inputList) }; })", "trace": [
+"#edgeId(1015)",
+"#edgeId(1016)",
+"#edgeId(1017)",
+"#edgeId(1018)",
+"#edgeId(1019)",
+"#edgeId(1021)",
+"#edgeId(1022)",
+"#edgeId(1023)",
+"#edgeId(1089)"
+], "space": "@adaptonSpace (@here)", "result": [111, "?inputTree(9-binary)"]}},
+{ "metaTime":112, "nodeId": "(@adaptonSpace (lazyMergeSort(`(nilList))), @adaptonTime (@now), 112)", "node": { "type": "thunk" , "body": "@thunk ({ null })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort)", "result": null}},
+{ "metaTime":113, "nodeId": "(@adaptonSpace (lazyMergeSort(result)), @adaptonTime (@now), 113)", "node": { "type": "thunk" , "body": "@thunk ({ reduceUp(@ (t!), null, func (symbol: Symbol, element: X) : LazyList<X> { ?{symbol=symbol; element; next=nilList} }, func (symbol: Symbol, xs: LazyList<X>, ys: LazyList<X>) : LazyList<X> { do within space (`merge - symbol){ LazyList.merge(xs, ys) } },) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort)", "result": null}},
+{ "metaTime":116, "nodeId": "(@adaptonSpace (lazyMergeSort(9)), @adaptonTime (@now), 116)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort)", "result": null}},
+{ "metaTime":119, "nodeId": "(@adaptonSpace (lazyMergeSort(5)), @adaptonTime (@now), 119)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort)", "result": null}},
+{ "metaTime":122, "nodeId": "(@adaptonSpace (lazyMergeSort(4)), @adaptonTime (@now), 122)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort)", "result": null}},
+{ "metaTime":125, "nodeId": "(@adaptonSpace (lazyMergeSort(3)), @adaptonTime (@now), 125)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort)", "result": null}},
+{ "metaTime":128, "nodeId": "(@adaptonSpace (lazyMergeSort(2)), @adaptonTime (@now), 128)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort)", "result": null}},
+{ "metaTime":132, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 132)", "node": { "type": "nonThunk" , "value": "1"}},
+{ "metaTime":133, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-2)(2)), @adaptonTime (@now), 133)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-2))", "result": null}},
+{ "metaTime":134, "nodeId": "(@adaptonSpace (lazyMergeSort(2)), @adaptonTime (@now), 128)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+"#edgeId(1103)",
+"#edgeId(1104)",
+"#edgeId(1105)"
+], "space": "@adaptonSpace (lazyMergeSort)", "result": [134, "?{element = 0; next = lazyMergeSort(merge-2)(2); symbol = 2}"]}},
+{ "metaTime":136, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 136)", "node": { "type": "nonThunk" , "value": "2"}},
+{ "metaTime":137, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-3)(2)), @adaptonTime (@now), 137)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-3))", "result": null}},
+{ "metaTime":138, "nodeId": "(@adaptonSpace (lazyMergeSort(3)), @adaptonTime (@now), 125)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+"#edgeId(1101)",
+"#edgeId(1102)",
+"#edgeId(1106)",
+"#edgeId(1107)",
+"#edgeId(1108)"
+], "space": "@adaptonSpace (lazyMergeSort)", "result": [138, "?{element = 0; next = lazyMergeSort(merge-3)(2); symbol = 2}"]}},
+{ "metaTime":140, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 140)", "node": { "type": "nonThunk" , "value": "3"}},
+{ "metaTime":141, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-4)(2)), @adaptonTime (@now), 141)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-4))", "result": null}},
+{ "metaTime":142, "nodeId": "(@adaptonSpace (lazyMergeSort(4)), @adaptonTime (@now), 122)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+"#edgeId(1099)",
+"#edgeId(1100)",
+"#edgeId(1109)",
+"#edgeId(1110)",
+"#edgeId(1111)"
+], "space": "@adaptonSpace (lazyMergeSort)", "result": [142, "?{element = 0; next = lazyMergeSort(merge-4)(2); symbol = 2}"]}},
+{ "metaTime":144, "nodeId": "(@adaptonSpace (lazyMergeSort(8)), @adaptonTime (@now), 144)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort)", "result": null}},
+{ "metaTime":147, "nodeId": "(@adaptonSpace (lazyMergeSort(7)), @adaptonTime (@now), 147)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort)", "result": null}},
+{ "metaTime":150, "nodeId": "(@adaptonSpace (lazyMergeSort(6)), @adaptonTime (@now), 150)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort)", "result": null}},
+{ "metaTime":154, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 154)", "node": { "type": "nonThunk" , "value": "4"}},
+{ "metaTime":155, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-6)(5)), @adaptonTime (@now), 155)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-6))", "result": null}},
+{ "metaTime":156, "nodeId": "(@adaptonSpace (lazyMergeSort(6)), @adaptonTime (@now), 150)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+"#edgeId(1119)",
+"#edgeId(1120)",
+"#edgeId(1121)"
+], "space": "@adaptonSpace (lazyMergeSort)", "result": [156, "?{element = 195; next = lazyMergeSort(merge-6)(5); symbol = 5}"]}},
+{ "metaTime":158, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 158)", "node": { "type": "nonThunk" , "value": "5"}},
+{ "metaTime":159, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-7)(5)), @adaptonTime (@now), 159)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-7))", "result": null}},
+{ "metaTime":160, "nodeId": "(@adaptonSpace (lazyMergeSort(7)), @adaptonTime (@now), 147)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+"#edgeId(1117)",
+"#edgeId(1118)",
+"#edgeId(1122)",
+"#edgeId(1123)",
+"#edgeId(1124)"
+], "space": "@adaptonSpace (lazyMergeSort)", "result": [160, "?{element = 195; next = lazyMergeSort(merge-7)(5); symbol = 5}"]}},
+{ "metaTime":162, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 162)", "node": { "type": "nonThunk" , "value": "6"}},
+{ "metaTime":163, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-8)(5)), @adaptonTime (@now), 163)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-8))", "result": null}},
+{ "metaTime":164, "nodeId": "(@adaptonSpace (lazyMergeSort(8)), @adaptonTime (@now), 144)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+"#edgeId(1115)",
+"#edgeId(1116)",
+"#edgeId(1125)",
+"#edgeId(1126)",
+"#edgeId(1127)"
+], "space": "@adaptonSpace (lazyMergeSort)", "result": [164, "?{element = 195; next = lazyMergeSort(merge-8)(5); symbol = 5}"]}},
+{ "metaTime":165, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 165)", "node": { "type": "nonThunk" , "value": "7"}},
+{ "metaTime":166, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-5)(2)), @adaptonTime (@now), 166)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-5))", "result": null}},
+{ "metaTime":167, "nodeId": "(@adaptonSpace (lazyMergeSort(5)), @adaptonTime (@now), 119)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+"#edgeId(1097)",
+"#edgeId(1098)",
+"#edgeId(1112)",
+"#edgeId(1113)",
+"#edgeId(1114)",
+"#edgeId(1128)",
+"#edgeId(1129)"
+], "space": "@adaptonSpace (lazyMergeSort)", "result": [167, "?{element = 0; next = lazyMergeSort(merge-5)(2); symbol = 2}"]}},
+{ "metaTime":169, "nodeId": "(@adaptonSpace (lazyMergeSort(10)), @adaptonTime (@now), 169)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort)", "result": null}},
+{ "metaTime":173, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 173)", "node": { "type": "nonThunk" , "value": "8"}},
+{ "metaTime":174, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-10)(10)), @adaptonTime (@now), 174)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-10))", "result": null}},
+{ "metaTime":175, "nodeId": "(@adaptonSpace (lazyMergeSort(10)), @adaptonTime (@now), 169)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+"#edgeId(1133)",
+"#edgeId(1134)",
+"#edgeId(1135)"
+], "space": "@adaptonSpace (lazyMergeSort)", "result": [175, "?{element = 545; next = lazyMergeSort(merge-10)(10); symbol = 10}"]}},
+{ "metaTime":176, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 176)", "node": { "type": "nonThunk" , "value": "9"}},
+{ "metaTime":177, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(2)), @adaptonTime (@now), 177)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": null}},
+{ "metaTime":178, "nodeId": "(@adaptonSpace (lazyMergeSort(9)), @adaptonTime (@now), 116)", "node": { "type": "thunk" , "body": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "trace": [
+"#edgeId(1095)",
+"#edgeId(1096)",
+"#edgeId(1130)",
+"#edgeId(1131)",
+"#edgeId(1132)",
+"#edgeId(1136)",
+"#edgeId(1137)"
+], "space": "@adaptonSpace (lazyMergeSort)", "result": [178, "?{element = 0; next = lazyMergeSort(merge-9)(2); symbol = 2}"]}},
+{ "metaTime":179, "nodeId": "(@adaptonSpace (lazyMergeSort(result)), @adaptonTime (@now), 113)", "node": { "type": "thunk" , "body": "@thunk ({ reduceUp(@ (t!), null, func (symbol: Symbol, element: X) : LazyList<X> { ?{symbol=symbol; element; next=nilList} }, func (symbol: Symbol, xs: LazyList<X>, ys: LazyList<X>) : LazyList<X> { do within space (`merge - symbol){ LazyList.merge(xs, ys) } },) })", "trace": [
+"#edgeId(1093)",
+"#edgeId(1094)",
+"#edgeId(1138)"
+], "space": "@adaptonSpace (lazyMergeSort)", "result": [179, "?{element = 0; next = lazyMergeSort(merge-9)(2); symbol = 2}"]}},
+{ "metaTime":186, "nodeId": "(@adaptonSpace (lazyMergeSort(`(nilList))), @adaptonTime (@now), 112)", "node": { "type": "thunk" , "body": "@thunk ({ null })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort)", "result": [186, "null"]}},
+{ "metaTime":187, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-2)(2)), @adaptonTime (@now), 133)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+"#edgeId(1140)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-2))", "result": [187, "?{element = 470; next = lazyMergeSort(`(nilList)); symbol = 1}"]}},
+{ "metaTime":188, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 188)", "node": { "type": "nonThunk" , "value": "10"}},
+{ "metaTime":189, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-3)(1)), @adaptonTime (@now), 189)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-3))", "result": null}},
+{ "metaTime":190, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-3)(2)), @adaptonTime (@now), 137)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1141)",
+"#edgeId(1142)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-3))", "result": [190, "?{element = 470; next = lazyMergeSort(merge-3)(1); symbol = 1}"]}},
+{ "metaTime":191, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 191)", "node": { "type": "nonThunk" , "value": "11"}},
+{ "metaTime":192, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-4)(4)), @adaptonTime (@now), 192)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-4))", "result": null}},
+{ "metaTime":193, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-4)(2)), @adaptonTime (@now), 141)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1143)",
+"#edgeId(1144)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-4))", "result": [193, "?{element = 55; next = lazyMergeSort(merge-4)(4); symbol = 4}"]}},
+{ "metaTime":194, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 194)", "node": { "type": "nonThunk" , "value": "12"}},
+{ "metaTime":195, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-5)(4)), @adaptonTime (@now), 195)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-5))", "result": null}},
+{ "metaTime":196, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-5)(2)), @adaptonTime (@now), 166)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1145)",
+"#edgeId(1146)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-5))", "result": [196, "?{element = 55; next = lazyMergeSort(merge-5)(4); symbol = 4}"]}},
+{ "metaTime":197, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 197)", "node": { "type": "nonThunk" , "value": "13"}},
+{ "metaTime":198, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(4)), @adaptonTime (@now), 198)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": null}},
+{ "metaTime":199, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(2)), @adaptonTime (@now), 177)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1147)",
+"#edgeId(1148)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": [199, "?{element = 55; next = lazyMergeSort(merge-9)(4); symbol = 4}"]}},
+{ "metaTime":204, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-4)(4)), @adaptonTime (@now), 192)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+"#edgeId(1150)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-4))", "result": [204, "?{element = 470; next = lazyMergeSort(merge-3)(1); symbol = 1}"]}},
+{ "metaTime":205, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 205)", "node": { "type": "nonThunk" , "value": "14"}},
+{ "metaTime":206, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-5)(5)), @adaptonTime (@now), 206)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-5))", "result": null}},
+{ "metaTime":207, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-5)(4)), @adaptonTime (@now), 195)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1151)",
+"#edgeId(1152)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-5))", "result": [207, "?{element = 195; next = lazyMergeSort(merge-5)(5); symbol = 5}"]}},
+{ "metaTime":208, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 208)", "node": { "type": "nonThunk" , "value": "15"}},
+{ "metaTime":209, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(5)), @adaptonTime (@now), 209)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": null}},
+{ "metaTime":210, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(4)), @adaptonTime (@now), 198)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1153)",
+"#edgeId(1154)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": [210, "?{element = 195; next = lazyMergeSort(merge-9)(5); symbol = 5}"]}},
+{ "metaTime":217, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-6)(5)), @adaptonTime (@now), 155)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1156)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-6))", "result": [217, "?{element = 1191; next = lazyMergeSort(`(nilList)); symbol = 6}"]}},
+{ "metaTime":218, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 218)", "node": { "type": "nonThunk" , "value": "16"}},
+{ "metaTime":219, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-7)(7)), @adaptonTime (@now), 219)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-7))", "result": null}},
+{ "metaTime":220, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-7)(5)), @adaptonTime (@now), 159)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1157)",
+"#edgeId(1158)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-7))", "result": [220, "?{element = 777; next = lazyMergeSort(merge-7)(7); symbol = 7}"]}},
+{ "metaTime":221, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 221)", "node": { "type": "nonThunk" , "value": "17"}},
+{ "metaTime":222, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-8)(8)), @adaptonTime (@now), 222)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-8))", "result": null}},
+{ "metaTime":223, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-8)(5)), @adaptonTime (@now), 163)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1159)",
+"#edgeId(1160)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-8))", "result": [223, "?{element = 581; next = lazyMergeSort(merge-8)(8); symbol = 8}"]}},
+{ "metaTime":224, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 224)", "node": { "type": "nonThunk" , "value": "18"}},
+{ "metaTime":225, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-5)(1)), @adaptonTime (@now), 225)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-5))", "result": null}},
+{ "metaTime":226, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-5)(5)), @adaptonTime (@now), 206)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+"#edgeId(1161)",
+"#edgeId(1162)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-5))", "result": [226, "?{element = 470; next = lazyMergeSort(merge-5)(1); symbol = 1}"]}},
+{ "metaTime":227, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 227)", "node": { "type": "nonThunk" , "value": "19"}},
+{ "metaTime":228, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(1)), @adaptonTime (@now), 228)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": null}},
+{ "metaTime":229, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(5)), @adaptonTime (@now), 209)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1163)",
+"#edgeId(1164)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": [229, "?{element = 470; next = lazyMergeSort(merge-9)(1); symbol = 1}"]}},
+{ "metaTime":234, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-3)(1)), @adaptonTime (@now), 189)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1166)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-3))", "result": [234, "?{element = 1192; next = lazyMergeSort(`(nilList)); symbol = 3}"]}},
+{ "metaTime":235, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 235)", "node": { "type": "nonThunk" , "value": "20"}},
+{ "metaTime":236, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-5)(8)), @adaptonTime (@now), 236)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-5))", "result": null}},
+{ "metaTime":237, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-5)(1)), @adaptonTime (@now), 225)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1167)",
+"#edgeId(1168)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-5))", "result": [237, "?{element = 581; next = lazyMergeSort(merge-5)(8); symbol = 8}"]}},
+{ "metaTime":238, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 238)", "node": { "type": "nonThunk" , "value": "21"}},
+{ "metaTime":239, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(10)), @adaptonTime (@now), 239)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": null}},
+{ "metaTime":240, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(1)), @adaptonTime (@now), 228)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1169)",
+"#edgeId(1170)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": [240, "?{element = 545; next = lazyMergeSort(merge-9)(10); symbol = 10}"]}},
+{ "metaTime":244, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-10)(10)), @adaptonTime (@now), 174)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+"#edgeId(1172)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-10))", "result": [244, "?{element = 1306; next = lazyMergeSort(`(nilList)); symbol = 9}"]}},
+{ "metaTime":245, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 245)", "node": { "type": "nonThunk" , "value": "22"}},
+{ "metaTime":246, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(8)), @adaptonTime (@now), 246)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": null}},
+{ "metaTime":247, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(10)), @adaptonTime (@now), 239)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+"#edgeId(1173)",
+"#edgeId(1174)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": [247, "?{element = 581; next = lazyMergeSort(merge-9)(8); symbol = 8}"]}},
+{ "metaTime":252, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-8)(8)), @adaptonTime (@now), 222)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+"#edgeId(1176)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-8))", "result": [252, "?{element = 777; next = lazyMergeSort(merge-7)(7); symbol = 7}"]}},
+{ "metaTime":253, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 253)", "node": { "type": "nonThunk" , "value": "23"}},
+{ "metaTime":254, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-5)(7)), @adaptonTime (@now), 254)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-5))", "result": null}},
+{ "metaTime":255, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-5)(8)), @adaptonTime (@now), 236)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+"#edgeId(1177)",
+"#edgeId(1178)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-5))", "result": [255, "?{element = 777; next = lazyMergeSort(merge-5)(7); symbol = 7}"]}},
+{ "metaTime":256, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 256)", "node": { "type": "nonThunk" , "value": "24"}},
+{ "metaTime":257, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(7)), @adaptonTime (@now), 257)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": null}},
+{ "metaTime":258, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(8)), @adaptonTime (@now), 246)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1179)",
+"#edgeId(1180)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": [258, "?{element = 777; next = lazyMergeSort(merge-9)(7); symbol = 7}"]}},
+{ "metaTime":263, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-7)(7)), @adaptonTime (@now), 219)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+"#edgeId(1182)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-7))", "result": [263, "?{element = 1191; next = lazyMergeSort(`(nilList)); symbol = 6}"]}},
+{ "metaTime":264, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 264)", "node": { "type": "nonThunk" , "value": "25"}},
+{ "metaTime":265, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-5)(6)), @adaptonTime (@now), 265)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-5))", "result": null}},
+{ "metaTime":266, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-5)(7)), @adaptonTime (@now), 254)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+"#edgeId(1183)",
+"#edgeId(1184)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-5))", "result": [266, "?{element = 1191; next = lazyMergeSort(merge-5)(6); symbol = 6}"]}},
+{ "metaTime":267, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 267)", "node": { "type": "nonThunk" , "value": "26"}},
+{ "metaTime":268, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(6)), @adaptonTime (@now), 268)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": null}},
+{ "metaTime":269, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(7)), @adaptonTime (@now), 257)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1185)",
+"#edgeId(1186)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": [269, "?{element = 1191; next = lazyMergeSort(merge-9)(6); symbol = 6}"]}},
+{ "metaTime":273, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-5)(6)), @adaptonTime (@now), 265)", "node": { "type": "thunk" , "body": "@thunk ({ merge(?xc, force (yc.next)) })", "trace": [
+"#edgeId(1188)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-5))", "result": [273, "?{element = 1192; next = lazyMergeSort(`(nilList)); symbol = 3}"]}},
+{ "metaTime":274, "nodeId": "(@adaptonSpace (merge), @adaptonTime (@now), 274)", "node": { "type": "nonThunk" , "value": "27"}},
+{ "metaTime":275, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(3)), @adaptonTime (@now), 275)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": null}},
+{ "metaTime":276, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(6)), @adaptonTime (@now), 268)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1189)",
+"#edgeId(1190)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": [276, "?{element = 1192; next = lazyMergeSort(merge-9)(3); symbol = 3}"]}},
+{ "metaTime":279, "nodeId": "(@adaptonSpace (lazyMergeSort(merge-9)(3)), @adaptonTime (@now), 275)", "node": { "type": "thunk" , "body": "@thunk ({ merge(force (xc.next), ?yc) })", "trace": [
+"#edgeId(1192)"
+], "space": "@adaptonSpace (lazyMergeSort(merge-9))", "result": [279, "?{element = 1306; next = lazyMergeSort(`(nilList)); symbol = 9}"]}},
+{ "metaTime":280, "nodeId": "(@adaptonSpace (scene), @adaptonTime (@now), 1)", "node": { "type": "thunk" , "body": "@thunk ({ let inputArray = R.generateRandomInput(seed, size); let inputList_ = `ListFromRandomArray := thunk { do within space `inputList{ List.fromIter(inputArray.vals()) } }; let inputList = force (inputList_); let inputTree_ = `LevelTreeFromList := thunk { do within space `inputTree{ Seq.fromList(inputList) }; }; let inputTree = force (inputTree_); let lazySorted_ = do within space `lazyMergeSort{ Seq.lazyMergeSort(inputTree); }; let sorted = do within space `forceSort{ LazyList.takeN_(lazySorted_, size); }; let components = {inputArray=inputArray; inputList_; inputList; inputTree_; inputTree; lazySorted_; sorted}; {components=components} })", "trace": [
+"#edgeId(1002)",
+"#edgeId(1013)",
+"#edgeId(1014)",
+"#edgeId(1090)",
+"#edgeId(1091)",
+"#edgeId(1092)",
+"#edgeId(1139)",
+"#edgeId(1149)",
+"#edgeId(1155)",
+"#edgeId(1165)",
+"#edgeId(1171)",
+"#edgeId(1175)",
+"#edgeId(1181)",
+"#edgeId(1187)",
+"#edgeId(1191)",
+"#edgeId(1193)"
+], "space": "@adaptonSpace (@here)", "result": [280, "{components = {inputArray = [(1, 470), (2, 0), (3, 1192), (4, 55), (5, 195), (6, 1191), (7, 777), (8, 581), (9, 1306), (10, 545)]; inputList = ?{element = 470; next = inputList(1); symbol = 1}; inputList_ = ListFromRandomArray; inputTree = ?inputTree(9-binary); inputTree_ = LevelTreeFromList; lazySorted_ = lazyMergeSort(result); sorted = ([(lazyMergeSort(result), 2, 0), (lazyMergeSort(merge-9)(2), 4, 55), (lazyMergeSort(merge-9)(4), 5, 195), (lazyMergeSort(merge-9)(5), 1, 470), (lazyMergeSort(merge-9)(1), 10, 545), (lazyMergeSort(merge-9)(10), 8, 581), (lazyMergeSort(merge-9)(8), 7, 777), (lazyMergeSort(merge-9)(7), 6, 1191), (lazyMergeSort(merge-9)(6), 3, 1192), (lazyMergeSort(merge-9)(3), 9, 1306)], lazyMergeSort(`(nilList)))}}"]}}
+]
 ,
 "edges": 
-{}
+[
+{ "metaTime":1, "edgeId": "#edgeId(1001)", "edge": { "source":["@here","@now","0"], "target": ["scene","@now","1"], "action": { "type": "put" , "value": "@thunk ({ let inputArray = R.generateRandomInput(seed, size); let inputList_ = `ListFromRandomArray := thunk { do within space `inputList{ List.fromIter(inputArray.vals()) } }; let inputList = force (inputList_); let inputTree_ = `LevelTreeFromList := thunk { do within space `inputTree{ Seq.fromList(inputList) }; }; let inputTree = force (inputTree_); let lazySorted_ = do within space `lazyMergeSort{ Seq.lazyMergeSort(inputTree); }; let sorted = do within space `forceSort{ LazyList.takeN_(lazySorted_, size); }; let components = {inputArray=inputArray; inputList_; inputList; inputTree_; inputTree; lazySorted_; sorted}; {components=components} })"}, "metaTimes": 1}},
+{ "metaTime":3, "edgeId": "#edgeId(1002)", "edge": { "source":["scene","@now","1"], "target": ["ListFromRandomArray","@now","3"], "action": { "type": "put" , "value": "@thunk ({ do within space `inputList{ List.fromIter(inputArray.vals()) } })"}, "metaTimes": 3}},
+{ "metaTime":5, "edgeId": "#edgeId(1003)", "edge": { "source":["ListFromRandomArray","@now","3"], "target": ["inputList(10)","@now","5"], "action": { "type": "put" , "value": "null"}, "metaTimes": 5}},
+{ "metaTime":6, "edgeId": "#edgeId(1004)", "edge": { "source":["ListFromRandomArray","@now","3"], "target": ["inputList(9)","@now","6"], "action": { "type": "put" , "value": "?{element = 545; next = inputList(10); symbol = 10}"}, "metaTimes": 6}},
+{ "metaTime":7, "edgeId": "#edgeId(1005)", "edge": { "source":["ListFromRandomArray","@now","3"], "target": ["inputList(8)","@now","7"], "action": { "type": "put" , "value": "?{element = 1306; next = inputList(9); symbol = 9}"}, "metaTimes": 7}},
+{ "metaTime":8, "edgeId": "#edgeId(1006)", "edge": { "source":["ListFromRandomArray","@now","3"], "target": ["inputList(7)","@now","8"], "action": { "type": "put" , "value": "?{element = 581; next = inputList(8); symbol = 8}"}, "metaTimes": 8}},
+{ "metaTime":9, "edgeId": "#edgeId(1007)", "edge": { "source":["ListFromRandomArray","@now","3"], "target": ["inputList(6)","@now","9"], "action": { "type": "put" , "value": "?{element = 777; next = inputList(7); symbol = 7}"}, "metaTimes": 9}},
+{ "metaTime":10, "edgeId": "#edgeId(1008)", "edge": { "source":["ListFromRandomArray","@now","3"], "target": ["inputList(5)","@now","10"], "action": { "type": "put" , "value": "?{element = 1191; next = inputList(6); symbol = 6}"}, "metaTimes": 10}},
+{ "metaTime":11, "edgeId": "#edgeId(1009)", "edge": { "source":["ListFromRandomArray","@now","3"], "target": ["inputList(4)","@now","11"], "action": { "type": "put" , "value": "?{element = 195; next = inputList(5); symbol = 5}"}, "metaTimes": 11}},
+{ "metaTime":12, "edgeId": "#edgeId(1010)", "edge": { "source":["ListFromRandomArray","@now","3"], "target": ["inputList(3)","@now","12"], "action": { "type": "put" , "value": "?{element = 55; next = inputList(4); symbol = 4}"}, "metaTimes": 12}},
+{ "metaTime":13, "edgeId": "#edgeId(1011)", "edge": { "source":["ListFromRandomArray","@now","3"], "target": ["inputList(2)","@now","13"], "action": { "type": "put" , "value": "?{element = 1192; next = inputList(3); symbol = 3}"}, "metaTimes": 13}},
+{ "metaTime":14, "edgeId": "#edgeId(1012)", "edge": { "source":["ListFromRandomArray","@now","3"], "target": ["inputList(1)","@now","14"], "action": { "type": "put" , "value": "?{element = 0; next = inputList(2); symbol = 2}"}, "metaTimes": 14}},
+{ "metaTime":15, "edgeId": "#edgeId(1013)", "edge": { "source":["scene","@now","1"], "target": ["ListFromRandomArray","@now","15"], "action": { "type": "force" , "thunk": "@thunk ({ do within space `inputList{ List.fromIter(inputArray.vals()) } })", "value": "?{element = 470; next = inputList(1); symbol = 1}"}, "metaTimes": [4, 15]}},
+{ "metaTime":16, "edgeId": "#edgeId(1014)", "edge": { "source":["scene","@now","1"], "target": ["LevelTreeFromList","@now","16"], "action": { "type": "put" , "value": "@thunk ({ do within space `inputTree{ Seq.fromList(inputList) }; })"}, "metaTimes": 16}},
+{ "metaTime":18, "edgeId": "#edgeId(1015)", "edge": { "source":["LevelTreeFromList","@now","16"], "target": ["inputTree(`(nilList))","@now","18"], "action": { "type": "put" , "value": "null"}, "metaTimes": 18}},
+{ "metaTime":19, "edgeId": "#edgeId(1016)", "edge": { "source":["LevelTreeFromList","@now","16"], "target": ["inputTree(1-element)","@now","19"], "action": { "type": "put" , "value": "#element{element = 470; symbol = 1}"}, "metaTimes": 19}},
+{ "metaTime":20, "edgeId": "#edgeId(1017)", "edge": { "source":["LevelTreeFromList","@now","16"], "target": ["inputList(1)","@now","20"], "action": { "type": "get" , "value": "?{element = 0; next = inputList(2); symbol = 2}"}, "metaTimes": 20}},
+{ "metaTime":21, "edgeId": "#edgeId(1018)", "edge": { "source":["LevelTreeFromList","@now","16"], "target": ["inputTree(2-element)","@now","21"], "action": { "type": "put" , "value": "#element{element = 0; symbol = 2}"}, "metaTimes": 21}},
+{ "metaTime":22, "edgeId": "#edgeId(1019)", "edge": { "source":["LevelTreeFromList","@now","16"], "target": ["inputTree(2-rec1)","@now","22"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })"}, "metaTimes": 22}},
+{ "metaTime":24, "edgeId": "#edgeId(1020)", "edge": { "source":["inputTree(2-rec1)","@now","22"], "target": ["inputList(2)","@now","24"], "action": { "type": "get" , "value": "?{element = 1192; next = inputList(3); symbol = 3}"}, "metaTimes": 24}},
+{ "metaTime":25, "edgeId": "#edgeId(1021)", "edge": { "source":["LevelTreeFromList","@now","16"], "target": ["inputTree(2-rec1)","@now","25"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "value": "(inputTree(2-element), inputList(2))"}, "metaTimes": [23, 25]}},
+{ "metaTime":26, "edgeId": "#edgeId(1022)", "edge": { "source":["LevelTreeFromList","@now","16"], "target": ["inputTree(2-binary)","@now","26"], "action": { "type": "put" , "value": "#binary{left = inputTree(1-element); level = 64; right = inputTree(2-element); symbol = 2}"}, "metaTimes": 26}},
+{ "metaTime":27, "edgeId": "#edgeId(1023)", "edge": { "source":["LevelTreeFromList","@now","16"], "target": ["inputTree(2-rec2)","@now","27"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, left, parentLevel, nil) })"}, "metaTimes": 27}},
+{ "metaTime":29, "edgeId": "#edgeId(1024)", "edge": { "source":["inputTree(2-rec2)","@now","27"], "target": ["inputList(2)","@now","29"], "action": { "type": "get" , "value": "?{element = 1192; next = inputList(3); symbol = 3}"}, "metaTimes": 29}},
+{ "metaTime":30, "edgeId": "#edgeId(1025)", "edge": { "source":["inputTree(2-rec2)","@now","27"], "target": ["inputTree(3-element)","@now","30"], "action": { "type": "put" , "value": "#element{element = 1192; symbol = 3}"}, "metaTimes": 30}},
+{ "metaTime":31, "edgeId": "#edgeId(1026)", "edge": { "source":["inputTree(2-rec2)","@now","27"], "target": ["inputTree(3-rec1)","@now","31"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })"}, "metaTimes": 31}},
+{ "metaTime":33, "edgeId": "#edgeId(1027)", "edge": { "source":["inputTree(3-rec1)","@now","31"], "target": ["inputList(3)","@now","33"], "action": { "type": "get" , "value": "?{element = 55; next = inputList(4); symbol = 4}"}, "metaTimes": 33}},
+{ "metaTime":34, "edgeId": "#edgeId(1028)", "edge": { "source":["inputTree(2-rec2)","@now","27"], "target": ["inputTree(3-rec1)","@now","34"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "value": "(inputTree(3-element), inputList(3))"}, "metaTimes": [32, 34]}},
+{ "metaTime":35, "edgeId": "#edgeId(1029)", "edge": { "source":["inputTree(2-rec2)","@now","27"], "target": ["inputTree(3-binary)","@now","35"], "action": { "type": "put" , "value": "#binary{left = inputTree(2-binary); level = 262144; right = inputTree(3-element); symbol = 3}"}, "metaTimes": 35}},
+{ "metaTime":36, "edgeId": "#edgeId(1030)", "edge": { "source":["inputTree(2-rec2)","@now","27"], "target": ["inputTree(3-rec2)","@now","36"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, left, parentLevel, nil) })"}, "metaTimes": 36}},
+{ "metaTime":38, "edgeId": "#edgeId(1031)", "edge": { "source":["inputTree(3-rec2)","@now","36"], "target": ["inputList(3)","@now","38"], "action": { "type": "get" , "value": "?{element = 55; next = inputList(4); symbol = 4}"}, "metaTimes": 38}},
+{ "metaTime":39, "edgeId": "#edgeId(1032)", "edge": { "source":["inputTree(3-rec2)","@now","36"], "target": ["inputTree(4-element)","@now","39"], "action": { "type": "put" , "value": "#element{element = 55; symbol = 4}"}, "metaTimes": 39}},
+{ "metaTime":40, "edgeId": "#edgeId(1033)", "edge": { "source":["inputTree(3-rec2)","@now","36"], "target": ["inputTree(4-rec1)","@now","40"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })"}, "metaTimes": 40}},
+{ "metaTime":42, "edgeId": "#edgeId(1034)", "edge": { "source":["inputTree(4-rec1)","@now","40"], "target": ["inputList(4)","@now","42"], "action": { "type": "get" , "value": "?{element = 195; next = inputList(5); symbol = 5}"}, "metaTimes": 42}},
+{ "metaTime":43, "edgeId": "#edgeId(1035)", "edge": { "source":["inputTree(3-rec2)","@now","36"], "target": ["inputTree(4-rec1)","@now","43"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "value": "(inputTree(4-element), inputList(4))"}, "metaTimes": [41, 43]}},
+{ "metaTime":44, "edgeId": "#edgeId(1036)", "edge": { "source":["inputTree(3-rec2)","@now","36"], "target": ["inputTree(4-binary)","@now","44"], "action": { "type": "put" , "value": "#binary{left = inputTree(3-binary); level = 262272; right = inputTree(4-element); symbol = 4}"}, "metaTimes": 44}},
+{ "metaTime":45, "edgeId": "#edgeId(1037)", "edge": { "source":["inputTree(3-rec2)","@now","36"], "target": ["inputTree(4-rec2)","@now","45"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, left, parentLevel, nil) })"}, "metaTimes": 45}},
+{ "metaTime":47, "edgeId": "#edgeId(1038)", "edge": { "source":["inputTree(4-rec2)","@now","45"], "target": ["inputList(4)","@now","47"], "action": { "type": "get" , "value": "?{element = 195; next = inputList(5); symbol = 5}"}, "metaTimes": 47}},
+{ "metaTime":48, "edgeId": "#edgeId(1039)", "edge": { "source":["inputTree(4-rec2)","@now","45"], "target": ["inputTree(5-element)","@now","48"], "action": { "type": "put" , "value": "#element{element = 195; symbol = 5}"}, "metaTimes": 48}},
+{ "metaTime":49, "edgeId": "#edgeId(1040)", "edge": { "source":["inputTree(4-rec2)","@now","45"], "target": ["inputTree(5-rec1)","@now","49"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })"}, "metaTimes": 49}},
+{ "metaTime":51, "edgeId": "#edgeId(1041)", "edge": { "source":["inputTree(5-rec1)","@now","49"], "target": ["inputList(5)","@now","51"], "action": { "type": "get" , "value": "?{element = 1191; next = inputList(6); symbol = 6}"}, "metaTimes": 51}},
+{ "metaTime":52, "edgeId": "#edgeId(1042)", "edge": { "source":["inputTree(5-rec1)","@now","49"], "target": ["inputTree(6-element)","@now","52"], "action": { "type": "put" , "value": "#element{element = 1191; symbol = 6}"}, "metaTimes": 52}},
+{ "metaTime":53, "edgeId": "#edgeId(1043)", "edge": { "source":["inputTree(5-rec1)","@now","49"], "target": ["inputTree(6-rec1)","@now","53"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })"}, "metaTimes": 53}},
+{ "metaTime":55, "edgeId": "#edgeId(1044)", "edge": { "source":["inputTree(6-rec1)","@now","53"], "target": ["inputList(6)","@now","55"], "action": { "type": "get" , "value": "?{element = 777; next = inputList(7); symbol = 7}"}, "metaTimes": 55}},
+{ "metaTime":56, "edgeId": "#edgeId(1045)", "edge": { "source":["inputTree(5-rec1)","@now","49"], "target": ["inputTree(6-rec1)","@now","56"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "value": "(inputTree(6-element), inputList(6))"}, "metaTimes": [54, 56]}},
+{ "metaTime":57, "edgeId": "#edgeId(1046)", "edge": { "source":["inputTree(5-rec1)","@now","49"], "target": ["inputTree(6-binary)","@now","57"], "action": { "type": "put" , "value": "#binary{left = inputTree(5-element); level = 4224; right = inputTree(6-element); symbol = 6}"}, "metaTimes": 57}},
+{ "metaTime":58, "edgeId": "#edgeId(1047)", "edge": { "source":["inputTree(5-rec1)","@now","49"], "target": ["inputTree(6-rec2)","@now","58"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, left, parentLevel, nil) })"}, "metaTimes": 58}},
+{ "metaTime":60, "edgeId": "#edgeId(1048)", "edge": { "source":["inputTree(6-rec2)","@now","58"], "target": ["inputList(6)","@now","60"], "action": { "type": "get" , "value": "?{element = 777; next = inputList(7); symbol = 7}"}, "metaTimes": 60}},
+{ "metaTime":61, "edgeId": "#edgeId(1049)", "edge": { "source":["inputTree(6-rec2)","@now","58"], "target": ["inputTree(7-element)","@now","61"], "action": { "type": "put" , "value": "#element{element = 777; symbol = 7}"}, "metaTimes": 61}},
+{ "metaTime":62, "edgeId": "#edgeId(1050)", "edge": { "source":["inputTree(6-rec2)","@now","58"], "target": ["inputTree(7-rec1)","@now","62"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })"}, "metaTimes": 62}},
+{ "metaTime":64, "edgeId": "#edgeId(1051)", "edge": { "source":["inputTree(7-rec1)","@now","62"], "target": ["inputList(7)","@now","64"], "action": { "type": "get" , "value": "?{element = 581; next = inputList(8); symbol = 8}"}, "metaTimes": 64}},
+{ "metaTime":65, "edgeId": "#edgeId(1052)", "edge": { "source":["inputTree(6-rec2)","@now","58"], "target": ["inputTree(7-rec1)","@now","65"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "value": "(inputTree(7-element), inputList(7))"}, "metaTimes": [63, 65]}},
+{ "metaTime":66, "edgeId": "#edgeId(1053)", "edge": { "source":["inputTree(6-rec2)","@now","58"], "target": ["inputTree(7-binary)","@now","66"], "action": { "type": "put" , "value": "#binary{left = inputTree(6-binary); level = 8321; right = inputTree(7-element); symbol = 7}"}, "metaTimes": 66}},
+{ "metaTime":67, "edgeId": "#edgeId(1054)", "edge": { "source":["inputTree(6-rec2)","@now","58"], "target": ["inputTree(7-rec2)","@now","67"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, left, parentLevel, nil) })"}, "metaTimes": 67}},
+{ "metaTime":69, "edgeId": "#edgeId(1055)", "edge": { "source":["inputTree(7-rec2)","@now","67"], "target": ["inputList(7)","@now","69"], "action": { "type": "get" , "value": "?{element = 581; next = inputList(8); symbol = 8}"}, "metaTimes": 69}},
+{ "metaTime":70, "edgeId": "#edgeId(1056)", "edge": { "source":["inputTree(7-rec2)","@now","67"], "target": ["inputTree(8-element)","@now","70"], "action": { "type": "put" , "value": "#element{element = 581; symbol = 8}"}, "metaTimes": 70}},
+{ "metaTime":71, "edgeId": "#edgeId(1057)", "edge": { "source":["inputTree(7-rec2)","@now","67"], "target": ["inputTree(8-rec1)","@now","71"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })"}, "metaTimes": 71}},
+{ "metaTime":73, "edgeId": "#edgeId(1058)", "edge": { "source":["inputTree(8-rec1)","@now","71"], "target": ["inputList(8)","@now","73"], "action": { "type": "get" , "value": "?{element = 1306; next = inputList(9); symbol = 9}"}, "metaTimes": 73}},
+{ "metaTime":74, "edgeId": "#edgeId(1059)", "edge": { "source":["inputTree(7-rec2)","@now","67"], "target": ["inputTree(8-rec1)","@now","74"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "value": "(inputTree(8-element), inputList(8))"}, "metaTimes": [72, 74]}},
+{ "metaTime":75, "edgeId": "#edgeId(1060)", "edge": { "source":["inputTree(7-rec2)","@now","67"], "target": ["inputTree(8-binary)","@now","75"], "action": { "type": "put" , "value": "#binary{left = inputTree(7-binary); level = 262144; right = inputTree(8-element); symbol = 8}"}, "metaTimes": 75}},
+{ "metaTime":76, "edgeId": "#edgeId(1061)", "edge": { "source":["inputTree(7-rec2)","@now","67"], "target": ["inputTree(8-rec2)","@now","76"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, left, parentLevel, nil) })"}, "metaTimes": 76}},
+{ "metaTime":78, "edgeId": "#edgeId(1062)", "edge": { "source":["inputTree(8-rec2)","@now","76"], "target": ["inputList(8)","@now","78"], "action": { "type": "get" , "value": "?{element = 1306; next = inputList(9); symbol = 9}"}, "metaTimes": 78}},
+{ "metaTime":79, "edgeId": "#edgeId(1063)", "edge": { "source":["inputTree(7-rec2)","@now","67"], "target": ["inputTree(8-rec2)","@now","79"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "value": "(inputTree(8-binary), inputList(8))"}, "metaTimes": [77, 79]}},
+{ "metaTime":80, "edgeId": "#edgeId(1064)", "edge": { "source":["inputTree(6-rec2)","@now","58"], "target": ["inputTree(7-rec2)","@now","80"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "value": "(inputTree(8-binary), inputList(8))"}, "metaTimes": [68, 80]}},
+{ "metaTime":81, "edgeId": "#edgeId(1065)", "edge": { "source":["inputTree(5-rec1)","@now","49"], "target": ["inputTree(6-rec2)","@now","81"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "value": "(inputTree(8-binary), inputList(8))"}, "metaTimes": [59, 81]}},
+{ "metaTime":82, "edgeId": "#edgeId(1066)", "edge": { "source":["inputTree(4-rec2)","@now","45"], "target": ["inputTree(5-rec1)","@now","82"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "value": "(inputTree(8-binary), inputList(8))"}, "metaTimes": [50, 82]}},
+{ "metaTime":83, "edgeId": "#edgeId(1067)", "edge": { "source":["inputTree(4-rec2)","@now","45"], "target": ["inputTree(5-binary)","@now","83"], "action": { "type": "put" , "value": "#binary{left = inputTree(4-binary); level = 266240; right = inputTree(8-binary); symbol = 5}"}, "metaTimes": 83}},
+{ "metaTime":84, "edgeId": "#edgeId(1068)", "edge": { "source":["inputTree(4-rec2)","@now","45"], "target": ["inputTree(5-rec2)","@now","84"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, left, parentLevel, nil) })"}, "metaTimes": 84}},
+{ "metaTime":86, "edgeId": "#edgeId(1069)", "edge": { "source":["inputTree(5-rec2)","@now","84"], "target": ["inputList(8)","@now","86"], "action": { "type": "get" , "value": "?{element = 1306; next = inputList(9); symbol = 9}"}, "metaTimes": 86}},
+{ "metaTime":87, "edgeId": "#edgeId(1070)", "edge": { "source":["inputTree(5-rec2)","@now","84"], "target": ["inputTree(9-element)","@now","87"], "action": { "type": "put" , "value": "#element{element = 1306; symbol = 9}"}, "metaTimes": 87}},
+{ "metaTime":88, "edgeId": "#edgeId(1071)", "edge": { "source":["inputTree(5-rec2)","@now","84"], "target": ["inputTree(9-rec1)","@now","88"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })"}, "metaTimes": 88}},
+{ "metaTime":90, "edgeId": "#edgeId(1072)", "edge": { "source":["inputTree(9-rec1)","@now","88"], "target": ["inputList(9)","@now","90"], "action": { "type": "get" , "value": "?{element = 545; next = inputList(10); symbol = 10}"}, "metaTimes": 90}},
+{ "metaTime":91, "edgeId": "#edgeId(1073)", "edge": { "source":["inputTree(9-rec1)","@now","88"], "target": ["inputTree(10-element)","@now","91"], "action": { "type": "put" , "value": "#element{element = 545; symbol = 10}"}, "metaTimes": 91}},
+{ "metaTime":92, "edgeId": "#edgeId(1074)", "edge": { "source":["inputTree(9-rec1)","@now","88"], "target": ["inputTree(10-rec1)","@now","92"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })"}, "metaTimes": 92}},
+{ "metaTime":94, "edgeId": "#edgeId(1075)", "edge": { "source":["inputTree(10-rec1)","@now","92"], "target": ["inputList(10)","@now","94"], "action": { "type": "get" , "value": "null"}, "metaTimes": 94}},
+{ "metaTime":95, "edgeId": "#edgeId(1076)", "edge": { "source":["inputTree(9-rec1)","@now","88"], "target": ["inputTree(10-rec1)","@now","95"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "value": "(inputTree(10-element), inputTree(`(nilList)))"}, "metaTimes": [93, 95]}},
+{ "metaTime":96, "edgeId": "#edgeId(1077)", "edge": { "source":["inputTree(9-rec1)","@now","88"], "target": ["inputTree(10-binary)","@now","96"], "action": { "type": "put" , "value": "#binary{left = inputTree(9-element); level = 4162; right = inputTree(10-element); symbol = 10}"}, "metaTimes": 96}},
+{ "metaTime":97, "edgeId": "#edgeId(1078)", "edge": { "source":["inputTree(9-rec1)","@now","88"], "target": ["inputTree(10-rec2)","@now","97"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, left, parentLevel, nil) })"}, "metaTimes": 97}},
+{ "metaTime":99, "edgeId": "#edgeId(1079)", "edge": { "source":["inputTree(10-rec2)","@now","97"], "target": ["inputTree(`(nilList))","@now","99"], "action": { "type": "get" , "value": "null"}, "metaTimes": 99}},
+{ "metaTime":100, "edgeId": "#edgeId(1080)", "edge": { "source":["inputTree(9-rec1)","@now","88"], "target": ["inputTree(10-rec2)","@now","100"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "value": "(inputTree(10-binary), inputTree(`(nilList)))"}, "metaTimes": [98, 100]}},
+{ "metaTime":101, "edgeId": "#edgeId(1081)", "edge": { "source":["inputTree(5-rec2)","@now","84"], "target": ["inputTree(9-rec1)","@now","101"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, rightLeft, ?level, nil) })", "value": "(inputTree(10-binary), inputTree(`(nilList)))"}, "metaTimes": [89, 101]}},
+{ "metaTime":102, "edgeId": "#edgeId(1082)", "edge": { "source":["inputTree(5-rec2)","@now","84"], "target": ["inputTree(9-binary)","@now","102"], "action": { "type": "put" , "value": "#binary{left = inputTree(5-binary); level = 786433; right = inputTree(10-binary); symbol = 9}"}, "metaTimes": 102}},
+{ "metaTime":103, "edgeId": "#edgeId(1083)", "edge": { "source":["inputTree(5-rec2)","@now","84"], "target": ["inputTree(9-rec2)","@now","103"], "action": { "type": "put" , "value": "@thunk ({ fromListRec(next, left, parentLevel, nil) })"}, "metaTimes": 103}},
+{ "metaTime":105, "edgeId": "#edgeId(1084)", "edge": { "source":["inputTree(9-rec2)","@now","103"], "target": ["inputTree(`(nilList))","@now","105"], "action": { "type": "get" , "value": "null"}, "metaTimes": 105}},
+{ "metaTime":106, "edgeId": "#edgeId(1085)", "edge": { "source":["inputTree(5-rec2)","@now","84"], "target": ["inputTree(9-rec2)","@now","106"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "value": "(inputTree(9-binary), inputTree(`(nilList)))"}, "metaTimes": [104, 106]}},
+{ "metaTime":107, "edgeId": "#edgeId(1086)", "edge": { "source":["inputTree(4-rec2)","@now","45"], "target": ["inputTree(5-rec2)","@now","107"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "value": "(inputTree(9-binary), inputTree(`(nilList)))"}, "metaTimes": [85, 107]}},
+{ "metaTime":108, "edgeId": "#edgeId(1087)", "edge": { "source":["inputTree(3-rec2)","@now","36"], "target": ["inputTree(4-rec2)","@now","108"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "value": "(inputTree(9-binary), inputTree(`(nilList)))"}, "metaTimes": [46, 108]}},
+{ "metaTime":109, "edgeId": "#edgeId(1088)", "edge": { "source":["inputTree(2-rec2)","@now","27"], "target": ["inputTree(3-rec2)","@now","109"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "value": "(inputTree(9-binary), inputTree(`(nilList)))"}, "metaTimes": [37, 109]}},
+{ "metaTime":110, "edgeId": "#edgeId(1089)", "edge": { "source":["LevelTreeFromList","@now","16"], "target": ["inputTree(2-rec2)","@now","110"], "action": { "type": "force" , "thunk": "@thunk ({ fromListRec(next, left, parentLevel, nil) })", "value": "(inputTree(9-binary), inputTree(`(nilList)))"}, "metaTimes": [28, 110]}},
+{ "metaTime":111, "edgeId": "#edgeId(1090)", "edge": { "source":["scene","@now","1"], "target": ["LevelTreeFromList","@now","111"], "action": { "type": "force" , "thunk": "@thunk ({ do within space `inputTree{ Seq.fromList(inputList) }; })", "value": "?inputTree(9-binary)"}, "metaTimes": [17, 111]}},
+{ "metaTime":112, "edgeId": "#edgeId(1091)", "edge": { "source":["scene","@now","1"], "target": ["lazyMergeSort(`(nilList))","@now","112"], "action": { "type": "put" , "value": "@thunk ({ null })"}, "metaTimes": 112}},
+{ "metaTime":113, "edgeId": "#edgeId(1092)", "edge": { "source":["scene","@now","1"], "target": ["lazyMergeSort(result)","@now","113"], "action": { "type": "put" , "value": "@thunk ({ reduceUp(@ (t!), null, func (symbol: Symbol, element: X) : LazyList<X> { ?{symbol=symbol; element; next=nilList} }, func (symbol: Symbol, xs: LazyList<X>, ys: LazyList<X>) : LazyList<X> { do within space (`merge - symbol){ LazyList.merge(xs, ys) } },) })"}, "metaTimes": 113}},
+{ "metaTime":115, "edgeId": "#edgeId(1093)", "edge": { "source":["lazyMergeSort(result)","@now","113"], "target": ["inputTree(9-binary)","@now","115"], "action": { "type": "get" , "value": "#binary{left = inputTree(5-binary); level = 786433; right = inputTree(10-binary); symbol = 9}"}, "metaTimes": 115}},
+{ "metaTime":116, "edgeId": "#edgeId(1094)", "edge": { "source":["lazyMergeSort(result)","@now","113"], "target": ["lazyMergeSort(9)","@now","116"], "action": { "type": "put" , "value": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })"}, "metaTimes": 116}},
+{ "metaTime":118, "edgeId": "#edgeId(1095)", "edge": { "source":["lazyMergeSort(9)","@now","116"], "target": ["inputTree(5-binary)","@now","118"], "action": { "type": "get" , "value": "#binary{left = inputTree(4-binary); level = 266240; right = inputTree(8-binary); symbol = 5}"}, "metaTimes": 118}},
+{ "metaTime":119, "edgeId": "#edgeId(1096)", "edge": { "source":["lazyMergeSort(9)","@now","116"], "target": ["lazyMergeSort(5)","@now","119"], "action": { "type": "put" , "value": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })"}, "metaTimes": 119}},
+{ "metaTime":121, "edgeId": "#edgeId(1097)", "edge": { "source":["lazyMergeSort(5)","@now","119"], "target": ["inputTree(4-binary)","@now","121"], "action": { "type": "get" , "value": "#binary{left = inputTree(3-binary); level = 262272; right = inputTree(4-element); symbol = 4}"}, "metaTimes": 121}},
+{ "metaTime":122, "edgeId": "#edgeId(1098)", "edge": { "source":["lazyMergeSort(5)","@now","119"], "target": ["lazyMergeSort(4)","@now","122"], "action": { "type": "put" , "value": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })"}, "metaTimes": 122}},
+{ "metaTime":124, "edgeId": "#edgeId(1099)", "edge": { "source":["lazyMergeSort(4)","@now","122"], "target": ["inputTree(3-binary)","@now","124"], "action": { "type": "get" , "value": "#binary{left = inputTree(2-binary); level = 262144; right = inputTree(3-element); symbol = 3}"}, "metaTimes": 124}},
+{ "metaTime":125, "edgeId": "#edgeId(1100)", "edge": { "source":["lazyMergeSort(4)","@now","122"], "target": ["lazyMergeSort(3)","@now","125"], "action": { "type": "put" , "value": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })"}, "metaTimes": 125}},
+{ "metaTime":127, "edgeId": "#edgeId(1101)", "edge": { "source":["lazyMergeSort(3)","@now","125"], "target": ["inputTree(2-binary)","@now","127"], "action": { "type": "get" , "value": "#binary{left = inputTree(1-element); level = 64; right = inputTree(2-element); symbol = 2}"}, "metaTimes": 127}},
+{ "metaTime":128, "edgeId": "#edgeId(1102)", "edge": { "source":["lazyMergeSort(3)","@now","125"], "target": ["lazyMergeSort(2)","@now","128"], "action": { "type": "put" , "value": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })"}, "metaTimes": 128}},
+{ "metaTime":130, "edgeId": "#edgeId(1103)", "edge": { "source":["lazyMergeSort(2)","@now","128"], "target": ["inputTree(1-element)","@now","130"], "action": { "type": "get" , "value": "#element{element = 470; symbol = 1}"}, "metaTimes": 130}},
+{ "metaTime":131, "edgeId": "#edgeId(1104)", "edge": { "source":["lazyMergeSort(2)","@now","128"], "target": ["inputTree(2-element)","@now","131"], "action": { "type": "get" , "value": "#element{element = 0; symbol = 2}"}, "metaTimes": 131}},
+{ "metaTime":133, "edgeId": "#edgeId(1105)", "edge": { "source":["lazyMergeSort(2)","@now","128"], "target": ["lazyMergeSort(merge-2)(2)","@now","133"], "action": { "type": "put" , "value": "@thunk ({ merge(?xc, force (yc.next)) })"}, "metaTimes": 133}},
+{ "metaTime":134, "edgeId": "#edgeId(1106)", "edge": { "source":["lazyMergeSort(3)","@now","125"], "target": ["lazyMergeSort(2)","@now","134"], "action": { "type": "force" , "thunk": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "value": "?{element = 0; next = lazyMergeSort(merge-2)(2); symbol = 2}"}, "metaTimes": [129, 134]}},
+{ "metaTime":135, "edgeId": "#edgeId(1107)", "edge": { "source":["lazyMergeSort(3)","@now","125"], "target": ["inputTree(3-element)","@now","135"], "action": { "type": "get" , "value": "#element{element = 1192; symbol = 3}"}, "metaTimes": 135}},
+{ "metaTime":137, "edgeId": "#edgeId(1108)", "edge": { "source":["lazyMergeSort(3)","@now","125"], "target": ["lazyMergeSort(merge-3)(2)","@now","137"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 137}},
+{ "metaTime":138, "edgeId": "#edgeId(1109)", "edge": { "source":["lazyMergeSort(4)","@now","122"], "target": ["lazyMergeSort(3)","@now","138"], "action": { "type": "force" , "thunk": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "value": "?{element = 0; next = lazyMergeSort(merge-3)(2); symbol = 2}"}, "metaTimes": [126, 138]}},
+{ "metaTime":139, "edgeId": "#edgeId(1110)", "edge": { "source":["lazyMergeSort(4)","@now","122"], "target": ["inputTree(4-element)","@now","139"], "action": { "type": "get" , "value": "#element{element = 55; symbol = 4}"}, "metaTimes": 139}},
+{ "metaTime":141, "edgeId": "#edgeId(1111)", "edge": { "source":["lazyMergeSort(4)","@now","122"], "target": ["lazyMergeSort(merge-4)(2)","@now","141"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 141}},
+{ "metaTime":142, "edgeId": "#edgeId(1112)", "edge": { "source":["lazyMergeSort(5)","@now","119"], "target": ["lazyMergeSort(4)","@now","142"], "action": { "type": "force" , "thunk": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "value": "?{element = 0; next = lazyMergeSort(merge-4)(2); symbol = 2}"}, "metaTimes": [123, 142]}},
+{ "metaTime":143, "edgeId": "#edgeId(1113)", "edge": { "source":["lazyMergeSort(5)","@now","119"], "target": ["inputTree(8-binary)","@now","143"], "action": { "type": "get" , "value": "#binary{left = inputTree(7-binary); level = 262144; right = inputTree(8-element); symbol = 8}"}, "metaTimes": 143}},
+{ "metaTime":144, "edgeId": "#edgeId(1114)", "edge": { "source":["lazyMergeSort(5)","@now","119"], "target": ["lazyMergeSort(8)","@now","144"], "action": { "type": "put" , "value": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })"}, "metaTimes": 144}},
+{ "metaTime":146, "edgeId": "#edgeId(1115)", "edge": { "source":["lazyMergeSort(8)","@now","144"], "target": ["inputTree(7-binary)","@now","146"], "action": { "type": "get" , "value": "#binary{left = inputTree(6-binary); level = 8321; right = inputTree(7-element); symbol = 7}"}, "metaTimes": 146}},
+{ "metaTime":147, "edgeId": "#edgeId(1116)", "edge": { "source":["lazyMergeSort(8)","@now","144"], "target": ["lazyMergeSort(7)","@now","147"], "action": { "type": "put" , "value": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })"}, "metaTimes": 147}},
+{ "metaTime":149, "edgeId": "#edgeId(1117)", "edge": { "source":["lazyMergeSort(7)","@now","147"], "target": ["inputTree(6-binary)","@now","149"], "action": { "type": "get" , "value": "#binary{left = inputTree(5-element); level = 4224; right = inputTree(6-element); symbol = 6}"}, "metaTimes": 149}},
+{ "metaTime":150, "edgeId": "#edgeId(1118)", "edge": { "source":["lazyMergeSort(7)","@now","147"], "target": ["lazyMergeSort(6)","@now","150"], "action": { "type": "put" , "value": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })"}, "metaTimes": 150}},
+{ "metaTime":152, "edgeId": "#edgeId(1119)", "edge": { "source":["lazyMergeSort(6)","@now","150"], "target": ["inputTree(5-element)","@now","152"], "action": { "type": "get" , "value": "#element{element = 195; symbol = 5}"}, "metaTimes": 152}},
+{ "metaTime":153, "edgeId": "#edgeId(1120)", "edge": { "source":["lazyMergeSort(6)","@now","150"], "target": ["inputTree(6-element)","@now","153"], "action": { "type": "get" , "value": "#element{element = 1191; symbol = 6}"}, "metaTimes": 153}},
+{ "metaTime":155, "edgeId": "#edgeId(1121)", "edge": { "source":["lazyMergeSort(6)","@now","150"], "target": ["lazyMergeSort(merge-6)(5)","@now","155"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 155}},
+{ "metaTime":156, "edgeId": "#edgeId(1122)", "edge": { "source":["lazyMergeSort(7)","@now","147"], "target": ["lazyMergeSort(6)","@now","156"], "action": { "type": "force" , "thunk": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "value": "?{element = 195; next = lazyMergeSort(merge-6)(5); symbol = 5}"}, "metaTimes": [151, 156]}},
+{ "metaTime":157, "edgeId": "#edgeId(1123)", "edge": { "source":["lazyMergeSort(7)","@now","147"], "target": ["inputTree(7-element)","@now","157"], "action": { "type": "get" , "value": "#element{element = 777; symbol = 7}"}, "metaTimes": 157}},
+{ "metaTime":159, "edgeId": "#edgeId(1124)", "edge": { "source":["lazyMergeSort(7)","@now","147"], "target": ["lazyMergeSort(merge-7)(5)","@now","159"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 159}},
+{ "metaTime":160, "edgeId": "#edgeId(1125)", "edge": { "source":["lazyMergeSort(8)","@now","144"], "target": ["lazyMergeSort(7)","@now","160"], "action": { "type": "force" , "thunk": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "value": "?{element = 195; next = lazyMergeSort(merge-7)(5); symbol = 5}"}, "metaTimes": [148, 160]}},
+{ "metaTime":161, "edgeId": "#edgeId(1126)", "edge": { "source":["lazyMergeSort(8)","@now","144"], "target": ["inputTree(8-element)","@now","161"], "action": { "type": "get" , "value": "#element{element = 581; symbol = 8}"}, "metaTimes": 161}},
+{ "metaTime":163, "edgeId": "#edgeId(1127)", "edge": { "source":["lazyMergeSort(8)","@now","144"], "target": ["lazyMergeSort(merge-8)(5)","@now","163"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 163}},
+{ "metaTime":164, "edgeId": "#edgeId(1128)", "edge": { "source":["lazyMergeSort(5)","@now","119"], "target": ["lazyMergeSort(8)","@now","164"], "action": { "type": "force" , "thunk": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "value": "?{element = 195; next = lazyMergeSort(merge-8)(5); symbol = 5}"}, "metaTimes": [145, 164]}},
+{ "metaTime":166, "edgeId": "#edgeId(1129)", "edge": { "source":["lazyMergeSort(5)","@now","119"], "target": ["lazyMergeSort(merge-5)(2)","@now","166"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 166}},
+{ "metaTime":167, "edgeId": "#edgeId(1130)", "edge": { "source":["lazyMergeSort(9)","@now","116"], "target": ["lazyMergeSort(5)","@now","167"], "action": { "type": "force" , "thunk": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "value": "?{element = 0; next = lazyMergeSort(merge-5)(2); symbol = 2}"}, "metaTimes": [120, 167]}},
+{ "metaTime":168, "edgeId": "#edgeId(1131)", "edge": { "source":["lazyMergeSort(9)","@now","116"], "target": ["inputTree(10-binary)","@now","168"], "action": { "type": "get" , "value": "#binary{left = inputTree(9-element); level = 4162; right = inputTree(10-element); symbol = 10}"}, "metaTimes": 168}},
+{ "metaTime":169, "edgeId": "#edgeId(1132)", "edge": { "source":["lazyMergeSort(9)","@now","116"], "target": ["lazyMergeSort(10)","@now","169"], "action": { "type": "put" , "value": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })"}, "metaTimes": 169}},
+{ "metaTime":171, "edgeId": "#edgeId(1133)", "edge": { "source":["lazyMergeSort(10)","@now","169"], "target": ["inputTree(9-element)","@now","171"], "action": { "type": "get" , "value": "#element{element = 1306; symbol = 9}"}, "metaTimes": 171}},
+{ "metaTime":172, "edgeId": "#edgeId(1134)", "edge": { "source":["lazyMergeSort(10)","@now","169"], "target": ["inputTree(10-element)","@now","172"], "action": { "type": "get" , "value": "#element{element = 545; symbol = 10}"}, "metaTimes": 172}},
+{ "metaTime":174, "edgeId": "#edgeId(1135)", "edge": { "source":["lazyMergeSort(10)","@now","169"], "target": ["lazyMergeSort(merge-10)(10)","@now","174"], "action": { "type": "put" , "value": "@thunk ({ merge(?xc, force (yc.next)) })"}, "metaTimes": 174}},
+{ "metaTime":175, "edgeId": "#edgeId(1136)", "edge": { "source":["lazyMergeSort(9)","@now","116"], "target": ["lazyMergeSort(10)","@now","175"], "action": { "type": "force" , "thunk": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "value": "?{element = 545; next = lazyMergeSort(merge-10)(10); symbol = 10}"}, "metaTimes": [170, 175]}},
+{ "metaTime":177, "edgeId": "#edgeId(1137)", "edge": { "source":["lazyMergeSort(9)","@now","116"], "target": ["lazyMergeSort(merge-9)(2)","@now","177"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 177}},
+{ "metaTime":178, "edgeId": "#edgeId(1138)", "edge": { "source":["lazyMergeSort(result)","@now","113"], "target": ["lazyMergeSort(9)","@now","178"], "action": { "type": "force" , "thunk": "@thunk ({ binary(b.symbol, reduceUp(@ (b.left), empty, element, binary), reduceUp(@ (b.right), empty, element, binary)) })", "value": "?{element = 0; next = lazyMergeSort(merge-9)(2); symbol = 2}"}, "metaTimes": [117, 178]}},
+{ "metaTime":179, "edgeId": "#edgeId(1139)", "edge": { "source":["scene","@now","1"], "target": ["lazyMergeSort(result)","@now","179"], "action": { "type": "force" , "thunk": "@thunk ({ reduceUp(@ (t!), null, func (symbol: Symbol, element: X) : LazyList<X> { ?{symbol=symbol; element; next=nilList} }, func (symbol: Symbol, xs: LazyList<X>, ys: LazyList<X>) : LazyList<X> { do within space (`merge - symbol){ LazyList.merge(xs, ys) } },) })", "value": "?{element = 0; next = lazyMergeSort(merge-9)(2); symbol = 2}"}, "metaTimes": [114, 179]}},
+{ "metaTime":186, "edgeId": "#edgeId(1140)", "edge": { "source":["lazyMergeSort(merge-2)(2)","@now","133"], "target": ["lazyMergeSort(`(nilList))","@now","186"], "action": { "type": "force" , "thunk": "@thunk ({ null })", "value": "null"}, "metaTimes": [185, 186]}},
+{ "metaTime":187, "edgeId": "#edgeId(1141)", "edge": { "source":["lazyMergeSort(merge-3)(2)","@now","137"], "target": ["lazyMergeSort(merge-2)(2)","@now","187"], "action": { "type": "force" , "thunk": "@thunk ({ merge(?xc, force (yc.next)) })", "value": "?{element = 470; next = lazyMergeSort(`(nilList)); symbol = 1}"}, "metaTimes": [184, 187]}},
+{ "metaTime":189, "edgeId": "#edgeId(1142)", "edge": { "source":["lazyMergeSort(merge-3)(2)","@now","137"], "target": ["lazyMergeSort(merge-3)(1)","@now","189"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 189}},
+{ "metaTime":190, "edgeId": "#edgeId(1143)", "edge": { "source":["lazyMergeSort(merge-4)(2)","@now","141"], "target": ["lazyMergeSort(merge-3)(2)","@now","190"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 470; next = lazyMergeSort(merge-3)(1); symbol = 1}"}, "metaTimes": [183, 190]}},
+{ "metaTime":192, "edgeId": "#edgeId(1144)", "edge": { "source":["lazyMergeSort(merge-4)(2)","@now","141"], "target": ["lazyMergeSort(merge-4)(4)","@now","192"], "action": { "type": "put" , "value": "@thunk ({ merge(?xc, force (yc.next)) })"}, "metaTimes": 192}},
+{ "metaTime":193, "edgeId": "#edgeId(1145)", "edge": { "source":["lazyMergeSort(merge-5)(2)","@now","166"], "target": ["lazyMergeSort(merge-4)(2)","@now","193"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 55; next = lazyMergeSort(merge-4)(4); symbol = 4}"}, "metaTimes": [182, 193]}},
+{ "metaTime":195, "edgeId": "#edgeId(1146)", "edge": { "source":["lazyMergeSort(merge-5)(2)","@now","166"], "target": ["lazyMergeSort(merge-5)(4)","@now","195"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 195}},
+{ "metaTime":196, "edgeId": "#edgeId(1147)", "edge": { "source":["lazyMergeSort(merge-9)(2)","@now","177"], "target": ["lazyMergeSort(merge-5)(2)","@now","196"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 55; next = lazyMergeSort(merge-5)(4); symbol = 4}"}, "metaTimes": [181, 196]}},
+{ "metaTime":198, "edgeId": "#edgeId(1148)", "edge": { "source":["lazyMergeSort(merge-9)(2)","@now","177"], "target": ["lazyMergeSort(merge-9)(4)","@now","198"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 198}},
+{ "metaTime":199, "edgeId": "#edgeId(1149)", "edge": { "source":["scene","@now","1"], "target": ["lazyMergeSort(merge-9)(2)","@now","199"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 55; next = lazyMergeSort(merge-9)(4); symbol = 4}"}, "metaTimes": [180, 199]}},
+{ "metaTime":203, "edgeId": "#edgeId(1150)", "edge": { "source":["lazyMergeSort(merge-4)(4)","@now","192"], "target": ["lazyMergeSort(`(nilList))","@now","203"], "action": { "type": "force" , "thunk": "@thunk ({ null })", "value": "null"}, "metaTimes": 203}},
+{ "metaTime":204, "edgeId": "#edgeId(1151)", "edge": { "source":["lazyMergeSort(merge-5)(4)","@now","195"], "target": ["lazyMergeSort(merge-4)(4)","@now","204"], "action": { "type": "force" , "thunk": "@thunk ({ merge(?xc, force (yc.next)) })", "value": "?{element = 470; next = lazyMergeSort(merge-3)(1); symbol = 1}"}, "metaTimes": [202, 204]}},
+{ "metaTime":206, "edgeId": "#edgeId(1152)", "edge": { "source":["lazyMergeSort(merge-5)(4)","@now","195"], "target": ["lazyMergeSort(merge-5)(5)","@now","206"], "action": { "type": "put" , "value": "@thunk ({ merge(?xc, force (yc.next)) })"}, "metaTimes": 206}},
+{ "metaTime":207, "edgeId": "#edgeId(1153)", "edge": { "source":["lazyMergeSort(merge-9)(4)","@now","198"], "target": ["lazyMergeSort(merge-5)(4)","@now","207"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 195; next = lazyMergeSort(merge-5)(5); symbol = 5}"}, "metaTimes": [201, 207]}},
+{ "metaTime":209, "edgeId": "#edgeId(1154)", "edge": { "source":["lazyMergeSort(merge-9)(4)","@now","198"], "target": ["lazyMergeSort(merge-9)(5)","@now","209"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 209}},
+{ "metaTime":210, "edgeId": "#edgeId(1155)", "edge": { "source":["scene","@now","1"], "target": ["lazyMergeSort(merge-9)(4)","@now","210"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 195; next = lazyMergeSort(merge-9)(5); symbol = 5}"}, "metaTimes": [200, 210]}},
+{ "metaTime":216, "edgeId": "#edgeId(1156)", "edge": { "source":["lazyMergeSort(merge-6)(5)","@now","155"], "target": ["lazyMergeSort(`(nilList))","@now","216"], "action": { "type": "force" , "thunk": "@thunk ({ null })", "value": "null"}, "metaTimes": 216}},
+{ "metaTime":217, "edgeId": "#edgeId(1157)", "edge": { "source":["lazyMergeSort(merge-7)(5)","@now","159"], "target": ["lazyMergeSort(merge-6)(5)","@now","217"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 1191; next = lazyMergeSort(`(nilList)); symbol = 6}"}, "metaTimes": [215, 217]}},
+{ "metaTime":219, "edgeId": "#edgeId(1158)", "edge": { "source":["lazyMergeSort(merge-7)(5)","@now","159"], "target": ["lazyMergeSort(merge-7)(7)","@now","219"], "action": { "type": "put" , "value": "@thunk ({ merge(?xc, force (yc.next)) })"}, "metaTimes": 219}},
+{ "metaTime":220, "edgeId": "#edgeId(1159)", "edge": { "source":["lazyMergeSort(merge-8)(5)","@now","163"], "target": ["lazyMergeSort(merge-7)(5)","@now","220"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 777; next = lazyMergeSort(merge-7)(7); symbol = 7}"}, "metaTimes": [214, 220]}},
+{ "metaTime":222, "edgeId": "#edgeId(1160)", "edge": { "source":["lazyMergeSort(merge-8)(5)","@now","163"], "target": ["lazyMergeSort(merge-8)(8)","@now","222"], "action": { "type": "put" , "value": "@thunk ({ merge(?xc, force (yc.next)) })"}, "metaTimes": 222}},
+{ "metaTime":223, "edgeId": "#edgeId(1161)", "edge": { "source":["lazyMergeSort(merge-5)(5)","@now","206"], "target": ["lazyMergeSort(merge-8)(5)","@now","223"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 581; next = lazyMergeSort(merge-8)(8); symbol = 8}"}, "metaTimes": [213, 223]}},
+{ "metaTime":225, "edgeId": "#edgeId(1162)", "edge": { "source":["lazyMergeSort(merge-5)(5)","@now","206"], "target": ["lazyMergeSort(merge-5)(1)","@now","225"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 225}},
+{ "metaTime":226, "edgeId": "#edgeId(1163)", "edge": { "source":["lazyMergeSort(merge-9)(5)","@now","209"], "target": ["lazyMergeSort(merge-5)(5)","@now","226"], "action": { "type": "force" , "thunk": "@thunk ({ merge(?xc, force (yc.next)) })", "value": "?{element = 470; next = lazyMergeSort(merge-5)(1); symbol = 1}"}, "metaTimes": [212, 226]}},
+{ "metaTime":228, "edgeId": "#edgeId(1164)", "edge": { "source":["lazyMergeSort(merge-9)(5)","@now","209"], "target": ["lazyMergeSort(merge-9)(1)","@now","228"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 228}},
+{ "metaTime":229, "edgeId": "#edgeId(1165)", "edge": { "source":["scene","@now","1"], "target": ["lazyMergeSort(merge-9)(5)","@now","229"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 470; next = lazyMergeSort(merge-9)(1); symbol = 1}"}, "metaTimes": [211, 229]}},
+{ "metaTime":233, "edgeId": "#edgeId(1166)", "edge": { "source":["lazyMergeSort(merge-3)(1)","@now","189"], "target": ["lazyMergeSort(`(nilList))","@now","233"], "action": { "type": "force" , "thunk": "@thunk ({ null })", "value": "null"}, "metaTimes": 233}},
+{ "metaTime":234, "edgeId": "#edgeId(1167)", "edge": { "source":["lazyMergeSort(merge-5)(1)","@now","225"], "target": ["lazyMergeSort(merge-3)(1)","@now","234"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 1192; next = lazyMergeSort(`(nilList)); symbol = 3}"}, "metaTimes": [232, 234]}},
+{ "metaTime":236, "edgeId": "#edgeId(1168)", "edge": { "source":["lazyMergeSort(merge-5)(1)","@now","225"], "target": ["lazyMergeSort(merge-5)(8)","@now","236"], "action": { "type": "put" , "value": "@thunk ({ merge(?xc, force (yc.next)) })"}, "metaTimes": 236}},
+{ "metaTime":237, "edgeId": "#edgeId(1169)", "edge": { "source":["lazyMergeSort(merge-9)(1)","@now","228"], "target": ["lazyMergeSort(merge-5)(1)","@now","237"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 581; next = lazyMergeSort(merge-5)(8); symbol = 8}"}, "metaTimes": [231, 237]}},
+{ "metaTime":239, "edgeId": "#edgeId(1170)", "edge": { "source":["lazyMergeSort(merge-9)(1)","@now","228"], "target": ["lazyMergeSort(merge-9)(10)","@now","239"], "action": { "type": "put" , "value": "@thunk ({ merge(?xc, force (yc.next)) })"}, "metaTimes": 239}},
+{ "metaTime":240, "edgeId": "#edgeId(1171)", "edge": { "source":["scene","@now","1"], "target": ["lazyMergeSort(merge-9)(1)","@now","240"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 545; next = lazyMergeSort(merge-9)(10); symbol = 10}"}, "metaTimes": [230, 240]}},
+{ "metaTime":243, "edgeId": "#edgeId(1172)", "edge": { "source":["lazyMergeSort(merge-10)(10)","@now","174"], "target": ["lazyMergeSort(`(nilList))","@now","243"], "action": { "type": "force" , "thunk": "@thunk ({ null })", "value": "null"}, "metaTimes": 243}},
+{ "metaTime":244, "edgeId": "#edgeId(1173)", "edge": { "source":["lazyMergeSort(merge-9)(10)","@now","239"], "target": ["lazyMergeSort(merge-10)(10)","@now","244"], "action": { "type": "force" , "thunk": "@thunk ({ merge(?xc, force (yc.next)) })", "value": "?{element = 1306; next = lazyMergeSort(`(nilList)); symbol = 9}"}, "metaTimes": [242, 244]}},
+{ "metaTime":246, "edgeId": "#edgeId(1174)", "edge": { "source":["lazyMergeSort(merge-9)(10)","@now","239"], "target": ["lazyMergeSort(merge-9)(8)","@now","246"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 246}},
+{ "metaTime":247, "edgeId": "#edgeId(1175)", "edge": { "source":["scene","@now","1"], "target": ["lazyMergeSort(merge-9)(10)","@now","247"], "action": { "type": "force" , "thunk": "@thunk ({ merge(?xc, force (yc.next)) })", "value": "?{element = 581; next = lazyMergeSort(merge-9)(8); symbol = 8}"}, "metaTimes": [241, 247]}},
+{ "metaTime":251, "edgeId": "#edgeId(1176)", "edge": { "source":["lazyMergeSort(merge-8)(8)","@now","222"], "target": ["lazyMergeSort(`(nilList))","@now","251"], "action": { "type": "force" , "thunk": "@thunk ({ null })", "value": "null"}, "metaTimes": 251}},
+{ "metaTime":252, "edgeId": "#edgeId(1177)", "edge": { "source":["lazyMergeSort(merge-5)(8)","@now","236"], "target": ["lazyMergeSort(merge-8)(8)","@now","252"], "action": { "type": "force" , "thunk": "@thunk ({ merge(?xc, force (yc.next)) })", "value": "?{element = 777; next = lazyMergeSort(merge-7)(7); symbol = 7}"}, "metaTimes": [250, 252]}},
+{ "metaTime":254, "edgeId": "#edgeId(1178)", "edge": { "source":["lazyMergeSort(merge-5)(8)","@now","236"], "target": ["lazyMergeSort(merge-5)(7)","@now","254"], "action": { "type": "put" , "value": "@thunk ({ merge(?xc, force (yc.next)) })"}, "metaTimes": 254}},
+{ "metaTime":255, "edgeId": "#edgeId(1179)", "edge": { "source":["lazyMergeSort(merge-9)(8)","@now","246"], "target": ["lazyMergeSort(merge-5)(8)","@now","255"], "action": { "type": "force" , "thunk": "@thunk ({ merge(?xc, force (yc.next)) })", "value": "?{element = 777; next = lazyMergeSort(merge-5)(7); symbol = 7}"}, "metaTimes": [249, 255]}},
+{ "metaTime":257, "edgeId": "#edgeId(1180)", "edge": { "source":["lazyMergeSort(merge-9)(8)","@now","246"], "target": ["lazyMergeSort(merge-9)(7)","@now","257"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 257}},
+{ "metaTime":258, "edgeId": "#edgeId(1181)", "edge": { "source":["scene","@now","1"], "target": ["lazyMergeSort(merge-9)(8)","@now","258"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 777; next = lazyMergeSort(merge-9)(7); symbol = 7}"}, "metaTimes": [248, 258]}},
+{ "metaTime":262, "edgeId": "#edgeId(1182)", "edge": { "source":["lazyMergeSort(merge-7)(7)","@now","219"], "target": ["lazyMergeSort(`(nilList))","@now","262"], "action": { "type": "force" , "thunk": "@thunk ({ null })", "value": "null"}, "metaTimes": 262}},
+{ "metaTime":263, "edgeId": "#edgeId(1183)", "edge": { "source":["lazyMergeSort(merge-5)(7)","@now","254"], "target": ["lazyMergeSort(merge-7)(7)","@now","263"], "action": { "type": "force" , "thunk": "@thunk ({ merge(?xc, force (yc.next)) })", "value": "?{element = 1191; next = lazyMergeSort(`(nilList)); symbol = 6}"}, "metaTimes": [261, 263]}},
+{ "metaTime":265, "edgeId": "#edgeId(1184)", "edge": { "source":["lazyMergeSort(merge-5)(7)","@now","254"], "target": ["lazyMergeSort(merge-5)(6)","@now","265"], "action": { "type": "put" , "value": "@thunk ({ merge(?xc, force (yc.next)) })"}, "metaTimes": 265}},
+{ "metaTime":266, "edgeId": "#edgeId(1185)", "edge": { "source":["lazyMergeSort(merge-9)(7)","@now","257"], "target": ["lazyMergeSort(merge-5)(7)","@now","266"], "action": { "type": "force" , "thunk": "@thunk ({ merge(?xc, force (yc.next)) })", "value": "?{element = 1191; next = lazyMergeSort(merge-5)(6); symbol = 6}"}, "metaTimes": [260, 266]}},
+{ "metaTime":268, "edgeId": "#edgeId(1186)", "edge": { "source":["lazyMergeSort(merge-9)(7)","@now","257"], "target": ["lazyMergeSort(merge-9)(6)","@now","268"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 268}},
+{ "metaTime":269, "edgeId": "#edgeId(1187)", "edge": { "source":["scene","@now","1"], "target": ["lazyMergeSort(merge-9)(7)","@now","269"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 1191; next = lazyMergeSort(merge-9)(6); symbol = 6}"}, "metaTimes": [259, 269]}},
+{ "metaTime":272, "edgeId": "#edgeId(1188)", "edge": { "source":["lazyMergeSort(merge-5)(6)","@now","265"], "target": ["lazyMergeSort(`(nilList))","@now","272"], "action": { "type": "force" , "thunk": "@thunk ({ null })", "value": "null"}, "metaTimes": 272}},
+{ "metaTime":273, "edgeId": "#edgeId(1189)", "edge": { "source":["lazyMergeSort(merge-9)(6)","@now","268"], "target": ["lazyMergeSort(merge-5)(6)","@now","273"], "action": { "type": "force" , "thunk": "@thunk ({ merge(?xc, force (yc.next)) })", "value": "?{element = 1192; next = lazyMergeSort(`(nilList)); symbol = 3}"}, "metaTimes": [271, 273]}},
+{ "metaTime":275, "edgeId": "#edgeId(1190)", "edge": { "source":["lazyMergeSort(merge-9)(6)","@now","268"], "target": ["lazyMergeSort(merge-9)(3)","@now","275"], "action": { "type": "put" , "value": "@thunk ({ merge(force (xc.next), ?yc) })"}, "metaTimes": 275}},
+{ "metaTime":276, "edgeId": "#edgeId(1191)", "edge": { "source":["scene","@now","1"], "target": ["lazyMergeSort(merge-9)(6)","@now","276"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 1192; next = lazyMergeSort(merge-9)(3); symbol = 3}"}, "metaTimes": [270, 276]}},
+{ "metaTime":278, "edgeId": "#edgeId(1192)", "edge": { "source":["lazyMergeSort(merge-9)(3)","@now","275"], "target": ["lazyMergeSort(`(nilList))","@now","278"], "action": { "type": "force" , "thunk": "@thunk ({ null })", "value": "null"}, "metaTimes": 278}},
+{ "metaTime":279, "edgeId": "#edgeId(1193)", "edge": { "source":["scene","@now","1"], "target": ["lazyMergeSort(merge-9)(3)","@now","279"], "action": { "type": "force" , "thunk": "@thunk ({ merge(force (xc.next), ?yc) })", "value": "?{element = 1306; next = lazyMergeSort(`(nilList)); symbol = 9}"}, "metaTimes": [277, 279]}},
+{ "metaTime":280, "edgeId": "#edgeId(1194)", "edge": { "source":["@here","@now","0"], "target": ["scene","@now","280"], "action": { "type": "force" , "thunk": "@thunk ({ let inputArray = R.generateRandomInput(seed, size); let inputList_ = `ListFromRandomArray := thunk { do within space `inputList{ List.fromIter(inputArray.vals()) } }; let inputList = force (inputList_); let inputTree_ = `LevelTreeFromList := thunk { do within space `inputTree{ Seq.fromList(inputList) }; }; let inputTree = force (inputTree_); let lazySorted_ = do within space `lazyMergeSort{ Seq.lazyMergeSort(inputTree); }; let sorted = do within space `forceSort{ LazyList.takeN_(lazySorted_, size); }; let components = {inputArray=inputArray; inputList_; inputList; inputTree_; inputTree; lazySorted_; sorted}; {components=components} })", "value": "{components = {inputArray = [(1, 470), (2, 0), (3, 1192), (4, 55), (5, 195), (6, 1191), (7, 777), (8, 581), (9, 1306), (10, 545)]; inputList = ?{element = 470; next = inputList(1); symbol = 1}; inputList_ = ListFromRandomArray; inputTree = ?inputTree(9-binary); inputTree_ = LevelTreeFromList; lazySorted_ = lazyMergeSort(result); sorted = ([(lazyMergeSort(result), 2, 0), (lazyMergeSort(merge-9)(2), 4, 55), (lazyMergeSort(merge-9)(4), 5, 195), (lazyMergeSort(merge-9)(5), 1, 470), (lazyMergeSort(merge-9)(1), 10, 545), (lazyMergeSort(merge-9)(10), 8, 581), (lazyMergeSort(merge-9)(8), 7, 777), (lazyMergeSort(merge-9)(7), 6, 1191), (lazyMergeSort(merge-9)(6), 3, 1192), (lazyMergeSort(merge-9)(3), 9, 1306)], lazyMergeSort(`(nilList)))}}"}, "metaTimes": [2, 280]}}
+]
 
 }
