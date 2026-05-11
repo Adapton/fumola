@@ -142,7 +142,7 @@ impl Space {
 
     pub fn into_symbol(&self) -> Res<Symbol_> {
         match self {
-            Space::Here => todo!(),
+            Space::Here => Ok(Shared::new(Symbol::Id(Id::new("@here".to_owned())))),
             Space::Symbol(s) => Ok(s.clone()),
             Space::Exp_(_, _) => todo!(),
         }

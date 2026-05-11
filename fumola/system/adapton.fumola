@@ -28,18 +28,20 @@ module {
     /// graphical representation of the Adapton cache.
     ///
     public module PeekInfo {
+        public type NodeHistoryItem = {
+            nodeId : NodeId;
+            metaTime: MetaTime;
+            node : Node; 
+        };
+        public type EdgeHistoryItem = {
+            edgeId : EdgeId;
+            metaTime: MetaTime;
+            edge : Edge
+        };
         public type History = {
             events : Events;
-            nodes : [{
-                nodeId : NodeId;
-                metaTime: MetaTime;
-                node : Node; 
-            }];
-            edges : [{
-                edgeId : EdgeId;
-                metaTime: MetaTime;
-                edge : Edge
-            }]
+            nodes : [NodeHistoryItem];
+            edges : [EdgeHistoryItem];
         };
         public type Events = [Event];
         public type Event = {
@@ -81,6 +83,12 @@ module {
             target : NodeId;
             action : Action;
             metaTimes : MetaTimes;
+        };
+
+        public type Action = {
+            #force_ : (Any, Any);
+            #put : Any;
+            #get : Any;
         };
 
         public type NodeInfo = {
@@ -460,8 +468,16 @@ module {
             fromArray(input, fromObject)
         };
 
-        public func fromEvents(input : [SceneObject]) : Text {
+        public func fromEvents(input : [Event]) : Text {
             fromArray(input, fromEvent)
+        };
+
+        public func fromNodeHistoryItems(input : [NodeHistoryItem]) : Text {
+            fromArray(input, fromNodeHistoryItem)
+        };
+
+        public func fromEdgeHistoryItems(input : [EdgeHistoryItem]) : Text {
+            fromArray(input, fromEdgeHistoryItem)
         };
 
         public func fromScene( s : Scene ) : Text {
@@ -471,8 +487,8 @@ module {
             "\"objects\" : \n" # fromObjects(s.objects) # "\n,\n" #
             "\"outline\" : \n" # fromOutline(s.outline) # "\n,\n" #
             "\"events\": \n" # fromEvents(s.history.events) # "\n,\n" #
-            "\"nodes\": \n" # nodesText # "\n,\n" #
-            "\"edges\": \n" # edgesText # "\n\n" #
+            "\"nodes\": \n" # fromNodeHistoryItems(s.history.nodes) # "\n,\n" #
+            "\"edges\": \n" # fromEdgeHistoryItems(s.history.edges) # "\n\n" #
             "}"
         };
    
@@ -527,6 +543,69 @@ module {
             # "]"
         };
 
+        public func fromSpace(sp : Space)  : Text {
+            fromAny(sp)
+        };
+
+        public func fromAction(action : Action) : Text {
+            (switch action {
+                case (#force_(t, v)) {
+                    "{ \"type\": \"force\" " #
+                    ", \"thunk\": " # fromAny(t) #
+                    ", \"value\": " # fromAny(v)
+                };
+                case (#put(v)) {
+                    "{ \"type\": \"put\" " #
+                    ", \"value\": " # fromAny(v)
+                };
+                case (#get(v)) {
+                    "{ \"type\": \"get\" " #
+                    ", \"value\": " # fromAny(v)
+                }}) # "}"
+        };
+        
+        public func fromNode(node : Node) : Text {
+            (switch node {
+                case (#nonThunk(v)) {
+                    "{ \"type\": \"nonThunk\" " #
+                    ", \"value\": " # fromAny(v)
+                };
+                case (#thunk_(thunkNode)) {
+                    "{ \"type\": \"thunk\" " #
+                    ", \"body\": " # fromAny(thunkNode.body) #
+                    ", \"trace\": " # fromArray(thunkNode.trace, fromEdgeId) #
+                    ", \"space\": " # fromSpace(thunkNode.space) #
+                    ", \"result\": " # (switch (thunkNode.result) {
+                        case null "null";
+                        case (?(valueMetaTime, value)) {
+                            debug_show [valueMetaTime, debug_show value]                
+                        }})
+                }
+            }) # "}"
+        };
+
+        public func fromEdge(edge : Edge) : Text {
+            "{ \"source\":" # fromNodeId(edge.source) #
+            ", \"target\": " # fromNodeId(edge.target) #
+            ", \"action\": " # fromAction(edge.action) #
+            ", \"metaTimes\": " # fromMetaTimes(edge.metaTimes) #
+            "}"
+        };
+
+        public func fromNodeHistoryItem(item : NodeHistoryItem) : Text {
+            "{ \"metaTime\":" # debug_show item.metaTime  # 
+            ", \"nodeId\": " # fromEdgeId(item.nodeId) #
+            ", \"node\": " # fromNode(item.node) #
+            "}"
+        };
+
+        public func fromEdgeHistoryItem(item : EdgeHistoryItem) : Text {
+            "{ \"metaTime\":" # debug_show item.metaTime  # 
+            ", \"edgeId\": " # fromEdgeId(item.edgeId) #
+            ", \"edge\": " # fromEdge(item.edge) #
+            "}"
+        };
+
         public func fromEdgeId(edgeId : EdgeId) : Text {
             fromAnyValue(edgeId)
         };
@@ -556,6 +635,7 @@ module {
         public func fromAnyValue(v : Any) : Text {
             debug_show (debug_show v)
         };
+        public let fromAny = fromAnyValue;
 
         public func fromOutline(outline : Outline) : Text {
             switch outline {
