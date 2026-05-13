@@ -12,6 +12,7 @@
             --bg: #111318;
             --bg-elev: #171a20;
             --bg-panel: #1b1f27;
+            --bg-outline-vert: #64727c;
 
             --border: #2a2f3a;
             --border-soft: #222733;
@@ -70,6 +71,18 @@
             flex-direction: column;
             height: 100vh;
             background: #000;
+        }
+
+        .outline-edge {
+            border: 0px;
+        }
+
+        .outline-node {
+            gap: 2px;
+            border: 0px;
+            border-left: 2px;
+            border-style: solid;
+            border-color: var(--bg-outline-vert);
         }
 
         .outline-value-text {
@@ -185,6 +198,9 @@
 
         .action-arrow {
             font-size: 20px;
+        }
+        .result-arrow {
+            color: var(--blue-dark);
         }
         .action-put {
             color: var(--purple-dark);
@@ -1299,7 +1315,7 @@
             // console.log(e.metaTimes + " " + ts);
 
             const span = document.createElement("span");
-            span.textContent = metaTime + (useEndTime ? (isAnchor ? " }" : " {") : "");
+            span.textContent = metaTime // + (useEndTime ? (isAnchor ? " }" : " {") : "");
             span.className = "metaTime";
             span.onclick = () => onMetaTimeClick(metaTime);
             if (!useEndTime || isAnchor) {
@@ -1335,9 +1351,11 @@
 
                 const div = document.createElement("div");
                 div.style.marginLeft = outlineMargin(depth);
+                div.className = "outline-node";
                 // console.log(node);
 
                 if (depth == 0) {
+                    // to do -- create nodeId div
                     // no "edge" above the root to print this name.
                     // otherwise, some edge already printed this out.
                     div.appendChild(document.createTextNode(node.nodeId));
@@ -1351,6 +1369,7 @@
                     node.edges.forEach(e => {
                         edgeCount += 1;
                         let div = document.createElement("div");
+                        div.className = "outline-edge";
                         const hasNested = typeof e.metaTimes != "number";
 
                         div.style.marginLeft = outlineMargin(depth); // ???
@@ -1381,19 +1400,34 @@
                         rootElm_.appendChild(div);
                         walk(rootElm_, e.outline, depth + 1);
                         
+                        div.appendChild(document.createTextNode(" " + e.action));
+           
                         const valueNode = document.createElement("span");
                         valueNode.textContent = e.value;
                         valueNode.className = "outline-value-text";
-                        div.appendChild(valueNode);
-                      
-                        if (hasNested) {
-                            //rootElm_.appendChild(document.createTextNode(e.metaTimes[1] + " }"))
-                            //addMetaTimeElementForOutlineEdge(rootElm_, e, false, true, depth)
-                            addMetaTimeElementForOutlineEdge(rootElm_, e, true, true, depth)
-                            //rootElm_.appendChild(document.createTextNode(" }"))
+
+                        if(!hasNested) {
+                            div.appendChild(valueNode);
+                        } else {
+                            const thunkNode = document.createElement("span");
+                            thunkNode.textContent = e.outline.nodeId;
+                            // to do -- look up nodeId to get listing/env information, to display here.
+                            thunkNode.className = "outline-value-text";
+                            div.appendChild(thunkNode)
+
+                            let arrowSpan = document.createElement("span");
+                            arrowSpan.className = "action-arrow result-arrow";
+                            arrowSpan.textContent = "╰〜〜>";
+
+                            const resultNode = document.createElement("div");
+                            resultNode.className = "outline-internal-result";
+                            resultNode.style.marginLeft = outlineMargin(depth);
+                            addMetaTimeElementForOutlineEdge(resultNode, e, true, true);
+                            resultNode.appendChild(arrowSpan);
+                            resultNode.appendChild(valueNode);
+                            rootElm_.appendChild(resultNode);
                         };
-                    }
-                    );
+                    }); // foreach edge e
                 } 
             }
 
