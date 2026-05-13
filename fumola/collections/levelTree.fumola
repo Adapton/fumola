@@ -334,27 +334,59 @@ module {
     }
   };
 
-  func sceneObjectsFromList(outline) {
+  func objectFromEdge(edge) {
+    // -- TODO
+  };
+
+  func sceneObjectsFromList(outline, defaultPos) {
     switch (outline) {
       case (#leaf(n)) { assert false };
       case (#internal(n)) {
-        // prim "print" (n.edges.size());
         switch (n.edges.size()) {
           case 1 { 
+              //
               // various base cases land here.
+              // use defaultPos for the orb object.
+              //
+              [n.__nodeId] #
+              [objectFromEdge(n.edges[0])]
           };
           case 5 { 
               // most common (binary) recursive case lands here.
-              sceneObjectsFromList(n.edges[2].outline!);
-              sceneObjectsFromList(n.edges[4].outline!);
+              // use position of the target of n.edges[3] for orb object.
+              // re-set defaultPos for each sub-case using logic like in original binary tree layout.
+              [n.__nodeId] #
+              [ 
+                objectFromEdge(n.edges[0]),
+                objectFromEdge(n.edges[1]),
+                objectFromEdge(n.edges[2]),
+              ] #
+              sceneObjectsFromList(n.edges[2].outline!, defaultPos)
+              # [ 
+                objectFromEdge(n.edges[3]),
+                objectFromEdge(n.edges[4])
+              ] #
+              sceneObjectsFromList(n.edges[4].outline!, defaultPos)
           };
           case 7 { 
               // special case for the top of the recursion.
-              // two initial steps: 
+              // similar to case 5 except for extra two initial steps: 
               //  - intialize a local copy of the empty input/output list,
               //  - and put the first list element into an initial leaf-element tree. 
-              sceneObjectsFromList(n.edges[4].outline!);
-              sceneObjectsFromList(n.edges[6].outline!);
+              [n.__nodeId] #
+              [ 
+                objectFromEdge(n.edges[0]),
+                objectFromEdge(n.edges[1]),
+                objectFromEdge(n.edges[2]),
+                objectFromEdge(n.edges[3]),
+                objectFromEdge(n.edges[4]),
+              ] #
+              sceneObjectsFromList(n.edges[4].outline!, defaultPos)
+              # [
+                objectFromEdge(n.edges[5]),
+                objectFromEdge(n.edges[6])
+              ] #
+              sceneObjectsFromList(n.edges[6].outline!, defaultPos)
           };
           case _ { 
             assert false
@@ -373,7 +405,8 @@ module {
     let tree = force buildTree;
     let outline = A.Outline.outline(buildTree);
     // prim "print" (debug_show outline);
-    let sceneObjects = sceneObjectsFromList(outline);
+    let sceneObjects = sceneObjectsFromList(outline, A.Scene.zero);
+    // prim "print" (debug_show sceneObjects);
   };
 
   #[listing]
