@@ -518,9 +518,10 @@ module {
                     "}"
                 };
                 case(#action(fields)) {
-                   "{ \"type\": \"action\", \"from\": " # debug_show fields.from # 
+                   "{ \"type\": " # fromShowAction(fields.action) #
+                    ", \"from\": " # debug_show fields.from # 
                     ", \"to\": " # debug_show fields.to # 
-                    ", \"action\": " # fromShowAction(fields.action)
+                   // ", \"action\": " # fromShowAction(fields.action)
                     "}"
                 };
             };
