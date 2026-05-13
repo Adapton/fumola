@@ -321,6 +321,61 @@ module {
     writeSceneFile(`testWriteSceneFile, 10, 10)
   };
 
+  public type Listing = {
+    #fromList;
+    #reduceUp;
+    #lazyMergeSort;
+  };
+
+  #[listing]
+  public func sceneObjectsFromOutline(whichListing : Listing, outline) : SceneObjects {
+    switch (whichListing) {
+      case (#fromList) (sceneObjectsFromList(outline))
+    }
+  };
+
+  func sceneObjectsFromList(outline) {
+    switch (outline) {
+      case (#leaf(n)) { assert false };
+      case (#internal(n)) {
+        // prim "print" (n.edges.size());
+        switch (n.edges.size()) {
+          case 1 { 
+              // various base cases land here.
+          };
+          case 5 { 
+              // most common (binary) recursive case lands here.
+              sceneObjectsFromList(n.edges[2].outline!);
+              sceneObjectsFromList(n.edges[4].outline!);
+          };
+          case 7 { 
+              // special case for the top of the recursion.
+              // two initial steps: 
+              //  - intialize a local copy of the empty input/output list,
+              //  - and put the first list element into an initial leaf-element tree. 
+              sceneObjectsFromList(n.edges[4].outline!);
+              sceneObjectsFromList(n.edges[6].outline!);
+          };
+          case _ { 
+            assert false
+          };
+        }
+      };
+    }
+  };
+
+  #[test]
+  public func testSceneObjectsFromList() {
+    let array = R.generateRandomInput(10, 10);
+    let buildList = `() := thunk { List.fromIter(array.vals()) };
+    let list = force buildList;
+    let buildTree = `() := thunk { fromList(list); };
+    let tree = force buildTree;
+    let outline = A.Outline.outline(buildTree);
+    // prim "print" (debug_show outline);
+    let sceneObjects = sceneObjectsFromList(outline);
+  };
+
   #[listing]
   public func sceneObjects<X>(nodeIdsByLabel : Map<Text, [NodeIds]>, tree : Pointer<SeqTree<X>>, origin : Vec3) : SceneObjects {
     let g = geom2d(tree);

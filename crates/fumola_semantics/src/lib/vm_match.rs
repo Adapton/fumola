@@ -144,6 +144,13 @@ pub fn pattern_matches(env: Env, pat: &Pat, v: Value_) -> Option<Env> {
         (Pat::Wild, _) => Some(env),
         (Pat::Literal(Literal::Unit), Value::Unit) => Some(env),
         (Pat::Literal(Literal::Null), Value::Null) => Some(env),
+         (Pat::Literal(Literal::Nat(n1)), Value::Nat(n2)) => {
+            if format!("{}", n2) == *n1 {
+                Some(env)
+            } else {
+                None
+            }
+        }
         (Pat::Optional(p), Value::Option(v)) => pattern_matches(env, &p.0, v.fast_clone()),
         (Pat::Paren(p), _) => pattern_matches(env, &p.0, v),
         (Pat::Annot(_), _) => Some(env),
