@@ -623,7 +623,7 @@ module {
             debug_show (switch showAction {
                 case (#get) "get";
                 case (#put) "put";
-                case (#putForce) "put,force";
+                case (#putForce) "putForce";
                 case (#force_) "force";
             })
         };

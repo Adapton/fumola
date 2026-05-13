@@ -120,7 +120,7 @@ module {
   #[listing(62)]
   public func lazyMergeSort<X>(t : ?SeqTree_<X>) : LazyList_<X> {
     let nilList = `(nilList) := thunk { null };
-    if (t == null) { return empty };
+    if (t == null) { return nilList };
     `result := thunk {
       reduceUp(
         @(t!),

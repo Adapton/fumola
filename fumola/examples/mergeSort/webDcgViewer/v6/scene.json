@@ -42,7 +42,7 @@
 "outline" : 
 { "type": "outlineInternal" , "nodeId":["scene","@now","1"], "shape": "#thunk_", "edges":
 [
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"ListFromRandomArray", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"ListFromRandomArray", "outline": 
 { "type": "outlineInternal" , "nodeId":["ListFromRandomArray","@now","3"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputList(10)", "outline": null, "value": "null", "metaTimes": 5},
@@ -56,80 +56,80 @@
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputList(2)", "outline": null, "value": "?{element = 1192; next = inputList(3); symbol = 3}", "metaTimes": 13},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputList(1)", "outline": null, "value": "?{element = 0; next = inputList(2); symbol = 2}", "metaTimes": 14}
 ], "value": "?{element = 470; next = inputList(1); symbol = 1}", "valueMetaTime": "15"}, "value": "?{element = 470; next = inputList(1); symbol = 1}", "metaTimes": [3, 15]},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"LevelTreeFromList", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"LevelTreeFromList", "outline": 
 { "type": "outlineInternal" , "nodeId":["LevelTreeFromList","@now","16"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(`(nilList))", "outline": null, "value": "null", "metaTimes": 18},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(1-element)", "outline": null, "value": "#element{element = 470; symbol = 1}", "metaTimes": 19},
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(1)", "outline": null, "value": "?{element = 0; next = inputList(2); symbol = 2}", "metaTimes": 20},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(2-element)", "outline": null, "value": "#element{element = 0; symbol = 2}", "metaTimes": 21},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(2-rec1)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(2-rec1)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(2-rec1)","@now","22"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(2)", "outline": null, "value": "?{element = 1192; next = inputList(3); symbol = 3}", "metaTimes": 24}
 ], "value": "(inputTree(2-element), inputList(2))", "valueMetaTime": "25"}, "value": "(inputTree(2-element), inputList(2))", "metaTimes": [22, 25]},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(2-binary)", "outline": null, "value": "#binary{left = inputTree(1-element); level = 64; right = inputTree(2-element); symbol = 2}", "metaTimes": 26},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(2-rec2)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(2-rec2)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(2-rec2)","@now","27"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(2)", "outline": null, "value": "?{element = 1192; next = inputList(3); symbol = 3}", "metaTimes": 29},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(3-element)", "outline": null, "value": "#element{element = 1192; symbol = 3}", "metaTimes": 30},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(3-rec1)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(3-rec1)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(3-rec1)","@now","31"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(3)", "outline": null, "value": "?{element = 55; next = inputList(4); symbol = 4}", "metaTimes": 33}
 ], "value": "(inputTree(3-element), inputList(3))", "valueMetaTime": "34"}, "value": "(inputTree(3-element), inputList(3))", "metaTimes": [31, 34]},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(3-binary)", "outline": null, "value": "#binary{left = inputTree(2-binary); level = 262144; right = inputTree(3-element); symbol = 3}", "metaTimes": 35},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(3-rec2)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(3-rec2)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(3-rec2)","@now","36"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(3)", "outline": null, "value": "?{element = 55; next = inputList(4); symbol = 4}", "metaTimes": 38},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(4-element)", "outline": null, "value": "#element{element = 55; symbol = 4}", "metaTimes": 39},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(4-rec1)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(4-rec1)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(4-rec1)","@now","40"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(4)", "outline": null, "value": "?{element = 195; next = inputList(5); symbol = 5}", "metaTimes": 42}
 ], "value": "(inputTree(4-element), inputList(4))", "valueMetaTime": "43"}, "value": "(inputTree(4-element), inputList(4))", "metaTimes": [40, 43]},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(4-binary)", "outline": null, "value": "#binary{left = inputTree(3-binary); level = 262272; right = inputTree(4-element); symbol = 4}", "metaTimes": 44},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(4-rec2)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(4-rec2)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(4-rec2)","@now","45"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(4)", "outline": null, "value": "?{element = 195; next = inputList(5); symbol = 5}", "metaTimes": 47},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(5-element)", "outline": null, "value": "#element{element = 195; symbol = 5}", "metaTimes": 48},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(5-rec1)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(5-rec1)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(5-rec1)","@now","49"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(5)", "outline": null, "value": "?{element = 1191; next = inputList(6); symbol = 6}", "metaTimes": 51},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(6-element)", "outline": null, "value": "#element{element = 1191; symbol = 6}", "metaTimes": 52},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(6-rec1)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(6-rec1)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(6-rec1)","@now","53"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(6)", "outline": null, "value": "?{element = 777; next = inputList(7); symbol = 7}", "metaTimes": 55}
 ], "value": "(inputTree(6-element), inputList(6))", "valueMetaTime": "56"}, "value": "(inputTree(6-element), inputList(6))", "metaTimes": [53, 56]},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(6-binary)", "outline": null, "value": "#binary{left = inputTree(5-element); level = 4224; right = inputTree(6-element); symbol = 6}", "metaTimes": 57},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(6-rec2)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(6-rec2)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(6-rec2)","@now","58"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(6)", "outline": null, "value": "?{element = 777; next = inputList(7); symbol = 7}", "metaTimes": 60},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(7-element)", "outline": null, "value": "#element{element = 777; symbol = 7}", "metaTimes": 61},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(7-rec1)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(7-rec1)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(7-rec1)","@now","62"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(7)", "outline": null, "value": "?{element = 581; next = inputList(8); symbol = 8}", "metaTimes": 64}
 ], "value": "(inputTree(7-element), inputList(7))", "valueMetaTime": "65"}, "value": "(inputTree(7-element), inputList(7))", "metaTimes": [62, 65]},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(7-binary)", "outline": null, "value": "#binary{left = inputTree(6-binary); level = 8321; right = inputTree(7-element); symbol = 7}", "metaTimes": 66},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(7-rec2)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(7-rec2)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(7-rec2)","@now","67"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(7)", "outline": null, "value": "?{element = 581; next = inputList(8); symbol = 8}", "metaTimes": 69},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(8-element)", "outline": null, "value": "#element{element = 581; symbol = 8}", "metaTimes": 70},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(8-rec1)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(8-rec1)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(8-rec1)","@now","71"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(8)", "outline": null, "value": "?{element = 1306; next = inputList(9); symbol = 9}", "metaTimes": 73}
 ], "value": "(inputTree(8-element), inputList(8))", "valueMetaTime": "74"}, "value": "(inputTree(8-element), inputList(8))", "metaTimes": [71, 74]},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(8-binary)", "outline": null, "value": "#binary{left = inputTree(7-binary); level = 262144; right = inputTree(8-element); symbol = 8}", "metaTimes": 75},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(8-rec2)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(8-rec2)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(8-rec2)","@now","76"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(8)", "outline": null, "value": "?{element = 1306; next = inputList(9); symbol = 9}", "metaTimes": 78}
@@ -138,30 +138,30 @@
 ], "value": "(inputTree(8-binary), inputList(8))", "valueMetaTime": "81"}, "value": "(inputTree(8-binary), inputList(8))", "metaTimes": [58, 81]}
 ], "value": "(inputTree(8-binary), inputList(8))", "valueMetaTime": "82"}, "value": "(inputTree(8-binary), inputList(8))", "metaTimes": [49, 82]},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(5-binary)", "outline": null, "value": "#binary{left = inputTree(4-binary); level = 266240; right = inputTree(8-binary); symbol = 5}", "metaTimes": 83},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(5-rec2)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(5-rec2)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(5-rec2)","@now","84"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(8)", "outline": null, "value": "?{element = 1306; next = inputList(9); symbol = 9}", "metaTimes": 86},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(9-element)", "outline": null, "value": "#element{element = 1306; symbol = 9}", "metaTimes": 87},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(9-rec1)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(9-rec1)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(9-rec1)","@now","88"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(9)", "outline": null, "value": "?{element = 545; next = inputList(10); symbol = 10}", "metaTimes": 90},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(10-element)", "outline": null, "value": "#element{element = 545; symbol = 10}", "metaTimes": 91},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(10-rec1)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(10-rec1)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(10-rec1)","@now","92"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputList(10)", "outline": null, "value": "null", "metaTimes": 94}
 ], "value": "(inputTree(10-element), inputTree(`(nilList)))", "valueMetaTime": "95"}, "value": "(inputTree(10-element), inputTree(`(nilList)))", "metaTimes": [92, 95]},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(10-binary)", "outline": null, "value": "#binary{left = inputTree(9-element); level = 4162; right = inputTree(10-element); symbol = 10}", "metaTimes": 96},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(10-rec2)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(10-rec2)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(10-rec2)","@now","97"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputTree(`(nilList))", "outline": null, "value": "null", "metaTimes": 99}
 ], "value": "(inputTree(10-binary), inputTree(`(nilList)))", "valueMetaTime": "100"}, "value": "(inputTree(10-binary), inputTree(`(nilList)))", "metaTimes": [97, 100]}
 ], "value": "(inputTree(10-binary), inputTree(`(nilList)))", "valueMetaTime": "101"}, "value": "(inputTree(10-binary), inputTree(`(nilList)))", "metaTimes": [88, 101]},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"inputTree(9-binary)", "outline": null, "value": "#binary{left = inputTree(5-binary); level = 786433; right = inputTree(10-binary); symbol = 9}", "metaTimes": 102},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"inputTree(9-rec2)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"inputTree(9-rec2)", "outline": 
 { "type": "outlineInternal" , "nodeId":["inputTree(9-rec2)","@now","103"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputTree(`(nilList))", "outline": null, "value": "null", "metaTimes": 105}
@@ -172,27 +172,27 @@
 ], "value": "(inputTree(9-binary), inputTree(`(nilList)))", "valueMetaTime": "110"}, "value": "(inputTree(9-binary), inputTree(`(nilList)))", "metaTimes": [27, 110]}
 ], "value": "?inputTree(9-binary)", "valueMetaTime": "111"}, "value": "?inputTree(9-binary)", "metaTimes": [16, 111]},
 { "type": "outlineEdge" , "action":"put", "actionTarget":"lazyMergeSort(`(nilList))", "outline": null, "value": "@thunk ({ null })", "metaTimes": 112},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"lazyMergeSort(result)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"lazyMergeSort(result)", "outline": 
 { "type": "outlineInternal" , "nodeId":["lazyMergeSort(result)","@now","113"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputTree(9-binary)", "outline": null, "value": "#binary{left = inputTree(5-binary); level = 786433; right = inputTree(10-binary); symbol = 9}", "metaTimes": 115},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"lazyMergeSort(9)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"lazyMergeSort(9)", "outline": 
 { "type": "outlineInternal" , "nodeId":["lazyMergeSort(9)","@now","116"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputTree(5-binary)", "outline": null, "value": "#binary{left = inputTree(4-binary); level = 266240; right = inputTree(8-binary); symbol = 5}", "metaTimes": 118},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"lazyMergeSort(5)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"lazyMergeSort(5)", "outline": 
 { "type": "outlineInternal" , "nodeId":["lazyMergeSort(5)","@now","119"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputTree(4-binary)", "outline": null, "value": "#binary{left = inputTree(3-binary); level = 262272; right = inputTree(4-element); symbol = 4}", "metaTimes": 121},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"lazyMergeSort(4)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"lazyMergeSort(4)", "outline": 
 { "type": "outlineInternal" , "nodeId":["lazyMergeSort(4)","@now","122"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputTree(3-binary)", "outline": null, "value": "#binary{left = inputTree(2-binary); level = 262144; right = inputTree(3-element); symbol = 3}", "metaTimes": 124},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"lazyMergeSort(3)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"lazyMergeSort(3)", "outline": 
 { "type": "outlineInternal" , "nodeId":["lazyMergeSort(3)","@now","125"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputTree(2-binary)", "outline": null, "value": "#binary{left = inputTree(1-element); level = 64; right = inputTree(2-element); symbol = 2}", "metaTimes": 127},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"lazyMergeSort(2)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"lazyMergeSort(2)", "outline": 
 { "type": "outlineInternal" , "nodeId":["lazyMergeSort(2)","@now","128"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputTree(1-element)", "outline": null, "value": "#element{element = 470; symbol = 1}", "metaTimes": 130},
@@ -206,15 +206,15 @@
 { "type": "outlineEdge" , "action":"put", "actionTarget":"lazyMergeSort(merge-4)(2)", "outline": null, "value": "@thunk ({ merge(force (xc.next), ?yc) })", "metaTimes": 141}
 ], "value": "?{element = 0; next = lazyMergeSort(merge-4)(2); symbol = 2}", "valueMetaTime": "142"}, "value": "?{element = 0; next = lazyMergeSort(merge-4)(2); symbol = 2}", "metaTimes": [122, 142]},
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputTree(8-binary)", "outline": null, "value": "#binary{left = inputTree(7-binary); level = 262144; right = inputTree(8-element); symbol = 8}", "metaTimes": 143},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"lazyMergeSort(8)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"lazyMergeSort(8)", "outline": 
 { "type": "outlineInternal" , "nodeId":["lazyMergeSort(8)","@now","144"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputTree(7-binary)", "outline": null, "value": "#binary{left = inputTree(6-binary); level = 8321; right = inputTree(7-element); symbol = 7}", "metaTimes": 146},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"lazyMergeSort(7)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"lazyMergeSort(7)", "outline": 
 { "type": "outlineInternal" , "nodeId":["lazyMergeSort(7)","@now","147"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputTree(6-binary)", "outline": null, "value": "#binary{left = inputTree(5-element); level = 4224; right = inputTree(6-element); symbol = 6}", "metaTimes": 149},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"lazyMergeSort(6)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"lazyMergeSort(6)", "outline": 
 { "type": "outlineInternal" , "nodeId":["lazyMergeSort(6)","@now","150"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputTree(5-element)", "outline": null, "value": "#element{element = 195; symbol = 5}", "metaTimes": 152},
@@ -230,7 +230,7 @@
 { "type": "outlineEdge" , "action":"put", "actionTarget":"lazyMergeSort(merge-5)(2)", "outline": null, "value": "@thunk ({ merge(force (xc.next), ?yc) })", "metaTimes": 166}
 ], "value": "?{element = 0; next = lazyMergeSort(merge-5)(2); symbol = 2}", "valueMetaTime": "167"}, "value": "?{element = 0; next = lazyMergeSort(merge-5)(2); symbol = 2}", "metaTimes": [119, 167]},
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputTree(10-binary)", "outline": null, "value": "#binary{left = inputTree(9-element); level = 4162; right = inputTree(10-element); symbol = 10}", "metaTimes": 168},
-{ "type": "outlineEdge" , "action":"put,force", "actionTarget":"lazyMergeSort(10)", "outline": 
+{ "type": "outlineEdge" , "action":"putForce", "actionTarget":"lazyMergeSort(10)", "outline": 
 { "type": "outlineInternal" , "nodeId":["lazyMergeSort(10)","@now","169"], "shape": "#thunk_", "edges":
 [
 { "type": "outlineEdge" , "action":"get", "actionTarget":"inputTree(9-element)", "outline": null, "value": "#element{element = 1306; symbol = 9}", "metaTimes": 171},

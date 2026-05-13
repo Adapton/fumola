@@ -63,9 +63,9 @@
         }
 
         #sidebar {
-            width: 23%;
+            width: 50%;
             min-width: 220px;
-            max-width: 70%;
+            max-width: 99%;
             display: flex;
             flex-direction: column;
             height: 100vh;
@@ -183,6 +183,25 @@
             font-size: larger;
         }
 
+        .action-arrow {
+            font-size: 20px;
+        }
+        .action-put {
+            color: var(--purple-dark);
+        }
+        .action-putForce {
+            color: var(--purple)
+        }
+        .action-force {
+            color: var(--purple)
+        }
+        .action-get {
+            color: var(--blue-dark);
+        }
+        .action-arrow:hover {
+            background-color: var(--hover);
+        }
+
         .adaptonPointer.focused {
             background: #c0d7b5;
             color: #111;
@@ -226,7 +245,6 @@
             overflow: auto;
             min-height: 0;
         }
-
 
         /*----------*/
 
@@ -1328,7 +1346,10 @@
 
                 if (node.edges) {
                     let rootElm_ = div;
+                    var edgeCount = 0;
+                    const edgeTotal = node.edges.length;
                     node.edges.forEach(e => {
+                        edgeCount += 1;
                         let div = document.createElement("div");
                         const hasNested = typeof e.metaTimes != "number";
 
@@ -1339,8 +1360,22 @@
                             addMetaTimeElementForOutlineEdge(div, e, true)
                         };
                         div.appendChild(document.createTextNode(" "));
-                        let edgeText = document.createTextNode(/*e.metaTimes + " " +*/ e.action + " ");
-                        div.appendChild(edgeText);
+                        div.appendChild(document.createTextNode("("+edgeCount+"/"+edgeTotal+")"));
+                        div.appendChild(document.createTextNode(" "));
+                        var edgeText = e.action + "";
+                        let arrows = { 
+                            "put" : "───» ",
+                            "get" : "───> ",
+                            "putForce" : "══▷» ",
+                            "force": "═══▷ ",
+                        };
+                        if (arrows[e.action]){
+                            edgeText = arrows[e.action] 
+                        };
+                        let arrowSpan = document.createElement("span");
+                        arrowSpan.className = "action-arrow  action-" + e.action;
+                        arrowSpan.textContent = edgeText;
+                        div.appendChild(arrowSpan);
                         div.appendChild(createPointerElm(e.actionTarget));
                         //if (hasNested) { div.appendChild(document.createTextNode(" {")) };
                         rootElm_.appendChild(div);
