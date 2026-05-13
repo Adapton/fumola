@@ -13,7 +13,11 @@
             --bg-elev: #171a20;
             --bg-panel: #1b1f27;
             --bg-outline-vert: #64727c;
-
+            --bg-outline-edge: #2a1e2d;
+            --bg-outline-edge-hover: #422b48;
+            --bg-outline-internal-result: #1e1f2d;
+            --bg-outline-internal-result-hover: #2b2c48;
+            --bg-outline-result: var(--bg-outline-edge);
             --border: #2a2f3a;
             --border-soft: #222733;
 
@@ -74,11 +78,33 @@
         }
 
         .outline-edge {
+            border-style: solid;
+            margin-top: 0px;
+            margin-bottom: 0px;
+            margin-left: 8px;
+            border: 1px;
+            border-color: white;
+            background-color: var(--bg-outline-edge);
+        }
+        .outline-edge:hover {
+            background-color: var(--bg-outline-edge-hover);
+        }
+
+        .outline-internal-result {
+            margin-left: 8px;
             border: 0px;
+            border-left: 2px;
+            border-style: solid;
+            border-color: var(--bg-outline-vert);
+            background-color: var(--bg-outline-internal-result);
+        }
+        .outline-internal-result:hover {
+            background-color: var(--bg-outline-internal-result-hover);
         }
 
         .outline-node {
-            gap: 2px;
+            margin-left: 8px;
+            padding-left: 2px;
             border: 0px;
             border-left: 2px;
             border-style: solid;
@@ -1350,7 +1376,7 @@
                 if (!node) return;
 
                 const div = document.createElement("div");
-                div.style.marginLeft = outlineMargin(depth);
+                //div.style.marginLeft = outlineMargin(depth);
                 div.className = "outline-node";
                 // console.log(node);
 
@@ -1372,7 +1398,7 @@
                         div.className = "outline-edge";
                         const hasNested = typeof e.metaTimes != "number";
 
-                        div.style.marginLeft = outlineMargin(depth); // ???
+                        //div.style.marginLeft = outlineMargin(depth); // ???
                         addMetaTimeElementForOutlineEdge(div, e);
                         if (hasNested) {
                             div.appendChild(document.createTextNode(", "));
@@ -1421,7 +1447,7 @@
 
                             const resultNode = document.createElement("div");
                             resultNode.className = "outline-internal-result";
-                            resultNode.style.marginLeft = outlineMargin(depth);
+                            //resultNode.style.marginLeft = outlineMargin(depth);
                             addMetaTimeElementForOutlineEdge(resultNode, e, true, true);
                             resultNode.appendChild(arrowSpan);
                             resultNode.appendChild(valueNode);
