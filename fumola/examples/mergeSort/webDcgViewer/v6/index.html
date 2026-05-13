@@ -925,7 +925,7 @@
             const group = new THREE.Group();
 
             //color = 0x0088ff;
-            if (type === "Force" || type === "ForcePut") color = 0xaa88aa;
+            if (type === "Force" || type === "putForce") color = 0xaa88aa;
 
             // Compute vector from source → target
             const dir = new THREE.Vector3().subVectors(target, source);
@@ -934,7 +934,7 @@
 
             // Shaft parameters
             let shaftRadius = 0.02;
-            if (type === "Force" || type === "ForcePut") shaftRadius = 0.05;
+            if (type === "Force" || type === "putForce") shaftRadius = 0.05;
 
             const shaftLength = length + (hoverOffset * 1.6); // shorten shaft slightly so head hovers
 
@@ -945,8 +945,8 @@
             const shaftGeo = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength, 12);
             const shaftMat = new THREE.MeshStandardMaterial({
                 color: color,
-                transparent: true || (type === "Force" || type === "ForcePut"),
-                opacity: (type === "Force" || type === "ForcePut") ? 0.2 : 0.6
+                transparent: true || (type === "Force" || type === "putForce"),
+                opacity: (type === "Force" || type === "putForce") ? 0.2 : 0.6
             });
             const shaftMesh = new THREE.Mesh(shaftGeo, shaftMat);
 
@@ -997,7 +997,7 @@
                 innerShaftMesh.position.copy(mid);
                 innerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 group.add(innerShaftMesh);
-            } else if (type === "ForcePut") {
+            } else if (type === "putForce") {
                 const coneForce = makeCone();
                 const conePut = makeDoublePyramid();
                 coneForce.position.copy(headPos);
@@ -1040,7 +1040,7 @@
                 const mesh = createPointer(from, adjustedTarget);
                 scene.add(mesh);
             }
-            else if (obj.type == "Get" || obj.type == "Put" || obj.type == "Force" || obj.type == "ForcePut") {
+            else if (obj.type == "Get" || obj.type == "Put" || obj.type == "Force" || obj.type == "putForce") {
                 const from = pointerDotsByKey.get(obj.from);
                 const target = nodesByLabel.get(obj.to);
                 if (!from || !target) { console.error("error connecting: " + obj); continue };

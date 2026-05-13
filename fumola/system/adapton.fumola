@@ -410,7 +410,7 @@ module {
         public type SceneObject = {
             #orb : LabeledObject;
             #box : LabeledObject;
-            #action : Action;
+            #action : ActionEdge;
             #pointer : Edge;
         };
         public type LabeledObject = {
@@ -423,8 +423,8 @@ module {
         public type Label = Text;
         public type Edge = { from : Label ; to : Label };
         public type Pointer = Edge;
-        public type Action = { actionType: ActionType; from: Label; to:Label } /* and Edge */ ;
-        public type ActionType = { #get ; #put ; #force_ ; #forcePut };
+        public type ActionEdge = { action: SceneAction; from: Label; to:Label } /* and Edge */ ;
+        public type SceneAction = Outline.OutlineAction;
 
         public type Vec3 = { x : Float; y : Float; z : Float };
         public let zero = { x = 0.0; y = 0.0; z =0.0 };
@@ -503,11 +503,26 @@ module {
                     ", \"nodeIds\": " # debug_show fields.nodeIds #
                     "}"
                 };
+                case (#orb(fields)) {
+                    "{ \"type\": \"box\"" #
+                    ", \"position\": " # debug_show [fields.position.x, fields.position.y, fields.position.z] #
+                    ", \"label\": " # debug_show fields.label_ #
+                    ", \"textLines\": " # debug_show fields.textFields #
+                    ", \"pointerFields\": " # debug_show fields.pointerFields #
+                    ", \"nodeIds\": " # debug_show fields.nodeIds #
+                    "}"
+                };
                 case (#pointer(fields)) {
                     "{ \"type\": \"pointer\", \"from\": " # debug_show fields.from # 
                     ", \"to\": " # debug_show fields.to # 
                     "}"
-                }
+                };
+                case(#action(fields)) {
+                   "{ \"type\": \"action\", \"from\": " # debug_show fields.from # 
+                    ", \"to\": " # debug_show fields.to # 
+                    ", \"action\": " # fromShowAction(fields.action)
+                    "}"
+                };
             };
         };
 
