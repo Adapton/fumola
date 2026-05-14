@@ -300,7 +300,7 @@ module {
                                 outline := ? outlineRec(actionTarget /*, visited */);
                             };
                             let metaTimes = edgeInfo.metaTimes;
-                            if ( 
+                            if ( edgeInfo.action == #force_ and
                                 prevEdge != null and
                                 prevEdge!.action == #put and 
                                 prevEdge!.actionTarget == actionTarget  ) {
@@ -308,6 +308,7 @@ module {
                                     actionTarget;
                                     action=#putForce;
                                     outline;
+                                    forcedThunk=edgeInfo.forcedThunk;
                                     value=edgeInfo.value;
                                     metaTimes=(prevEdge!.metaTimes.0, metaTimes.1);
                                 }
@@ -318,6 +319,7 @@ module {
                                     outline;
                                     metaTimes;
                                     value=edgeInfo.value;
+                                    forcedThunk=edgeInfo.forcedThunk;
                                 };
                                 edges #= [ edge ];
                                 prevEdge := ?edge;
@@ -697,6 +699,7 @@ module {
             "{ \"type\": \"outlineEdge\" " #
             ", \"action\":" # fromShowAction(edge.action) #
             ", \"actionTarget\":" # fromPointer(edge.actionTarget) #
+            ", \"forcedThunk\":" # (switch (edge.forcedThunk) { case null "null"; case (?t) fromAny(t) })  #
             ", \"outline\": " # fromOutlineOption(edge.outline) #
             ", \"value\": " # fromAnyValue(edge.value) #
             ", \"metaTimes\": " # fromMetaTimes(edge.metaTimes) #

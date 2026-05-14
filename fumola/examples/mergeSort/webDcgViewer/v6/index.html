@@ -31,6 +31,10 @@
             --blue: #8bd5ff;
             --green: #a6da95;
 
+            --blue-hover: #c1e5fa;
+            --green-hover: #c4dbbc;
+
+
             --purple-dark: #8c6fd1;
             --blue-dark: #5ca7d9;
             --green-dark: #7fba72;
@@ -111,15 +115,34 @@
             border-color: var(--bg-outline-vert);
         }
 
+        .outline-forced-thunk-text {
+            display: flex;
+            margin-left: 6px;
+            border: 1px;
+            border-radius: 4px;
+            padding: 4px;
+            font-size: larger;
+            border-style: solid;
+            border-color: var(--green-dark);
+            background-color: black;
+            color: var(--green-dark);
+        }
+
+        .outline-forced-thunk-text:hover {
+            /* font-size: larger; */
+            color: var(--green-hover);
+            /* background-color: var(--hover); */
+        }
+
         .outline-value-text {
             margin-left: 6px;
             color: var(--blue-dark);
-            font-size: smaller;
+            /* font-size: smaller; */
         }
 
         .outline-value-text:hover {
             /* font-size: larger; */
-            color: var(--blue);
+            color: var(--blue-hover);
             background-color: var(--hover);
         }
 
@@ -1436,9 +1459,9 @@
                             div.appendChild(valueNode);
                         } else {
                             const thunkNode = document.createElement("span");
-                            thunkNode.textContent = e.outline.nodeId;
+                            thunkNode.textContent = e.forcedThunk; // e.outline.nodeId;
                             // to do -- look up nodeId to get listing/env information, to display here.
-                            thunkNode.className = "outline-value-text";
+                            thunkNode.className = "outline-forced-thunk-text";
                             div.appendChild(thunkNode)
 
                             let arrowSpan = document.createElement("span");
