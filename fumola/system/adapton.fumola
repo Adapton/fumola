@@ -294,7 +294,7 @@ module {
                             let edgeInfo = edgeActionInfo(edge);
                             let actionTarget = prim "adaptonPointer" (edge.target.0);
                             var outline = null;
-                            if (edgeInfo.action == #force_ 
+                            if (true or edgeInfo.action == #force_ 
                                 /* and not(visited.contains(target)) */ ) {
                                 // visited.insert(target);
                                 outline := ? outlineRec(actionTarget /*, visited */);

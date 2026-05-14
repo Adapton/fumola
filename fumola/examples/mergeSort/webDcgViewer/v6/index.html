@@ -90,6 +90,7 @@
             border-color: white;
             background-color: var(--bg-outline-edge);
         }
+
         .outline-edge:hover {
             background-color: var(--bg-outline-edge-hover);
         }
@@ -102,6 +103,7 @@
             border-color: var(--bg-outline-vert);
             background-color: var(--bg-outline-internal-result);
         }
+
         .outline-internal-result:hover {
             background-color: var(--bg-outline-internal-result-hover);
         }
@@ -113,6 +115,26 @@
             border-left: 2px;
             border-style: solid;
             border-color: var(--bg-outline-vert);
+        }
+
+        .outline-node-thunk-shape {
+            border-radius: 8px;
+            border-style: solid;
+            border: 1px;
+            margin: 2px;
+            color: var(--blue-dark);
+            border-color: var(--blue);
+            background-color: var(--blue-dark);
+        }
+
+        .outline-node-nonthunk-shape {
+            border-radius: 0px;
+            border-style: solid;
+            border: 1px;
+            margin: 2px;
+            color: var(--green-dark);
+            border-color: var(--green);
+            background-color: var(--green-dark);
         }
 
         .outline-forced-thunk-text {
@@ -248,21 +270,27 @@
         .action-arrow {
             font-size: 20px;
         }
+
         .result-arrow {
             color: var(--blue-dark);
         }
+
         .action-put {
             color: var(--purple-dark);
         }
+
         .action-putForce {
             color: var(--purple)
         }
+
         .action-force {
             color: var(--purple)
         }
+
         .action-get {
             color: var(--blue-dark);
         }
+
         .action-arrow:hover {
             background-color: var(--hover);
         }
@@ -1377,14 +1405,14 @@
                 span_.textContent = beginMetaTime + ", ";
                 span_.className = "metaTime";
                 span_.onclick = () => onMetaTimeClick(beginMetaTime);
-              
+
                 //span.style.textDecoration = "underline";
                 //span.style.marginLeft = 0;
                 const div = document.createElement("div");
                 div.style.marginLeft = outlineMargin(depth);
                 div.appendChild(span_);
                 div.appendChild(span);
-       
+
                 parentElm.appendChild(div)
             } else {
                 parentElm.appendChild(span)
@@ -1428,34 +1456,46 @@
                             addMetaTimeElementForOutlineEdge(div, e, true)
                         };
                         div.appendChild(document.createTextNode(" "));
-                        div.appendChild(document.createTextNode("("+edgeCount+"/"+edgetotal+")"));
+                        div.appendChild(document.createTextNode("(" + edgeCount + "/" + edgetotal + ")"));
                         div.appendChild(document.createTextNode(" "));
                         var edgetext = e.action + "";
-                        let arrows = { 
-                            "put" : "───» ",
-                            "get" : "───> ",
-                            "putForce" : "══▷» ",
+                        let arrows = {
+                            "put": "───» ",
+                            "get": "───> ",
+                            "putForce": "══▷» ",
                             "force": "═══▷ ",
                         };
-                        if (arrows[e.action]){
-                            edgetext = arrows[e.action] 
+                        if (arrows[e.action]) {
+                            edgetext = arrows[e.action]
                         };
                         let arrowSpan = document.createElement("span");
                         arrowSpan.className = "action-arrow  action-" + e.action;
                         arrowSpan.textContent = edgetext;
                         div.appendChild(arrowSpan);
+
+                        const shapeElm = document.createElement("span");
+                        div.appendChild(shapeElm);
+                        if (e.outline.shape == "#thunk_") {
+                            shapeElm.className = "outline-node-thunk-shape";
+                            shapeElm.textContent = "{}"
+                        } else if (e.outline.shape == "#nonThunk") {
+                            shapeElm.className = "outline-node-nonthunk-shape";
+                            shapeElm.textContent = "[]"
+                        } else {
+                            console.error("unrecognized outline node shape", e.outline.shape);
+                        }
                         div.appendChild(createPointerElm(e.actionTarget));
                         //if (hasNested) { div.appendChild(document.createTextNode(" {")) };
                         rootElm_.appendChild(div);
                         walk(rootElm_, e.outline, depth + 1);
-                        
+
                         div.appendChild(document.createTextNode(" " + e.action));
-           
+
                         const valueNode = document.createElement("span");
                         valueNode.textContent = e.value;
                         valueNode.className = "outline-value-text";
 
-                        if(!hasNested) {
+                        if (!hasNested) {
                             div.appendChild(valueNode);
                         } else {
                             const thunkNode = document.createElement("span");
@@ -1471,13 +1511,13 @@
                             const resultNode = document.createElement("div");
                             resultNode.className = "outline-internal-result";
                             //resultNode.style.marginLeft = outlineMargin(depth);
-                            addMetaTimeElementForOutlineEdge(resultNode, e, true, true);
                             resultNode.appendChild(arrowSpan);
                             resultNode.appendChild(valueNode);
                             rootElm_.appendChild(resultNode);
+                            addMetaTimeElementForOutlineEdge(resultNode, e, true, true);
                         };
                     }); // foreach edge e
-                } 
+                }
             }
 
             walk(panel, outline);
