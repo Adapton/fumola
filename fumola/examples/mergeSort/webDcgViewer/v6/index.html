@@ -267,6 +267,18 @@
             font-size: larger;
         }
 
+        .pointer {
+            color: #c0d7b5;
+            cursor: pointer;
+            border-color: var(--border-soft);
+            border-style: solid;
+            padding: 1px;
+            margin: 3px;
+            border-width: 1px;
+            border-radius: 1px;
+            display:inline-block;
+        }
+
         .action-arrow {
             font-size: 20px;
         }
@@ -304,7 +316,10 @@
         .adaptonPointer:hover {
             color: #ffffff;
         }
-
+        .pointer:hover {
+            color: #ffffff;
+            border-color: white;
+        }
 
         .nodeId {
             color: #f3e2c2;
@@ -462,8 +477,27 @@
             <div class="panel-header" id="titlePanelHeader">DCG Scene Player</div>
 
             <div class="panel" id="infoPanel">
-                <div class="panel-header">Info</div>
+                <div class="panel-header">Details about selected:</div>
                 <div class="panel-body" id="info">
+
+                    <div class="panel" id="metaTimesInfoPanel">
+                        <div class="panel-header">Meta Times</div>
+                        <div class="panel-body" id="metaTimes">
+                        </div>
+                    </div>
+
+                    <div class="panel" id="pointersInfoPanel">
+                        <div class="panel-header">Pointers / Object Labels</div>
+                        <div class="panel-body" id="pointers">
+                        </div>
+                    </div>
+
+                    <div class="panel" id="edgeIdsInfoPanel">
+                        <div class="panel-header">Edges</div>
+                        <div class="panel-body" id="edgeIds">
+                        </div>
+
+                    </div>
                 </div>
             </div>
 
@@ -586,6 +620,9 @@
     <script type="module">
         import * as THREE from 'https://esm.sh/three@0.160.0';
         import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+
+        // import { Map as IMap } from "immutable";
+        import { Map as IMap } from "https://unpkg.com/immutable@5/dist/immutable.es.js";
 
         // --------------------------------
 
@@ -1306,14 +1343,50 @@
             false && console.log("selected time stamps: ", selectedTimestamps);
         }
 
-        // --- entry point ---
-        function loadScene(json) {
-            SCENE = json;
 
-            renderEvents(json.events || []);
-            renderOutline(json.outline || null);
+        var pointers = []; // each space/pointer mentioned by a node-based event.
+        var nodesMap = IMap();  // indexed by space: map to the node history item, or { "type": "future"; "metaTime" : _ }.
+        var nodesMap_ = IMap(); // indexed by meta time, mapping to nodesMap for that metaTime.
+        var pointerMetaTimes = new Map(); // all metaTimes relevant for a space/pointer.
+
+        var edgesMap_ = IMap(); // indexed by meta time, mapping to edgesMap.
+        var edgesMap = IMap(); // indexed by edgeId
+
+        data.nodes.forEach(nhi => {
+            const space = nhi.nodeId[0];
+            if (!pointerMetaTimes.get(space)) {
+                pointers = [...pointers, space];
+                pointerMetaTimes.set(space, [nhi.metaTime])
+            } else {
+                const times = pointerMetaTimes.get(space);
+                pointerMetaTimes.set(space, [...times, nhi.metaTime]);
+            }
+        });
+
+        const pointersEl = document.getElementById("pointers");
+        pointers.forEach(sp => {
+            const pointerEl = document.createElement("span");
+            pointerEl.textContent = sp;
+            pointerEl.className = "pointer";
+            pointersEl.appendChild(pointerEl);
+        })
+
+        pointerMetaTimes.forEach((metaTimes, space, m) => {
+            nodesMap = nodesMap.set(space, { "type": "future", "metaTime": metaTimes[0] });
+        });
+        data.nodes.forEach(nhi => {
+            const space = nhi.nodeId[0];
+            nodesMap = nodesMap.set(space, nhi);
+            nodesMap_ = nodesMap_.set(nhi.metaTime, nodesMap);
+        });
+
+
+        // --- entry point ---
+        function loadScene() {
+            renderEvents(data);
+            renderOutline(data);
         };
-        loadScene(data);
+        loadScene();
 
         function createMetaTimeElm(metaTime) {
             const elm = document.createElement("span");
@@ -1352,14 +1425,23 @@
         }
 
         // --- EVENTS PANEL ---
-        function renderEvents(events) {
+        function renderEvents(json) {
+            const events = json.events;
+            const mtEl = document.getElementById("metaTimes");
             const el = document.getElementById("events");
             el.innerHTML = "";
+            var lastMetaTime = null;
 
             events.forEach(ev => {
                 const row = document.createElement("div");
                 //row.metaTime = ev.metaTime;
                 const ts = createMetaTimeElm(ev.metaTime);
+                if (ev.metaTime != lastMetaTime) {
+                    const ts_ = createMetaTimeElm(ev.metaTime);
+                    mtEl.appendChild(ts_);
+                    mtEl.appendChild(document.createTextNode(" "));
+                    lastMetaTime = ev.metaTime;
+                }
                 row.appendChild(ts);
                 row.appendChild(document.createTextNode(" " + ev.type + " "));
                 if (ev.type == "addNode") {
@@ -1420,7 +1502,8 @@
         }
 
         // --- OUTLINE PANEL (recursive) ---
-        function renderOutline(outline) {
+        function renderOutline(json) {
+            const outline = json.outline;
             const panel = document.getElementById("outline");
 
             function walk(rootElm, node, depth = 0) {
@@ -1532,12 +1615,17 @@
         controls.dampingFactor = 0.05;
 
         window.app = {
+            SCENE,
             frames,
             lastHoverNode,
             objectMaterials,
             nodesByLabel,
             labelsByNode,
             data,
+            pointers,
+            nodesMap,
+            nodesMap_,
+            pointerMetaTimes,
             scene,
             camera,
             renderer,

@@ -612,7 +612,7 @@ module {
 
         public func fromNodeHistoryItem(item : NodeHistoryItem) : Text {
             "{ \"metaTime\":" # debug_show item.metaTime  # 
-            ", \"nodeId\": " # fromEdgeId(item.nodeId) #
+            ", \"nodeId\": " # fromNodeId(item.nodeId) #
             ", \"node\": " # fromNode(item.node) #
             "}"
         };
