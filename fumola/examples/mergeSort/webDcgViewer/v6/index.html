@@ -118,6 +118,7 @@
         }
 
         .outline-node-thunk-shape {
+            cursor: pointer;
             border-radius: 8px;
             border-style: solid;
             border: 1px;
@@ -128,6 +129,7 @@
         }
 
         .outline-node-nonthunk-shape {
+            cursor: pointer;
             border-radius: 0px;
             border-style: solid;
             border: 1px;
@@ -138,6 +140,7 @@
         }
 
         .outline-forced-thunk-text {
+            cursor: pointer;
             display: flex;
             margin-left: 6px;
             border: 1px;
@@ -145,27 +148,36 @@
             padding: 4px;
             font-size: larger;
             border-style: solid;
-            border-color: var(--green-dark);
+            border-color: var(--blue-dark);
             background-color: black;
-            color: var(--green-dark);
+            color: var(--blue-dark);
         }
 
         .outline-forced-thunk-text:hover {
             /* font-size: larger; */
-            color: var(--green-hover);
+            color: var(--blue-hover);
             /* background-color: var(--hover); */
         }
 
         .outline-value-text {
-            margin-left: 6px;
-            color: var(--blue-dark);
+            cursor: pointer;
+            color: var(--green-dark);
+            display: inline-block;
+            border-radius: 2px;
+            border-width: 1px;
+            border-color: var(--green-dark);
+            border-style: solid;
+            background-color: black;
+            padding: 2px;
+            margin: 2px;
+            margin-left: 8px;
             /* font-size: smaller; */
         }
 
         .outline-value-text:hover {
             /* font-size: larger; */
-            color: var(--blue-hover);
-            background-color: var(--hover);
+            color: var(--green-hover);
+            border-color: var(--green-hover);
         }
 
         .panel {
@@ -261,25 +273,41 @@
             color: #ffffff;
         }
 
-        .adaptonPointer {
-            color: #c0d7b5;
+        .pointerThunk {
+            color: #b5b7d7;
             cursor: pointer;
-            font-size: larger;
+            border-color: var(--border-soft);
+            border-style: solid;
+            padding: 3px;
+            margin: 2px;
+            border-width: 1px;
+            border-radius: 1px;
+            display:inline-block;
+            background-color: black;
         }
-
-        .pointer {
+        .pointerNonThunk {
             color: #c0d7b5;
             cursor: pointer;
             border-color: var(--border-soft);
             border-style: solid;
-            padding: 1px;
-            margin: 3px;
+            padding: 3px;
+            margin: 2px;
             border-width: 1px;
             border-radius: 1px;
             display:inline-block;
+            background-color: black;
+        }
+        .pointerThunk:hover {
+            color: #ffffff;
+            border-color: white;
+        }
+        .pointerNonThunk:hover {
+            color: #ffffff;
+            border-color: white;
         }
 
         .action-arrow {
+            cursor: pointer;
             font-size: 20px;
         }
 
@@ -307,19 +335,6 @@
             background-color: var(--hover);
         }
 
-        .adaptonPointer.focused {
-            background: #c0d7b5;
-            color: #111;
-            font-weight: bold;
-        }
-
-        .adaptonPointer:hover {
-            color: #ffffff;
-        }
-        .pointer:hover {
-            color: #ffffff;
-            border-color: white;
-        }
 
         .nodeId {
             color: #f3e2c2;
@@ -1364,13 +1379,7 @@
         });
 
         const pointersEl = document.getElementById("pointers");
-        pointers.forEach(sp => {
-            const pointerEl = document.createElement("span");
-            pointerEl.textContent = sp;
-            pointerEl.className = "pointer";
-            pointersEl.appendChild(pointerEl);
-        })
-
+      
         pointerMetaTimes.forEach((metaTimes, space, m) => {
             nodesMap = nodesMap.set(space, { "type": "future", "metaTime": metaTimes[0] });
         });
@@ -1380,6 +1389,21 @@
             nodesMap_ = nodesMap_.set(nhi.metaTime, nodesMap);
         });
 
+        pointers.forEach(sp => {
+            const pointerEl = document.createElement("span");
+            pointerEl.textContent = sp;
+            //pointerEl.className = "pointer";
+            let metaTimes = pointerMetaTimes.get(sp);
+            let firstDef = nodesMap_.get(metaTimes[0]).get(sp);
+            if (firstDef && firstDef.node.type == "thunk") {
+                pointerEl.classList = "pointerThunk";
+            } else if (firstDef && firstDef.node.type == "nonThunk") {
+                pointerEl.classList = "pointerNonThunk";
+            } else {
+                console.error(sp, firstDef);
+            }
+            pointersEl.appendChild(pointerEl);
+        })
 
         // --- entry point ---
         function loadScene() {
@@ -1415,9 +1439,16 @@
             return elm
         }
 
-        function createPointerElm(ptr) {
+        function createPointerElm(ptr, shape) {
             const elm = document.createElement("span");
-            elm.className = "adaptonPointer";
+            if (shape == "#thunk_") {
+                elm.className = "pointerThunk";
+            }
+            else if (shape == "#nonThunk") {
+                elm.className = "pointerNonThunk";
+            } else {
+                console.error("unrecognized pointer shape", shape);
+            }
             elm.textContent = ptr;
             elm.adaptonPointer = ptr;
             elm.onclick = () => onPointerClick(ptr);
@@ -1567,7 +1598,7 @@
                         } else {
                             console.error("unrecognized outline node shape", e.outline.shape);
                         }
-                        div.appendChild(createPointerElm(e.actionTarget));
+                        div.appendChild(createPointerElm(e.actionTarget, e.outline.shape));
                         //if (hasNested) { div.appendChild(document.createTextNode(" {")) };
                         rootElm_.appendChild(div);
                         walk(rootElm_, e.outline, depth + 1);
