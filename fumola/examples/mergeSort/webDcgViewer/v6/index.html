@@ -246,33 +246,49 @@
         .metaTime {
             color: #7fd1ff;
             cursor: pointer;
+            border-color: var(--border-soft);
+            border-style: solid;
+            padding: 3px;
+            margin: 0px;
+            border-width: 1px;
+            border-radius: 1px;
+            display:inline-block;
         }
-
         .metaTime.focused {
-            background: #dde2c8;
+            background: #b4b415;
             color: #111;
             font-weight: bold;
         }
-
         .metaTime:hover {
             color: #ffffff;
+            border-color: white;
         }
-
-        .edgeId {
-            color: #7fd1ff;
-            cursor: pointer;
+        .metaTime:hover.focused {
+            color: black;
+            background-color: white;
         }
 
         .edgeId.focused {
-            background: #dde2c8;
+            background: var(--purple-dark);
             color: #111;
             font-weight: bold;
         }
-
         .edgeId:hover {
             color: #ffffff;
+            border-color: white;
         }
-
+        .edgeId {
+            color: var(--purple);
+            cursor: pointer;
+            border-color: var(--border-soft);
+            border-style: solid;
+            padding: 3px;
+            margin: 2px;
+            border-width: 1px;
+            border-radius: 1px;
+            display:inline-block;
+            background-color: black;
+        }
         .pointerThunk {
             color: #b5b7d7;
             cursor: pointer;
@@ -1358,14 +1374,14 @@
             false && console.log("selected time stamps: ", selectedTimestamps);
         }
 
+        // # Nodes
+        //
+        // process nodes, producing indicies and dynamic HTML elements.
 
         var pointers = []; // each space/pointer mentioned by a node-based event.
         var nodesMap = IMap();  // indexed by space: map to the node history item, or { "type": "future"; "metaTime" : _ }.
         var nodesMap_ = IMap(); // indexed by meta time, mapping to nodesMap for that metaTime.
         var pointerMetaTimes = new Map(); // all metaTimes relevant for a space/pointer.
-
-        var edgesMap_ = IMap(); // indexed by meta time, mapping to edgesMap.
-        var edgesMap = IMap(); // indexed by edgeId
 
         data.nodes.forEach(nhi => {
             const space = nhi.nodeId[0];
@@ -1403,6 +1419,18 @@
                 console.error(sp, firstDef);
             }
             pointersEl.appendChild(pointerEl);
+        })
+
+        // # Edges
+        //
+        // process edges, producing indicies and dynamic HTML elements.
+        const edgeIdsEl = document.getElementById("edgeIds");
+
+        data.edges.forEach(ehi => {
+            const edgeIdEl = document.createElement("span");
+            edgeIdEl.textContent = ehi.edgeId;
+            edgeIdEl.className = "edgeId";   
+            edgeIdsEl.appendChild(edgeIdEl);
         })
 
         // --- entry point ---
@@ -1603,7 +1631,14 @@
                         rootElm_.appendChild(div);
                         walk(rootElm_, e.outline, depth + 1);
 
-                        div.appendChild(document.createTextNode(" " + e.action));
+                        div.appendChild(document.createTextNode(" " + e.action + " "));
+
+                        function createEdgeIdEl() { // wait until the outline contains edgeIds.
+                            const edgeIdSpan = document.createElement("span");
+                            edgeIdSpan.className = "edgeId";
+                            edgeIdSpan.textContent = "TODO";
+                            return edgeIdSpan;
+                        }
 
                         const valueNode = document.createElement("span");
                         valueNode.textContent = e.value;
@@ -1611,7 +1646,10 @@
 
                         if (!hasNested) {
                             div.appendChild(valueNode);
+                            div.appendChild(createEdgeIdEl());
                         } else {
+                            div.appendChild(createEdgeIdEl());
+
                             const thunkNode = document.createElement("span");
                             thunkNode.textContent = e.forcedThunk; // e.outline.nodeId;
                             // to do -- look up nodeId to get listing/env information, to display here.
