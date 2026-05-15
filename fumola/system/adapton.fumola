@@ -268,6 +268,20 @@ module {
             outlineRec(root /*, PointerSetObj.new()*/ )
         };
 
+        public func outlineLeaf(p : Pointer) : Outline {
+            let nodeInfo = (peekInfo p)!;
+	        let nodeId = nodeInfo.nodeId;
+            let (shape, value) = switch (nodeInfo.node) {
+                case(#nonThunk(value)) { (#nonThunk, value) };
+                case(#thunk_(t)) { (#thunk_, t.body) };
+            };
+            #leaf({
+                nodeId;
+                shape; 
+                value
+            })
+        };
+
         public func outlineRec(root : Pointer /*, visited : PointerSetOBj */) : Outline {
             let nodeInfo = (peekInfo root)!;
 	        let nodeId = nodeInfo.nodeId;
@@ -294,10 +308,12 @@ module {
                             let edgeInfo = edgeActionInfo(edge);
                             let actionTarget = prim "adaptonPointer" (edge.target.0);
                             var outline = null;
-                            if (true or edgeInfo.action == #force_ 
+                            if (edgeInfo.action == #force_ 
                                 /* and not(visited.contains(target)) */ ) {
                                 // visited.insert(target);
                                 outline := ? outlineRec(actionTarget /*, visited */);
+                            } else {
+                                outline := ? outlineLeaf(actionTarget);
                             };
                             let metaTimes = edgeInfo.metaTimes;
                             if ( edgeInfo.action == #force_ and
