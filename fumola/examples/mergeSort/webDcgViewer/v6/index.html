@@ -115,6 +115,10 @@
             border-left: 2px;
             border-style: solid;
             border-color: var(--bg-outline-vert);
+            background-color: var(--bg-outline-internal-result);
+        }
+        .outline-node:hover {
+            background-color: var(--bg-outline-internal-result-hover);      
         }
 
         .outline-node-thunk-shape {
@@ -146,7 +150,7 @@
             border: 1px;
             border-radius: 4px;
             padding: 4px;
-            font-size: larger;
+            /*font-size: larger; */
             border-style: solid;
             border-color: var(--blue-dark);
             background-color: black;
@@ -244,18 +248,18 @@
         }
 
         .metaTime {
-            color: #7fd1ff;
+            color: var(--blue);
             cursor: pointer;
             border-color: var(--border-soft);
             border-style: solid;
+            border-radius: 33%;
             padding: 3px;
             margin: 0px;
             border-width: 1px;
-            border-radius: 1px;
             display:inline-block;
         }
         .metaTime.focused {
-            background: #b4b415;
+            background: var(--blue-hover);
             color: #111;
             font-weight: bold;
         }
@@ -267,16 +271,17 @@
             color: black;
             background-color: white;
         }
-
-        .edgeId.focused {
-            background: var(--purple-dark);
-            color: #111;
-            font-weight: bold;
+        .metaTime.player-focused {
+            color: yellowgreen;
+            border-color: yellow;
+            background-color: black;
         }
-        .edgeId:hover {
-            color: #ffffff;
+        .metaTime.focused.player-focused {
+            background-color: yellowgreen;
             border-color: white;
+            color: black;
         }
+
         .edgeId {
             color: var(--purple);
             cursor: pointer;
@@ -289,10 +294,20 @@
             display:inline-block;
             background-color: black;
         }
+        .edgeId.focused {
+            background: var(--purple-dark);
+            color: #111;
+            font-weight: bold;
+        }
+        .edgeId:hover {
+            color: #ffffff;
+            border-color: white;
+        }
+
         .pointerThunk {
             color: #b5b7d7;
             cursor: pointer;
-            border-color: var(--border-soft);
+            border-color: #7e7f95;
             border-style: solid;
             padding: 3px;
             margin: 2px;
@@ -304,7 +319,7 @@
         .pointerNonThunk {
             color: #c0d7b5;
             cursor: pointer;
-            border-color: var(--border-soft);
+            border-color: #899882;
             border-style: solid;
             padding: 3px;
             margin: 2px;
@@ -323,8 +338,18 @@
         }
 
         .action-arrow {
+            margin: 2px;
             cursor: pointer;
-            font-size: 20px;
+            font-size: large;
+            border-width: 1px;
+            border-radius: 13%;
+            border-style: solid;
+            border-color: transparent;
+        }
+        .action-arrow:active {
+            background-color: black;
+            color: white;
+            border-color: white;
         }
 
         .result-arrow {
@@ -348,9 +373,10 @@
         }
 
         .action-arrow:hover {
-            background-color: var(--hover);
+            border-color: white;
+            border-style: solid;
+            border-bottom: 3px;
         }
-
 
         .nodeId {
             color: #f3e2c2;
@@ -655,59 +681,44 @@
         // import { Map as IMap } from "immutable";
         import { Map as IMap } from "https://unpkg.com/immutable@5/dist/immutable.es.js";
 
-        // --------------------------------
-
-        function focusEvent(metaTime) {
-            const rows = document.querySelectorAll("#events .metaTime");
-
-            for (let row of rows) {
-                //console.log("row.metaTime", metaTime, row.metaTime);
-
-                if (row.metaTime == metaTime) {
-                    row.scrollIntoView({ behavior: "smooth", block: "center" });
-                    row.classList.add("focused");
-                    selectedElements.add(row);
-
-
-
-                    break;
-                }
-            }
-            // console.log("focusEvent done: " + metaTime);
-        }
-
-        function focusOutline(metaTime) {
-            const rows = document.querySelectorAll("#outline .metaTime");
-
-            let first = null;
-
-            for (let row of rows) {
-                if (row.metaTime == metaTime) {
-                    first = row;
-                    break;
-                }
-            }
-            if (first) {
-                first.scrollIntoView({ behavior: "smooth", block: "center" });
-                first.classList.add("focused");
-                selectedElements.add(first);
-            }
-            // console.log("focusOutline done: " + metaTime, rows, " and first is ", first);
-        }
+        var metaTimeInFocus = new Set();
 
         function clearFocus() {
             document.querySelectorAll(".focused")
                 .forEach(el => el.classList.remove("focused"));
         }
-
-        // ---------------------
+        function setFocus(t) {
+            console.log("setFocus", t);
+            if (metaTimeInFocus.has(t)) {
+                metaTimeInFocus.delete(t);
+                document.querySelectorAll(".metaTime")
+                .forEach(el => {
+                    if (el.metaTime == t) {
+                        el.classList.remove("focused")
+                    }
+                });
+            } else {
+                metaTimeInFocus.add(t);
+                document.querySelectorAll(".metaTime")
+                .forEach(el => {
+                    if (el.metaTime == t) {
+                        el.classList.add("focused-history");
+                        el.classList.add("focused")
+                    }
+                });
+            }
+        }
         function renderSceneAtMetaTime(t) {
             console.log("renderSceneAtMetaTime", t);
-            focusEvent(t);
-            focusOutline(t);
+            document.querySelectorAll(".player-focused")
+                .forEach(el => el.classList.remove("player-focused"));
+            document.querySelectorAll(".metaTime")
+                .forEach(el => {
+                    if (el.metaTime == t) {
+                        el.classList.add("player-focused");
+                    }
+                });     
         }
-
-        // -------------------------------
         const playerState = {
             isPlaying: false,
             metaTime: 1,
@@ -1342,36 +1353,9 @@
 
         let SCENE = null;
 
-        let selectedTimestamps = new Set();
-        let selectedElements = new Set();
-
         // --- hook ---
         function onMetaTimeClick(t) {
-
-            if (selectedTimestamps.has(t)) {
-                false && console.log("un-focus metaTime:", t);
-
-                selectedTimestamps.delete(t);
-                let staleElements = new Set();
-                selectedElements.forEach(elm => {
-                    if (elm.metaTime == t) {
-                        staleElements.add(elm);
-                    }
-                });
-                staleElements.forEach(staleElm => {
-                    selectedElements.delete(staleElm);
-                    staleElm.classList.remove("focused");
-                })
-            } else {
-                false && console.log("focus metaTime:", t);
-
-                selectedTimestamps.add(t);
-
-                focusEvent(t);
-                focusOutline(t);
-            }
-
-            false && console.log("selected time stamps: ", selectedTimestamps);
+            setFocus(t);
         }
 
         // # Nodes
@@ -1699,8 +1683,6 @@
             camera,
             renderer,
             controls,
-            selectedTimestamps,
-            selectedElements,
         };
 
     </script>
