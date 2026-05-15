@@ -342,7 +342,7 @@
             cursor: pointer;
             font-size: large;
             border-width: 1px;
-            border-radius: 13%;
+            border-radius: 4px;
             border-style: solid;
             border-color: transparent;
         }
@@ -1583,13 +1583,13 @@
                         };
                         div.appendChild(document.createTextNode(" "));
                         div.appendChild(document.createTextNode("(" + edgeCount + "/" + edgetotal + ")"));
-                        div.appendChild(document.createTextNode(" "));
+                        //div.appendChild(document.createTextNode(" "));
                         var edgetext = e.action + "";
                         let arrows = {
-                            "put": "───» ",
-                            "get": "───> ",
-                            "putForce": "══▷» ",
-                            "force": "═══▷ ",
+                            "put": " ───» ",
+                            "get": " ───> ",
+                            "putForce": " ══▷» ",
+                            "force": " ═══▷ ",
                         };
                         if (arrows[e.action]) {
                             edgetext = arrows[e.action]
