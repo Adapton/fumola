@@ -42,12 +42,16 @@ module {
             };
         };
         let inputTree = force(inputTree_);
-        let lazySorted_ = do within space `lazyMergeSort {
+        let lazySorted_ = 
+            force(`lazyMergeSort := thunk {
+            do within space `lazyMergeSort {
             Seq.lazyMergeSort(inputTree);
-        };
-        let sorted = do within space `forceSort {
+        }});
+        let sorted = 
+            force(`forceSort := thunk {
+            do within space `forceSort {
             LazyList.takeN_(lazySorted_, size);
-        };
+        }});
         let components = {
             inputArray;
             inputList_;
@@ -101,11 +105,18 @@ module {
     #[test]
     public func testGenerateSceneFullDemand() {
         let scene = generateSceneFullDemand(10, 10);
-        assert scene.history.events.size() == 409;
-        assert scene.history.nodes.size() == 175;
-        assert scene.history.edges.size() == 194;
+        if false { prim "print" (debug_show ({
+            _0_eventsSize = scene.history.events.size();
+            _1_nodesSize = scene.history.nodes.size();
+            _2_edgesSize = scene.history.edges.size();
+            _3_objectsSize = scene.objects.size();
+            _4_finalMetaTime = ((scene.outline.1).0).value!.0;
+        }))};
+        assert scene.history.events.size() == 419;
+        assert scene.history.nodes.size() == 179;
+        assert scene.history.edges.size() == 198;
         assert scene.objects.size() == 37; // TO DO -- Should be closer to total nodes + edges.
-        assert ((scene.outline.1).0).value!.0 == 280; // Final Meta Time.
+        assert ((scene.outline.1).0).value!.0 == 286; // Final Meta Time.
     };
             
     public func dcg(seed : Nat, size : Nat, demand) {

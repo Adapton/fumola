@@ -123,25 +123,52 @@
 
         .outline-node-thunk-shape {
             cursor: pointer;
-            border-radius: 8px;
+            font-size: large;
+            border-radius: 50%;
             border-style: solid;
-            border: 1px;
+            border-width: 2px;
             margin: 2px;
             color: var(--blue-dark);
-            border-color: var(--blue);
+            border-color: transparent;
             background-color: var(--blue-dark);
+            user-select: none;
+            padding: 2px;
+            padding-left: 6px;
+            padding-right: 6px;
+        }
+        .outline-node-thunk-shape:active {
+            background-color: black;
+            color: white;
+            border-color: white;
+        }
+        .outline-node-thunk-shape:hover {
+            border-color: white;
         }
 
         .outline-node-nonthunk-shape {
             cursor: pointer;
+            font-size: large;
+            padding-left: 4px;
+            padding-right: 4px;
             border-radius: 0px;
             border-style: solid;
-            border: 1px;
+            border-width: 2px;
             margin: 2px;
             color: var(--green-dark);
-            border-color: var(--green);
+            border-color: transparent;
             background-color: var(--green-dark);
+            user-select: none;
         }
+        .outline-node-nonthunk-shape:active {
+            background-color: black;
+            color: white;
+            border-color: white;
+        }
+        .outline-node-nonthunk-shape:hover {
+            border-color: white;
+        }
+
+
 
         .outline-forced-thunk-text {
             cursor: pointer;
@@ -250,12 +277,12 @@
         .metaTime {
             color: var(--blue);
             cursor: pointer;
-            border-color: var(--border-soft);
+            border-color: transparent;
             border-style: solid;
             border-radius: 33%;
-            padding: 3px;
-            margin: 0px;
-            border-width: 1px;
+            padding: 2px;
+            margin: 2px;
+            border-width: 2px;
             display:inline-block;
         }
         .metaTime.focused {
@@ -338,19 +365,26 @@
         }
 
         .action-arrow {
-            margin: 2px;
+            margin: 3px;
+            padding: 3px;   
             cursor: pointer;
             font-size: large;
-            border-width: 1px;
+            border-width: 2px;
             border-radius: 4px;
             border-style: solid;
             border-color: transparent;
+            user-select: none;
         }
         .action-arrow:active {
             background-color: black;
             color: white;
             border-color: white;
         }
+        .action-arrow:hover {
+            border-color: white;
+            border-style: solid;
+        }
+
 
         .result-arrow {
             color: var(--blue-dark);
@@ -372,12 +406,7 @@
             color: var(--blue-dark);
         }
 
-        .action-arrow:hover {
-            border-color: white;
-            border-style: solid;
-            border-bottom: 3px;
-        }
-
+       
         .nodeId {
             color: #f3e2c2;
             cursor: pointer;
@@ -1603,10 +1632,10 @@
                         div.appendChild(shapeElm);
                         if (e.outline.shape == "#thunk_") {
                             shapeElm.className = "outline-node-thunk-shape";
-                            shapeElm.textContent = "{}"
+                            shapeElm.textContent = "◉"
                         } else if (e.outline.shape == "#nonThunk") {
                             shapeElm.className = "outline-node-nonthunk-shape";
-                            shapeElm.textContent = "[]"
+                            shapeElm.textContent = "▣"
                         } else {
                             console.error("unrecognized outline node shape", e.outline.shape);
                         }
