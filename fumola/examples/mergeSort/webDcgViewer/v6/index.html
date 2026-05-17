@@ -117,8 +117,9 @@
             border-color: var(--bg-outline-vert);
             background-color: var(--bg-outline-internal-result);
         }
+
         .outline-node:hover {
-            background-color: var(--bg-outline-internal-result-hover);      
+            background-color: var(--bg-outline-internal-result-hover);
         }
 
         .outline-node-thunk-shape {
@@ -136,11 +137,13 @@
             padding-left: 6px;
             padding-right: 6px;
         }
+
         .outline-node-thunk-shape:active {
             background-color: black;
             color: white;
             border-color: white;
         }
+
         .outline-node-thunk-shape:hover {
             border-color: white;
         }
@@ -159,11 +162,13 @@
             background-color: var(--green-dark);
             user-select: none;
         }
+
         .outline-node-nonthunk-shape:active {
             background-color: black;
             color: white;
             border-color: white;
         }
+
         .outline-node-nonthunk-shape:hover {
             border-color: white;
         }
@@ -275,6 +280,7 @@
         }
 
         .metaTime {
+            user-select: none;
             color: var(--blue);
             cursor: pointer;
             border-color: transparent;
@@ -283,26 +289,31 @@
             padding: 2px;
             margin: 2px;
             border-width: 2px;
-            display:inline-block;
+            display: inline-block;
         }
+
         .metaTime.focused {
             background: var(--blue-hover);
             color: #111;
             font-weight: bold;
         }
+
         .metaTime:hover {
             color: #ffffff;
             border-color: white;
         }
+
         .metaTime:hover.focused {
             color: black;
             background-color: white;
         }
+
         .metaTime.player-focused {
             color: yellowgreen;
             border-color: yellow;
             background-color: black;
         }
+
         .metaTime.focused.player-focused {
             background-color: yellowgreen;
             border-color: white;
@@ -310,6 +321,7 @@
         }
 
         .edgeId {
+            user-select: none;
             color: var(--purple);
             cursor: pointer;
             border-color: var(--border-soft);
@@ -318,31 +330,45 @@
             margin: 2px;
             border-width: 1px;
             border-radius: 1px;
-            display:inline-block;
+            display: inline-block;
             background-color: black;
         }
+
         .edgeId.focused {
             background: var(--purple-dark);
             color: #111;
             font-weight: bold;
         }
+
         .edgeId:hover {
             color: #ffffff;
             border-color: white;
         }
 
+        .pointer {
+            user-select: none;
+        }
         .pointerThunk {
             color: #b5b7d7;
             cursor: pointer;
-            border-color: #7e7f95;
+            border-color: var(--bg-panel);
             border-style: solid;
             padding: 3px;
             margin: 2px;
-            border-width: 1px;
-            border-radius: 1px;
-            display:inline-block;
+            border-width: 2px;
+            border-radius: 2px;
+            display: inline-block;
             background-color: black;
         }
+        .pointerThunk.focused {
+            background-color: var(--blue-dark);
+            color: var(--bg-panel);
+        }
+        .pointerThunk.focused:hover {
+            color: white;
+            border-color: white;
+        }
+        
         .pointerNonThunk {
             color: #c0d7b5;
             cursor: pointer;
@@ -352,13 +378,24 @@
             margin: 2px;
             border-width: 1px;
             border-radius: 1px;
-            display:inline-block;
+            display: inline-block;
             background-color: black;
         }
+        .pointerNonThunk.focused {
+            background-color: var(--green-dark);
+            color: var(--bg-panel);
+        }
+        .pointerNonThunk.focused:hover {
+            color: white;
+            border-color: white;
+        }
+     
+
         .pointerThunk:hover {
             color: #ffffff;
             border-color: white;
         }
+
         .pointerNonThunk:hover {
             color: #ffffff;
             border-color: white;
@@ -366,7 +403,7 @@
 
         .action-arrow {
             margin: 3px;
-            padding: 3px;   
+            padding: 3px;
             cursor: pointer;
             font-size: large;
             border-width: 2px;
@@ -375,11 +412,13 @@
             border-color: transparent;
             user-select: none;
         }
+
         .action-arrow:active {
             background-color: black;
             color: white;
             border-color: white;
         }
+
         .action-arrow:hover {
             border-color: white;
             border-style: solid;
@@ -406,7 +445,7 @@
             color: var(--blue-dark);
         }
 
-       
+
         .nodeId {
             color: #f3e2c2;
             cursor: pointer;
@@ -710,7 +749,76 @@
         // import { Map as IMap } from "immutable";
         import { Map as IMap } from "https://unpkg.com/immutable@5/dist/immutable.es.js";
 
-        var metaTimeInFocus = new Set();
+        const inFocus = {
+            metaTime: new Set(),
+            edgeId: new Set(),
+            pointer: new Set(),
+        };
+
+        function openDoor(type, id) {
+            console.log("openDoor", type, id);
+            if (type == "metaTime") {
+                inFocus.metaTime.add(id);
+                document.querySelectorAll(".metaTime")
+                    .forEach(el => {
+                        if (el.metaTime == id) {
+                            el.classList.add("focused-history");
+                            el.classList.add("focused")
+                        }
+                    });
+            } else if (type == "edgeId") {
+                inFocus.edgeId.add(id);
+                document.querySelectorAll(".edgeId")
+                    .forEach(el => {
+                        if (el.edgeId == id) {
+                            el.classList.add("focused-history");
+                            el.classList.add("focused")
+                        }
+                    });
+            } else if (type == "pointer") {
+                inFocus.pointer.add(id);
+                document.querySelectorAll(".pointer")
+                    .forEach(el => {
+                        if (el.pointer == id) {
+                            el.classList.add("focused-history");
+                            el.classList.add("focused")
+                        }
+                    });
+            } else {
+                console.error("openDoor: unrecognized type", type)
+            }
+        }
+
+        function closeDoor(type, id) {
+            console.log("closeDoor", type, id);
+            if (type == "metaTime") {
+                inFocus.metaTime.delete(id);
+                document.querySelectorAll(".metaTime")
+                    .forEach(el => {
+                        if (el.metaTime == id) {
+                            el.classList.remove("focused")
+                        }
+                    });
+            } else if (type == "edgeId") {
+                inFocus.edgeId.delete(id);
+                document.querySelectorAll(".edgeId")
+                    .forEach(el => {
+                        if (el.edgeId == id) {
+                            el.classList.remove("focused")
+                        }
+                    });
+            } else if (type == "pointer") {
+                inFocus.pointer.delete(id);
+                document.querySelectorAll(".pointer")
+                    .forEach(el => {
+                        if (el.pointer == id) {
+                            el.classList.remove("focused")
+                        }
+                    });
+            } else {
+                console.error("closeDoor: unrecognized type", type)
+            }
+        }
 
         function clearFocus() {
             document.querySelectorAll(".focused")
@@ -718,23 +826,10 @@
         }
         function setFocus(t) {
             console.log("setFocus", t);
-            if (metaTimeInFocus.has(t)) {
-                metaTimeInFocus.delete(t);
-                document.querySelectorAll(".metaTime")
-                .forEach(el => {
-                    if (el.metaTime == t) {
-                        el.classList.remove("focused")
-                    }
-                });
+            if (inFocus.metaTime.has(t)) {
+                closeDoor("metaTime", t)
             } else {
-                metaTimeInFocus.add(t);
-                document.querySelectorAll(".metaTime")
-                .forEach(el => {
-                    if (el.metaTime == t) {
-                        el.classList.add("focused-history");
-                        el.classList.add("focused")
-                    }
-                });
+                openDoor("metaTime", t)
             }
         }
         function renderSceneAtMetaTime(t) {
@@ -746,7 +841,7 @@
                     if (el.metaTime == t) {
                         el.classList.add("player-focused");
                     }
-                });     
+                });
         }
         const playerState = {
             isPlaying: false,
@@ -1255,6 +1350,20 @@
             };
         }
 
+        function lookAtLabel(label) {
+            console.log("lookAtLabel", label);
+            // TO DO -- scroll details panel to the given label.
+
+        }
+
+        function lookAtMesh(m) {
+            console.log("lookAtMesh", m);
+            if (!m) { return };
+            camTargetPos = m.position.clone().add(new THREE.Vector3(0.0, 0.0, 3.0));
+            camTargetLook = m.position.clone();
+            transitionStart = performance.now() / 1000;
+        }
+
         window.addEventListener('click', e => {
             const pos = getMouseNDC(e);
             mouse.x = pos.x;
@@ -1263,9 +1372,8 @@
             const intersects = raycaster.intersectObjects([...nodesByLabel.values()]);
             if (intersects.length) {
                 const m = intersects[0].object;
-                camTargetPos = m.position.clone().add(new THREE.Vector3(0, 0, 2.3));
-                camTargetLook = m.position.clone();
-                transitionStart = performance.now() / 1000;
+                lookAtMesh(m);
+                lookAtLabel(labelsByNode.get(m));
             }
         });
 
@@ -1382,11 +1490,6 @@
 
         let SCENE = null;
 
-        // --- hook ---
-        function onMetaTimeClick(t) {
-            setFocus(t);
-        }
-
         // # Nodes
         //
         // process nodes, producing indicies and dynamic HTML elements.
@@ -1408,7 +1511,7 @@
         });
 
         const pointersEl = document.getElementById("pointers");
-      
+
         pointerMetaTimes.forEach((metaTimes, space, m) => {
             nodesMap = nodesMap.set(space, { "type": "future", "metaTime": metaTimes[0] });
         });
@@ -1425,12 +1528,14 @@
             let metaTimes = pointerMetaTimes.get(sp);
             let firstDef = nodesMap_.get(metaTimes[0]).get(sp);
             if (firstDef && firstDef.node.type == "thunk") {
-                pointerEl.classList = "pointerThunk";
+                pointerEl.classList = "pointer pointerThunk";
             } else if (firstDef && firstDef.node.type == "nonThunk") {
-                pointerEl.classList = "pointerNonThunk";
+                pointerEl.classList = "pointer pointerNonThunk";
             } else {
                 console.error(sp, firstDef);
             }
+            pointerEl.onclick = elmOnClick("pointer", sp);
+            pointerEl.pointer = sp;
             pointersEl.appendChild(pointerEl);
         })
 
@@ -1442,7 +1547,9 @@
         data.edges.forEach(ehi => {
             const edgeIdEl = document.createElement("span");
             edgeIdEl.textContent = ehi.edgeId;
-            edgeIdEl.className = "edgeId";   
+            edgeIdEl.className = "edgeId";
+            edgeIdEl.edgeId = ehi.edgeId;
+            edgeIdEl.onclick = elmOnClick("edgeId", ehi.edgeId);
             edgeIdsEl.appendChild(edgeIdEl);
         })
 
@@ -1453,21 +1560,32 @@
         };
         loadScene();
 
+        function elmOnClick(type, id) { 
+            return (e) => {
+            if (e.shiftKey) {
+                closeDoor(type, id)
+            }
+            else {
+                openDoor(type, id);
+            }
+        }}
+
         function createMetaTimeElm(metaTime) {
             const elm = document.createElement("span");
             elm.className = "metaTime";
             elm.textContent = metaTime;
             elm.metaTime = metaTime;
-            elm.onclick = () => onMetaTimeClick(metaTime);
+            elm.onclick = elmOnClick("metaTime", metaTime);
             return elm
         }
 
         function createNodeIdElm(nodeId) {
             const elm = document.createElement("span");
-            elm.className = "nodeId";
+            elm.className = "nodeId pointer";
             elm.textContent = nodeId;
             elm.nodeId = nodeId;
-            elm.onclick = () => onNodeIdClick(ptr);
+            elm.pointer = nodeId[0];
+            elm.onclick = elmOnClick("pointer", nodeId[0]);
             return elm
         }
 
@@ -1475,24 +1593,24 @@
             const elm = document.createElement("span");
             elm.className = "edgeId";
             elm.textContent = edgeId;
-            elm.nodeId = edgeId;
-            elm.onclick = () => onNodeIdClick(ptr);
+            elm.edgeId = edgeId;
+            elm.onclick = elmOnClick("edgeId", edgeId);
             return elm
         }
 
         function createPointerElm(ptr, shape) {
             const elm = document.createElement("span");
             if (shape == "#thunk_") {
-                elm.className = "pointerThunk";
+                elm.className = "pointer pointerThunk";
             }
             else if (shape == "#nonThunk") {
-                elm.className = "pointerNonThunk";
+                elm.className = "pointer pointerNonThunk";
             } else {
                 console.error("unrecognized pointer shape", shape);
             }
             elm.textContent = ptr;
-            elm.adaptonPointer = ptr;
-            elm.onclick = () => onPointerClick(ptr);
+            elm.pointer = ptr;
+            elm.onclick = elmOnClick("pointer", ptr)
             return elm
         }
 
@@ -1548,7 +1666,7 @@
             const span = document.createElement("span");
             span.textContent = metaTime // + (useEndTime ? (isAnchor ? " }" : " {") : "");
             span.className = "metaTime";
-            span.onclick = () => onMetaTimeClick(metaTime);
+            span.onclick = elmOnClick("metaTime", metaTime);
             if (!useEndTime || isAnchor) {
                 span.metaTime = metaTime;
             };
@@ -1558,7 +1676,7 @@
                 const beginMetaTime = e.metaTimes[0];
                 span_.textContent = beginMetaTime + ", ";
                 span_.className = "metaTime";
-                span_.onclick = () => onMetaTimeClick(beginMetaTime);
+                span_.onclick = elmOnClick("metaTime", metaTime);
 
                 //span.style.textDecoration = "underline";
                 //span.style.marginLeft = 0;
@@ -1690,8 +1808,6 @@
 
         // expose
         window.loadScene = loadScene;
-        window.onMetaTimeClick = onMetaTimeClick;
-
 
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
