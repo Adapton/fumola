@@ -348,6 +348,7 @@
         .pointer {
             user-select: none;
         }
+
         .pointerThunk {
             color: #b5b7d7;
             cursor: pointer;
@@ -360,15 +361,17 @@
             display: inline-block;
             background-color: black;
         }
+
         .pointerThunk.focused {
             background-color: var(--blue-dark);
             color: var(--bg-panel);
         }
+
         .pointerThunk.focused:hover {
             color: white;
             border-color: white;
         }
-        
+
         .pointerNonThunk {
             color: #c0d7b5;
             cursor: pointer;
@@ -381,15 +384,17 @@
             display: inline-block;
             background-color: black;
         }
+
         .pointerNonThunk.focused {
             background-color: var(--green-dark);
             color: var(--bg-panel);
         }
+
         .pointerNonThunk.focused:hover {
             color: white;
             border-color: white;
         }
-     
+
 
         .pointerThunk:hover {
             color: #ffffff;
@@ -1560,15 +1565,16 @@
         };
         loadScene();
 
-        function elmOnClick(type, id) { 
+        function elmOnClick(type, id) {
             return (e) => {
-            if (e.shiftKey) {
-                closeDoor(type, id)
+                if (e.shiftKey) {
+                    closeDoor(type, id)
+                }
+                else {
+                    openDoor(type, id);
+                }
             }
-            else {
-                openDoor(type, id);
-            }
-        }}
+        }
 
         function createMetaTimeElm(metaTime) {
             const elm = document.createElement("span");
