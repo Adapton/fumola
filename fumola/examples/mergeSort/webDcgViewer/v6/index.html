@@ -30,6 +30,7 @@
             --purple: #c6a0f6;
             --blue: #8bd5ff;
             --green: #a6da95;
+            --brown: #e6b775;
 
             --blue-hover: #c1e5fa;
             --green-hover: #c4dbbc;
@@ -38,6 +39,7 @@
             --purple-dark: #8c6fd1;
             --blue-dark: #5ca7d9;
             --green-dark: #7fba72;
+            --brown-dark: #bc7f28;
 
             /* --- INTERACTION --- */
 
@@ -365,6 +367,7 @@
         .pointerThunk.focused {
             background-color: var(--blue-dark);
             color: var(--bg-panel);
+            font-weight: bold;
         }
 
         .pointerThunk.focused:hover {
@@ -388,6 +391,7 @@
         .pointerNonThunk.focused {
             background-color: var(--green-dark);
             color: var(--bg-panel);
+            font-weight: bold;
         }
 
         .pointerNonThunk.focused:hover {
@@ -452,12 +456,20 @@
 
 
         .nodeId {
-            color: #f3e2c2;
+            color: var(--brown);
             cursor: pointer;
+            border-color: var(--brown);
+            border-style: solid;
+            padding: 3px;
+            margin: 2px;
+            border-width: 1px;
+            border-radius: 1px;
+            display: inline-block;
+            background-color: black;
         }
 
         .nodeId.focused {
-            background: #d2cbb4;
+            background: var(--brown-dark);
             color: #111;
             font-weight: bold;
         }
@@ -1714,7 +1726,7 @@
                     // to do -- create nodeId div
                     // no "edge" above the root to print this name.
                     // otherwise, some edge already printed this out.
-                    div.appendChild(document.createTextNode(node.nodeId));
+                    div.appendChild(createNodeIdElm(node.nodeId));
                 }
                 rootElm.appendChild(div);
 
