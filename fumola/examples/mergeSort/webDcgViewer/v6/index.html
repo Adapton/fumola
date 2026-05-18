@@ -460,7 +460,7 @@
             cursor: pointer;
             border-color: var(--brown-dark);
             border-style: solid;
-            border-radius: 9%;
+            border-radius: 5%;
             padding: 3px;
             margin: 2px;
             border-width: 1px;
@@ -592,6 +592,10 @@
             border-color: var(--active);
             color: var(--text);
         }
+        .player-button-small {
+            font-size: 16px;
+            color: var(--text-faint);
+        }
 
         .player-field label {
             font-size: 23px;
@@ -668,9 +672,10 @@
                 <div class="panel-body player-body">
 
                     <div class="player-row">
-
+                        <button id="gotoStartBtn" class="player-button">⏮</button>
+                        <button id="tickBackBtn" class="player-button player-button-small">▌◀</button>
                         <button id="playPauseBtn" class="player-button">▶</button>
-
+                        <button id="tickForwardBtn" class="player-button player-button-small">▶ ▌</button>
                         <button id="stopBtn" class="player-button">■</button>
 
                         <div class="player-field">
@@ -696,7 +701,7 @@
 
                     <div class="player-slider-row">
 
-                        <input id="metaSlider" class="player-field" type="range" min="1" max="280" value="1" step="1" />
+                        <input id="metaSlider" class="player-field" type="range" min="1" max="1" value="1" step="1" />
 
                     </div>
 
@@ -771,6 +776,8 @@
             edgeId: new Set(),
             pointer: new Set(),
         };
+        
+        const data = await fetch('./scene.json').then(r => r.json());
 
         function openDoor(type, id) {
             console.log("openDoor", type, id);
@@ -849,8 +856,22 @@
                 openDoor("metaTime", t)
             }
         }
-        function renderSceneAtMetaTime(t) {
-            console.log("renderSceneAtMetaTime", t);
+
+        function scrollToMetaTime(t, behavior) {
+            document.querySelectorAll(".metaTimeAnchor")
+                .forEach(el => {
+                    if (el.metaTime == t) {
+                        el.scrollIntoView({
+                            behavior,
+                            block: "nearest",
+                            inline: "nearest",
+                        });
+                    }
+                });
+        }
+        function renderPlayerFocusAtMetaTime(scrollBehavior = "instant") {
+            const t = playerState.metaTime;
+            false && console.log("renderSceneAtMetaTime", t);
             document.querySelectorAll(".player-focused")
                 .forEach(el => el.classList.remove("player-focused"));
             document.querySelectorAll(".metaTime")
@@ -859,11 +880,13 @@
                         el.classList.add("player-focused");
                     }
                 });
+            scrollToMetaTime(t, scrollBehavior);
         }
         const playerState = {
             isPlaying: false,
             metaTime: 1,
-            maxMetaTime: 280,
+            maxMetaTime: data.events[data.events.length - 1].metaTime,
+            stopResetsTo: 1,
             bpm: 1337,
             timer: null,
         };
@@ -877,17 +900,18 @@
         function renderPlayerUI() {
 
             document.getElementById("metaTimeDisplay").value =
-                playerState.metaTime;
+                playerState.metaTime + " of " + playerState.maxMetaTime;
 
             document.getElementById("bpmDisplay").value =
                 playerState.bpm;
 
-            document.getElementById("metaSlider").value =
-                playerState.metaTime;
+            slider.value = playerState.metaTime;
+            slider.max = playerState.maxMetaTime;
 
             document.getElementById("playPauseBtn").textContent =
                 playerState.isPlaying ? "⏸" : "▶";
         }
+        renderPlayerUI();
 
         function beatDurationMs() {
             return (60 * 1000) / playerState.bpm;
@@ -903,7 +927,7 @@
                 stopPlayback();
                 return;
             }
-            renderSceneAtMetaTime(playerState.metaTime);
+            renderPlayerFocusAtMetaTime();
             renderPlayerUI();
             playerState.timer = setTimeout(
                 tickPlayback,
@@ -912,43 +936,56 @@
         }
 
         function startPlayback() {
-
             if (playerState.isPlaying) {
                 return;
             }
-
             playerState.isPlaying = true;
-
             renderPlayerUI();
-
             tickPlayback();
         }
 
         function pausePlayback() {
-
             playerState.isPlaying = false;
-
             clearTimeout(playerState.timer);
-
             renderPlayerUI();
         }
 
         function stopPlayback() {
-
             pausePlayback();
-
-            playerState.metaTime = 1;
-
-            renderSceneAtMetaTime(playerState.metaTime);
-
+            playerState.metaTime = playerState.stopResetsTo;
+            renderPlayerFocusAtMetaTime("smooth");
             renderPlayerUI();
-
             clearFocus();
+        }
+        document.getElementById("tickBackBtn").onclick = () => {
+            pausePlayback();
+            if (playerState.metaTime > 1) {
+                playerState.metaTime = playerState.metaTime - 1;
+                playerState.stopResetsTo = playerState.metaTime;    
+            }
+            renderPlayerUI();
+            renderPlayerFocusAtMetaTime("smooth");
+        }
+        document.getElementById("tickForwardBtn").onclick = () => {
+            pausePlayback();
+            if (playerState.metaTime < playerState.maxMetaTime) {
+                playerState.metaTime = playerState.metaTime + 1;
+                playerState.stopResetsTo = playerState.metaTime; 
+            }
+            renderPlayerUI();
+            renderPlayerFocusAtMetaTime("smooth");
+        }
+        document.getElementById("gotoStartBtn").onclick = () => {
+            let isPlaying = playerState.isPlaying;
+            playerState.metaTime = 1;
+            playerState.stopResetsTo = 1;
+            playerState.isPlaying = isPlaying;
+            renderPlayerUI();
+            renderPlayerFocusAtMetaTime("smooth");
         }
 
         document.getElementById("playPauseBtn")
             .onclick = () => {
-
                 if (playerState.isPlaying) {
                     pausePlayback();
                 } else {
@@ -981,8 +1018,8 @@
 
                 playerState.metaTime =
                     Number(e.target.value);
-
-                renderSceneAtMetaTime(playerState.metaTime);
+                playerState.stopResetsTo = playerState.metaTime;
+                renderPlayerFocusAtMetaTime("smooth");
 
                 renderPlayerUI();
             };
@@ -1321,7 +1358,6 @@
 
             return group;
         }
-        const data = await fetch('./scene.json').then(r => r.json());
 
         for (const obj of data.objects) {
             if (obj.type === "box") createBox(obj);
@@ -1574,6 +1610,8 @@
         function loadScene() {
             renderEvents(data);
             renderOutline(data);
+            renderPlayerFocusAtMetaTime("instant");
+            false && console.log(playerState);
         };
         loadScene();
 
@@ -1584,13 +1622,27 @@
                 }
                 else {
                     openDoor(type, id);
+                    if (type == "metaTime") {
+                        //scrollToMetaTime(id, "smooth");
+                        playerState.metaTime = id;
+                        playerState.stopResetsTo = playerState.metaTime;
+                        renderPlayerFocusAtMetaTime("smooth");
+                        renderPlayerUI();
+                    }
                 }
             }
         }
 
-        function createMetaTimeElm(metaTime) {
+        function createMetaTimeAnchorElm(metaTime) {
             const elm = document.createElement("span");
-            elm.className = "metaTime";
+            elm.className = "metaTimeAnchor";
+            elm.textContent = "";
+            elm.metaTime = metaTime;
+            return elm
+        }
+        function createMetaTimeElm(metaTime, isAnchor) {
+            const elm = document.createElement("span");
+            elm.className = "metaTime" + (isAnchor ? " metaTimeAnchor" : "");
             elm.textContent = metaTime;
             elm.metaTime = metaTime;
             elm.onclick = elmOnClick("metaTime", metaTime);
@@ -1643,13 +1695,8 @@
             events.forEach(ev => {
                 const row = document.createElement("div");
                 //row.metaTime = ev.metaTime;
-                const ts = createMetaTimeElm(ev.metaTime);
-                if (ev.metaTime != lastMetaTime) {
-                    const ts_ = createMetaTimeElm(ev.metaTime);
-                    mtEl.appendChild(ts_);
-                    mtEl.appendChild(document.createTextNode(" "));
-                    lastMetaTime = ev.metaTime;
-                }
+                const ts = createMetaTimeElm(ev.metaTime, (ev.metaTime != lastMetaTime));
+                lastMetaTime = ev.metaTime;
                 row.appendChild(ts);
                 row.appendChild(document.createTextNode(" " + ev.type + " "));
                 if (ev.type == "addNode") {
@@ -1713,6 +1760,7 @@
         function renderOutline(json) {
             const outline = json.outline;
             const panel = document.getElementById("outline");
+            var lastMetaTimeAnchor = null;
 
             function walk(rootElm, node, depth = 0) {
                 if (!node) return;
@@ -1739,9 +1787,16 @@
                         let div = document.createElement("div");
                         div.className = "outline-edge";
                         const hasNested = typeof e.metaTimes != "number";
+                        let metaTimeBegin = hasNested ? e.metaTimes[0] : e.metaTimes;
+                        let metaTimeEnd = hasNested ? e.metaTimes[1] : e.metaTimes;
+
+                        if(!lastMetaTimeAnchor && metaTimeBegin > 1) {
+                            div.appendChild(createMetaTimeAnchorElm(1))
+                            lastMetaTimeAnchor = 1;
+                        }
 
                         //div.style.marginLeft = outlineMargin(depth); // ???
-                        addMetaTimeElementForOutlineEdge(div, e);
+                        div.appendChild(createMetaTimeElm(metaTimeBegin, true));
                         if (hasNested) {
                             div.appendChild(document.createTextNode(", "));
                             addMetaTimeElementForOutlineEdge(div, e, true)
