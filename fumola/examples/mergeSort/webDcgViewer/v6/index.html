@@ -592,6 +592,7 @@
             border-color: var(--active);
             color: var(--text);
         }
+
         .player-button-small {
             font-size: 16px;
             color: var(--text-faint);
@@ -776,7 +777,7 @@
             edgeId: new Set(),
             pointer: new Set(),
         };
-        
+
         const data = await fetch('./scene.json').then(r => r.json());
 
         function openDoor(type, id) {
@@ -961,7 +962,7 @@
             pausePlayback();
             if (playerState.metaTime > 1) {
                 playerState.metaTime = playerState.metaTime - 1;
-                playerState.stopResetsTo = playerState.metaTime;    
+                playerState.stopResetsTo = playerState.metaTime;
             }
             renderPlayerUI();
             renderPlayerFocusAtMetaTime("smooth");
@@ -970,7 +971,7 @@
             pausePlayback();
             if (playerState.metaTime < playerState.maxMetaTime) {
                 playerState.metaTime = playerState.metaTime + 1;
-                playerState.stopResetsTo = playerState.metaTime; 
+                playerState.stopResetsTo = playerState.metaTime;
             }
             renderPlayerUI();
             renderPlayerFocusAtMetaTime("smooth");
@@ -1621,13 +1622,17 @@
                     closeDoor(type, id)
                 }
                 else {
-                    openDoor(type, id);
-                    if (type == "metaTime") {
-                        //scrollToMetaTime(id, "smooth");
-                        playerState.metaTime = id;
-                        playerState.stopResetsTo = playerState.metaTime;
-                        renderPlayerFocusAtMetaTime("smooth");
-                        renderPlayerUI();
+                    if (type == "thunkShape") {
+                        lookAtMesh(nodesByLabel.get(id))
+                    } else {
+                        openDoor(type, id);
+                        if (type == "metaTime") {
+                            //scrollToMetaTime(id, "smooth");
+                            playerState.metaTime = id;
+                            playerState.stopResetsTo = playerState.metaTime;
+                            renderPlayerFocusAtMetaTime("smooth");
+                            renderPlayerUI();
+                        }
                     }
                 }
             }
@@ -1790,7 +1795,7 @@
                         let metaTimeBegin = hasNested ? e.metaTimes[0] : e.metaTimes;
                         let metaTimeEnd = hasNested ? e.metaTimes[1] : e.metaTimes;
 
-                        if(!lastMetaTimeAnchor && metaTimeBegin > 1) {
+                        if (!lastMetaTimeAnchor && metaTimeBegin > 1) {
                             div.appendChild(createMetaTimeAnchorElm(1))
                             lastMetaTimeAnchor = 1;
                         }
@@ -1823,10 +1828,12 @@
                         div.appendChild(shapeElm);
                         if (e.outline.shape == "#thunk_") {
                             shapeElm.className = "outline-node-thunk-shape";
-                            shapeElm.textContent = "◉"
+                            shapeElm.textContent = "◉";
+                            shapeElm.onclick = elmOnClick("thunkShape", e.actionTarget);
                         } else if (e.outline.shape == "#nonThunk") {
                             shapeElm.className = "outline-node-nonthunk-shape";
-                            shapeElm.textContent = "▣"
+                            shapeElm.textContent = "▣";
+                            shapeElm.onclick = elmOnClick("thunkShape", e.actionTarget);
                         } else {
                             console.error("unrecognized outline node shape", e.outline.shape);
                         }
