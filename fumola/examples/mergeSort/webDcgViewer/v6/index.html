@@ -83,6 +83,10 @@
             background: #000;
         }
 
+        .focus-detail {
+            display: none;
+        }
+
         .outline-edge {
             border-style: solid;
             margin-top: 0px;
@@ -784,6 +788,12 @@
             console.log("openDoor", type, id);
             if (type == "metaTime") {
                 inFocus.metaTime.add(id);
+                document.querySelectorAll(".focus-detail")
+                    .forEach(el => {
+                        if (el.dataset.type == "metaTime" && el.dataset.id == id) {
+                            el.style.display = "inline-block";
+                        }
+                    });
                 document.querySelectorAll(".metaTime")
                     .forEach(el => {
                         if (el.metaTime == id) {
@@ -793,6 +803,12 @@
                     });
             } else if (type == "edgeId") {
                 inFocus.edgeId.add(id);
+                document.querySelectorAll(".focus-detail")
+                    .forEach(el => {
+                        if (el.dataset.type == "edgeId" && el.dataset.id == id) {
+                            el.style.display = "inline-block";
+                        }
+                    });
                 document.querySelectorAll(".edgeId")
                     .forEach(el => {
                         if (el.edgeId == id) {
@@ -802,6 +818,12 @@
                     });
             } else if (type == "pointer") {
                 inFocus.pointer.add(id);
+                document.querySelectorAll(".focus-detail")
+                    .forEach(el => {
+                        if (el.dataset.type == "pointer" && el.dataset.id == id) {
+                            el.style.display = "inline-block";
+                        }
+                    });
                 document.querySelectorAll(".pointer")
                     .forEach(el => {
                         if (el.pointer == id) {
@@ -818,6 +840,12 @@
             console.log("closeDoor", type, id);
             if (type == "metaTime") {
                 inFocus.metaTime.delete(id);
+                document.querySelectorAll(".focus-detail")
+                    .forEach(el => {
+                        if (el.dataset.type == "metaTime" && el.dataset.id == id) {
+                            el.style.display = "none";
+                        }
+                    });
                 document.querySelectorAll(".metaTime")
                     .forEach(el => {
                         if (el.metaTime == id) {
@@ -826,6 +854,12 @@
                     });
             } else if (type == "edgeId") {
                 inFocus.edgeId.delete(id);
+                document.querySelectorAll(".focus-detail")
+                    .forEach(el => {
+                        if (el.dataset.type == "edgeId" && el.dataset.id == id) {
+                            el.style.display = "none";
+                        }
+                    });
                 document.querySelectorAll(".edgeId")
                     .forEach(el => {
                         if (el.edgeId == id) {
@@ -834,6 +868,12 @@
                     });
             } else if (type == "pointer") {
                 inFocus.pointer.delete(id);
+                document.querySelectorAll(".focus-detail")
+                    .forEach(el => {
+                        if (el.dataset.type == "pointer" && el.dataset.id == id) {
+                            el.style.display = "none";
+                        }
+                    });
                 document.querySelectorAll(".pointer")
                     .forEach(el => {
                         if (el.pointer == id) {
@@ -1575,10 +1615,19 @@
             nodesMap_ = nodesMap_.set(nhi.metaTime, nodesMap);
         });
 
+        function createFocusDetailDiv(type, id) {
+            const focusEl = document.createElement("div");
+            focusEl.className = "focus-detail";
+            focusEl.dataset.type = type;
+            focusEl.dataset.id = id;
+            return focusEl;
+        };
+
         pointers.forEach(sp => {
+            const focusEl = createFocusDetailDiv("pointer", sp);
             const pointerEl = document.createElement("span");
+            focusEl.appendChild(pointerEl);
             pointerEl.textContent = sp;
-            //pointerEl.className = "pointer";
             let metaTimes = pointerMetaTimes.get(sp);
             let firstDef = nodesMap_.get(metaTimes[0]).get(sp);
             if (firstDef && firstDef.node.type == "thunk") {
@@ -1590,7 +1639,7 @@
             }
             pointerEl.onclick = elmOnClick("pointer", sp);
             pointerEl.pointer = sp;
-            pointersEl.appendChild(pointerEl);
+            pointersEl.appendChild(focusEl);
         })
 
         // # Edges
@@ -1599,12 +1648,14 @@
         const edgeIdsEl = document.getElementById("edgeIds");
 
         data.edges.forEach(ehi => {
+            const focusEl = createFocusDetailDiv("edgeId", ehi.edgeId);
             const edgeIdEl = document.createElement("span");
             edgeIdEl.textContent = ehi.edgeId;
             edgeIdEl.className = "edgeId";
             edgeIdEl.edgeId = ehi.edgeId;
             edgeIdEl.onclick = elmOnClick("edgeId", ehi.edgeId);
-            edgeIdsEl.appendChild(edgeIdEl);
+            focusEl.appendChild(edgeIdEl);
+            edgeIdsEl.appendChild(focusEl);
         })
 
         // --- entry point ---
