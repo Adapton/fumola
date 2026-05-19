@@ -77,7 +77,6 @@
             width: 50%;
             min-width: 220px;
             max-width: 99%;
-            display: flex;
             flex-direction: column;
             height: 100vh;
             background: #000;
@@ -228,8 +227,10 @@
             flex: 1;
             min-height: 0;
             /* CRITICAL for scrolling in flex layouts */
-            border-bottom: 1px solid #222;
-
+            border-bottom: 3px solid var(--border);
+        }
+        #outlinePanel {
+            flex: 4;
         }
 
         .panel-header#titlePanel {
@@ -617,6 +618,10 @@
             align-items: center;
             gap: 4px;
         }
+
+        #infoPanel {
+            display: block;
+        }
     </style>
 </head>
 
@@ -628,28 +633,16 @@
             <div class="panel-header" id="titlePanelHeader">DCG Scene Player</div>
 
             <div class="panel" id="infoPanel">
-                <div class="panel-header">Details about selected:</div>
-                <div class="panel-body" id="info">
+                <!-- <div class="panel-header">Meta Times</div> -->
+                <div class="panel-focus" id="metaTimes"></div>
 
-                    <div class="panel" id="metaTimesInfoPanel">
-                        <div class="panel-header">Meta Times</div>
-                        <div class="panel-body" id="metaTimes">
-                        </div>
-                    </div>
+                <!-- <div class="panel-header">Pointers / Object Labels</div> -->
+                <div class="panel-focus" id="pointers"></div>
 
-                    <div class="panel" id="pointersInfoPanel">
-                        <div class="panel-header">Pointers / Object Labels</div>
-                        <div class="panel-body" id="pointers">
-                        </div>
-                    </div>
+                <!-- <div class="panel-header">Edges</div> -->
+                <div class="panel-focus" id="edgeIds"></div>
 
-                    <div class="panel" id="edgeIdsInfoPanel">
-                        <div class="panel-header">Edges</div>
-                        <div class="panel-body" id="edgeIds">
-                        </div>
 
-                    </div>
-                </div>
             </div>
 
             <div class="splitter"></div>
@@ -1673,7 +1666,7 @@
                     closeDoor(type, id)
                 }
                 else {
-                    if (type == "thunkShape") {
+                    if (type == "objectShape") {
                         lookAtMesh(nodesByLabel.get(id))
                     } else {
                         openDoor(type, id);
@@ -1880,11 +1873,11 @@
                         if (e.outline.shape == "#thunk_") {
                             shapeElm.className = "outline-node-thunk-shape";
                             shapeElm.textContent = "◉";
-                            shapeElm.onclick = elmOnClick("thunkShape", e.actionTarget);
+                            shapeElm.onclick = elmOnClick("objectShape", e.actionTarget);
                         } else if (e.outline.shape == "#nonThunk") {
                             shapeElm.className = "outline-node-nonthunk-shape";
                             shapeElm.textContent = "▣";
-                            shapeElm.onclick = elmOnClick("thunkShape", e.actionTarget);
+                            shapeElm.onclick = elmOnClick("objectShape", e.actionTarget);
                         } else {
                             console.error("unrecognized outline node shape", e.outline.shape);
                         }
