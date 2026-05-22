@@ -229,6 +229,7 @@
             /* CRITICAL for scrolling in flex layouts */
             border-bottom: 3px solid var(--border);
         }
+
         #outlinePanel {
             flex: 4;
         }
@@ -775,6 +776,18 @@
             pointer: new Set(),
         };
 
+
+        const color = {
+            _box: 0xaa8844,
+            _pointer: 0xaa8844,
+            box: 0x55aa44,
+            pointer: 0x55aa44,
+        };
+        const emissiveIntensity = {
+            noHoverNode: 0,
+            hoverNode: 1.0,
+        };
+
         const data = await fetch('./scene.json').then(r => r.json());
 
         function openDoor(type, id) {
@@ -1062,8 +1075,13 @@
         const BoxDim = 0.23;
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xffffff);
+        const lightMode = false;
 
+        if (lightMode) {
+            scene.background = new THREE.Color(0xffffff);
+        } else {
+            scene.background = new THREE.Color(0x00000000);
+        }
         // const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
 
         const camera = new THREE.PerspectiveCamera(
@@ -1078,10 +1096,10 @@
         const viewport = document.getElementById("viewport");
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
+
         renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+
         viewport.appendChild(renderer.domElement);
-
-
 
         const controls = new OrbitControls(camera, renderer.domElement);
 
@@ -1116,13 +1134,25 @@
             ctx.font = `${fontSize}px monospace`;
 
             if (type === "pointerSymbol") {
-                ctx.fillStyle = '#123';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.strokeStyle = '#888';
-                ctx.strokeRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'white';
+                if (lightMode) {
+                    ctx.fillStyle = '#123';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.strokeStyle = '#888';
+                    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = 'white';
+                } else {
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.strokeStyle = '#0a0';
+                    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = 'white';
+                }
             } else {
-                ctx.fillStyle = 'rgba(0,0,0,1)';
+                if (lightMode) {
+                    ctx.fillStyle = 'rgba(0,0,0,1)';
+                } else {
+                    ctx.fillStyle = 'white';
+                }
             }
 
             lines.forEach((line, i) => {
@@ -1142,8 +1172,10 @@
             // }
             return { texture, aspect };
         }
-        function createBox(obj) {
-            let material = new THREE.MeshStandardMaterial({ color: 0xaa8844, transparent: true, opacity: 0.2 });
+        function createBoxMesh(obj) {
+            let material = new THREE.MeshStandardMaterial({
+                color: color.box, transparent: true, opacity: 0.618,
+                emissive: "white", emissiveIntensity: emissiveIntensity.noHoverNode, });
             objectMaterials.set(obj.label, material);
             const mesh = new THREE.Mesh(
                 new THREE.BoxGeometry(BoxDim, BoxDim, BoxDim),
@@ -1161,7 +1193,7 @@
                 new THREE.MeshBasicMaterial({ map: texture, transparent: false })
             );
             labelMesh.position.copy(labelAnchor);
-            scene.add(labelMesh);
+            false && scene.add(labelMesh);
 
             const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim));
             const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.textLines || "", "textLines");
@@ -1170,7 +1202,7 @@
                 new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: true, alphaTest: 0.1 })
             );
             fieldMesh.position.copy(fieldsAnchor);
-            scene.add(fieldMesh);
+            false && scene.add(fieldMesh);
 
             const dots = [];
             if (obj.pointerFields) {
@@ -1253,16 +1285,22 @@
             return { dirNorm: n, length: len, quat };
         }
 
-        function createPointer(from, to) {
+        function createPointerMesh(from, to) {
             const start = from.clone();
             const end = to.clone();
+            const material = new THREE.MeshStandardMaterial({
+                color: color.pointer, emissive: "white",
+                transparent: true,
+                opacity: 1,
+                emissiveIntensity: 0.0
+            });
             const { dirNorm, length, quat } = computeEdgeFrame(start, end);
 
             const group = new THREE.Group();
 
             const dot = new THREE.Mesh(
                 new THREE.SphereGeometry(0.04, 12, 12),
-                new THREE.MeshStandardMaterial({ color: 0x000000 })
+                material
             );
             dot.position.copy(start);
             group.add(dot);
@@ -1270,7 +1308,7 @@
             const shaftLen = Math.max(0.001, length - 0.08);
             const shaft = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.01, 0.01, shaftLen, 8),
-                new THREE.MeshStandardMaterial({ color: 0x000000 })
+                material
             );
             const mid = start.clone().addScaledVector(dirNorm, shaftLen / 2);
             shaft.position.copy(mid);
@@ -1279,7 +1317,7 @@
 
             const cone = new THREE.Mesh(
                 new THREE.ConeGeometry(0.03, 0.08, 8),
-                new THREE.MeshStandardMaterial({ color: 0x000000 })
+                material
             );
             const center = end.clone().addScaledVector(dirNorm, -0.04);
             cone.position.copy(center);
@@ -1289,7 +1327,7 @@
             return group;
         }
 
-        function makeActionArrow(type, source, target, color = 0x0088aa, hoverOffset = -BoxDim) {
+        function createActionMesh(type, source, target, color = 0x0088aa, hoverOffset = -BoxDim) {
             const group = new THREE.Group();
 
             //color = 0x0088ff;
@@ -1394,7 +1432,7 @@
         }
 
         for (const obj of data.objects) {
-            if (obj.type === "box") createBox(obj);
+            if (obj.type === "box") createBoxMesh(obj);
             if (obj.type === "orb") createOrb(obj);
         }
 
@@ -1404,14 +1442,14 @@
                 const target = nodesByLabel.get(obj.to);
                 if (!from || !target) continue;
                 const adjustedTarget = target.position.clone().add(new THREE.Vector3(0, BoxDim / 2, 0));
-                const mesh = createPointer(from, adjustedTarget);
+                const mesh = createPointerMesh(from, adjustedTarget);
                 scene.add(mesh);
             }
             else if (obj.type == "get" || obj.type == "put" || obj.type == "force" || obj.type == "putForce") {
                 const from = pointerDotsByKey.get(obj.from);
                 const target = nodesByLabel.get(obj.to);
                 if (!from || !target) { console.error("error connecting: " + obj); continue };
-                const mesh = makeActionArrow(obj.type, from, target.position);
+                const mesh = createActionMesh(obj.type, from, target.position);
                 scene.add(mesh)
 
             }
@@ -1478,7 +1516,7 @@
             mouse.y = pos.y;
         });
 
-        function animate() {
+        async function animate() {
             frames++;
 
             const now = performance.now() / 1000;
@@ -1524,7 +1562,8 @@
 
                     hoverNode.material = hoverNode.material.clone();
                     DEBUG && console.log("   material uuid is  " + hoverNode.material.uuid);
-                    hoverNode.material.opacity = 0.618;
+                    
+                    hoverNode.material.emissiveIntensity = emissiveIntensity.hoverNode;
                 }
             }
             else {
@@ -1938,6 +1977,7 @@
 
         window.app = {
             SCENE,
+            inFocus,
             frames,
             lastHoverNode,
             objectMaterials,
