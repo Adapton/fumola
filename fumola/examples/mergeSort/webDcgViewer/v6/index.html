@@ -1141,8 +1141,8 @@
         light.position.set(5, 5, 5);
         scene.add(light);
 
-        const nodesByLabel = new Map();
-        const labelsByNode = new Map();
+        const meshByLabel = new Map();
+        const labelByMesh = new Map();
         const pointerDotsByKey = new Map();
 
         const objectMaterials = new Map();
@@ -1217,8 +1217,8 @@
             );
             mesh.position.set(...obj.position);
             scene.add(mesh);
-            nodesByLabel.set(obj.label, mesh);
-            labelsByNode.set(mesh, obj.label);
+            meshByLabel.set(obj.label, mesh);
+            labelByMesh.set(mesh, obj.label);
 
             const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim));
             const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
@@ -1228,6 +1228,8 @@
             );
             labelMesh.position.copy(labelAnchor);
             false && scene.add(labelMesh);
+
+            // Add label mesh to a mapping.
 
             const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim));
             const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.textLines || "", "textLines");
@@ -1268,8 +1270,8 @@
             );
             mesh.position.set(...obj.position);
             scene.add(mesh);
-            nodesByLabel.set(obj.label, mesh);
-            labelsByNode.set(mesh, obj.label);
+            meshByLabel.set(obj.label, mesh);
+            labelByMesh.set(mesh, obj.label);
 
             const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim));
             const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
@@ -1473,7 +1475,7 @@
         for (const obj of data.objects) {
             if (obj.type === "pointer") {
                 const from = pointerDotsByKey.get(obj.from);
-                const target = nodesByLabel.get(obj.to);
+                const target = meshByLabel.get(obj.to);
                 if (!from || !target) continue;
                 const adjustedTarget = target.position.clone().add(new THREE.Vector3(0, BoxDim / 2, 0));
                 const mesh = createPointerMesh(from, adjustedTarget);
@@ -1481,7 +1483,7 @@
             }
             else if (obj.type == "get" || obj.type == "put" || obj.type == "force" || obj.type == "putForce") {
                 const from = pointerDotsByKey.get(obj.from);
-                const target = nodesByLabel.get(obj.to);
+                const target = meshByLabel.get(obj.to);
                 if (!from || !target) { console.error("error connecting: " + obj); continue };
                 const mesh = createActionMesh(obj.type, from, target.position);
                 scene.add(mesh)
@@ -1511,8 +1513,7 @@
 
         function lookAtLabel(label) {
             console.log("lookAtLabel", label);
-            // TO DO -- scroll details panel to the given label.
-
+            openDoor("pointer", label)
         }
 
         function lookAtMesh(m) {
@@ -1528,11 +1529,11 @@
             mouse.x = pos.x;
             mouse.y = pos.y;
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects([...nodesByLabel.values()]);
+            const intersects = raycaster.intersectObjects([...meshByLabel.values()]);
             if (intersects.length) {
                 const m = intersects[0].object;
                 lookAtMesh(m);
-                lookAtLabel(labelsByNode.get(m));
+                lookAtLabel(labelByMesh.get(m));
             }
         });
 
@@ -1562,7 +1563,7 @@
             }
 
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects([...nodesByLabel.values()]);
+            const intersects = raycaster.intersectObjects([...meshByLabel.values()]);
 
             function cancelHoverNode() {
                 const DEBUG = false;
@@ -1570,7 +1571,7 @@
                     console.error("no hoverNode to cancel")
                     return
                 }
-                let label = labelsByNode.get(hoverNode);
+                let label = labelByMesh.get(hoverNode);
                 if (label) {
                     DEBUG && console.log("old hover node was " + label);
                     let material = objectMaterials.get(label);
@@ -1591,7 +1592,7 @@
 
                     hoverNode = intersects[0].object;
                     lastHoverNode.lastHoverNode = hoverNode;
-                    DEBUG && console.log("new hover node is " + labelsByNode.get(hoverNode));
+                    DEBUG && console.log("new hover node is " + labelByMesh.get(hoverNode));
                     DEBUG && console.log("   material uuid was " + hoverNode.material.uuid);
 
                     hoverNode.material = hoverNode.material.clone();
@@ -1670,7 +1671,7 @@
                 }
                 else {
                     if (type == "objectShape") {
-                        lookAtMesh(nodesByLabel.get(id))
+                        lookAtMesh(meshByLabel.get(id))
                     } else {
                         openDoor(type, id);
                         if (type == "metaTime") {
@@ -2079,8 +2080,8 @@
             frames,
             lastHoverNode,
             objectMaterials,
-            nodesByLabel,
-            labelsByNode,
+            meshByLabel,
+            labelByMesh,
             data,
             pointers,
             nodesMap,
