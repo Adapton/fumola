@@ -949,19 +949,6 @@
                     }
                 });
         }
-        function renderPlayerFocusAtMetaTime(scrollBehavior = "instant") {
-            const t = playerState.metaTime;
-            false && console.log("renderSceneAtMetaTime", t);
-            document.querySelectorAll(".player-focused")
-                .forEach(el => el.classList.remove("player-focused"));
-            document.querySelectorAll(".metaTime")
-                .forEach(el => {
-                    if (el.metaTime == t) {
-                        el.classList.add("player-focused");
-                    }
-                });
-            scrollToMetaTime(t, scrollBehavior);
-        }
         const playerState = {
             isPlaying: false,
             metaTime: 1,
@@ -1144,7 +1131,8 @@
         const meshByLabel = new Map();
         const labelByMesh = new Map();
         const pointerDotsByKey = new Map();
-
+        const labelMeshByLabel = new Map();
+        const fieldMeshByLabel = new Map();
         const objectMaterials = new Map();
 
 
@@ -1227,9 +1215,8 @@
                 new THREE.MeshBasicMaterial({ map: texture, transparent: false })
             );
             labelMesh.position.copy(labelAnchor);
-            false && scene.add(labelMesh);
-
-            // Add label mesh to a mapping.
+            scene.add(labelMesh);
+            labelMeshByLabel.set(obj.label, labelMesh);
 
             const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim));
             const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.textLines || "", "textLines");
@@ -1238,7 +1225,8 @@
                 new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: true, alphaTest: 0.1 })
             );
             fieldMesh.position.copy(fieldsAnchor);
-            false && scene.add(fieldMesh);
+            scene.add(fieldMesh);
+            fieldMeshByLabel.set(obj.label, fieldMesh);
 
             const dots = [];
             if (obj.pointerFields) {
@@ -1499,7 +1487,7 @@
         const mouse = new THREE.Vector2();
         let camTargetPos = null;
         let camTargetLook = null;
-        const transitionDuration = 1.3;
+        let transitionDuration = 2.3;
         let transitionStart = 0;
 
         function getMouseNDC(event) {
@@ -1516,10 +1504,10 @@
             openDoor("pointer", label)
         }
 
-        function lookAtMesh(m) {
+        function lookAtMesh(m, distance=3.0) {
             console.log("lookAtMesh", m);
             if (!m) { return };
-            camTargetPos = m.position.clone().add(new THREE.Vector3(0.0, 0.0, 3.0));
+            camTargetPos = m.position.clone().add(new THREE.Vector3(0.0, 0.0, distance));
             camTargetLook = m.position.clone();
             transitionStart = performance.now() / 1000;
         }
@@ -1551,67 +1539,6 @@
             mouse.y = pos.y;
         });
 
-        async function animate() {
-            frames++;
-
-            const now = performance.now() / 1000;
-            if (camTargetPos) {
-                const t = Math.min((now - transitionStart) / transitionDuration, 1);
-                camera.position.lerpVectors(camera.position, camTargetPos, t);
-                controls.target.lerpVectors(controls.target, camTargetLook, t);
-                if (t >= 1) camTargetPos = null;
-            }
-
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects([...meshByLabel.values()]);
-
-            function cancelHoverNode() {
-                const DEBUG = false;
-                if (!hoverNode) {
-                    console.error("no hoverNode to cancel")
-                    return
-                }
-                let label = labelByMesh.get(hoverNode);
-                if (label) {
-                    DEBUG && console.log("old hover node was " + label);
-                    let material = objectMaterials.get(label);
-                    DEBUG && console.log("  current material uuid is " + hoverNode.material.uuid);
-                    DEBUG && console.log("  original material uuid was " + material.uuid);
-                    hoverNode.material = material.clone();
-                    DEBUG && console.log("  restored, and cloned original as " + material.uuid);
-                    hoverNode = null;
-                } else {
-                    DEBUG && console.log("cancelHoverNode() failed to find label.  Internal error.")
-                }
-            }
-
-            if (intersects.length) {
-                const DEBUG = false;
-                if (hoverNode !== intersects[0].object) {
-                    if (hoverNode) { cancelHoverNode() };
-
-                    hoverNode = intersects[0].object;
-                    lastHoverNode.lastHoverNode = hoverNode;
-                    DEBUG && console.log("new hover node is " + labelByMesh.get(hoverNode));
-                    DEBUG && console.log("   material uuid was " + hoverNode.material.uuid);
-
-                    hoverNode.material = hoverNode.material.clone();
-                    DEBUG && console.log("   material uuid is  " + hoverNode.material.uuid);
-
-                    hoverNode.material.emissiveIntensity = emissiveIntensity.hoverNode;
-                }
-            }
-            else {
-                if (hoverNode) {
-                    cancelHoverNode()
-                }
-            }
-            controls.update();
-            renderer.render(scene, camera);
-            requestAnimationFrame(animate);
-        }
-        animate();
-
 
 
         function onResize() {
@@ -1622,6 +1549,7 @@
             camera.aspect = width / height;
             camera.updateProjectionMatrix();
         }
+
 
         window.addEventListener("resize", onResize);
 
@@ -1647,6 +1575,8 @@
 
         // initial size
         resizeRendererToViewport();
+
+
 
 
         function createFocusDetailDiv(type, id, displayTrue = "inline-block", displayFalse = "none") {
@@ -1765,9 +1695,18 @@
         var nodesMap = IMap();  // indexed by space: map to the node history item, or { "type": "future"; "metaTime" : _ }.
         var nodesMap_ = IMap(); // indexed by meta time, mapping to nodesMap for that metaTime.
         var pointerMetaTimes = new Map(); // all metaTimes relevant for a space/pointer.
+        var objectsAtMetaTime = new Map();
 
         data.nodes.forEach(nhi => {
             const space = nhi.nodeId[0];
+            
+            if (!objectsAtMetaTime.get(nhi.metaTime)) {
+                objectsAtMetaTime.set(nhi.metaTime, [space]);
+            } else {
+                const spaces = objectsAtMetaTime.get(nhi.metaTime);
+                objectsAtMetaTime.set(nhi.metaTime, [...spaces, space]);
+            }
+
             if (!pointerMetaTimes.get(space)) {
                 pointers = [...pointers, space];
                 pointerMetaTimes.set(space, [nhi.metaTime])
@@ -1876,6 +1815,13 @@
             edgeIdEl.onclick = elmOnClick("edgeId", ehi.edgeId);
             focusEl.appendChild(edgeIdEl);
             edgeIdsEl.appendChild(focusEl);
+        
+            if (!objectsAtMetaTime.get(ehi.metaTime)) {
+                objectsAtMetaTime.set(ehi.metaTime, [ehi.edgeId]);
+            } else {
+                const objects = objectsAtMetaTime.get(ehi.metaTime);
+                objectsAtMetaTime.set(ehi.metaTime, [...objects, ehi.edgeId]);
+            }
         })
 
         // --- entry point ---
@@ -2068,6 +2014,108 @@
             walk(panel, outline);
         }
 
+        const glowingMeshes = new Set();
+
+        function renderPlayerFocusAtMetaTime(scrollBehavior = "instant") {
+            const t = playerState.metaTime;
+            false && console.log("renderSceneAtMetaTime", t);
+            document.querySelectorAll(".player-focused")
+                .forEach(el => el.classList.remove("player-focused"));
+            document.querySelectorAll(".metaTime")
+                .forEach(el => {
+                    if (el.metaTime == t) {
+                        el.classList.add("player-focused");
+                    }
+                });
+            scrollToMetaTime(t, scrollBehavior);
+
+            var focusObjects = objectsAtMetaTime.get(t);
+            if (!focusObjects) { focusObjects = [] };
+            
+            focusObjects.forEach(obj => {
+                const mesh = meshByLabel.get(obj);
+                if(mesh) {
+                    mesh.material.emissiveIntensity = emissiveIntensity.hoverNode;
+                    lookAtMesh(mesh, 20.0)
+                    if (!glowingMeshes.has(mesh)) {
+                        glowingMeshes.add(mesh)
+                    }
+                } else {
+                    console.warn("could not find mesh for object", obj);
+                }
+            })
+        }
+
+        async function animate() {
+            frames++;
+
+            glowingMeshes.forEach(mesh => {
+                if (mesh.material.emissiveIntensity < 0.01) {
+                    mesh.material.emissiveIntensity = emissiveIntensity.noHoverNode;
+                    glowingMeshes.delete(mesh);
+                } else {
+                    mesh.material.emissiveIntensity -= 0.01;
+                }
+            })
+
+            const now = performance.now() / 1000;
+            if (camTargetPos) {
+                const t = Math.min((now - transitionStart) / transitionDuration, 1);
+                camera.position.lerpVectors(camera.position, camTargetPos, t);
+                controls.target.lerpVectors(controls.target, camTargetLook, t);
+                if (t >= 1) camTargetPos = null;
+            }
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects([...meshByLabel.values()]);
+
+            function cancelHoverNode() {
+                const DEBUG = false;
+                if (!hoverNode) {
+                    console.error("no hoverNode to cancel")
+                    return
+                }
+                let label = labelByMesh.get(hoverNode);
+                if (label) {
+                    DEBUG && console.log("old hover node was " + label);
+                    let material = objectMaterials.get(label);
+                    DEBUG && console.log("  current material uuid is " + hoverNode.material.uuid);
+                    DEBUG && console.log("  original material uuid was " + material.uuid);
+                    hoverNode.material = material.clone();
+                    DEBUG && console.log("  restored, and cloned original as " + material.uuid);
+                    hoverNode = null;
+                } else {
+                    DEBUG && console.log("cancelHoverNode() failed to find label.  Internal error.")
+                }
+            }
+
+            if (intersects.length) {
+                const DEBUG = false;
+                if (hoverNode !== intersects[0].object) {
+                    if (hoverNode) { cancelHoverNode() };
+
+                    hoverNode = intersects[0].object;
+                    lastHoverNode.lastHoverNode = hoverNode;
+                    DEBUG && console.log("new hover node is " + labelByMesh.get(hoverNode));
+                    DEBUG && console.log("   material uuid was " + hoverNode.material.uuid);
+
+                    hoverNode.material = hoverNode.material.clone();
+                    DEBUG && console.log("   material uuid is  " + hoverNode.material.uuid);
+
+                    hoverNode.material.emissiveIntensity = emissiveIntensity.hoverNode;
+                }
+            }
+            else {
+                if (hoverNode) {
+                    cancelHoverNode()
+                }
+            }
+            controls.update();
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        animate();
+      
         // expose
         window.loadScene = loadScene;
 
