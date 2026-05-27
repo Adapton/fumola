@@ -86,6 +86,19 @@
             display: none;
         }
 
+        .focus-detail.focused {
+            margin: 2px;
+            border: 2px;
+            background-color: var(--bg-panel);
+            border-radius: 3px;
+            border-color: var(--border-soft);
+            border-style: solid;
+        }
+
+        .focus-detail.focused.inner {
+            border-style: none;
+        }
+
         .outline-edge {
             border-style: solid;
             margin-top: 0px;
@@ -179,6 +192,18 @@
         }
 
 
+        .thunk-body-text {
+            cursor: pointer;
+            display: flex;
+            margin: 1px;
+            border: 1px;
+            border-radius: 4px;
+            /*font-size: larger; */
+            border-style: solid;
+            border-color: transparent;
+            background-color: black;
+            color: var(--blue-dark);
+        }
 
         .outline-forced-thunk-text {
             cursor: pointer;
@@ -633,7 +658,7 @@
 
             <div class="panel-header" id="titlePanelHeader">DCG Scene Player</div>
 
-            <div class="panel" id="infoPanel">
+            <div class="panel-body" id="infoPanel">
                 <!-- <div class="panel-header">Meta Times</div> -->
                 <div class="panel-focus" id="metaTimes"></div>
 
@@ -797,7 +822,9 @@
                 document.querySelectorAll(".focus-detail")
                     .forEach(el => {
                         if (el.dataset.type == "metaTime" && el.dataset.id == id) {
-                            el.style.display = el.dataset.displayTrue
+                            el.style.display = el.dataset.displayTrue;
+                            el.classList.add("focused")
+
                         }
                     });
                 document.querySelectorAll(".metaTime")
@@ -813,6 +840,8 @@
                     .forEach(el => {
                         if (el.dataset.type == "edgeId" && el.dataset.id == id) {
                             el.style.display = "inline-block";
+                            el.classList.add("focused")
+
                         }
                     });
                 document.querySelectorAll(".edgeId")
@@ -828,6 +857,7 @@
                     .forEach(el => {
                         if (el.dataset.type == "pointer" && el.dataset.id == id) {
                             el.style.display = "inline-block";
+                            el.classList.add("focused")
                         }
                     });
                 document.querySelectorAll(".pointer")
@@ -849,7 +879,8 @@
                 document.querySelectorAll(".focus-detail")
                     .forEach(el => {
                         if (el.dataset.type == "metaTime" && el.dataset.id == id) {
-                            el.style.display = el.dataset.displayFalse
+                            el.style.display = el.dataset.displayFalse;
+                            el.classList.remove("focused")
                         }
                     });
                 document.querySelectorAll(".metaTime")
@@ -864,6 +895,7 @@
                     .forEach(el => {
                         if (el.dataset.type == "edgeId" && el.dataset.id == id) {
                             el.style.display = "none";
+                            el.classList.remove("focused")
                         }
                     });
                 document.querySelectorAll(".edgeId")
@@ -878,6 +910,7 @@
                     .forEach(el => {
                         if (el.dataset.type == "pointer" && el.dataset.id == id) {
                             el.style.display = "none";
+                            el.classList.remove("focused");
                         }
                     });
                 document.querySelectorAll(".pointer")
@@ -1175,7 +1208,8 @@
         function createBoxMesh(obj) {
             let material = new THREE.MeshStandardMaterial({
                 color: color.box, transparent: true, opacity: 0.618,
-                emissive: "white", emissiveIntensity: emissiveIntensity.noHoverNode, });
+                emissive: "white", emissiveIntensity: emissiveIntensity.noHoverNode,
+            });
             objectMaterials.set(obj.label, material);
             const mesh = new THREE.Mesh(
                 new THREE.BoxGeometry(BoxDim, BoxDim, BoxDim),
@@ -1562,7 +1596,7 @@
 
                     hoverNode.material = hoverNode.material.clone();
                     DEBUG && console.log("   material uuid is  " + hoverNode.material.uuid);
-                    
+
                     hoverNode.material.emissiveIntensity = emissiveIntensity.hoverNode;
                 }
             }
@@ -1614,7 +1648,7 @@
         resizeRendererToViewport();
 
 
-        function createFocusDetailDiv(type, id, displayTrue="inline-block", displayFalse="none") {
+        function createFocusDetailDiv(type, id, displayTrue = "inline-block", displayFalse = "none") {
             const focusEl = document.createElement("div");
             focusEl.className = "focus-detail";
             focusEl.style.display = displayFalse;
@@ -1628,102 +1662,6 @@
         let SCENE = null;
 
 
-        // # Nodes
-        //
-        // Each node of a DCG corresponds to a "space",
-        // and the set of spaces is the the set of possible values for a "pointer" in Fumola.
-        // each unique space/pointer gets dynamic HTML elements.
-        //
-      
-        var pointers = []; // each space/pointer mentioned by a node-based event.
-        var nodesMap = IMap();  // indexed by space: map to the node history item, or { "type": "future"; "metaTime" : _ }.
-        var nodesMap_ = IMap(); // indexed by meta time, mapping to nodesMap for that metaTime.
-        var pointerMetaTimes = new Map(); // all metaTimes relevant for a space/pointer.
-
-        data.nodes.forEach(nhi => {
-            const space = nhi.nodeId[0];
-            if (!pointerMetaTimes.get(space)) {
-                pointers = [...pointers, space];
-                pointerMetaTimes.set(space, [nhi.metaTime])
-            } else {
-                const times = pointerMetaTimes.get(space);
-                pointerMetaTimes.set(space, [...times, nhi.metaTime]);
-            }
-        });
-
-        const pointersEl = document.getElementById("pointers");
-
-        pointerMetaTimes.forEach((metaTimes, space, m) => {
-            nodesMap = nodesMap.set(space, { "type": "future", "metaTime": metaTimes[0] });
-        });
-        data.nodes.forEach(nhi => {
-            const space = nhi.nodeId[0];
-            nodesMap = nodesMap.set(space, nhi);
-            nodesMap_ = nodesMap_.set(nhi.metaTime, nodesMap);
-        });
-        pointers.forEach(sp => {
-            const focusEl = createFocusDetailDiv("pointer", sp);
-            const pointerEl = document.createElement("span");
-            focusEl.appendChild(pointerEl);
-            pointerEl.textContent = sp;
-            let metaTimes = pointerMetaTimes.get(sp);
-            let firstDef = nodesMap_.get(metaTimes[0]).get(sp);
-            if (firstDef && firstDef.node.type == "thunk") {
-                pointerEl.classList = "pointer pointerThunk";
-            } else if (firstDef && firstDef.node.type == "nonThunk") {
-                pointerEl.classList = "pointer pointerNonThunk";
-            } else {
-                console.error(sp, firstDef);
-            }
-
-            pointerEl.onclick = elmOnClick("pointer", sp);
-            pointerEl.pointer = sp;
-            pointersEl.appendChild(focusEl);
-
-            metaTimes.forEach(mt => {
-                const mtElm = createMetaTimeElm(mt);
-                const mtFocusOuter = createFocusDetailDiv("metaTime", mt, "block", "inline-block");
-                const mtFocusInner = createFocusDetailDiv("metaTime", mt, "inline-block", "none");
-                focusEl.appendChild(mtFocusOuter);
-                mtFocusOuter.appendChild(mtElm);
-                mtFocusOuter.appendChild(mtFocusInner);
-                let nhi = nodesMap_.get(mt).get(sp);
-                var nhiText = "";
-                if (nhi.node.type == "thunk") {
-                    nhiText = "result = " + (nhi.node.result ? nhi.node.result[1] : "null")
-                } else if (nhi.node.type == "nonThunk") {
-                    nhiText = "value = " + nhi.node.value;
-                } else {
-                    console.error("invalid node history item node type", nhi.node.type)
-                }
-                mtFocusInner.appendChild(document.createTextNode("" + nhiText))
-            })
-        })
-
-        // # Edges
-        //
-        // process edges, producing indicies and dynamic HTML elements.
-        const edgeIdsEl = document.getElementById("edgeIds");
-
-        data.edges.forEach(ehi => {
-            const focusEl = createFocusDetailDiv("edgeId", ehi.edgeId);
-            const edgeIdEl = document.createElement("span");
-            edgeIdEl.textContent = ehi.edgeId;
-            edgeIdEl.className = "edgeId";
-            edgeIdEl.edgeId = ehi.edgeId;
-            edgeIdEl.onclick = elmOnClick("edgeId", ehi.edgeId);
-            focusEl.appendChild(edgeIdEl);
-            edgeIdsEl.appendChild(focusEl);
-        })
-
-        // --- entry point ---
-        function loadScene() {
-            renderEvents(data);
-            renderOutline(data);
-            renderPlayerFocusAtMetaTime("instant");
-            false && console.log(playerState);
-        };
-        loadScene();
 
         function elmOnClick(type, id) {
             return (e) => {
@@ -1797,6 +1735,157 @@
             elm.onclick = elmOnClick("pointer", ptr)
             return elm
         }
+
+        function createShapeElm(outlineShape = "#thunk_", actionTarget = "scene") {
+            const shapeElm = document.createElement("span");
+            if (outlineShape == "#thunk_") {
+                shapeElm.className = "outline-node-thunk-shape";
+                shapeElm.textContent = "◉";
+                shapeElm.onclick = elmOnClick("objectShape", actionTarget);
+            } else if (outlineShape == "#nonThunk") {
+                shapeElm.className = "outline-node-nonthunk-shape";
+                shapeElm.textContent = "▣";
+                shapeElm.onclick = elmOnClick("objectShape", actionTarget);
+            } else {
+                console.error("unrecognized outline node shape", outlineShape);
+            }
+            return shapeElm
+        }
+
+
+        // # Nodes
+        //
+        // Each node of a DCG corresponds to a "space",
+        // and the set of spaces is the the set of possible values for a "pointer" in Fumola.
+        // each unique space/pointer gets dynamic HTML elements.
+        //
+
+        var pointers = []; // each space/pointer mentioned by a node-based event.
+        var nodesMap = IMap();  // indexed by space: map to the node history item, or { "type": "future"; "metaTime" : _ }.
+        var nodesMap_ = IMap(); // indexed by meta time, mapping to nodesMap for that metaTime.
+        var pointerMetaTimes = new Map(); // all metaTimes relevant for a space/pointer.
+
+        data.nodes.forEach(nhi => {
+            const space = nhi.nodeId[0];
+            if (!pointerMetaTimes.get(space)) {
+                pointers = [...pointers, space];
+                pointerMetaTimes.set(space, [nhi.metaTime])
+            } else {
+                const times = pointerMetaTimes.get(space);
+                pointerMetaTimes.set(space, [...times, nhi.metaTime]);
+            }
+        });
+
+        const pointersEl = document.getElementById("pointers");
+
+        pointerMetaTimes.forEach((metaTimes, space, m) => {
+            nodesMap = nodesMap.set(space, { "type": "future", "metaTime": metaTimes[0] });
+        });
+        data.nodes.forEach(nhi => {
+            const space = nhi.nodeId[0];
+            nodesMap = nodesMap.set(space, nhi);
+            nodesMap_ = nodesMap_.set(nhi.metaTime, nodesMap);
+        });
+        pointers.forEach(sp => {
+            let metaTimes = pointerMetaTimes.get(sp);
+            let firstDef = nodesMap_.get(metaTimes[0]).get(sp);
+           
+            const focusEl = createFocusDetailDiv("pointer", sp);
+            var shapeElm = null; 
+            const pointerEl = document.createElement("span");
+
+            if (firstDef && firstDef.node.type == "thunk") {
+                pointerEl.classList = "pointer pointerThunk";
+                shapeElm = createShapeElm("#thunk_", sp);
+            } else if (firstDef && firstDef.node.type == "nonThunk") {
+                pointerEl.classList = "pointer pointerNonThunk";
+                shapeElm = createShapeElm("#nonThunk", sp);
+            } else {
+                console.error(sp, firstDef);
+            }
+   
+            focusEl.appendChild(shapeElm);
+            focusEl.appendChild(pointerEl);
+
+            pointerEl.textContent = sp;    
+            pointerEl.onclick = elmOnClick("pointer", sp);
+            pointerEl.pointer = sp;
+            pointersEl.appendChild(focusEl);
+
+            metaTimes.forEach(mt => {
+                const mtElm = createMetaTimeElm(mt);
+                const mtFocusOuter = createFocusDetailDiv("metaTime", mt, "block", "inline-block");
+                const mtFocusInner = createFocusDetailDiv("metaTime", mt, "inline-block", "none");
+                mtFocusInner.classList.add("inner");
+                focusEl.appendChild(mtFocusOuter);
+                mtFocusOuter.appendChild(mtElm);
+                mtFocusOuter.appendChild(mtFocusInner);
+                let nhi = nodesMap_.get(mt).get(sp);
+                var nhiText = "";
+                if (nhi.node.type == "thunk") {
+                    const bodyEl = document.createElement("span");
+                    bodyEl.className = "thunk-body-text";
+                    bodyEl.textContent = nhi.node.body;
+                    mtFocusInner.appendChild(bodyEl);
+                    
+                    const traceEl = document.createElement("div");
+                    traceEl.className = "thunk-trace";
+                    
+                    nhi.node.trace.forEach(edgeId => {
+                        const e = createEdgeIdElm(edgeId);
+                        traceEl.appendChild(e);
+                    });
+                    mtFocusInner.appendChild(traceEl);
+
+                    const resultEl = document.createElement("div");
+                    resultEl.className = "thunk-result";
+                    if (!nhi.node.result) {
+                        resultEl.appendChild(document.createTextNode("result undefined"));
+                    } else {
+                        const resultInnerEl = document.createElement("span");
+                        resultInnerEl.className = "thunk-result-value";
+                        resultInnerEl.textContent = nhi.node.result[1];
+                        resultEl.appendChild(resultInnerEl)
+                    }
+                    mtFocusInner.appendChild(resultEl);
+
+                } else if (nhi.node.type == "nonThunk") {
+
+                    const nhiText = "" + nhi.node.value;
+                    mtFocusInner.appendChild(document.createTextNode("" + nhiText))
+
+                } else {
+                    console.error("invalid node history item node type", nhi.node.type)
+
+                }
+            })
+        })
+
+        // # Edges
+        //
+        // process edges, producing indicies and dynamic HTML elements.
+        const edgeIdsEl = document.getElementById("edgeIds");
+
+        data.edges.forEach(ehi => {
+            const focusEl = createFocusDetailDiv("edgeId", ehi.edgeId);
+            const edgeIdEl = document.createElement("span");
+            edgeIdEl.textContent = ehi.edgeId;
+            edgeIdEl.className = "edgeId";
+            edgeIdEl.edgeId = ehi.edgeId;
+            edgeIdEl.onclick = elmOnClick("edgeId", ehi.edgeId);
+            focusEl.appendChild(edgeIdEl);
+            edgeIdsEl.appendChild(focusEl);
+        })
+
+        // --- entry point ---
+        function loadScene() {
+            renderEvents(data);
+            renderOutline(data);
+            renderPlayerFocusAtMetaTime("instant");
+            false && console.log(playerState);
+        };
+        loadScene();
+
 
         // --- EVENTS PANEL ---
         function renderEvents(json) {
@@ -1933,19 +2022,9 @@
                         arrowSpan.textContent = edgetext;
                         div.appendChild(arrowSpan);
 
-                        const shapeElm = document.createElement("span");
+                        const shapeElm = createShapeElm(e.outline.shape, e.actionTarget);
                         div.appendChild(shapeElm);
-                        if (e.outline.shape == "#thunk_") {
-                            shapeElm.className = "outline-node-thunk-shape";
-                            shapeElm.textContent = "◉";
-                            shapeElm.onclick = elmOnClick("objectShape", e.actionTarget);
-                        } else if (e.outline.shape == "#nonThunk") {
-                            shapeElm.className = "outline-node-nonthunk-shape";
-                            shapeElm.textContent = "▣";
-                            shapeElm.onclick = elmOnClick("objectShape", e.actionTarget);
-                        } else {
-                            console.error("unrecognized outline node shape", e.outline.shape);
-                        }
+
                         div.appendChild(createPointerElm(e.actionTarget, e.outline.shape));
                         //if (hasNested) { div.appendChild(document.createTextNode(" {")) };
                         rootElm_.appendChild(div);
