@@ -304,7 +304,7 @@ module {
                     } else {
                         var prevEdge = null;
                         var edges = [var ];
-                        for ((_, edge) in nodeInfo.outgoingEdges.vals()) {
+                        for ((edgeId, edge) in nodeInfo.outgoingEdges.vals()) {
                             let edgeInfo = edgeActionInfo(edge);
                             let actionTarget = prim "adaptonPointer" (edge.target.0);
                             var outline = null;
@@ -321,15 +321,17 @@ module {
                                 prevEdge!.action == #put and 
                                 prevEdge!.actionTarget == actionTarget  ) {
                                 edges[edges.size() - 1] := {
+                                    edgeId; // TO DO -- 2026-05-23 -- better to combine two edgeIds into an array here?
                                     actionTarget;
                                     action=#putForce;
                                     outline;
                                     forcedThunk=edgeInfo.forcedThunk;
                                     value=edgeInfo.value;
-                                    metaTimes=(prevEdge!.metaTimes.0, metaTimes.1);
+                                    metaTimes=(prevEdge!.metaTimes.0, metaTimes.1); // TO DO -- 2026-05-23 -- combine into a longer array?
                                 }
                             } else { 
                                 let edge = {
+                                    edgeId;
                                     action=edgeInfo.action;
                                     actionTarget;
                                     outline;
@@ -713,6 +715,7 @@ module {
 
         public func fromOutlineEdge(edge : OutlineEdge) : Text {
             "{ \"type\": \"outlineEdge\" " #
+            ", \"edgeId\":" # fromEdgeId(edge.edgeId) #
             ", \"action\":" # fromShowAction(edge.action) #
             ", \"actionTarget\":" # fromPointer(edge.actionTarget) #
             ", \"forcedThunk\":" # (switch (edge.forcedThunk) { case null "null"; case (?t) fromAny(t) })  #

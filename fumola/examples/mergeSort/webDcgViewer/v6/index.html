@@ -797,7 +797,7 @@
                 document.querySelectorAll(".focus-detail")
                     .forEach(el => {
                         if (el.dataset.type == "metaTime" && el.dataset.id == id) {
-                            el.style.display = "inline-block";
+                            el.style.display = el.dataset.displayTrue
                         }
                     });
                 document.querySelectorAll(".metaTime")
@@ -849,7 +849,7 @@
                 document.querySelectorAll(".focus-detail")
                     .forEach(el => {
                         if (el.dataset.type == "metaTime" && el.dataset.id == id) {
-                            el.style.display = "none";
+                            el.style.display = el.dataset.displayFalse
                         }
                     });
                 document.querySelectorAll(".metaTime")
@@ -1614,12 +1614,26 @@
         resizeRendererToViewport();
 
 
+        function createFocusDetailDiv(type, id, displayTrue="inline-block", displayFalse="none") {
+            const focusEl = document.createElement("div");
+            focusEl.className = "focus-detail";
+            focusEl.dataset.type = type;
+            focusEl.dataset.id = id;
+            focusEl.dataset.displayTrue = displayTrue;
+            focusEl.dataset.displayFalse = displayFalse;
+            return focusEl;
+        };
+
         let SCENE = null;
+
 
         // # Nodes
         //
-        // process nodes, producing indicies and dynamic HTML elements.
-
+        // Each node of a DCG corresponds to a "space",
+        // and the set of spaces is the the set of possible values for a "pointer" in Fumola.
+        // each unique space/pointer gets dynamic HTML elements.
+        //
+      
         var pointers = []; // each space/pointer mentioned by a node-based event.
         var nodesMap = IMap();  // indexed by space: map to the node history item, or { "type": "future"; "metaTime" : _ }.
         var nodesMap_ = IMap(); // indexed by meta time, mapping to nodesMap for that metaTime.
@@ -1646,15 +1660,6 @@
             nodesMap = nodesMap.set(space, nhi);
             nodesMap_ = nodesMap_.set(nhi.metaTime, nodesMap);
         });
-
-        function createFocusDetailDiv(type, id) {
-            const focusEl = document.createElement("div");
-            focusEl.className = "focus-detail";
-            focusEl.dataset.type = type;
-            focusEl.dataset.id = id;
-            return focusEl;
-        };
-
         pointers.forEach(sp => {
             const focusEl = createFocusDetailDiv("pointer", sp);
             const pointerEl = document.createElement("span");
@@ -1669,6 +1674,7 @@
             } else {
                 console.error(sp, firstDef);
             }
+
             pointerEl.onclick = elmOnClick("pointer", sp);
             pointerEl.pointer = sp;
             pointersEl.appendChild(focusEl);
@@ -1927,22 +1933,15 @@
 
                         div.appendChild(document.createTextNode(" " + e.action + " "));
 
-                        function createEdgeIdEl() { // wait until the outline contains edgeIds.
-                            const edgeIdSpan = document.createElement("span");
-                            edgeIdSpan.className = "edgeId";
-                            edgeIdSpan.textContent = "TODO";
-                            return edgeIdSpan;
-                        }
-
                         const valueNode = document.createElement("span");
                         valueNode.textContent = e.value;
                         valueNode.className = "outline-value-text";
 
                         if (!hasNested) {
                             div.appendChild(valueNode);
-                            div.appendChild(createEdgeIdEl());
+                            div.appendChild(createEdgeIdElm(e.edgeId));
                         } else {
-                            div.appendChild(createEdgeIdEl());
+                            div.appendChild(createEdgeIdElm(e.edgeId));
 
                             const thunkNode = document.createElement("span");
                             thunkNode.textContent = e.forcedThunk; // e.outline.nodeId;
