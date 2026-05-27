@@ -1617,6 +1617,7 @@
         function createFocusDetailDiv(type, id, displayTrue="inline-block", displayFalse="none") {
             const focusEl = document.createElement("div");
             focusEl.className = "focus-detail";
+            focusEl.style.display = displayFalse;
             focusEl.dataset.type = type;
             focusEl.dataset.id = id;
             focusEl.dataset.displayTrue = displayTrue;
@@ -1678,6 +1679,25 @@
             pointerEl.onclick = elmOnClick("pointer", sp);
             pointerEl.pointer = sp;
             pointersEl.appendChild(focusEl);
+
+            metaTimes.forEach(mt => {
+                const mtElm = createMetaTimeElm(mt);
+                const mtFocusOuter = createFocusDetailDiv("metaTime", mt, "block", "inline-block");
+                const mtFocusInner = createFocusDetailDiv("metaTime", mt, "inline-block", "none");
+                focusEl.appendChild(mtFocusOuter);
+                mtFocusOuter.appendChild(mtElm);
+                mtFocusOuter.appendChild(mtFocusInner);
+                let nhi = nodesMap_.get(mt).get(sp);
+                var nhiText = "";
+                if (nhi.node.type == "thunk") {
+                    nhiText = "result = " + (nhi.node.result ? nhi.node.result[1] : "null")
+                } else if (nhi.node.type == "nonThunk") {
+                    nhiText = "value = " + nhi.node.value;
+                } else {
+                    console.error("invalid node history item node type", nhi.node.type)
+                }
+                mtFocusInner.appendChild(document.createTextNode("" + nhiText))
+            })
         })
 
         // # Edges
