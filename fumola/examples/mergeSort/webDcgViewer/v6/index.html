@@ -1022,7 +1022,7 @@
             playerState.metaTime = playerState.stopResetsTo;
             renderPlayerFocusAtMetaTime("smooth");
             renderPlayerUI();
-            clearFocus();
+            // clearFocus();
         }
         document.getElementById("tickBackBtn").onclick = () => {
             pausePlayback();
@@ -1042,11 +1042,17 @@
             renderPlayerUI();
             renderPlayerFocusAtMetaTime("smooth");
         }
+        function setAllMeshesVisible(visible = true) {
+            sceneMeshes.forEach(mesh => {
+                mesh.visible = visible;
+            })
+        }
         document.getElementById("gotoStartBtn").onclick = () => {
             let isPlaying = playerState.isPlaying;
             playerState.metaTime = 1;
             playerState.stopResetsTo = 1;
             playerState.isPlaying = isPlaying;
+            setAllMeshesVisible(false);
             renderPlayerUI();
             renderPlayerFocusAtMetaTime("smooth");
         }
@@ -1128,13 +1134,24 @@
         light.position.set(5, 5, 5);
         scene.add(light);
 
+        const sceneMeshes = new Set();
         const meshByLabel = new Map();
         const labelByMesh = new Map();
         const pointerDotsByKey = new Map();
-        const labelMeshByLabel = new Map();
-        const fieldMeshByLabel = new Map();
+        const labelByPointerSource = new Map();
         const objectMaterials = new Map();
 
+        function addMesh(label, mesh) {
+            sceneMeshes.add(mesh);
+            scene.add(mesh);
+            labelByMesh.set(mesh, label);
+            if (!meshByLabel.get(label)) {
+                meshByLabel.set(label, [mesh])
+            } else {
+                let meshes = meshByLabel.get(label);
+                meshByLabel.set(label, [...meshes, mesh])
+            }
+        }
 
         function makeTextTexture(text, type = "textLines", isSprite = false) {
             const canvas = document.createElement('canvas');
@@ -1197,6 +1214,7 @@
             let material = new THREE.MeshStandardMaterial({
                 color: color.box, transparent: true, opacity: 0.618,
                 emissive: "white", emissiveIntensity: emissiveIntensity.noHoverNode,
+                visible: true
             });
             objectMaterials.set(obj.label, material);
             const mesh = new THREE.Mesh(
@@ -1204,9 +1222,9 @@
                 material
             );
             mesh.position.set(...obj.position);
-            scene.add(mesh);
-            meshByLabel.set(obj.label, mesh);
-            labelByMesh.set(mesh, obj.label);
+            // scene.add(mesh);
+            // sceneMeshes.add(mesh);
+            addMesh(obj.label, mesh);
 
             const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim));
             const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
@@ -1215,8 +1233,9 @@
                 new THREE.MeshBasicMaterial({ map: texture, transparent: false })
             );
             labelMesh.position.copy(labelAnchor);
-            scene.add(labelMesh);
-            labelMeshByLabel.set(obj.label, labelMesh);
+            // scene.add(labelMesh);
+            // sceneMeshes.add(labelMesh);
+            addMesh(obj.label, labelMesh);
 
             const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim));
             const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.textLines || "", "textLines");
@@ -1225,8 +1244,9 @@
                 new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: true, alphaTest: 0.1 })
             );
             fieldMesh.position.copy(fieldsAnchor);
-            scene.add(fieldMesh);
-            fieldMeshByLabel.set(obj.label, fieldMesh);
+            // scene.add(fieldMesh);
+            // sceneMeshes.add(fieldMesh);
+            addMesh(obj.label, fieldMesh);
 
             const dots = [];
             if (obj.pointerFields) {
@@ -1241,8 +1261,10 @@
                     );
                     dot.position.set(startX + i * spacing, y, z);
                     scene.add(dot);
+                    sceneMeshes.add(dot);
                     dots.push(dot);
                     pointerDotsByKey.set(obj.label + ":" + fname, dot.position);
+                    labelByPointerSource.set(obj.label + ":" + fname, obj.label);
                 });
             }
 
@@ -1257,9 +1279,9 @@
                 material
             );
             mesh.position.set(...obj.position);
-            scene.add(mesh);
-            meshByLabel.set(obj.label, mesh);
-            labelByMesh.set(mesh, obj.label);
+            // scene.add(mesh);
+            // sceneMeshes.add(mesh);
+            addMesh(obj.label, mesh);
 
             const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim));
             const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
@@ -1268,7 +1290,9 @@
                 new THREE.MeshBasicMaterial({ map: texture, transparent: false })
             );
             labelMesh.position.copy(labelAnchor);
-            scene.add(labelMesh);
+            // scene.add(labelMesh);
+            // sceneMeshes.add(labelMesh);
+            addMesh(obj.label, labelMesh);
 
             const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim));
             const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.fields || "", "textLines");
@@ -1277,7 +1301,9 @@
                 new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: true, alphaTest: 0.1 })
             );
             fieldMesh.position.copy(fieldsAnchor);
-            scene.add(fieldMesh);
+            // scene.add(fieldMesh);
+            // sceneMeshes.add(fieldMesh);
+            addMesh(obj.label, fieldMesh);
 
             const dots = [];
             if (obj.pointerFields) {
@@ -1292,8 +1318,10 @@
                     );
                     dot.position.set(startX + i * spacing, y, z);
                     scene.add(dot);
+                    sceneMeshes.add(dot);
                     dots.push(dot);
                     pointerDotsByKey.set(obj.label + ":" + fname, dot.position);
+                    labelByPointerSource.set(obj.label + ":" + fname, obj.label);
                 });
             }
 
@@ -1309,7 +1337,7 @@
             return { dirNorm: n, length: len, quat };
         }
 
-        function createPointerMesh(from, to) {
+        function createPointerMesh(fromLabel, from, to) {
             const start = from.clone();
             const end = to.clone();
             const material = new THREE.MeshStandardMaterial({
@@ -1320,14 +1348,15 @@
             });
             const { dirNorm, length, quat } = computeEdgeFrame(start, end);
 
-            const group = new THREE.Group();
+            //const group = new THREE.Group();
 
             const dot = new THREE.Mesh(
                 new THREE.SphereGeometry(0.05, 12, 12),
                 material
             );
             dot.position.copy(start);
-            group.add(dot);
+            //group.add(dot);
+            addMesh(fromLabel, dot);
 
             const shaftLen = Math.max(0.001, length - 0.08);
             const shaft = new THREE.Mesh(
@@ -1337,7 +1366,8 @@
             const mid = start.clone().addScaledVector(dirNorm, shaftLen / 2);
             shaft.position.copy(mid);
             shaft.quaternion.copy(quat);
-            group.add(shaft);
+            addMesh(fromLabel, shaft);
+            // group.add(shaft);
 
             const cone = new THREE.Mesh(
                 new THREE.ConeGeometry(0.04, 0.08, 8),
@@ -1346,9 +1376,10 @@
             const center = end.clone().addScaledVector(dirNorm, -0.04);
             cone.position.copy(center);
             cone.quaternion.copy(quat);
-            group.add(cone);
-
-            return group;
+            // group.add(cone);
+            addMesh(fromLabel, cone);
+            false && console.log("createPointerMesh addMesh", fromLabel, cone);
+            //return group;
         }
 
         function createActionMesh(type, source, target, color = 0x0088aa, hoverOffset = -BoxDim) {
@@ -1460,22 +1491,29 @@
             if (obj.type === "orb") createOrb(obj);
         }
 
+        false && console.log(labelByPointerSource);
+
         for (const obj of data.objects) {
             if (obj.type === "pointer") {
                 const from = pointerDotsByKey.get(obj.from);
                 const target = meshByLabel.get(obj.to);
                 if (!from || !target) continue;
-                const adjustedTarget = target.position.clone().add(new THREE.Vector3(0, BoxDim / 2, 0));
-                const mesh = createPointerMesh(from, adjustedTarget);
-                scene.add(mesh);
+                const adjustedTarget = target[0].position.clone().add(new THREE.Vector3(0, BoxDim / 2, 0));
+                const fromLabel = labelByPointerSource.get(obj.from);
+                false && console.log("pointer ", obj.from, fromLabel);
+                createPointerMesh(fromLabel, from, adjustedTarget);
+                // scene.add(mesh);
+                // sceneMeshes.add(mesh);
+                // addMesh(fromLabel, mesh);
             }
             else if (obj.type == "get" || obj.type == "put" || obj.type == "force" || obj.type == "putForce") {
                 const from = pointerDotsByKey.get(obj.from);
                 const target = meshByLabel.get(obj.to);
                 if (!from || !target) { console.error("error connecting: " + obj); continue };
-                const mesh = createActionMesh(obj.type, from, target.position);
-                scene.add(mesh)
-
+                const mesh = createActionMesh(obj.type, from, target[0].position);
+                // scene.add(mesh)
+                // sceneMeshes.add(mesh);
+                addMesh(obj.edgeId, mesh)
             }
             else if (obj.type === "box" || obj.type === "orb") { /* already handled */ }
             else {
@@ -1504,7 +1542,7 @@
             openDoor("pointer", label)
         }
 
-        function lookAtMesh(m, distance=3.0) {
+        function lookAtMesh(m, distance = 3.0) {
             console.log("lookAtMesh", m);
             if (!m) { return };
             camTargetPos = m.position.clone().add(new THREE.Vector3(0.0, 0.0, distance));
@@ -1517,7 +1555,7 @@
             mouse.x = pos.x;
             mouse.y = pos.y;
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects([...meshByLabel.values()]);
+            const intersects = raycaster.intersectObjects([...sceneMeshes]);
             if (intersects.length) {
                 const m = intersects[0].object;
                 lookAtMesh(m);
@@ -1601,7 +1639,9 @@
                 }
                 else {
                     if (type == "objectShape") {
-                        lookAtMesh(meshByLabel.get(id))
+                        let meshes = meshByLabel.get(id);
+                        if (!meshes) { console.warn("no meshes for id", id) }
+                        meshes && lookAtMesh(meshes[0])
                     } else {
                         openDoor(type, id);
                         if (type == "metaTime") {
@@ -1699,7 +1739,7 @@
 
         data.nodes.forEach(nhi => {
             const space = nhi.nodeId[0];
-            
+
             if (!objectsAtMetaTime.get(nhi.metaTime)) {
                 objectsAtMetaTime.set(nhi.metaTime, [space]);
             } else {
@@ -1729,9 +1769,9 @@
         pointers.forEach(sp => {
             let metaTimes = pointerMetaTimes.get(sp);
             let firstDef = nodesMap_.get(metaTimes[0]).get(sp);
-           
+
             const focusEl = createFocusDetailDiv("pointer", sp);
-            var shapeElm = null; 
+            var shapeElm = null;
             const pointerEl = document.createElement("span");
 
             if (firstDef && firstDef.node.type == "thunk") {
@@ -1743,11 +1783,11 @@
             } else {
                 console.error(sp, firstDef);
             }
-   
+
             focusEl.appendChild(shapeElm);
             focusEl.appendChild(pointerEl);
 
-            pointerEl.textContent = sp;    
+            pointerEl.textContent = sp;
             pointerEl.onclick = elmOnClick("pointer", sp);
             pointerEl.pointer = sp;
             pointersEl.appendChild(focusEl);
@@ -1767,10 +1807,10 @@
                     bodyEl.className = "thunk-body-text";
                     bodyEl.textContent = nhi.node.body;
                     mtFocusInner.appendChild(bodyEl);
-                    
+
                     const traceEl = document.createElement("div");
                     traceEl.className = "thunk-trace";
-                    
+
                     nhi.node.trace.forEach(edgeId => {
                         const e = createEdgeIdElm(edgeId);
                         traceEl.appendChild(e);
@@ -1815,7 +1855,7 @@
             edgeIdEl.onclick = elmOnClick("edgeId", ehi.edgeId);
             focusEl.appendChild(edgeIdEl);
             edgeIdsEl.appendChild(focusEl);
-        
+
             if (!objectsAtMetaTime.get(ehi.metaTime)) {
                 objectsAtMetaTime.set(ehi.metaTime, [ehi.edgeId]);
             } else {
@@ -2031,20 +2071,24 @@
 
             var focusObjects = objectsAtMetaTime.get(t);
             if (!focusObjects) { focusObjects = [] };
-            
+
             focusObjects.forEach(obj => {
-                const mesh = meshByLabel.get(obj);
-                if(mesh) {
-                    mesh.material.emissiveIntensity = emissiveIntensity.hoverNode;
-                    lookAtMesh(mesh, 20.0)
-                    if (!glowingMeshes.has(mesh)) {
-                        glowingMeshes.add(mesh)
-                    }
+                const meshes = meshByLabel.get(obj);
+                if (meshes) {
+                    meshes.forEach(mesh => {
+                        mesh.material.emissiveIntensity = emissiveIntensity.hoverNode;
+                        mesh.visible = true;
+                        false && lookAtMesh(mesh, 20.0)
+                        if (!glowingMeshes.has(mesh)) {
+                            glowingMeshes.add(mesh)
+                        }
+                    })
                 } else {
                     console.warn("could not find mesh for object", obj);
                 }
             })
         }
+
 
         async function animate() {
             frames++;
@@ -2067,7 +2111,7 @@
             }
 
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects([...meshByLabel.values()]);
+            const intersects = raycaster.intersectObjects([...sceneMeshes]);
 
             function cancelHoverNode() {
                 const DEBUG = false;
@@ -2078,10 +2122,11 @@
                 let label = labelByMesh.get(hoverNode);
                 if (label) {
                     DEBUG && console.log("old hover node was " + label);
-                    let material = objectMaterials.get(label);
+                    // let material = objectMaterials.get(label);
                     DEBUG && console.log("  current material uuid is " + hoverNode.material.uuid);
                     DEBUG && console.log("  original material uuid was " + material.uuid);
-                    hoverNode.material = material.clone();
+                    // hoverNode.material = material.clone();
+                    hoverNode.material.emissiveIntensity = emissiveIntensity.noHoverNode;
                     DEBUG && console.log("  restored, and cloned original as " + material.uuid);
                     hoverNode = null;
                 } else {
@@ -2099,7 +2144,7 @@
                     DEBUG && console.log("new hover node is " + labelByMesh.get(hoverNode));
                     DEBUG && console.log("   material uuid was " + hoverNode.material.uuid);
 
-                    hoverNode.material = hoverNode.material.clone();
+                    // hoverNode.material = hoverNode.material.clone();
                     DEBUG && console.log("   material uuid is  " + hoverNode.material.uuid);
 
                     hoverNode.material.emissiveIntensity = emissiveIntensity.hoverNode;
@@ -2115,7 +2160,7 @@
             requestAnimationFrame(animate);
         }
         animate();
-      
+
         // expose
         window.loadScene = loadScene;
 
@@ -2139,6 +2184,7 @@
             camera,
             renderer,
             controls,
+            labelByPointerSource,
         };
 
     </script>
