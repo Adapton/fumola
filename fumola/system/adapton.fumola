@@ -435,7 +435,7 @@ module {
         };
         public type LabeledObject = {
             label_ : Label;
-            nodeIds: [Text];
+            nodeIds: [Text]; // <-- 2026-07-06 Remove this.
             position : Vec3;
             textFields : Text;
             pointerFields : [Text]
