@@ -374,7 +374,13 @@ impl ToDoc for Value {
                     .append(f.0.content.doc()),
                 ")",
             )),
-            Value::PrimFunction(f) => kwd("prim").append(f.doc()),
+            Value::PrimFunction(f) => {
+                if let PrimFunction::AtSignVar(x) = f {
+                    RcDoc::text(x)
+                } else {
+                    kwd("prim").append(f.doc())
+                }
+            },
             Value::Collection(c) => match c {
                 crate::value::Collection::HashMap(m) => hashmap(m),
                 crate::value::Collection::FastRandIter(_) => todo!(),
