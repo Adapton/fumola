@@ -435,7 +435,7 @@ module {
         };
         public type LabeledObject = {
             label_ : Label;
-            nodeIds: [Text]; // <-- 2026-07-06 Remove this.
+            // nodeIds: [Text]; // <-- 2026-07-06 Remove this.
             position : Vec3;
             textFields : Text;
             pointerFields : [Text]
@@ -520,7 +520,7 @@ module {
                     ", \"label\": " # debug_show fields.label_ #
                     ", \"textLines\": " # debug_show fields.textFields #
                     ", \"pointerFields\": " # debug_show fields.pointerFields #
-                    ", \"nodeIds\": " # debug_show fields.nodeIds #
+                    // ", \"nodeIds\": " # debug_show fields.nodeIds #
                     "}"
                 };
                 case (#orb(fields)) {
@@ -529,7 +529,7 @@ module {
                     ", \"label\": " # debug_show fields.label_ #
                     ", \"textLines\": " # debug_show fields.textFields #
                     ", \"pointerFields\": " # debug_show fields.pointerFields #
-                    ", \"nodeIds\": " # debug_show fields.nodeIds #
+                    // ", \"nodeIds\": " # debug_show fields.nodeIds #
                     "}"
                 };
                 case (#pointer(fields)) {

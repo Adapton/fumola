@@ -433,8 +433,8 @@ module {
            ["left", "right"]) 
         };
       };
-    let nodeIds = Map.get(nodeIdsByLabel, label_)!;
-    [#box({label_; position; textFields; pointerFields; nodeIds})] # objs
+    //let nodeIds = Map.get(nodeIdsByLabel, label_)!;
+    [#box({label_; position; textFields; pointerFields /*; nodeIds */ })] # objs
   };
 
   #[test]
