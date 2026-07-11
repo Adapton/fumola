@@ -309,9 +309,9 @@ module {
   public func writeSceneFile(file : Symbol, seed : Nat, size : Nat) {
     let a = R.generateRandomInput(seed, size);
     let t = fromArray(a);
-    let evs = A.peekEvents();
-    let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(evs);
-    let objs = sceneObjects(nodeIdsByLabel, t!, A.Scene.zero);
+    // let evs = A.peekEvents();
+    // let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(evs);
+    let objs = sceneObjects(t!, A.Scene.zero);
     let text = A.IntoJSON.fromObjects(objs);
     prim "writeFile" (file, text)
   };
@@ -410,7 +410,7 @@ module {
   };
 
   #[listing]
-  public func sceneObjects<X>(nodeIdsByLabel : Map<Text, [NodeIds]>, tree : Pointer<SeqTree<X>>, origin : Vec3) : SceneObjects {
+  public func sceneObjects<X>(tree : Pointer<SeqTree<X>>, origin : Vec3) : SceneObjects {
     let g = geom2d(tree);
     let label_ = (debug_show tree);
     let position = {y = g.height * 1.618; x = origin.x; z = origin.z};
@@ -427,8 +427,8 @@ module {
             #pointer ( {from=label_# ":right"; to=(debug_show b.right)})
           ];
           assert (g.width == (g.widthLeft + g.widthRight));
-          objs #= sceneObjects(nodeIdsByLabel, b.left, {x=origin.x - (g.widthRight * 0.5); y=origin.y; z=0.0 + origin.z - 1.0});
-          objs #= sceneObjects(nodeIdsByLabel, b.right, {x=origin.x + (g.widthLeft * 0.5); y=origin.y; z=0.0 + origin.z + 1.0});
+          objs #= sceneObjects(b.left, {x=origin.x - (g.widthRight * 0.5); y=origin.y; z=0.0 + origin.z - 1.0});
+          objs #= sceneObjects(b.right, {x=origin.x + (g.widthLeft * 0.5); y=origin.y; z=0.0 + origin.z + 1.0});
           ("#binary\n\tsymbol=" # (debug_show b.symbol) # "\n\tlevel=" # (debug_show b.level),
            ["left", "right"]) 
         };
@@ -441,9 +441,9 @@ module {
   public func testSceneObjects() {
     let a = R.generateRandomInput(10, 10);
     let t = fromArray(a);
-    let evs = A.peekEvents();
-    let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(evs);
-    let objs = sceneObjects(nodeIdsByLabel, t!, A.Scene.zero);
+    // let evs = A.peekEvents();
+    // let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(evs);
+    let objs = sceneObjects(t!, A.Scene.zero);
     assert (objs.size() == 37);
     // prim "print" (objs[36]);
     let last = objs[36];
