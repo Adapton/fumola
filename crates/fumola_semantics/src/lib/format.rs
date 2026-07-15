@@ -380,7 +380,7 @@ impl ToDoc for Value {
                 } else {
                     kwd("prim").append(f.doc())
                 }
-            },
+            }
             Value::Collection(c) => match c {
                 crate::value::Collection::HashMap(m) => hashmap(m),
                 crate::value::Collection::FastRandIter(_) => todo!(),

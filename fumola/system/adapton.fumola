@@ -524,7 +524,7 @@ module {
                     "}"
                 };
                 case (#orb(fields)) {
-                    "{ \"type\": \"box\"" #
+                    "{ \"type\": \"orb\"" #
                     ", \"position\": " # debug_show [fields.position.x, fields.position.y, fields.position.z] #
                     ", \"label\": " # debug_show fields.label_ #
                     ", \"textLines\": " # debug_show fields.textFields #

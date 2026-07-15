@@ -1,3 +1,5 @@
+import A "adapton";
+
 module {
 
 #[listing(33)]
@@ -19,6 +21,21 @@ public func fromIter(iter : Iter<(Symbol, X)>) : List<X> {
     } 
 };
 
+public func size<X>(list: List<X>) : Nat {
+    switch list {
+        case null 0;
+        case (?cons) {
+            1 + size(@(cons.next))
+        }
+    }
+};
+
+#[test]
+public func testSize() {
+    let list = fromIter([(1,1), (2,2), (3,3)].vals());
+    assert (size(list) == 3);
+};
+
 #[test]
 public func testFromIter() {
     let list = fromIter([(1,1), (2,2), (3,3)].vals());
@@ -31,5 +48,55 @@ public func testFromIter() {
     assert ((@ ((@ ((@ (list!.next))!.next))!.next)) == null);
 };
 
+#[listing]
+public func sceneObjects<X>(list : List_<X>, position : Vec3) : SceneObjects {
+    let label_ : Text = (debug_show list);
+    var objs : SceneObjects = [];
+    let (textFields : Text, pointerFields : Text) = 
+      switch (@ list) {
+        case null { ("null", []) };
+        case (?cons) {
+          objs #= [ #pointer ( {from=label_# ":next"; to=(debug_show cons.next)}) ];
+          objs #= sceneObjects(cons.next, {x=position.x + 1; y=position.y; z=position.z});
+          ("symbol=" # (debug_show cons.symbol) # "\nelement=" # (debug_show cons.element),
+           ["next"]) 
+        };
+      };
+    [#box({label_; position; textFields; pointerFields })] # objs
+  };
+
+#[listing]
+public func sceneObjectsFromThunk<X>(list : Pointer<Thunk<List<X>>>, position : Vec3) : SceneObjects {
+    let label_ : Text = (debug_show list);
+    var objs : SceneObjects = [];
+    let (textFields : Text, pointerFields : Text) = 
+      switch (force list) {
+        case null { ("null", []) };
+        case (?cons) {
+          objs #= [ #pointer ( {from=label_# ":next"; to=(debug_show cons.next)}) ];
+          objs #= sceneObjects(cons.next, {x=position.x + 1; y=position.y; z=position.z});
+          ("symbol=" # (debug_show cons.symbol) # "\nelement=" # (debug_show cons.element),
+           ["next"]) 
+        };
+      };
+    [#orb({label_; position; textFields; pointerFields })] # objs
+};
+
+
+  #[test]
+  public func testSceneObjects() {
+    let list = `list := fromIter([(1,1), (2,2), (3,3)].vals());
+    let objs = sceneObjects(list, A.Scene.zero);
+    // prim "print" objs;
+    // prim "print" (objs[6]);
+    switch (objs[6]) {
+        case (#box(b)) {
+            // prim "print" b;
+            assert b.textFields == "null";
+        };
+        case _ { assert false };
+    }
+  };
+   
 
 }
