@@ -559,8 +559,14 @@ module {
                     case (#removeEdge(edge_id)) {
                             ", \"type\": \"removeEdge\", \"edgeId\": " # fromEdgeId(edge_id)
                     };
-                    case (#forceBegin(node_id)) {
-                            ", \"type\": \"forceBegin\", \"nodeId\": " # fromNodeId(node_id)
+                    case (#forceBegin(node_id, cache_hit)) {
+                            ", \"type\": \"forceBegin\", \"nodeId\": " # fromNodeId(node_id) #
+                            (switch cache_hit {
+                                case null ", \"cacheMiss\": true";
+                                case (?meta_time) {
+                                ", \"cacheHit\": " # (debug_show meta_time)
+                                };
+                            })
                     };
                     case (#forceEnd(node_id, edge_id)) {
                             ", \"type\": \"forceEnd\", \"nodeId\": " # fromNodeId(node_id) # 

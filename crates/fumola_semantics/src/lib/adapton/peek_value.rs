@@ -205,7 +205,10 @@ impl PeekValue for Event {
             Event::AddNode(v) => variant("addNode", v.into_value_()),
             Event::AddEdge(edge_id) => variant("addEdge", edge_id.into_value_()),
             Event::RemoveEdge(edge_id) => variant("removeEdge", edge_id.into_value_()),
-            Event::ForceBegin(node_id) => variant("forceBegin", node_id.into_value_()),
+            Event::ForceBegin(node_id, cache_hit) => variant(
+                "forceBegin",
+                (node_id.into_value_(), cache_hit.into_value_()).into_value_(),
+            ),
             Event::ForceEnd(node_id, edge_id) => {
                 variant("forceEnd", (node_id, edge_id).into_value_())
             }

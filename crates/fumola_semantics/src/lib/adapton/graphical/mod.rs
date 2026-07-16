@@ -16,7 +16,7 @@ pub enum Event {
     AddNode(NodeId),
     AddEdge(EdgeId),
     RemoveEdge(EdgeId),
-    ForceBegin(NodeId),
+    ForceBegin(NodeId, Option<MetaTime>),
     ForceEnd(NodeId, EdgeId),
 }
 
@@ -569,18 +569,24 @@ impl CacheState for GraphicalState {
             let (i, n) = self.get_node(&pointer)?.clone();
             (i, n.clone())
         };
-        self.extend_history_with_event(Event::ForceBegin(node_id.clone()));
         if let Node::Thunk(tc) = node.clone() {
             if let Some(cache_value) = tc.result.clone()
                 && !settings.force_begin_always_misses
             {
                 counts.force_begin_cache_hit += 1;
+                self.extend_history_with_event(Event::ForceBegin(
+                    node_id.clone(),
+                    Some(cache_value.0.clone()),
+                ));
+
                 // TODO -- clean.
                 let action = node.clone().force_action()?;
                 let edge_id = self.new_edge_to_pointer(action, pointer, None)?;
                 self.extend_history_with_event(Event::ForceEnd(node_id.clone(), edge_id));
                 Ok(ForceBeginResult::CacheHit(cache_value.0, cache_value.1))
             } else {
+                self.extend_history_with_event(Event::ForceBegin(node_id.clone(), None));
+
                 counts.force_begin_cache_miss += 1;
                 self.push_stack(FrameKind::Force(node_id.clone()));
                 self.current_node = node_id;

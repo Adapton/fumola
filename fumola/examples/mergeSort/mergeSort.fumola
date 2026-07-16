@@ -66,10 +66,18 @@ module {
         let scene = force(scene_);
         let history = A.peekHistory();
         let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(history.events);
-        let inputListObjects = List.sceneObjectsFromThunk(scene.components.inputList_, { x = 0.0 - (size + 0.0) / 2.0 ; y = 0.0; z = 0.0});
-        let inputTreeObjects = Seq.Scene.sceneObjects(scene.components.inputTree!, { x = 0.0; y = 0.0; z = -3.0});
+
+        // - - - - Create 3D objeccts that represent each component - - - - -
+        let inputListObjects =
+            List.sceneObjectsFromThunk(scene.components.inputList_,
+            { x = 0.0 - (size + 0.0) / 2.0 ; y = 0.0; z = 0.0});
+        let inputTreeFromListObjects =
+            Seq.Scene.sceneObjectsFromList(A.Outline.outline(scene.components.inputTree_),
+            { x = 0.0; y = 0.0; z = 5.0});
+        let inputTreeObjects =
+            Seq.Scene.sceneObjects(scene.components.inputTree!,
+            { x = 0.0; y = 0.0; z = -10.0});
         // to do:
-        // - inputListObjects
         // - mergeSortFullDemandObjects --- we can use our own tools to anticipate how to lay these out best.
         //    - outline of internal nodes, following geometry of input tree, but offset in space.
         //    - each internal node either arises from a thunk calling LazyList.merge, or
@@ -86,10 +94,11 @@ module {
                             -`seed-seed
                             -`size-size
                             -`Outline-`txt, outlineText);
-        let sceneText = A.IntoJSON.fromScene({
+        let sceneData = {
             history ; outline ;
             objects = inputListObjects # inputTreeObjects;
-        });
+        };
+        let sceneText = A.IntoJSON.fromScene(sceneData);
         prim "writeFile" (`mergeSortSceneFullDemand
                             -`seed-seed
                             -`size-size
@@ -98,7 +107,7 @@ module {
             components = scene.components ;
             nodeIdsByLabel;
             history;
-            objects = inputListObjects # inputTreeObjects;
+            objects = sceneData.objects;
             outline;
         }
     };
