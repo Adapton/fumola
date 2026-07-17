@@ -334,9 +334,9 @@ module {
     }
   };
 
-  func objectFromEdge(label_, edge) : A.Scene.SceneObject {
+  func objectFromEdge(from, edge) : A.Scene.SceneObject {
     // prim "print" (debug_show edge.edgeId);
-    #action{ label_ ; to = edge.actionTarget ; action = edge.action } 
+    #action{ from ; to = edge.actionTarget ; action = edge.action } 
   };
 
   public func sceneObjectsFromList(outline, position) : A.Scene.SceneObjects {
@@ -408,6 +408,7 @@ module {
     let outline = A.Outline.outline(buildTree);
     // prim "print" (debug_show outline);
     let sceneObjects = sceneObjectsFromList(outline, A.Scene.zero);
+    let _ = A.IntoJSON.fromObjects(sceneObjects);
     //prim "print" (debug_show sceneObjects);
     sceneObjects
   };
