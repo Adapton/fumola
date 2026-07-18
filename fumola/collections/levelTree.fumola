@@ -339,21 +339,25 @@ module {
     #action{ from ; to = edge.actionTarget ; action = edge.action } 
   };
 
-  public func sceneObjectsFromList(outline, position) : A.Scene.SceneObjects {
-    switch (outline) {
-      case (#leaf(n)) { assert false };
-      case (#internal(n)) {
-        let label_ = (debug_show ((n.__nodeId.0).0));
-        switch (n.edges.size()) {
-          case 1 { 
+  public func sceneObjectsFromList(outline, position, offsets) : A.Scene.SceneObjects {
+    func sceneObjectsFromList_(outline, position) : A.Scene.SceneObjects {
+      switch (outline) {
+        case (#leaf(n)) { assert false };
+        case (#internal(n)) {
+          let label_ = (debug_show ((n.__nodeId.0).0));
+          switch (n.edges.size()) {
+            case 1 { 
               //
               // various base cases land here.
               // use position for the orb object.
               //
+              let position = A.Scene.vec3Add(position, offsets.leaf);
               [#orb { label_; position; textFields = ""; pointerFields = ""}] #
               [objectFromEdge(label_, n.edges[0])]
-          };
-          case 5 { 
+            };
+            case 5 { 
+              let position = @ ((`position)(n.edges[3].actionTarget));
+              let position = A.Scene.vec3Add(position, offsets.binary);
               // most common (binary) recursive case lands here.
               // use position of the target of n.edges[3] for orb object.
               // re-set position for each sub-case using logic like in original binary tree layout.
@@ -363,14 +367,17 @@ module {
                 objectFromEdge(label_, n.edges[1]),
                 objectFromEdge(label_, n.edges[2]),
               ] #
-              sceneObjectsFromList(n.edges[2].outline!, position)
+              sceneObjectsFromList_(n.edges[2].outline!, position)
               # [ 
                 objectFromEdge(label_, n.edges[3]),
                 objectFromEdge(label_, n.edges[4])
               ] #
-              sceneObjectsFromList(n.edges[4].outline!, position)
-          };
-          case 7 { 
+              sceneObjectsFromList_(n.edges[4].outline!, position)
+            };
+            case 7 { 
+              let position = @ ((`position)(n.edges[1].actionTarget));
+              let position = A.Scene.vec3Add(position, offsets.binary);
+              
               // special case for the top of the recursion.
               // similar to case 5 except for extra two initial steps: 
               //  - intialize a local copy of the empty input/output list,
@@ -383,34 +390,42 @@ module {
                 objectFromEdge(label_, n.edges[3]),
                 objectFromEdge(label_, n.edges[4]),
               ] #
-              sceneObjectsFromList(n.edges[4].outline!, position)
+              sceneObjectsFromList_(n.edges[4].outline!, position)
               # [
                 objectFromEdge(label_, n.edges[5]),
                 objectFromEdge(label_, n.edges[6])
               ] #
-              sceneObjectsFromList(n.edges[6].outline!, position)
+              sceneObjectsFromList_(n.edges[6].outline!, position)
+            };
+            case _ { 
+              assert false
+            };
           };
-          case _ { 
-            assert false
-          };
-        }
-      };
-    }
+        };
+      }
+    };
+    sceneObjectsFromList_(outline, position)
   };
+  
 
   #[test]
   public func testSceneObjectsFromList() {
-    let array = R.generateRandomInput(10, 3);
+    let array = R.generateRandomInput(10, 10);
     let buildList = `buildList := thunk { List.fromIter(array.vals()) };
     let list = force buildList;
     let buildTree = `buildTree := thunk { fromList(list); };
     let tree = force buildTree;
     let outline = A.Outline.outline(buildTree);
-    // prim "print" (debug_show outline);
-    let sceneObjects = sceneObjectsFromList(outline, A.Scene.zero);
+    let sceneObjects1 = sceneObjects(tree!, A.Scene.zero);
+    let offsets = {
+      binary = { x = 0; y = 0; z = 10};
+      leaf = { x = 0; y = -1.618; z = 0};
+    };
+    let sceneObjects2 = sceneObjectsFromList(outline, A.Scene.zero, offsets);
+    let sceneObjects = sceneObjects1 # sceneObjects2;
     let _ = A.IntoJSON.fromObjects(sceneObjects);
-    //prim "print" (debug_show sceneObjects);
-    sceneObjects
+    sceneObjects;
+    ()
   };
 
   #[listing]
@@ -418,6 +433,7 @@ module {
     let g = geom2d(tree);
     let label_ : Text = (debug_show tree);
     let position : Vec3 = {y = origin.y + g.height * 1.618; x = origin.x; z = origin.z};
+    `position(tree) := position;
     var objs : SceneObjects = [];
     let (textFields : Text, pointerFields : Text) = 
       switch (@ tree) {
@@ -427,8 +443,8 @@ module {
         };
         case (#binary(b)) { 
           objs #= [
-            #pointer ( {label_=label_# ":left"; to=(debug_show b.left)}),
-            #pointer ( {label_=label_# ":right"; to=(debug_show b.right)})
+            #pointer ( {from=label_# ":left"; to=(debug_show b.left)}),
+            #pointer ( {from=label_# ":right"; to=(debug_show b.right)})
           ];
           assert (g.width == (g.widthLeft + g.widthRight));
           objs #= sceneObjects(b.left, {x=origin.x - (g.widthRight * 0.5); y=origin.y; z=origin.z});

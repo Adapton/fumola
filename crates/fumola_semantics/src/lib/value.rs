@@ -511,6 +511,18 @@ impl Value {
 
     pub fn into_sym_or<E>(&self, err: E) -> Result<Symbol_, E> {
         match self {
+            Value::AdaptonPointer(s) => match s {
+                crate::adapton::Space::Symbol(s) => Ok(s.clone()),
+                _ => Err(err),
+            },
+            Value::AdaptonSpace(s) => match s {
+                crate::adapton::Space::Symbol(s) => Ok(s.clone()),
+                _ => Err(err),
+            },
+            Value::AdaptonTime(t) => match t {
+                crate::adapton::Time::Symbol(s) => Ok(s.clone()),
+                _ => Err(err),
+            },
             Value::Symbol(s) => Ok(s.clone()),
             Value::Nat(n) => Ok(Shared::new(Symbol::Nat(n.clone()))),
             Value::Int(i) => Ok(Shared::new(Symbol::Int(i.clone()))),

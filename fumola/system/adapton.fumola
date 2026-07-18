@@ -448,6 +448,11 @@ module {
 
         public type Vec3 = { x : Float; y : Float; z : Float };
         public let zero = { x = 0.0; y = 0.0; z =0.0 };
+        public func vec3Add(v : Vec3, w : Vec3) : Vec3 = {
+            x = v.x + w.x;
+            y = v.y + w.y;
+            z = v.z + w.z; 
+        };
      
         public type Scene = {
             objects : [ SceneObject ];
