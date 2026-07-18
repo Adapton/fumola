@@ -334,9 +334,9 @@ module {
     }
   };
 
-  func objectFromEdge(from, edge) : A.Scene.SceneObject {
+  func objectFromEdge(source, port, edge) : A.Scene.SceneObject {
     // prim "print" (debug_show edge.edgeId);
-    #action{ from ; to = edge.actionTarget ; action = edge.action } 
+    #action{ from = source # ":" # port; to = debug_show edge.actionTarget ; action = edge.action } 
   };
 
   public func sceneObjectsFromList(outline, position, offsets) : A.Scene.SceneObjects {
@@ -352,8 +352,8 @@ module {
               // use position for the orb object.
               //
               let position = A.Scene.vec3Add(position, offsets.leaf);
-              [#orb { label_; position; textFields = ""; pointerFields = ""}] #
-              [objectFromEdge(label_, n.edges[0])]
+              [#orb { label_; position; textFields = ""; pointerFields = ["get"]}] #
+              [objectFromEdge(label_, "get", n.edges[0])]
             };
             case 5 { 
               let position = @ ((`position)(n.edges[3].actionTarget));
@@ -361,16 +361,18 @@ module {
               // most common (binary) recursive case lands here.
               // use position of the target of n.edges[3] for orb object.
               // re-set position for each sub-case using logic like in original binary tree layout.
-              [#orb { label_; position; textFields = ""; pointerFields = ""}] #
+              [#orb { label_; position; textFields = ""; pointerFields = [
+                "get", "putE", "rec1", "putB", "rec2"
+              ]}] #
               [ 
-                objectFromEdge(label_, n.edges[0]),
-                objectFromEdge(label_, n.edges[1]),
-                objectFromEdge(label_, n.edges[2]),
+                objectFromEdge(label_, "get", n.edges[0]),
+                objectFromEdge(label_, "putE", n.edges[1]),
+                objectFromEdge(label_, "rec1", n.edges[2]),
               ] #
               sceneObjectsFromList_(n.edges[2].outline!, position)
               # [ 
-                objectFromEdge(label_, n.edges[3]),
-                objectFromEdge(label_, n.edges[4])
+                objectFromEdge(label_, "putB", n.edges[3]),
+                objectFromEdge(label_, "rec2", n.edges[4])
               ] #
               sceneObjectsFromList_(n.edges[4].outline!, position)
             };
@@ -382,18 +384,20 @@ module {
               // similar to case 5 except for extra two initial steps: 
               //  - intialize a local copy of the empty input/output list,
               //  - and put the first list element into an initial leaf-element tree. 
-              [#orb { label_; position; textFields = ""; pointerFields = ""}] #
+              [#orb { label_; position; textFields = ""; pointerFields = [
+                "putN", "putE1", "get", "putE2", "rec1", "putB", "rec2"
+              ]}] #
               [ 
-                objectFromEdge(label_, n.edges[0]),
-                objectFromEdge(label_, n.edges[1]),
-                objectFromEdge(label_, n.edges[2]),
-                objectFromEdge(label_, n.edges[3]),
-                objectFromEdge(label_, n.edges[4]),
+                objectFromEdge(label_, "putN", n.edges[0]),
+                objectFromEdge(label_, "putE1", n.edges[1]),
+                objectFromEdge(label_, "get", n.edges[2]),
+                objectFromEdge(label_, "putE2", n.edges[3]),
+                objectFromEdge(label_, "rec1", n.edges[4]),
               ] #
               sceneObjectsFromList_(n.edges[4].outline!, position)
               # [
-                objectFromEdge(label_, n.edges[5]),
-                objectFromEdge(label_, n.edges[6])
+                objectFromEdge(label_, "putB", n.edges[5]),
+                objectFromEdge(label_, "rec2", n.edges[6])
               ] #
               sceneObjectsFromList_(n.edges[6].outline!, position)
             };
