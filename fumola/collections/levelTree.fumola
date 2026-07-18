@@ -358,6 +358,9 @@ module {
             case 5 { 
               let position = @ ((`position)(n.edges[3].actionTarget));
               let position = A.Scene.vec3Add(position, offsets.binary);
+              let positionL = A.Scene.vec3Add(position, offsets.binaryL);
+              let positionR = A.Scene.vec3Add(position, offsets.binaryR);
+      
               // most common (binary) recursive case lands here.
               // use position of the target of n.edges[3] for orb object.
               // re-set position for each sub-case using logic like in original binary tree layout.
@@ -369,16 +372,18 @@ module {
                 objectFromEdge(label_, "putE", n.edges[1]),
                 objectFromEdge(label_, "rec1", n.edges[2]),
               ] #
-              sceneObjectsFromList_(n.edges[2].outline!, position)
+              sceneObjectsFromList_(n.edges[2].outline!, positionL)
               # [ 
                 objectFromEdge(label_, "putB", n.edges[3]),
                 objectFromEdge(label_, "rec2", n.edges[4])
               ] #
-              sceneObjectsFromList_(n.edges[4].outline!, position)
+              sceneObjectsFromList_(n.edges[4].outline!, positionR)
             };
             case 7 { 
               let position = @ ((`position)(n.edges[1].actionTarget));
               let position = A.Scene.vec3Add(position, offsets.binary);
+              let positionL = A.Scene.vec3Add(position, offsets.binaryL);
+              let positionR = A.Scene.vec3Add(position, offsets.binaryR);
               
               // special case for the top of the recursion.
               // similar to case 5 except for extra two initial steps: 
@@ -394,12 +399,12 @@ module {
                 objectFromEdge(label_, "putE2", n.edges[3]),
                 objectFromEdge(label_, "rec1", n.edges[4]),
               ] #
-              sceneObjectsFromList_(n.edges[4].outline!, position)
+              sceneObjectsFromList_(n.edges[4].outline!, positionL)
               # [
                 objectFromEdge(label_, "putB", n.edges[5]),
                 objectFromEdge(label_, "rec2", n.edges[6])
               ] #
-              sceneObjectsFromList_(n.edges[6].outline!, position)
+              sceneObjectsFromList_(n.edges[6].outline!, positionR)
             };
             case _ { 
               assert false
