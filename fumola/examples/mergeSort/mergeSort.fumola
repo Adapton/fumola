@@ -82,7 +82,7 @@ module {
             Seq.Scene.sceneObjectsFromList(A.Outline.outline(scene.components.inputTree_),
             { x = 0.0; y = 0.0; z = 5.0}, {
                 binary = { x = 0.0; y = 0.0; z = 5.0};
-                leaf = {x = 0.0; y = -1.0; z = 0.0};
+                leaf = {x = 1.0; y = -1.0; z = 1.0};
             });
         // to do:
         // - mergeSortFullDemandObjects --- we can use our own tools to anticipate how to lay these out best.
