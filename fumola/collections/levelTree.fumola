@@ -426,8 +426,9 @@ module {
     let outline = A.Outline.outline(buildTree);
     let sceneObjects1 = sceneObjects(tree!, A.Scene.zero);
     let offsets = {
-      binary = { x = 0; y = 0; z = 10};
-      leaf = { x = 0; y = -1.618; z = 0};
+          binary = { x = 0.0; y = 0.0; z = 5.0};
+          binaryL = { x = -0.5; y = -0.25; z = 1.0};
+          binaryR = { x =  0.5; y = -0.25; z = 1.0};
     };
     let sceneObjects2 = sceneObjectsFromList(outline, A.Scene.zero, offsets);
     let sceneObjects = sceneObjects1 # sceneObjects2;

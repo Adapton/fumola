@@ -161,7 +161,7 @@ module {
         let evs = peekEvents();
     
         assert (evs.size() == 9);
-        assert (evs[4] == { event = #forceBegin(tId);        metaTime = 3});
+        assert (evs[4] == { event = #forceBegin((tId, null));metaTime = 3});
         assert (evs[5] == { event = #addNode(pId_);          metaTime = 4});
         assert (evs[6] == { event = #addEdge(#edgeId(1003)); metaTime = 4});
         assert (evs[7] == { event = #addEdge(#edgeId(1004)); metaTime = 5});
@@ -172,7 +172,9 @@ module {
         let evs = peekEvents();
 
         assert (evs.size() == 11);
-        assert (evs[9] == {event = #forceBegin(tId); metaTime = 6});
+        prim "print" (evs[9]);
+  
+        assert (evs[9] == {event = #forceBegin(tId, ?5); metaTime = 6});
         assert (evs[10] == {event = #forceEnd((tId, #edgeId(1005))); metaTime = 6});
 
         if false {

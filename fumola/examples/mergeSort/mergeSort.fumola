@@ -135,7 +135,8 @@ module {
         assert scene.history.events.size() == 419;
         assert scene.history.nodes.size() == 179;
         assert scene.history.edges.size() == 198;
-        assert scene.objects.size() == 58; // TO DO -- Should be closer to total nodes + edges.
+        //prim "print" (scene.objects.size());
+        assert scene.objects.size() == 134; // TO DO -- Should be closer to total nodes + edges.
         assert ((scene.outline.1).0).value!.0 == 286; // Final Meta Time.
     };
             
