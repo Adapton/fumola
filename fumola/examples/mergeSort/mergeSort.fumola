@@ -76,14 +76,14 @@ module {
    
         let inputListObjects =
             List.sceneObjectsFromThunk(scene.components.inputList_,
-            { x = 0.0 - (size + 0.0) / 2.0 ; y = 0.0; z = 0.0});
+            { x = 0.0 - (size + 0.0) / 2.0 ; y = 5.0; z = 0.0});
    
         let inputTreeFromListObjects =
             Seq.Scene.sceneObjectsFromList(A.Outline.outline(scene.components.inputTree_),
             { x = 0.0; y = 0.0; z = 5.0}, {
                 binary = { x = 0.0; y = 0.0; z = 5.0};
                 binaryL = { x = -0.5; y = 0.0; z = 0.0};
-                binaryR = { x = -0.5; y = 0.0; z = 0.0};
+                binaryR = { x =  0.5; y = 0.0; z = 0.0};
                 leaf = {x = 0.25; y = -0.25; z = 1.0};
             });
         // to do:
