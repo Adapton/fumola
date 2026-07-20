@@ -15,3 +15,6 @@ Cargo.lock
 *listing
 *TikZ
 *-dat
+*-txt
+*-json
+*.output
