@@ -1272,7 +1272,7 @@
         }
 
         function createOrb(obj) {
-            let material = new THREE.MeshStandardMaterial({ color: 0x4488aa, transparent: true, opacity: 0.3 });
+            let material = new THREE.MeshStandardMaterial({ color: 0x4488aa, transparent: true, opacity: 0.818 });
             objectMaterials.set(obj.label, material);
             const mesh = new THREE.Mesh(
                 new THREE.SphereGeometry(BoxDim * 0.618),
@@ -1314,7 +1314,7 @@
                 obj.pointerFields.forEach((fname, i) => {
                     const dot = new THREE.Mesh(
                         new THREE.SphereGeometry(0.03, 12, 12),
-                        new THREE.MeshStandardMaterial({ color: 0x000000 })
+                        material
                     );
                     dot.position.set(startX + i * spacing, y, z);
                     scene.add(dot);

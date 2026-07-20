@@ -433,8 +433,7 @@ module {
     let sceneObjects2 = sceneObjectsFromList(outline, A.Scene.zero, offsets);
     let sceneObjects = sceneObjects1 # sceneObjects2;
     let _ = A.IntoJSON.fromObjects(sceneObjects);
-    sceneObjects;
-    ()
+    { array; sceneObjects }
   };
 
   #[listing]
