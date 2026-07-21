@@ -357,8 +357,8 @@ module {
             case 5 { 
               let position = @ ((`position)(n.edges[3].actionTarget));
               let position = A.Scene.vec3Add(position, offsets.binary);
-              let positionL = A.Scene.vec3Add(position, offsets.binaryL);
-              let positionR = A.Scene.vec3Add(position, offsets.binaryR);
+              let positionL = A.Scene.vec3Add(position, offsets.leafL);
+              let positionR = A.Scene.vec3Add(position, offsets.leafR);
       
               // most common (binary) recursive case lands here.
               // use position of the target of n.edges[3] for orb object.
@@ -381,8 +381,8 @@ module {
             case 7 { 
               let position = @ ((`position)(n.edges[1].actionTarget));
               let position = A.Scene.vec3Add(position, offsets.binary);
-              let positionL = A.Scene.vec3Add(position, offsets.binaryL);
-              let positionR = A.Scene.vec3Add(position, offsets.binaryR);
+              let positionL = A.Scene.vec3Add(position, offsets.leafL);
+              let positionR = A.Scene.vec3Add(position, offsets.leafR);
               
               // special case for the top of the recursion.
               // similar to case 5 except for extra two initial steps: 
@@ -427,8 +427,8 @@ module {
     let sceneObjects1 = sceneObjects(tree!, A.Scene.zero);
     let offsets = {
           binary = { x = 0.0; y = 0.0; z = 5.0};
-          binaryL = { x = -0.5; y = -0.25; z = 1.0};
-          binaryR = { x =  0.5; y = -0.25; z = 1.0};
+          leafL = { x = -0.5; y = -0.25; z = 1.0};
+          leafR = { x =  0.5; y = -0.25; z = 1.0};
     };
     let sceneObjects2 = sceneObjectsFromList(outline, A.Scene.zero, offsets);
     let sceneObjects = sceneObjects1 # sceneObjects2;
