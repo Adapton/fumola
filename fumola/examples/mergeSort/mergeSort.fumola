@@ -75,16 +75,19 @@ module {
 
         let inputTreeObjects =
             Seq.Scene.sceneObjects(scene.components.inputTree!,
-            { x = 0.0; y = 0.0; z = -10.0});
+            { x = 0.0; y = 0.0; z = -20.0});
+
+        // to do -- use height of the tree to position the
+        //          other stages with a nice-looking gap at 45 degrees.
 
         let inputTreeFromListObjects =
             Seq.Scene.sceneObjectsFromList(A.Outline.outline(scene.components.inputTree_),
-            { x = 0.0; y = 0.0; z = 5.0}, {
-                binary = { x = 0.0; y = 0.0; z = 5.0};
+            { x = 0.0; y = 0.0; z = 10.0}, {
+                binary = { x = 0.0; y = 0.0; z = 10.0};
                 leafL = { x = -0.5; y = -0.25; z = 1.0};
                 leafR = { x =  0.5; y = -0.25; z = 1.0};
             });
-            
+
         // to do:
         // - mergeSortFullDemandObjects --- we can use our own tools to anticipate how to lay these out best.
         //    - outline of internal nodes, following geometry of input tree, but offset in space.

@@ -488,7 +488,7 @@ module {
   #[listing]
   public func geom2d<X>(tree : Pointer<SeqTree<X>>) : Geom2D {
     let oneUnit = { height=1; width=1; widthLeft=0.5; widthRight=0.5};
-    switch (@ tree) {
+    force(`geom2d(tree) := thunk { switch (@ tree) {
       case (#empty) { oneUnit };
       case (#element(e)) { oneUnit };
       case (#binary(b)) {
@@ -501,7 +501,7 @@ module {
           width = ml.width + mr.width;
         }
       };
-    }
+    }})
   };
 
   #[test]
