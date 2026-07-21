@@ -548,7 +548,7 @@ module {
                    "{ \"type\": " # fromShowAction(fields.action) #
                     ", \"from\": " # debug_show fields.from # 
                     ", \"to\": " # debug_show fields.to # 
-                   // ", \"action\": " # fromShowAction(fields.action)
+                    ", \"edgeId\": " # fromEdgeId(fields.edgeId) #
                     "}"
                 };
             };
@@ -668,7 +668,7 @@ module {
         };
 
         public func fromShowAction(showAction : OutlineAction) : Text {
-            // debug_show (debug_show showAction)
+            debug_show (debug_show showAction);
             debug_show (switch showAction {
                 case (#get) "get";
                 case (#put) "put";

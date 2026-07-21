@@ -1257,7 +1257,10 @@
                 obj.pointerFields.forEach((fname, i) => {
                     const dot = new THREE.Mesh(
                         new THREE.SphereGeometry(0.03, 12, 12),
-                        new THREE.MeshStandardMaterial({ color: 0x000000 })
+                        new THREE.MeshStandardMaterial({
+                            color: 0x000000, emissive: "white",
+                            emissiveIntensity: 0.0,
+                        })
                     );
                     dot.position.set(startX + i * spacing, y, z);
                     scene.add(dot);
@@ -1272,7 +1275,10 @@
         }
 
         function createOrb(obj) {
-            let material = new THREE.MeshStandardMaterial({ color: 0x4488aa, transparent: true, opacity: 0.818 });
+            let material = new THREE.MeshStandardMaterial({
+                color: 0x4488aa, transparent: true, opacity: 0.9, emissive: "white",
+                emissiveIntensity: 0.0,
+            });
             objectMaterials.set(obj.label, material);
             const mesh = new THREE.Mesh(
                 new THREE.SphereGeometry(BoxDim * 0.618),
@@ -1382,11 +1388,13 @@
             //return group;
         }
 
-        function createActionMesh(type, source, target, color = 0x0088aa, hoverOffset = -BoxDim) {
+        function createActionMesh(type, source, target, label, color = 0x0088aa, hoverOffset = -BoxDim) {
             const group = new THREE.Group();
+            console.log(label);
 
             //color = 0x0088ff;
-            if (type === "force" || type === "putForce") color = 0xaa88aa;
+            if (type === "put") color = 0x008877;
+            if (type == "putForce") color = 0xaaaaaa;
 
             // Compute vector from source → target
             const dir = new THREE.Vector3().subVectors(target, source);
@@ -1394,8 +1402,8 @@
             dir.normalize();
 
             // Shaft parameters
-            let shaftRadius = 0.02;
-            if (type === "force" || type === "putForce") shaftRadius = 0.05;
+            let shaftRadius = 0.03;
+            if (type === "force" || type === "putForce") shaftRadius = 0.10;
 
             const shaftLength = length + (hoverOffset * 1.6); // shorten shaft slightly so head hovers
 
@@ -1407,7 +1415,9 @@
             const shaftMat = new THREE.MeshStandardMaterial({
                 color: color,
                 transparent: true || (type === "force" || type === "putForce"),
-                opacity: (type === "force" || type === "putForce") ? 0.2 : 0.6
+                opacity: (type === "force" || type === "putForce") ? 0.6 : 0.8,
+                emissive: "white",
+                emissiveIntensity: 0.0,
             });
             const shaftMesh = new THREE.Mesh(shaftGeo, shaftMat);
 
@@ -1416,15 +1426,19 @@
             shaftMesh.position.copy(mid);
             shaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
             group.add(shaftMesh);
+            addMesh(label, shaftMesh);
 
             // Helper functions
-            function makeCone(radius = 0.06, height = 0.12) {
+            function makeCone(radius = 0.12, height = 0.12) {
                 const coneGeo = new THREE.ConeGeometry(radius, height, 12);
-                const coneMat = new THREE.MeshStandardMaterial({ color: color });
+                const coneMat = new THREE.MeshStandardMaterial({
+                    color: color, emissive: "white",
+                    emissiveIntensity: 0.0,
+                });
                 const coneMesh = new THREE.Mesh(coneGeo, coneMat);
                 return coneMesh;
             }
-            function makeDoublePyramid(radius = 0.06, height = 0.12) {
+            function makeDoublePyramid(radius = 0.12, height = 0.12) {
                 const cone1 = makeCone(radius, height);
                 const cone2 = makeCone(radius, height);
                 cone2.rotateX(Math.PI);
@@ -1441,11 +1455,13 @@
                 cone.position.copy(headPos);
                 cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 group.add(cone);
+                addMesh(label, cone);
             } else if (type === "put") {
                 const dp = makeDoublePyramid();
                 dp.position.copy(headPos);
                 dp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 group.add(dp);
+                addMesh(label, dp);
             } else if (type === "force") {
                 const cone = makeCone();
                 cone.position.copy(headPos);
@@ -1453,11 +1469,15 @@
                 group.add(cone);
 
                 const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12);
-                const innerShaftMat = new THREE.MeshStandardMaterial({ color: color });
+                const innerShaftMat = new THREE.MeshStandardMaterial({
+                    color: color, emissive: "white",
+                    emissiveIntensity: 0.0,
+                });
                 const innerShaftMesh = new THREE.Mesh(innerShaftGeo, innerShaftMat);
                 innerShaftMesh.position.copy(mid);
                 innerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 group.add(innerShaftMesh);
+                addMesh(label, cone);
             } else if (type === "putForce") {
                 const coneforce = makeCone();
                 const coneput = makeDoublePyramid();
@@ -1467,20 +1487,19 @@
                 coneput.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 group.add(coneforce);
                 group.add(coneput);
-
-                const outerShaftGeo = new THREE.CylinderGeometry(0.05, 0.05, shaftLength, 12);
-                const outerShaftMat = new THREE.MeshStandardMaterial({ color: color, transparent: true, opacity: 0.3 });
-                const outerShaftMesh = new THREE.Mesh(outerShaftGeo, outerShaftMat);
-                outerShaftMesh.position.copy(mid);
-                outerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-                group.add(outerShaftMesh);
+                addMesh(label, coneforce);
+                addMesh(label, coneput);
 
                 const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12);
-                const innerShaftMat = new THREE.MeshStandardMaterial({ color: color });
+                const innerShaftMat = new THREE.MeshStandardMaterial({
+                    color: 0x008877, emissive: "white",
+                    emissiveIntensity: 0.0,
+                });
                 const innerShaftMesh = new THREE.Mesh(innerShaftGeo, innerShaftMat);
                 innerShaftMesh.position.copy(mid);
                 innerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 group.add(innerShaftMesh);
+                addMesh(label, innerShaftMesh);
             }
 
             return group;
@@ -1510,10 +1529,10 @@
                 const from = pointerDotsByKey.get(obj.from);
                 const target = meshByLabel.get(obj.to);
                 if (!from || !target) { console.error("error connecting: " + obj); continue };
-                const mesh = createActionMesh(obj.type, from, target[0].position);
+                const mesh = createActionMesh(obj.type, from, target[0].position, obj.edgeId);
                 // scene.add(mesh)
                 // sceneMeshes.add(mesh);
-                addMesh(obj.edgeId, mesh)
+                // addMesh(obj.edgeId, mesh)
             }
             else if (obj.type === "box" || obj.type === "orb") { /* already handled */ }
             else {
@@ -1537,11 +1556,6 @@
             };
         }
 
-        function lookAtLabel(label) {
-            console.log("lookAtLabel", label);
-            openDoor("pointer", label)
-        }
-
         function lookAtMesh(m, distance = 3.0) {
             console.log("lookAtMesh", m);
             if (!m) { return };
@@ -1558,8 +1572,9 @@
             const intersects = raycaster.intersectObjects([...sceneMeshes]);
             if (intersects.length) {
                 const m = intersects[0].object;
+                let label = labelByMesh.get(m);
+                console.log("calling lookAtMesh() for ", label)
                 lookAtMesh(m);
-                lookAtLabel(labelByMesh.get(m));
             }
         });
 
@@ -2135,17 +2150,17 @@
             }
 
             if (intersects.length) {
-                const DEBUG = false;
+                const DEBUG = true;
                 if (hoverNode !== intersects[0].object) {
                     if (hoverNode) { cancelHoverNode() };
 
                     hoverNode = intersects[0].object;
                     lastHoverNode.lastHoverNode = hoverNode;
                     DEBUG && console.log("new hover node is " + labelByMesh.get(hoverNode));
-                    DEBUG && console.log("   material uuid was " + hoverNode.material.uuid);
+                    DEBUG && console.log("   material uuid is " + hoverNode.material.uuid);
 
                     // hoverNode.material = hoverNode.material.clone();
-                    DEBUG && console.log("   material uuid is  " + hoverNode.material.uuid);
+                    //DEBUG && console.log("   material uuid is  " + hoverNode.material.uuid);
 
                     hoverNode.material.emissiveIntensity = emissiveIntensity.hoverNode;
                 }

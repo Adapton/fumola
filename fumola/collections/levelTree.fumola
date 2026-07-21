@@ -336,7 +336,11 @@ module {
 
   func objectFromEdge(source, port, edge) : A.Scene.SceneObject {
     // prim "print" (debug_show edge.edgeId);
-    #action{ from = source # ":" # port; to = debug_show edge.actionTarget ; action = edge.action } 
+    #action{ from = source # ":" # port; 
+             to = debug_show edge.actionTarget;
+             action = edge.action;
+             edgeId = edge.edgeId;
+    } 
   };
 
   public func sceneObjectsFromList(outline, position, offsets) : A.Scene.SceneObjects {
