@@ -1389,8 +1389,8 @@
         }
 
         function createActionMesh(type, source, target, label, color = 0x0088aa, hoverOffset = -BoxDim) {
-            const group = new THREE.Group();
-            console.log(label);
+            //const group = new THREE.Group();
+            console.log("createActionMesh", label);
 
             //color = 0x0088ff;
             if (type === "put") color = 0x008877;
@@ -1425,7 +1425,7 @@
             const mid = new THREE.Vector3().addVectors(source, headPos).multiplyScalar(0.5);
             shaftMesh.position.copy(mid);
             shaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-            group.add(shaftMesh);
+            //group.add(shaftMesh);
             addMesh(label, shaftMesh);
 
             // Helper functions
@@ -1436,6 +1436,7 @@
                     emissiveIntensity: 0.0,
                 });
                 const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+                addMesh(label, coneMesh);
                 return coneMesh;
             }
             function makeDoublePyramid(radius = 0.12, height = 0.12) {
@@ -1447,6 +1448,8 @@
                 cone2.position.y = -height / 2;
                 g.add(cone1);
                 g.add(cone2);
+                    addMesh(label, cone1);
+                        addMesh(label, cone2);
                 return g;
             }
 
@@ -1454,20 +1457,15 @@
                 const cone = makeCone();
                 cone.position.copy(headPos);
                 cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-                group.add(cone);
-                addMesh(label, cone);
             } else if (type === "put") {
                 const dp = makeDoublePyramid();
                 dp.position.copy(headPos);
                 dp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-                group.add(dp);
-                addMesh(label, dp);
             } else if (type === "force") {
                 const cone = makeCone();
                 cone.position.copy(headPos);
                 cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-                group.add(cone);
-
+ 
                 const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12);
                 const innerShaftMat = new THREE.MeshStandardMaterial({
                     color: color, emissive: "white",
@@ -1476,8 +1474,7 @@
                 const innerShaftMesh = new THREE.Mesh(innerShaftGeo, innerShaftMat);
                 innerShaftMesh.position.copy(mid);
                 innerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-                group.add(innerShaftMesh);
-                addMesh(label, cone);
+                addMesh(label, innerShaftMesh);
             } else if (type === "putForce") {
                 const coneforce = makeCone();
                 const coneput = makeDoublePyramid();
@@ -1485,11 +1482,7 @@
                 coneput.position.copy(headPos);
                 coneforce.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 coneput.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-                group.add(coneforce);
-                group.add(coneput);
-                addMesh(label, coneforce);
-                addMesh(label, coneput);
-
+                
                 const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12);
                 const innerShaftMat = new THREE.MeshStandardMaterial({
                     color: 0x008877, emissive: "white",
@@ -1498,11 +1491,8 @@
                 const innerShaftMesh = new THREE.Mesh(innerShaftGeo, innerShaftMat);
                 innerShaftMesh.position.copy(mid);
                 innerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-                group.add(innerShaftMesh);
                 addMesh(label, innerShaftMesh);
             }
-
-            return group;
         }
 
         for (const obj of data.objects) {
@@ -1529,7 +1519,7 @@
                 const from = pointerDotsByKey.get(obj.from);
                 const target = meshByLabel.get(obj.to);
                 if (!from || !target) { console.error("error connecting: " + obj); continue };
-                const mesh = createActionMesh(obj.type, from, target[0].position, obj.edgeId);
+                createActionMesh(obj.type, from, target[0].position, obj.edgeId);
                 // scene.add(mesh)
                 // sceneMeshes.add(mesh);
                 // addMesh(obj.edgeId, mesh)
@@ -2091,6 +2081,7 @@
                 const meshes = meshByLabel.get(obj);
                 if (meshes) {
                     meshes.forEach(mesh => {
+                        console.log("mesh to glow: ", mesh);
                         mesh.material.emissiveIntensity = emissiveIntensity.hoverNode;
                         mesh.visible = true;
                         false && lookAtMesh(mesh, 20.0)
