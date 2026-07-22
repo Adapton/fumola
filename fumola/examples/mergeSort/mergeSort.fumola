@@ -69,21 +69,22 @@ module {
 
         // - - - - Create 3D objects that represent each component - - - - -
    
-        let inputListObjects =
-            List.sceneObjectsFromThunk(scene.components.inputList_,
-            { x = 0.0 - (size + 0.0) / 2.0 ; y = 5.0; z = 0.0});
-
         let inputTreeObjects =
             Seq.Scene.sceneObjects(scene.components.inputTree!,
-            { x = 0.0; y = 0.0; z = -20.0});
+            { x = 0.0; y = 0.0; z = 0.0});
 
-        // to do -- use height of the tree to position the
-        //          other stages with a nice-looking gap at 45 degrees.
+        let inputTreeGeom2d = Seq.Scene.geom2d(scene.components.inputTree!);
+        let height = inputTreeGeom2d.height;
+        let levelGap = height * 2.0;
+     
+        let inputListObjects =
+            List.sceneObjectsFromThunk(scene.components.inputList_,
+            { x = 0.0 - (size + 0.0) / 2.0 ; y = 5.0; z = levelGap});
 
         let inputTreeFromListObjects =
             Seq.Scene.sceneObjectsFromList(A.Outline.outline(scene.components.inputTree_),
-            { x = 0.0; y = 0.0; z = 10.0}, {
-                binary = { x = 0.0; y = 0.0; z = 10.0};
+            { x = 0.0; y = 0.0; z = levelGap / 2.0}, {
+                binary = { x = 0.0; y = 0.0; z = levelGap / 2.0};
                 leafL = { x = -0.5; y = -0.25; z = 1.0};
                 leafR = { x =  0.5; y = -0.25; z = 1.0};
             });
@@ -117,17 +118,14 @@ module {
                             -`size-size
                             -`Scene-`json, sceneText);
         {
+            sceneData ;
             components = scene.components ;
-            nodeIdsByLabel;
-            history;
-            objects = sceneData.objects;
-            outline;
         }
     };
 
     #[test]
     public func testGenerateSceneFullDemand() {
-        let scene = generateSceneFullDemand(10, 10);
+        let scene = generateSceneFullDemand(10, 10).sceneData;
         if false { prim "print" (debug_show ({
             _0_eventsSize = scene.history.events.size();
             _1_nodesSize = scene.history.nodes.size();

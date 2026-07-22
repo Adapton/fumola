@@ -321,6 +321,7 @@ module {
     writeSceneFile(`testWriteSceneFile, 10, 10)
   };
 
+/*
   public type Listing = {
     #fromList;
     #reduceUp;
@@ -333,6 +334,7 @@ module {
       case (#fromList) (sceneObjectsFromList(outline))
     }
   };
+*/
 
   func objectFromEdge(source, port, edge) : A.Scene.SceneObject {
     // prim "print" (debug_show edge.edgeId);
