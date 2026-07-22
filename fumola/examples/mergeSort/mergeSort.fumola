@@ -126,6 +126,7 @@ module {
     #[test]
     public func testGenerateSceneFullDemand() {
         let scene = generateSceneFullDemand(10, 10).sceneData;
+        // set to true when this test fails to see the new values and compare.
         if false { prim "print" (debug_show ({
             _0_eventsSize = scene.history.events.size();
             _1_nodesSize = scene.history.nodes.size();
@@ -136,7 +137,6 @@ module {
         assert scene.history.events.size() == 419;
         assert scene.history.nodes.size() == 179;
         assert scene.history.edges.size() == 198;
-        //prim "print" (scene.objects.size());
         assert scene.objects.size() == 134; // TO DO -- Should be closer to total nodes + edges.
         assert ((scene.outline.1).0).value!.0 == 286; // Final Meta Time.
     };
