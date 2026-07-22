@@ -47,6 +47,7 @@ module {
         public type Event = {
             #addNode : NodeId;
             #addEdge : EdgeId;
+            #updateEdge : EdgeId;
             #removeEdge : EdgeId;
             #forceBegin : NodeId;
             #forceEnd : (NodeId, EdgeId);
@@ -86,7 +87,8 @@ module {
         };
 
         public type Action = {
-            #force_ : (Any, Any);
+            #forceBegin : Any; // forced thunk can have any type.
+            #force_ : (Any, Any); // forced thunk and result can be any types.
             #put : Any;
             #get : Any;
         };
@@ -160,23 +162,24 @@ module {
 
         let evs = peekEvents();
     
-        assert (evs.size() == 9);
-        assert (evs[4] == { event = #forceBegin((tId, null));metaTime = 3});
-        assert (evs[5] == { event = #addNode(pId_);          metaTime = 4});
-        assert (evs[6] == { event = #addEdge(#edgeId(1003)); metaTime = 4});
-        assert (evs[7] == { event = #addEdge(#edgeId(1004)); metaTime = 5});
-        assert (evs[8] == { event = #forceEnd(tId, #edgeId(1004)); metaTime = 5});
-    
+        assert (evs.size() == 10);
+        assert (evs[4] == {event = #addEdge(#edgeId(1003)); metaTime = 3});
+        assert (evs[5] == {event = #forceBegin(#edgeId(1003), null); metaTime = 3});
+        assert (evs[6] == {event = #addNode(pId_); metaTime = 4});
+        assert (evs[7] == {event = #addEdge(#edgeId(1004)); metaTime = 4});
+        assert (evs[8] == {event = #forceEnd(#edgeId(1003)); metaTime = 5});
+        assert (evs[9] == {event = #updateEdge(#edgeId(1003)); metaTime = 5});
+     
         assert((force(t)) == p);
 
         let evs = peekEvents();
 
-        assert (evs.size() == 11);
-        prim "print" (evs[9]);
-  
-        assert (evs[9] == {event = #forceBegin(tId, ?5); metaTime = 6});
-        assert (evs[10] == {event = #forceEnd((tId, #edgeId(1005))); metaTime = 6});
-
+        assert (evs.size() == 12);
+    
+        assert (evs[10] == {event = #forceBegin(#edgeId(1005), ?5); metaTime = 6});
+        assert (evs[11] == {event = #forceEnd(#edgeId(1005)); metaTime = 6});
+      
+        // set to true when this test fails to see the correct output
         if false {
             prim "print" (evs.size());
             var count = 0;
@@ -564,11 +567,14 @@ module {
                     case (#addEdge(edge_id)) {
                             ", \"type\": \"addEdge\", \"edgeId\": " # fromEdgeId(edge_id)
                     };
+                    case (#updateEdge(edge_id)) {
+                            ", \"type\": \"updateEdge\", \"edgeId\": " # fromEdgeId(edge_id)
+                    };
                     case (#removeEdge(edge_id)) {
                             ", \"type\": \"removeEdge\", \"edgeId\": " # fromEdgeId(edge_id)
                     };
-                    case (#forceBegin(node_id, cache_hit)) {
-                            ", \"type\": \"forceBegin\", \"nodeId\": " # fromNodeId(node_id) #
+                    case (#forceBegin(edge_id, cache_hit)) {
+                            ", \"type\": \"forceBegin\", \"edgeId\": " # fromEdgeId(edge_id) #
                             (switch cache_hit {
                                 case null ", \"cacheMiss\": true";
                                 case (?meta_time) {
@@ -576,8 +582,8 @@ module {
                                 };
                             })
                     };
-                    case (#forceEnd(node_id, edge_id)) {
-                            ", \"type\": \"forceEnd\", \"nodeId\": " # fromNodeId(node_id) # 
+                    case (#forceEnd(edge_id)) {
+                            ", \"type\": \"forceEnd\"" # 
                             ", \"edgeId\": " # fromEdgeId(edge_id)
                     };
                 })
@@ -603,6 +609,10 @@ module {
                     "{ \"type\": \"force\" " #
                     ", \"thunk\": " # fromAny(t) #
                     ", \"value\": " # fromAny(v)
+                };
+                case (#forceBegin(t)) {
+                    "{ \"type\": \"forceBegin\" " #
+                    ", \"thunk\": " # fromAny(t)
                 };
                 case (#put(v)) {
                     "{ \"type\": \"put\" " #

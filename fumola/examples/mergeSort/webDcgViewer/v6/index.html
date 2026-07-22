@@ -74,7 +74,7 @@
         }
 
         #sidebar {
-            width: 10%;
+            width: 50%;
             min-width: 220px;
             max-width: 99%;
             flex-direction: column;
@@ -1899,11 +1899,13 @@
                 } else if (ev.type == "addEdge") {
                     row.appendChild(createEdgeIdElm(ev.edgeId))
                 } else if (ev.type == "forceBegin") {
-                    row.appendChild(createNodeIdElm(ev.nodeId))
+                    row.appendChild(createEdgeIdElm(ev.edgeId))
+                } else if (ev.type == "updateEdge") {
+                    row.appendChild(createEdgeIdElm(ev.edgeId))
                 } else if (ev.type == "forceEnd") {
-                    row.appendChild(createNodeIdElm(ev.nodeId));
-                    row.appendChild(document.createTextNode(" "));
                     row.appendChild(createEdgeIdElm(ev.edgeId));
+                } else {
+                    console.error("uknown event type", ev);
                 }
                 el.appendChild(row);
             });
