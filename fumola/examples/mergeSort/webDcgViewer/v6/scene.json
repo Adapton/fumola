@@ -1367,7 +1367,7 @@
 { "type": "putForce", "from": "inputTree(51-rec2):rec2", "to": "inputTree(57-rec2)", "edgeId": "#edgeId(2233)"},
 { "type": "orb", "position": [0.5, 24.020000000000003, 16], "label": "inputTree(57-rec2)", "textLines": "", "pointerFields": ["get"]},
 { "type": "get", "from": "inputTree(57-rec2):get", "to": "inputTree(`(nilList))", "edgeId": "#edgeId(2234)"},
-{ "type": "box", "position": [0, -5, 0], "label": "inputTree(`(nilList))", "textLines": "", "pointerFields": ""},
+{ "type": "box", "position": [0, 0, 15], "label": "inputTree(`(nilList))", "textLines": "", "pointerFields": ""},
 { "type": "box", "position": [0, 24.270000000000003, 0], "label": "inputTree(57-binary)", "textLines": "#binary\n\tsymbol=57\n\tlevel=2105349", "pointerFields": ["left", "right"]},
 { "type": "pointer", "from": "inputTree(57-binary):left", "to": "inputTree(51-binary)"},
 { "type": "pointer", "from": "inputTree(57-binary):right", "to": "inputTree(111-binary)"},

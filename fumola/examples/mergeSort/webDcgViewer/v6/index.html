@@ -1520,7 +1520,7 @@
             else if (obj.type == "get" || obj.type == "put" || obj.type == "force" || obj.type == "putForce") {
                 const from = pointerDotsByKey.get(obj.from);
                 const target = meshByLabel.get(obj.to);
-                if (!from || !target) { console.error("error connecting: ", obj); continue };
+                if (!from || !target) { console.error("error connecting to action's target object: ", obj); continue };
                 createActionMesh(obj.type, from, target[0].position, obj.edgeId);
                 // scene.add(mesh)
                 // sceneMeshes.add(mesh);

@@ -88,7 +88,14 @@ module {
                 leafL = { x = -0.5; y = -0.25; z = 1.0};
                 leafR = { x =  0.5; y = -0.25; z = 1.0};
             });
-
+        // constant pointer created by the tree-of-list procedure for initializing the accumlator:
+        let inputTree_NilList = 
+            #box{
+                label_="inputTree(`(nilList))";
+                position = {x=0; y=0; z=levelGap / 2.0};
+                textFields=""; pointerFields=""
+            };
+     
         let mergeGap = 2.0;
         let lazyMergeSortTakeFirst = if false {
             Seq.Scene.sceneObjectsLazyMergeSort(A.Outline.outline(scene.components.lazySorted_),
@@ -103,12 +110,6 @@ module {
                             -`seed-seed
                             -`size-size
                             -`Outline-`txt, outlineText);
-        let inputTree_NilList = 
-            #box{
-                label_="inputTree(`(nilList))";
-                position = {x=0;y=-5;z=0};
-                textFields=""; pointerFields=""
-            };
         let sceneData = {
             history ; outline ;
             objects = inputListObjects 
