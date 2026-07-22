@@ -1390,7 +1390,7 @@
 
         function createActionMesh(type, source, target, label, color = 0x0088aa, hoverOffset = -BoxDim) {
             //const group = new THREE.Group();
-            console.log("createActionMesh", label);
+            console.log("createActionMesh", type, label);
 
             //color = 0x0088ff;
             if (type === "put") color = 0x008877;
@@ -1448,8 +1448,8 @@
                 cone2.position.y = -height / 2;
                 g.add(cone1);
                 g.add(cone2);
-                    addMesh(label, cone1);
-                        addMesh(label, cone2);
+                //addMesh(label, cone1);
+                //addMesh(label, cone2);
                 return g;
             }
 
@@ -1465,7 +1465,7 @@
                 const cone = makeCone();
                 cone.position.copy(headPos);
                 cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
- 
+
                 const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12);
                 const innerShaftMat = new THREE.MeshStandardMaterial({
                     color: color, emissive: "white",
@@ -1476,13 +1476,15 @@
                 innerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 addMesh(label, innerShaftMesh);
             } else if (type === "putForce") {
+                console.log("createActionMesh* ", type, label);
                 const coneforce = makeCone();
                 const coneput = makeDoublePyramid();
                 coneforce.position.copy(headPos);
                 coneput.position.copy(headPos);
                 coneforce.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
                 coneput.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-                
+                //scene.add(coneforce);
+                //scene.add(coneput);
                 const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12);
                 const innerShaftMat = new THREE.MeshStandardMaterial({
                     color: 0x008877, emissive: "white",
@@ -1518,7 +1520,7 @@
             else if (obj.type == "get" || obj.type == "put" || obj.type == "force" || obj.type == "putForce") {
                 const from = pointerDotsByKey.get(obj.from);
                 const target = meshByLabel.get(obj.to);
-                if (!from || !target) { console.error("error connecting: " + obj); continue };
+                if (!from || !target) { console.error("error connecting: ", obj); continue };
                 createActionMesh(obj.type, from, target[0].position, obj.edgeId);
                 // scene.add(mesh)
                 // sceneMeshes.add(mesh);
@@ -1850,22 +1852,26 @@
         //
         // process edges, producing indicies and dynamic HTML elements.
         const edgeIdsEl = document.getElementById("edgeIds");
+        const edgeIdSet = new Map();
 
         data.edges.forEach(ehi => {
-            const focusEl = createFocusDetailDiv("edgeId", ehi.edgeId);
-            const edgeIdEl = document.createElement("span");
-            edgeIdEl.textContent = ehi.edgeId;
-            edgeIdEl.className = "edgeId";
-            edgeIdEl.edgeId = ehi.edgeId;
-            edgeIdEl.onclick = elmOnClick("edgeId", ehi.edgeId);
-            focusEl.appendChild(edgeIdEl);
-            edgeIdsEl.appendChild(focusEl);
+            if (!edgeIdSet.has(ehi.edgeId)) {
+                edgeIdSet.set(ehi.edgeId, ehi);
+                const focusEl = createFocusDetailDiv("edgeId", ehi.edgeId);
+                const edgeIdEl = document.createElement("span");
+                edgeIdEl.textContent = ehi.edgeId;
+                edgeIdEl.className = "edgeId";
+                edgeIdEl.edgeId = ehi.edgeId;
+                edgeIdEl.onclick = elmOnClick("edgeId", ehi.edgeId);
+                focusEl.appendChild(edgeIdEl);
+                edgeIdsEl.appendChild(focusEl);
 
-            if (!objectsAtMetaTime.get(ehi.metaTime)) {
-                objectsAtMetaTime.set(ehi.metaTime, [ehi.edgeId]);
-            } else {
-                const objects = objectsAtMetaTime.get(ehi.metaTime);
-                objectsAtMetaTime.set(ehi.metaTime, [...objects, ehi.edgeId]);
+                if (!objectsAtMetaTime.get(ehi.metaTime)) {
+                    objectsAtMetaTime.set(ehi.metaTime, [ehi.edgeId]);
+                } else {
+                    const objects = objectsAtMetaTime.get(ehi.metaTime);
+                    objectsAtMetaTime.set(ehi.metaTime, [...objects, ehi.edgeId]);
+                }
             }
         })
 

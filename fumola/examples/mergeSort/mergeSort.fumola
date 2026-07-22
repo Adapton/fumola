@@ -103,10 +103,17 @@ module {
                             -`seed-seed
                             -`size-size
                             -`Outline-`txt, outlineText);
+        let inputTree_NilList = 
+            #box{
+                label_="inputTree(`(nilList))";
+                position = {x=0;y=-5;z=0};
+                textFields=""; pointerFields=""
+            };
         let sceneData = {
             history ; outline ;
             objects = inputListObjects 
                     # inputTreeFromListObjects
+                    # [inputTree_NilList]
                     # inputTreeObjects;
         };
         let sceneText = A.IntoJSON.fromScene(sceneData);
