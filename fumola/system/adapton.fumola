@@ -285,6 +285,7 @@ module {
         };
 
         public func outlineRec(root : Pointer /*, visited : PointerSetOBj */) : Outline {
+            force(`outline(root) := thunk {
             let nodeInfo = (peekInfo root)!;
 	        let nodeId = nodeInfo.nodeId;
             switch (nodeInfo.node) {
@@ -354,7 +355,7 @@ module {
                     }
                 }
             }
-        };
+        })};
 
         // some helper code for re-packaging certain variant-based fields into a uniform, flat record.
         public func edgeActionInfo(edge : Edge) : { 

@@ -89,17 +89,14 @@ module {
                 leafR = { x =  0.5; y = -0.25; z = 1.0};
             });
 
-        // to do:
-        // - mergeSortFullDemandObjects --- we can use our own tools to anticipate how to lay these out best.
-        //    - outline of internal nodes, following geometry of input tree, but offset in space.
-        //    - each internal node either arises from a thunk calling LazyList.merge, or
-        //    - its a node that corresponds 1-1 with reducing some input tree node (the "main eager call " of lazyMergeSort).
-        //    - the "geometric data flow" is as follows:
-        //        - X-Y plane: Input tree in X-Y plane 
-        //          ==determines==> Reduction traversal position, but set back in Z, 
-        //          ==determines==> merge thunks, set further back in Z.
-        //        - Y-Z plane: Output list along Z axis
-        //          ==determines==> merge thunks "height" in the Z axis.
+        let mergeGap = 2.0;
+        let lazyMergeSortTakeFirst = if false {
+            Seq.Scene.sceneObjectsLazyMergeSort(A.Outline.outline(scene.components.lazySorted_),
+            { x = 0.0; y = 0.0; z = levelGap + mergeGap },
+            {
+                mergeCons = { x =  0.0; y = 0.0; z = mergeGap };
+            }) } else {};
+
         let outline = A.Outline.outline(scene_);
         let outlineText = A.IntoText.outline(outline);
         prim "writeFile" (`mergeSortSceneFullDemand
