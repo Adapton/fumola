@@ -45,7 +45,7 @@ module {
         let lazySorted_ = 
             force(`lazyMergeSort := thunk {
             do within space `lazyMergeSort {
-            Seq.lazyMergeSort(inputTree);
+            Seq.lazyMergeSort_(inputTree);
         }});
         let sorted = 
             force(`forceSort := thunk {
@@ -75,7 +75,8 @@ module {
 
         let inputTreeGeom2d = Seq.Scene.geom2d(scene.components.inputTree!);
         let height = inputTreeGeom2d.height;
-        let levelGap = height * 2.0;
+        let e = 2.71828;
+        let levelGap = height * e;
      
         let inputListObjects =
             List.sceneObjectsFromThunk(scene.components.inputList_,
@@ -85,8 +86,8 @@ module {
             Seq.Scene.sceneObjectsFromList(A.Outline.outline(scene.components.inputTree_),
             { x = 0.0; y = 0.0; z = levelGap / 2.0}, {
                 binary = { x = 0.0; y = 0.0; z = levelGap / 2.0};
-                leafL = { x = -0.5; y = -0.25; z = 1.0};
-                leafR = { x =  0.5; y = -0.25; z = 1.0};
+                leafL = { x = -(0.2 * e); y = -0.1 * e; z = 1.0};
+                leafR = { x =  (0.2 * e); y = -0.1 * e; z = 1.0};
             });
         // constant pointer created by the tree-of-list procedure for initializing the accumlator:
         let inputTree_NilList = 
@@ -99,8 +100,9 @@ module {
         let mergeGap = 2.0;
         let lazyMergeSortTakeFirst = if false {
             Seq.Scene.sceneObjectsLazyMergeSort(A.Outline.outline(scene.components.lazySorted_),
-            { x = 0.0; y = 0.0; z = levelGap + mergeGap },
+            { x = 0.0; y = height + 1; z = levelGap + mergeGap },
             {
+                reduceRoot = { x = 0; y = 1; z = 0; };
                 mergeCons = { x =  0.0; y = 0.0; z = mergeGap };
             }) } else {};
 
@@ -139,11 +141,11 @@ module {
             _3_objectsSize = scene.objects.size();
             _4_finalMetaTime = ((scene.outline.1).0).value!.0;
         }))};
-        assert scene.history.events.size() == 480;
-        assert scene.history.nodes.size() == 179;
-        assert scene.history.edges.size() == 259;
+        assert scene.history.events.size() == 534;
+        assert scene.history.nodes.size() == 197;
+        assert scene.history.edges.size() == 286;
         assert scene.objects.size() == 135;
-        assert ((scene.outline.1).0).value!.0 == 286; // Final Meta Time.
+        assert ((scene.outline.1).0).value!.0 == 313; // Final Meta Time.
     };
             
     public func dcg(seed : Nat, size : Nat, demand) {

@@ -52,6 +52,29 @@ module {
     }
   };
 
+ #[listing]
+  public func reduce_<X,Y>(
+        t : LevelTree_<X>, 
+        empty : Y,
+        element : (Symbol, X) -> Y,
+        binary : (Symbol, Y, Y) -> Y) : Y
+  {
+    switch (@ t) {
+      case (#empty) empty;
+      case (#element(e)) element(e.symbol, e.element);
+      case (#binary(b)) {
+        let recLeft = force(`recLeft(b.symbol) := thunk {
+          reduce_(b.left, empty, element, binary)
+        });
+        let recRight = force(`recRight(b.symbol) := thunk {
+          reduce_(b.right, empty, element, binary)
+        });
+        binary(b.symbol, recLeft, recRight)
+      };
+    }
+  };
+
+
   #[listing]
   public type GenSymThk = Thunk<(Symbol, GenSymThk)>;
   
@@ -124,6 +147,26 @@ module {
     `result := thunk {
       reduceUp(
         @(t!),
+        null,
+        func(symbol:Symbol, element:X) : LazyList<X> {
+         ?{ symbol; element; next = nilList }
+        },
+        func(symbol:Symbol, xs:LazyList<X>, ys:LazyList<X>) : LazyList<X> {
+         do within space (`merge-symbol) {
+           LazyList.merge(xs, ys)
+         }
+      },
+     )
+    }
+  };
+
+  #[listing(62)]
+  public func lazyMergeSort_<X>(t : ?SeqTree_<X>) : LazyList_<X> {
+    let nilList = `(nilList) := thunk { null };
+    if (t == null) { return nilList };
+    `result := thunk {
+      reduce_(
+        t!,
         null,
         func(symbol:Symbol, element:X) : LazyList<X> {
          ?{ symbol; element; next = nilList }
@@ -425,6 +468,43 @@ module {
     let sceneObjects = sceneObjects1 # sceneObjects2;
     let _ = A.IntoJSON.fromObjects(sceneObjects);
     { array; sceneObjects }
+  };
+
+  public func sceneObjectsLazyMergeSort(outline, position, offsets) {
+   func rec_(outline, position) : A.Scene.SceneObjects {
+      switch (outline) {
+        case (#leaf(n)) { assert false };
+        case (#internal(n)) {
+          let label_ = (debug_show ((n.__nodeId.0).0));
+          switch (n.edges.size()) {
+            // the setup for the recursion creates a nil output element,
+            // and then recurs according to reduce(tree, nil, singleton, merge)
+            case 2 { 
+              let positionReduce = A.Scene.vec3Add(position, offsets.reduceRoot);
+              [#orb { label_; position; textFields = ""; pointerFields = [
+                "putNil", "reduceRoot"
+                ]}] #
+              [ 
+                objectFromEdge(label_, "putNil", n.edges[0]),
+                objectFromEdge(label_, "reduceRoot", n.edges[1]),
+              ] #
+              rec_(n.edges[2].outline!, positionL)
+            };
+            case 5 {
+              // to do
+            }; 
+            case 7 {
+              // to do
+            };
+            case arity {
+              prim "print" arity; 
+              assert false
+            };
+          };
+        };
+      }
+    };
+    rec_(outline, position)
   };
 
   #[listing]

@@ -2,6 +2,6 @@
     time \
     stdbuf -oL -eL \
     cargo run --release  -- \
-    eval 'import M "fumola/examples/mergeSort/mergeSort"; let out = M.generateSceneFullDemand(10, 137); out.sceneData.objects.size()' \
+    eval 'import M "fumola/examples/mergeSort/mergeSort"; let out = M.generateSceneFullDemand(10, 44); out.sceneData.objects.size()' \
     --import $(find fumola -name "*.fumola")
 } 2>&1 | tee write-merge-sort-scene-larger.output
