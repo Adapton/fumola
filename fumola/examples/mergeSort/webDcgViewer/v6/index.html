@@ -1230,7 +1230,11 @@
             const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
             const labelMesh = new THREE.Mesh(
                 new THREE.PlaneGeometry(0.7, 0.7 * aspect),
-                new THREE.MeshBasicMaterial({ map: texture, transparent: false })
+                new THREE.MeshBasicMaterial({
+                    map: texture, transparent: false,
+                    //emissive: "white",
+                    //emissiveIntensity: 0.0,
+                })
             );
             labelMesh.position.copy(labelAnchor);
             // scene.add(labelMesh);
@@ -1241,7 +1245,11 @@
             const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.textLines || "", "textLines");
             const fieldMesh = new THREE.Mesh(
                 new THREE.PlaneGeometry(0.5, 0.5 * fieldAspect),
-                new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: true, alphaTest: 0.1 })
+                new THREE.MeshBasicMaterial({
+                    map: fieldTexture, transparent: true, alphaTest: 0.1,
+                    //emissive: "white",
+                    //emissiveIntensity: 0.0,
+                })
             );
             fieldMesh.position.copy(fieldsAnchor);
             // scene.add(fieldMesh);
@@ -1293,7 +1301,10 @@
             const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
             const labelMesh = new THREE.Mesh(
                 new THREE.PlaneGeometry(0.7, 0.7 * aspect),
-                new THREE.MeshBasicMaterial({ map: texture, transparent: false })
+                new THREE.MeshBasicMaterial({
+                    map: texture, transparent: false, emissive: "white",
+                    emissiveIntensity: 0.0,
+                })
             );
             labelMesh.position.copy(labelAnchor);
             // scene.add(labelMesh);
@@ -1304,7 +1315,10 @@
             const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.fields || "", "textLines");
             const fieldMesh = new THREE.Mesh(
                 new THREE.PlaneGeometry(0.5, 0.5 * fieldAspect),
-                new THREE.MeshBasicMaterial({ map: fieldTexture, transparent: true, alphaTest: 0.1 })
+                new THREE.MeshBasicMaterial({
+                    map: fieldTexture, transparent: true, alphaTest: 0.1, emissive: "white",
+                    emissiveIntensity: 0.0,
+                })
             );
             fieldMesh.position.copy(fieldsAnchor);
             // scene.add(fieldMesh);
@@ -1855,6 +1869,12 @@
         const edgeIdSet = new Map();
 
         data.edges.forEach(ehi => {
+            if (!objectsAtMetaTime.get(ehi.metaTime)) {
+                objectsAtMetaTime.set(ehi.metaTime, [ehi.edgeId]);
+            } else {
+                const objects = objectsAtMetaTime.get(ehi.metaTime);
+                objectsAtMetaTime.set(ehi.metaTime, [...objects, ehi.edgeId]);
+            }
             if (!edgeIdSet.has(ehi.edgeId)) {
                 edgeIdSet.set(ehi.edgeId, ehi);
                 const focusEl = createFocusDetailDiv("edgeId", ehi.edgeId);
@@ -1866,12 +1886,6 @@
                 focusEl.appendChild(edgeIdEl);
                 edgeIdsEl.appendChild(focusEl);
 
-                if (!objectsAtMetaTime.get(ehi.metaTime)) {
-                    objectsAtMetaTime.set(ehi.metaTime, [ehi.edgeId]);
-                } else {
-                    const objects = objectsAtMetaTime.get(ehi.metaTime);
-                    objectsAtMetaTime.set(ehi.metaTime, [...objects, ehi.edgeId]);
-                }
             }
         })
 
@@ -2085,16 +2099,34 @@
             var focusObjects = objectsAtMetaTime.get(t);
             if (!focusObjects) { focusObjects = [] };
 
+            // if t's has a forceBegin event, then
+            //    for each mesh at t, set the emissive value to yellow, and the intensity to hover node.
+            //    do not add the mesh to the set of glowing meshes, so it's intensity stays constant until
+            //    the corresponding forceEnd event.
+            // each time we make something glow, we shall set the emissive color too 
+            //    (to reset yellow to white when time).
+
             focusObjects.forEach(obj => {
                 const meshes = meshByLabel.get(obj);
                 if (meshes) {
                     meshes.forEach(mesh => {
                         console.log("mesh to glow: ", mesh);
-                        mesh.material.emissiveIntensity = emissiveIntensity.hoverNode;
-                        mesh.visible = true;
-                        false && lookAtMesh(mesh, 20.0)
-                        if (!glowingMeshes.has(mesh)) {
-                            glowingMeshes.add(mesh)
+                        if (!mesh.material.emissive) {
+                            console.warn("mesh's material missing emissive property", mesh, mesh.material);
+                            mesh.visible = true;
+
+                        } else {
+                            mesh.material.emissiveIntensity = emissiveIntensity.hoverNode;
+                            mesh.visible = true;
+                            mesh.material.emissive.setHex(0xffffff);
+                            mesh.material.needsUpdate = true;
+
+                            console.log("worked");
+
+                            false && lookAtMesh(mesh, 20.0);
+                            if (!glowingMeshes.has(mesh)) {
+                                glowingMeshes.add(mesh)
+                            }
                         }
                     })
                 } else {
