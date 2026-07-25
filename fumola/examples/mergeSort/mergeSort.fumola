@@ -45,7 +45,11 @@ module {
         let lazySorted_ = 
             force(`lazyMergeSort := thunk {
             do within space `lazyMergeSort {
-            Seq.lazyMergeSort_(inputTree);
+            if false { 
+                Seq.lazyMergeSort(inputTree)
+            } else {
+                Seq.lazyMergeSort_(inputTree)
+            };
         }});
         let sorted = 
             force(`forceSort := thunk {

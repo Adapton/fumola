@@ -1171,7 +1171,7 @@
 
             ctx.font = `${fontSize}px monospace`;
 
-            if (type === "pointerSymbol") {
+            if (false && type === "pointerSymbol") {
                 if (lightMode) {
                     ctx.fillStyle = '#123';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1179,10 +1179,10 @@
                     ctx.strokeRect(0, 0, canvas.width, canvas.height);
                     ctx.fillStyle = 'white';
                 } else {
-                    ctx.fillStyle = '#000';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.strokeStyle = '#0a0';
-                    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+                    //ctx.fillStyle = 'rgba(0,0,0,1)';
+                    //ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    //ctx.strokeStyle = '#0a0';
+                    //ctx.strokeRect(0, 0, canvas.width, canvas.height);
                     ctx.fillStyle = 'white';
                 }
             } else {
@@ -1192,7 +1192,6 @@
                     ctx.fillStyle = 'white';
                 }
             }
-
             lines.forEach((line, i) => {
                 ctx.fillText(line, padding, padding + (i + 1) * lineHeight - (lineHeight - fontSize));
             });
@@ -1230,10 +1229,10 @@
             const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
             const labelMesh = new THREE.Mesh(
                 new THREE.PlaneGeometry(0.7, 0.7 * aspect),
-                new THREE.MeshBasicMaterial({
+                new THREE.MeshStandardMaterial({
                     map: texture, transparent: false,
-                    //emissive: "white",
-                    //emissiveIntensity: 0.0,
+                    emissive: "white",
+                    emissiveIntensity: 0.0,
                 })
             );
             labelMesh.position.copy(labelAnchor);
@@ -1245,10 +1244,10 @@
             const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.textLines || "", "textLines");
             const fieldMesh = new THREE.Mesh(
                 new THREE.PlaneGeometry(0.5, 0.5 * fieldAspect),
-                new THREE.MeshBasicMaterial({
+                new THREE.MeshStandardMaterial({
                     map: fieldTexture, transparent: true, alphaTest: 0.1,
-                    //emissive: "white",
-                    //emissiveIntensity: 0.0,
+                    emissive: "white",
+                    emissiveIntensity: 0.0,
                 })
             );
             fieldMesh.position.copy(fieldsAnchor);

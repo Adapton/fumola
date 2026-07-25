@@ -470,7 +470,7 @@ module {
     { array; sceneObjects }
   };
 
-  public func sceneObjectsLazyMergeSort(outline, position, offsets) {
+  public func sceneObjectsLazyMergeSort_(outline, position, offsets) {
    func rec_(outline, position) : A.Scene.SceneObjects {
       switch (outline) {
         case (#leaf(n)) { assert false };
