@@ -494,9 +494,9 @@ module {
             case 4 {
               [
                 #orb { label_; position; textFields = ""; pointerFields = [
-                "forceMerge", "recL", "recR", "putMerge"
+                "getBinary", "recL", "recR", "putMerge"
                 ]},
-                objectFromEdge(label_, "forceMerge", n.edges[0]),
+                objectFromEdge(label_, "getBinary", n.edges[0]),
                 objectFromEdge(label_, "recL", n.edges[1]),
               ] #
               rec_(n.edges[1].outline!, position) #
@@ -512,9 +512,9 @@ module {
               //assert n.edges[0].outline == null ;
               [
                 #orb { label_; position; textFields = ""; pointerFields = [
-                "forceNil",
+                "getElement",
                 ]},
-                objectFromEdge(label_, "forceNil", n.edges[0]),
+                objectFromEdge(label_, "getElement", n.edges[0]),
               ]
             };
             case arity {

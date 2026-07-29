@@ -65,8 +65,8 @@ public func sceneObjects<X>(list : List_<X>, position : Vec3) : SceneObjects {
     [#box({label_; position; textFields; pointerFields })] # objs
   };
 
-#[listing]
-public func sceneObjectsFromThunk<X>(list : Pointer<Thunk<List<X>>>, position : Vec3) : SceneObjects {
+  #[listing]
+  public func sceneObjectsFromThunk<X>(list : Pointer<Thunk<List<X>>>, position : Vec3) : SceneObjects {
     let label_ : Text = (debug_show list);
     var objs : SceneObjects = [];
     let (textFields : Text, pointerFields : Text) = 
@@ -80,7 +80,7 @@ public func sceneObjectsFromThunk<X>(list : Pointer<Thunk<List<X>>>, position : 
         };
       };
     [#orb({label_; position; textFields; pointerFields })] # objs
-};
+  };
 
 
   #[test]
