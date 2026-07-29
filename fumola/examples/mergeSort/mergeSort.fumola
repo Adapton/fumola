@@ -106,8 +106,8 @@ module {
             Seq.Scene.sceneObjectsLazyMergeSort_(A.Outline.outline(scene.components.lazySorted_),
             { x = 0.0; y = 1.618 * height; z = -levelGap/2.0 },
             {
-                reduceRoot = { x = 0; y = 1; z = 0; };
-                mergeCons = { x =  0.0; y = 0.0; z = mergeGap };
+                reduce = { x = 0; y = 1; z = -levelGap/2.0; };
+                merge = { x =  0.0; y = 0.0; z = mergeGap };
             }) } else {};
 
         let outline = A.Outline.outline(scene_);

@@ -476,12 +476,16 @@ module {
       switch (outline) {
         case (#leaf(n)) { assert false };
         case (#internal(n)) {
-          let label_ = (debug_show ((n.__nodeId.0).0));
+          let label_ = (debug_show ((n.__nodeId.0).0));        
           switch (n.edges.size()) {
             // the setup for the recursion creates a nil output element,
             // and then recurs according to reduce(tree, nil, singleton, merge)
             case 2 { 
-              let positionReduce = A.Scene.vec3Add(position, offsets.reduceRoot);
+              assert false;
+              // TODO -- use this case in our tests.
+                           
+              let position = @(`position(n.edges[1].actionTarget));
+              let position = A.Scene.vec3Add(position, offsets.reduce);
               [#orb { label_; position; textFields = ""; pointerFields = [
                 "putNil", "reduceRoot"
                 ]}] #
@@ -489,9 +493,11 @@ module {
                 objectFromEdge(label_, "putNil", n.edges[0]),
                 objectFromEdge(label_, "reduceRoot", n.edges[1]),
               ] #
-              rec_(n.edges[1].outline!, positionL)
+              rec_(n.edges[1].outline!, position)
             };
             case 4 {
+              let position = @(`position(n.edges[0].actionTarget));
+              let position = A.Scene.vec3Add(position, offsets.reduce);     
               [
                 #orb { label_; position; textFields = ""; pointerFields = [
                 "getBinary", "recL", "recR", "putMerge"
@@ -509,7 +515,8 @@ module {
               ]
             }; 
             case 1 {
-              //assert n.edges[0].outline == null ;
+              let position = @(`position(n.edges[0].actionTarget));
+              let position = A.Scene.vec3Add(position, offsets.reduce);
               [
                 #orb { label_; position; textFields = ""; pointerFields = [
                 "getElement",
