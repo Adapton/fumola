@@ -102,9 +102,9 @@ module {
             };
      
         let mergeGap = 2.0;
-        let lazyMergeSortTakeFirst = if true {
+        let lazyMergeSort = if true {
             Seq.Scene.sceneObjectsLazyMergeSort_(A.Outline.outline(scene.components.lazySorted_),
-            { x = 0.0; y = height + 1; z = levelGap + mergeGap },
+            { x = 0.0; y = 1.618 * height; z = -levelGap/2.0 },
             {
                 reduceRoot = { x = 0; y = 1; z = 0; };
                 mergeCons = { x =  0.0; y = 0.0; z = mergeGap };
@@ -122,7 +122,7 @@ module {
                     # inputTreeFromListObjects
                     # [inputTree_NilList]
                     # inputTreeObjects
-                    # lazyMergeSortTakeFirst;
+                    # lazyMergeSort;
         };
         let sceneText = A.IntoJSON.fromScene(sceneData);
         prim "writeFile" (`mergeSortSceneFullDemand
