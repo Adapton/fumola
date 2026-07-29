@@ -298,8 +298,10 @@ fn post_eval(state: &mut State, result: Result<Value_, Error>) {
             // By default, do not create these listing files.
             // TO DO -- add a CLI flag back to help (1) turn this feature on and
             // (2) give an explicit output path, not merely the original source path.
-            
-            if false { continue };
+
+            if false {
+                continue;
+            };
         };
         let content = content.to_string();
         debug!(
