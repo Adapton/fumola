@@ -470,6 +470,7 @@ module {
     { array; sceneObjects }
   };
 
+  #[listing(88)]
   public func sceneObjectsLazyMergeSort_(outline, position, offsets) {
    func rec_(outline, position) : A.Scene.SceneObjects {
       switch (outline) {

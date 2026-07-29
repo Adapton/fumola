@@ -1,4 +1,5 @@
 import Counters "Counters";
+import A "adapton";
 
 module {
 
@@ -31,6 +32,43 @@ module {
     }
   };
 
+  #[listing(88)]
+  public func sceneObjectsMergeSortStream<X>(list : Pointer<Thunk<List<X>>>, position : Vec3, offset : Vec3) : SceneObjects {
+    let label_ : Text = (debug_show list);
+    var objs : SceneObjects = [];
+    let cell = A.peekForce(list);
+    let (textFields : Text, pointerFields : Text) = 
+      switch (cell) {
+        case null { ("(unforced)", []) };
+        case (?(_, null)) { ("null", []); };
+        case (?(_, ?cons)) {
+          prim "print" (debug_show cons);
+          objs #= [ #pointer ( {from=label_# ":next"; to=(debug_show cons.next)}) ];
+          let nextPosition = A.Scene.vec3Add(position, offset);
+          objs #= sceneObjectsMergeSortStream(cons.next, nextPosition, offset);
+          ("symbol=" # (debug_show cons.symbol) # "\nelement=" # (debug_show cons.element),
+           ["next"]) 
+        };
+      };
+    [#orb({label_; position; textFields; pointerFields })] # objs
+  };
+
+  #[test]
+  func testSceneObjectMergeSortStream() {
+    let s = testStreamNats();
+    //prim "print" s;
+    let out = sceneObjectsMergeSortStream(s, A.Scene.zero, A.Scene.zero);
+    assert out.size() == 1;
+    //prim "print" (debug_show out);
+    assert out[0].1!.textFields == "(unforced)";
+    let _ = takeN_(s, 3);
+    let out = sceneObjectsMergeSortStream(s, A.Scene.zero, {x=0.0;y=0.0;z=1.0});
+    //prim "print" (debug_show out);
+    assert out.size() == 5;
+    assert out[4].1!.textFields == "null";
+  };
+
+
   #[listing]
   public func takeN(l : LazyList<X>, len : Nat) : [(Symbol, X)] {
     if (len == 0) { return [] };
@@ -52,6 +90,13 @@ module {
         ([(l, lc.symbol, lc.element)] # arr, last)
       }
     }
+  };
+
+  func testStreamNats() : LazyList_<Nat> {
+    let p3 = `p3 := thunk { null };
+    let p2 = `p2 := thunk { ?{symbol=2; element=2; next=p3}};
+    let p1 = `p1 := thunk { ?{symbol=1; element=1; next=p2}};
+    p1
   };
 
   #[test]

@@ -113,6 +113,22 @@ module {
         // TO DO
     };
 
+    public func peekForce(p : Pointer) : ?(MetaTime, Any) {
+        let nodeInfo = peekInfo(p);
+        switch (nodeInfo!.node) {
+            case (#thunk_(t)) { t.result };
+            case _ { assert false };
+        }
+    };
+
+    #[test]
+    func testPeekForce() {
+        let t = `t := thunk { 137 };
+        let x = force(t);
+        assert x == 137;
+        assert ((peekForce(t)).0).1 == 137;
+    };
+
     public func peekHistory() : PeekInfo.History {
         let history = prim "adaptonPeekHistory" ();
 	    history
