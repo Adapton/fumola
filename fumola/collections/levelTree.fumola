@@ -489,13 +489,33 @@ module {
                 objectFromEdge(label_, "putNil", n.edges[0]),
                 objectFromEdge(label_, "reduceRoot", n.edges[1]),
               ] #
-              rec_(n.edges[2].outline!, positionL)
+              rec_(n.edges[1].outline!, positionL)
             };
-            case 5 {
-              // to do
+            case 4 {
+              [
+                #orb { label_; position; textFields = ""; pointerFields = [
+                "forceMerge", "recL", "recR", "putMerge"
+                ]},
+                objectFromEdge(label_, "forceMerge", n.edges[0]),
+                objectFromEdge(label_, "recL", n.edges[1]),
+              ] #
+              rec_(n.edges[1].outline!, position) #
+              [
+                objectFromEdge(label_, "recR", n.edges[2])
+              ] #
+              rec_(n.edges[2].outline!, position) #
+              [
+                objectFromEdge(label_, "putMerge", n.edges[3])
+              ]
             }; 
-            case 7 {
-              // to do
+            case 1 {
+              //assert n.edges[0].outline == null ;
+              [
+                #orb { label_; position; textFields = ""; pointerFields = [
+                "forceNil",
+                ]},
+                objectFromEdge(label_, "forceNil", n.edges[0]),
+              ]
             };
             case arity {
               prim "print" arity; 

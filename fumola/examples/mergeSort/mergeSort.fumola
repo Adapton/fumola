@@ -102,8 +102,8 @@ module {
             };
      
         let mergeGap = 2.0;
-        let lazyMergeSortTakeFirst = if false {
-            Seq.Scene.sceneObjectsLazyMergeSort(A.Outline.outline(scene.components.lazySorted_),
+        let lazyMergeSortTakeFirst = if true {
+            Seq.Scene.sceneObjectsLazyMergeSort_(A.Outline.outline(scene.components.lazySorted_),
             { x = 0.0; y = height + 1; z = levelGap + mergeGap },
             {
                 reduceRoot = { x = 0; y = 1; z = 0; };
@@ -121,7 +121,8 @@ module {
             objects = inputListObjects 
                     # inputTreeFromListObjects
                     # [inputTree_NilList]
-                    # inputTreeObjects;
+                    # inputTreeObjects
+                    # lazyMergeSortTakeFirst;
         };
         let sceneText = A.IntoJSON.fromScene(sceneData);
         prim "writeFile" (`mergeSortSceneFullDemand
@@ -148,7 +149,7 @@ module {
         assert scene.history.events.size() == 534;
         assert scene.history.nodes.size() == 197;
         assert scene.history.edges.size() == 286;
-        assert scene.objects.size() == 135;
+        assert scene.objects.size() == 200;
         assert ((scene.outline.1).0).value!.0 == 313; // Final Meta Time.
     };
             
