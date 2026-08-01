@@ -100,6 +100,12 @@ module {
                 position = {x=0; y=0; z=levelGap / 2.0};
                 textFields=""; pointerFields=""
             };
+        let lazyMergeSort_NilList = 
+            #orb{
+                label_="lazyMergeSort(`(nilList))";
+                position = {x=0; y=-1; z=-levelGap};
+                textFields=""; pointerFields=""
+            };
      
         let mergeGap = 1.0;
         let lazyMergeSort = if true {
@@ -122,7 +128,9 @@ module {
                     # inputTreeFromListObjects
                     # [inputTree_NilList]
                     # inputTreeObjects
-                    # lazyMergeSort;
+                    # lazyMergeSort
+                    # [lazyMergeSort_NilList]
+                    ;
         };
         let sceneText = A.IntoJSON.fromScene(sceneData);
         prim "writeFile" (`mergeSortSceneFullDemand

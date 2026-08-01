@@ -40,21 +40,25 @@ module {
     let cellPos = A.peekInfo(`position(list));
     if (cellPos != null) { return [] }; // we've already processed this tail of the stream.
     // Continue only if the stream isn't processed yet; avoid duplicates.
-    `position(list) := position;
-    let (textFields : Text, pointerFields : Text) = 
+    let (textFields : Text, pointerFields : Text, isNilList :?Bool) = 
       switch (cell) {
-        case null { ("(unforced)", []) };
-        case (?(_, null)) { ("null", []); };
+        case null { 
+          `position(list) := position;
+          ("(unforced)", [], null)
+        };
+        case (?(_, null)) { ("null", [], ?true); };
         case (?(_, ?cons)) {
-          prim "print" (debug_show cons);
+          `position(list) := position;
           objs #= [ #pointer ( {from=label_# ":next"; to=(debug_show cons.next)}) ];
           let nextPosition = A.Scene.vec3Add(position, offset);
           objs #= sceneObjectsMergeSortStream(cons.next, nextPosition, offset);
           ("symbol=" # (debug_show cons.symbol) # "\nelement=" # (debug_show cons.element),
-           ["next"]) 
+           ["next"], ?false) 
         };
       };
-    [#orb({label_; position; textFields; pointerFields })] # objs
+    if (isNilList != (?true)) {
+      [#orb({label_; position; textFields; pointerFields })] # objs
+    } else { objs }
   };
 
   #[test]

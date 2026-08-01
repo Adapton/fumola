@@ -637,7 +637,6 @@
 { "type": "put", "from": "lazyMergeSort(recLeft(3)):putMerge", "to": "lazyMergeSort(merge-2)(1)", "edgeId": "#edgeId(1427)"},
 { "type": "orb", "position": [-21, 4.236000000000001, -17.30968], "label": "lazyMergeSort(recRight(2))", "textLines": "symbol=2\nelement=1918", "pointerFields": ["next"]},
 { "type": "pointer", "from": "lazyMergeSort(recRight(2)):next", "to": "lazyMergeSort(`(nilList))"},
-{ "type": "orb", "position": [-21, 4.236000000000001, -18.30968], "label": "lazyMergeSort(`(nilList))", "textLines": "null", "pointerFields": []},
 { "type": "putForce", "from": "lazyMergeSort(recLeft(4)):recR", "to": "lazyMergeSort(recRight(3))", "edgeId": "#edgeId(1429)"},
 { "type": "orb", "position": [-19.5, 2.6180000000000003, -16.30968], "label": "lazyMergeSort(recRight(3))", "textLines": "", "pointerFields": ["getElement"]},
 { "type": "get", "from": "lazyMergeSort(recRight(3)):getElement", "to": "inputTree(3-element)", "edgeId": "#edgeId(1430)"},
@@ -1184,7 +1183,8 @@
 { "type": "orb", "position": [0, 20.416, -38.30968], "label": "lazyMergeSort(merge-41)(35)", "textLines": "symbol=41\nelement=5348", "pointerFields": ["next"]},
 { "type": "pointer", "from": "lazyMergeSort(merge-41)(35):next", "to": "lazyMergeSort(merge-41)(41)"},
 { "type": "orb", "position": [0, 20.416, -39.30968], "label": "lazyMergeSort(merge-41)(41)", "textLines": "symbol=33\nelement=5460", "pointerFields": ["next"]},
-{ "type": "pointer", "from": "lazyMergeSort(merge-41)(41):next", "to": "lazyMergeSort(merge-34)(33)"}
+{ "type": "pointer", "from": "lazyMergeSort(merge-41)(41):next", "to": "lazyMergeSort(merge-34)(33)"},
+{ "type": "orb", "position": [0, -1, -32.61936], "label": "lazyMergeSort(`(nilList))", "textLines": "", "pointerFields": ""}
 ]
 ,
 "outline" : 
