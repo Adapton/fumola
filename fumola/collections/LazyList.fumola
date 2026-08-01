@@ -37,6 +37,10 @@ module {
     let label_ : Text = (debug_show list);
     var objs : SceneObjects = [];
     let cell = A.peekForce(list);
+    let cellPos = A.peekInfo(`position(list));
+    if (cellPos != null) { return [] }; // we've already processed this tail of the stream.
+    // Continue only if the stream isn't processed yet; avoid duplicates.
+    `position(list) := position;
     let (textFields : Text, pointerFields : Text) = 
       switch (cell) {
         case null { ("(unforced)", []) };

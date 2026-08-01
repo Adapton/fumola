@@ -483,7 +483,7 @@ module {
             case 2 { 
               assert false;
               // TODO -- use this case in our tests.
-                           
+
               let position = @(`position(n.edges[1].actionTarget));
               let position = A.Scene.vec3Add(position, offsets.reduce);
               [#orb { label_; position; textFields = ""; pointerFields = [
@@ -497,7 +497,8 @@ module {
             };
             case 4 {
               let position = @(`position(n.edges[0].actionTarget));
-              let position = A.Scene.vec3Add(position, offsets.reduce);     
+              let position = A.Scene.vec3Add(position, offsets.reduce);
+              let positionM = A.Scene.vec3Add(position, offsets.merge);
               [
                 #orb { label_; position; textFields = ""; pointerFields = [
                 "getBinary", "recL", "recR", "putMerge"
@@ -512,7 +513,9 @@ module {
               rec_(n.edges[2].outline!, position) #
               [
                 objectFromEdge(label_, "putMerge", n.edges[3])
-              ]
+              ] #
+              LazyList.sceneObjectsMergeSortStream(n.edges[2].actionTarget,
+                  positionM, offsets.merge)
             }; 
             case 1 {
               let position = @(`position(n.edges[0].actionTarget));

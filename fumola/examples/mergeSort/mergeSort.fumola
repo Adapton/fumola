@@ -101,13 +101,13 @@ module {
                 textFields=""; pointerFields=""
             };
      
-        let mergeGap = 2.0;
+        let mergeGap = 1.0;
         let lazyMergeSort = if true {
             Seq.Scene.sceneObjectsLazyMergeSort_(A.Outline.outline(scene.components.lazySorted_),
             { x = 0.0; y = 1.618 * height; z = -levelGap/2.0 },
             {
                 reduce = { x = 0; y = 1; z = -levelGap/2.0; };
-                merge = { x =  0.0; y = 0.0; z = mergeGap };
+                merge = { x =  0.0; y = 0.0; z = -mergeGap };
             }) } else {};
 
         let outline = A.Outline.outline(scene_);
