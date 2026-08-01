@@ -514,7 +514,7 @@ module {
               [
                 objectFromEdge(label_, "putMerge", n.edges[3])
               ] #
-              LazyList.sceneObjectsMergeSortStream(n.edges[2].actionTarget,
+              LazyList.sceneObjectsMergeSortStream(n.edges[3].actionTarget,
                   positionM, offsets.merge)
             }; 
             case 1 {
