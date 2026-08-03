@@ -1,6 +1,8 @@
 # `fumola`
 
-<img width="1028" height="300" alt="image" src="https://github.com/user-attachments/assets/9df17454-d89f-416c-9588-88665f338410" />
+## `lazyMergeSort` 
+
+<img width="1357" height="1105" alt="image" src="https://github.com/user-attachments/assets/c34cd768-0b55-4110-8cb8-33ef4c455a75" />
 
 ## Contributing
 
