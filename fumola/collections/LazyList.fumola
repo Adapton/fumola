@@ -24,12 +24,30 @@ module {
       case (?xc, ?yc) {
         Counters.inc `merge;
         if (xc.element <= yc.element) {
-          ?{ element=xc.element; symbol=xc.symbol; next = xc.symbol := thunk { merge(force(xc.next), ?yc) } }
+          ?{ 
+              element=xc.element;
+              symbol=xc.symbol;
+              next = xc.symbol := thunk { merge(force(xc.next), ?yc) }
+           }
         } else {
-          ?{ element=yc.element; symbol=yc.symbol; next = yc.symbol := thunk { merge(?xc, force(yc.next)) } }
+          ?{
+              element=yc.element;
+              symbol=yc.symbol;
+              next = yc.symbol := thunk { merge(?xc, force(yc.next)) }
+            }
         }
       };
     }
+  };
+
+  func objectFromEdge(source, port, (edgeId, edge)) : A.Scene.SceneObject {
+    // prim "print" (debug_show edge.edgeId);
+    let x = A.Outline.edgeActionInfo(edge);
+    #action{ from = source # ":" # port; 
+             to = debug_show (edge.target.0).0;
+             action = x.action;
+             edgeId;
+    } 
   };
 
   #[listing(88)]
@@ -37,9 +55,20 @@ module {
     let label_ : Text = (debug_show list);
     var objs : SceneObjects = [];
     let cell = A.peekForce(list);
+    let nodeInfo = A.peekInfo(list);
+    //prim "print" nodeInfo;
+    //prim "print" (nodeInfo!.outgoingEdges);
+    if (nodeInfo!.outgoingEdges.size() > 0) {
+      //prim "print" "xxx";
+      let forceMergeEdge = nodeInfo!.outgoingEdges[0];
+      //prim "print" forceMergeEdge;
+      let forceMergeObj = objectFromEdge(label_, "forceMerge", forceMergeEdge);
+      //prim "print" forceMergeObj;
+      objs := objs # [ forceMergeObj ];
+    };
     let cellPos = A.peekInfo(`position(list));
     if (cellPos != null) { return [] }; // we've already processed this tail of the stream.
-    // Continue only if the stream isn't processed yet; avoid duplicates.
+      // Continue only if the stream isn't processed yet; avoid duplicates.
     let (textFields : Text, pointerFields : Text, isNilList :?Bool) = 
       switch (cell) {
         case null { 
@@ -53,7 +82,7 @@ module {
           let nextPosition = A.Scene.vec3Add(position, offset);
           objs #= sceneObjectsMergeSortStream(cons.next, nextPosition, offset);
           ("symbol=" # (debug_show cons.symbol) # "\nelement=" # (debug_show cons.element),
-           ["next"], ?false) 
+           ["next", "forceMerge"], ?false) 
         };
       };
     if (isNilList != (?true)) {

@@ -541,6 +541,7 @@ module {
         };
    
         public func fromObject( o : Object ) : Text {
+            //prim "print" o;
             switch o {
                 case (#box(fields)) {
                     "{ \"type\": \"box\"" #
