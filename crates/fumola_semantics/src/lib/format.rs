@@ -8,8 +8,8 @@ use crate::vm_types::{Env, LocalPointer, ScheduleChoice, def::CtxId};
 use fumola_syntax::ast::{
     AdaptonNav, AdaptonNavDim, BinOp, BindSort, Case, CasesPos, Dec, Dec_, DecField, DecFieldsPos,
     Delim, Exp, Exp_, ExpField, Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat,
-    PatField, PrimFunction, PrimType, QuotedAst, RelOp, Stab, Type, TypeBind, TypeField, TypePath,
-    TypeTag, TypeTag_, UnOp, Unquote, Vis,
+    PatField, PrimFunction, PrimType, ProjIndex, QuotedAst, RelOp, Stab, Type, TypeBind, TypeField,
+    TypePath, TypeTag, TypeTag_, UnOp, Unquote, Vis,
 };
 use fumola_syntax::lexer::is_keyword;
 use fumola_syntax::lexer_types::{GroupType, Token, TokenTree};
@@ -374,7 +374,13 @@ impl ToDoc for Value {
                     .append(f.0.content.doc()),
                 ")",
             )),
-            Value::PrimFunction(f) => kwd("prim").append(f.doc()),
+            Value::PrimFunction(f) => {
+                if let PrimFunction::AtSignVar(x) = f {
+                    RcDoc::text(x)
+                } else {
+                    kwd("prim").append(f.doc())
+                }
+            }
             Value::Collection(c) => match c {
                 crate::value::Collection::HashMap(m) => hashmap(m),
                 crate::value::Collection::FastRandIter(_) => todo!(),
@@ -537,6 +543,15 @@ impl ToDoc for AdaptonNavDim {
     }
 }
 
+impl ToDoc for ProjIndex {
+    fn doc(&'_ self) -> RcDoc<'_> {
+        match self {
+            ProjIndex::Usize(n) => RcDoc::text(n.to_string()),
+            ProjIndex::FloatLike(s) => s.doc(),
+        }
+    }
+}
+
 impl ToDoc for Exp {
     fn doc(&'_ self) -> RcDoc<'_> {
         use Exp::*;
@@ -648,7 +663,7 @@ impl ToDoc for Exp {
             Ignore(e) => kwd("ignore").append(e.doc()),
             Paren(e) => enclose("(", e.doc(), ")"),
             // Value_(_) => todo!(),
-            Proj(_, _) => todo!(),
+            Proj(e, i) => e.doc().append(kwd(".")).append(i.doc()),
             Object((bases, fields)) => enclose(
                 "{",
                 match (bases, fields) {

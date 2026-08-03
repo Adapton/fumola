@@ -52,6 +52,29 @@ module {
     }
   };
 
+ #[listing]
+  public func reduce_<X,Y>(
+        t : LevelTree_<X>, 
+        empty : Y,
+        element : (Symbol, X) -> Y,
+        binary : (Symbol, Y, Y) -> Y) : Y
+  {
+    switch (@ t) {
+      case (#empty) empty;
+      case (#element(e)) element(e.symbol, e.element);
+      case (#binary(b)) {
+        let recLeft = force(`recLeft(b.symbol) := thunk {
+          reduce_(b.left, empty, element, binary)
+        });
+        let recRight = force(`recRight(b.symbol) := thunk {
+          reduce_(b.right, empty, element, binary)
+        });
+        binary(b.symbol, recLeft, recRight)
+      };
+    }
+  };
+
+
   #[listing]
   public type GenSymThk = Thunk<(Symbol, GenSymThk)>;
   
@@ -120,10 +143,30 @@ module {
   #[listing(62)]
   public func lazyMergeSort<X>(t : ?SeqTree_<X>) : LazyList_<X> {
     let nilList = `(nilList) := thunk { null };
-    if (t == null) { return empty };
+    if (t == null) { return nilList };
     `result := thunk {
       reduceUp(
         @(t!),
+        null,
+        func(symbol:Symbol, element:X) : LazyList<X> {
+         ?{ symbol; element; next = nilList }
+        },
+        func(symbol:Symbol, xs:LazyList<X>, ys:LazyList<X>) : LazyList<X> {
+         do within space (`merge-symbol) {
+           LazyList.merge(xs, ys)
+         }
+      },
+     )
+    }
+  };
+
+  #[listing(62)]
+  public func lazyMergeSort_<X>(t : ?SeqTree_<X>) : LazyList_<X> {
+    let nilList = `(nilList) := thunk { null };
+    if (t == null) { return nilList };
+    `result := thunk {
+      reduce_(
+        t!,
         null,
         func(symbol:Symbol, element:X) : LazyList<X> {
          ?{ symbol; element; next = nilList }
@@ -297,7 +340,7 @@ module {
 
   };
 
-  public module Viz {
+  public module Scene {
 
   public type Geom2D = {
     height : Nat;
@@ -309,10 +352,11 @@ module {
   public func writeSceneFile(file : Symbol, seed : Nat, size : Nat) {
     let a = R.generateRandomInput(seed, size);
     let t = fromArray(a);
-    let evs = A.peekEvents();
-    let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(evs);
-    let objs = sceneObjects(nodeIdsByLabel, t!, A.Viz.zero);
-    prim "writeFile" (file, A.Viz.sceneIntoJSONText(objs))
+    // let evs = A.peekEvents();
+    // let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(evs);
+    let objs = sceneObjects(t!, A.Scene.zero);
+    let text = A.IntoJSON.fromObjects(objs);
+    prim "writeFile" (file, text)
   };
 
   #[test]
@@ -320,13 +364,188 @@ module {
     writeSceneFile(`testWriteSceneFile, 10, 10)
   };
 
+  func objectFromEdge(source, port, edge) : A.Scene.SceneObject {
+    // prim "print" (debug_show edge.edgeId);
+    #action{ from = source # ":" # port; 
+             to = debug_show edge.actionTarget;
+             action = edge.action;
+             edgeId = edge.edgeId;
+    } 
+  };
+
+  public func sceneObjectsFromList(outline, position, offsets) : A.Scene.SceneObjects {
+    func sceneObjectsFromList_(outline, position) : A.Scene.SceneObjects {
+      switch (outline) {
+        case (#leaf(n)) { assert false };
+        case (#internal(n)) {
+          let label_ = (debug_show ((n.__nodeId.0).0));
+          switch (n.edges.size()) {
+            case 1 { 
+              //
+              // various base cases land here.
+              // use position for the orb object.
+              //
+              [#orb { label_; position; textFields = ""; pointerFields = ["get"]}] #
+              [objectFromEdge(label_, "get", n.edges[0])]
+            };
+            case 5 { 
+              let position = @ ((`position)(n.edges[3].actionTarget));
+              let position = A.Scene.vec3Add(position, offsets.binary);
+              let positionL = A.Scene.vec3Add(position, offsets.leafL);
+              let positionR = A.Scene.vec3Add(position, offsets.leafR);
+      
+              // most common (binary) recursive case lands here.
+              // use position of the target of n.edges[3] for orb object.
+              // re-set position for each sub-case using logic like in original binary tree layout.
+              [#orb { label_; position; textFields = ""; pointerFields = [
+                "get", "putE", "rec1", "putB", "rec2"
+              ]}] #
+              [ 
+                objectFromEdge(label_, "get", n.edges[0]),
+                objectFromEdge(label_, "putE", n.edges[1]),
+                objectFromEdge(label_, "rec1", n.edges[2]),
+              ] #
+              sceneObjectsFromList_(n.edges[2].outline!, positionL)
+              # [ 
+                objectFromEdge(label_, "putB", n.edges[3]),
+                objectFromEdge(label_, "rec2", n.edges[4])
+              ] #
+              sceneObjectsFromList_(n.edges[4].outline!, positionR)
+            };
+            case 7 { 
+              let position = @ ((`position)(n.edges[1].actionTarget));
+              let position = A.Scene.vec3Add(position, offsets.binary);
+              let positionL = A.Scene.vec3Add(position, offsets.leafL);
+              let positionR = A.Scene.vec3Add(position, offsets.leafR);
+              
+              // special case for the top of the recursion.
+              // similar to case 5 except for extra two initial steps: 
+              //  - intialize a local copy of the empty input/output list,
+              //  - and put the first list element into an initial leaf-element tree. 
+              [#orb { label_; position; textFields = ""; pointerFields = [
+                "putN", "putE1", "get", "putE2", "rec1", "putB", "rec2"
+              ]}] #
+              [ 
+                objectFromEdge(label_, "putN", n.edges[0]),
+                objectFromEdge(label_, "putE1", n.edges[1]),
+                objectFromEdge(label_, "get", n.edges[2]),
+                objectFromEdge(label_, "putE2", n.edges[3]),
+                objectFromEdge(label_, "rec1", n.edges[4]),
+              ] #
+              sceneObjectsFromList_(n.edges[4].outline!, positionL)
+              # [
+                objectFromEdge(label_, "putB", n.edges[5]),
+                objectFromEdge(label_, "rec2", n.edges[6])
+              ] #
+              sceneObjectsFromList_(n.edges[6].outline!, positionR)
+            };
+            case _ { 
+              assert false
+            };
+          };
+        };
+      }
+    };
+    sceneObjectsFromList_(outline, position)
+  };
+  
+
+  #[test]
+  public func testSceneObjectsFromList() {
+    let array = R.generateRandomInput(10, 10);
+    let buildList = `buildList := thunk { List.fromIter(array.vals()) };
+    let list = force buildList;
+    let buildTree = `buildTree := thunk { fromList(list); };
+    let tree = force buildTree;
+    let outline = A.Outline.outline(buildTree);
+    let sceneObjects1 = sceneObjects(tree!, A.Scene.zero);
+    let offsets = {
+          binary = { x = 0.0; y = 0.0; z = 5.0};
+          leafL = { x = -0.5; y = -0.25; z = 1.0};
+          leafR = { x =  0.5; y = -0.25; z = 1.0};
+    };
+    let sceneObjects2 = sceneObjectsFromList(outline, A.Scene.zero, offsets);
+    let sceneObjects = sceneObjects1 # sceneObjects2;
+    let _ = A.IntoJSON.fromObjects(sceneObjects);
+    { array; sceneObjects }
+  };
+
+  #[listing(88)]
+  public func sceneObjectsLazyMergeSort_(outline, position, offsets) {
+   func rec_(outline, position) : A.Scene.SceneObjects {
+      switch (outline) {
+        case (#leaf(n)) { assert false };
+        case (#internal(n)) {
+          let label_ = (debug_show ((n.__nodeId.0).0));        
+          switch (n.edges.size()) {
+            // the setup for the recursion creates a nil output element,
+            // and then recurs according to reduce(tree, nil, singleton, merge)
+            case 2 { 
+              assert false;
+              // TODO -- use this case in our tests.
+
+              let position = @(`position(n.edges[1].actionTarget));
+              let position = A.Scene.vec3Add(position, offsets.reduce);
+              [#orb { label_; position; textFields = ""; pointerFields = [
+                "putNil", "reduceRoot"
+                ]}] #
+              [ 
+                objectFromEdge(label_, "putNil", n.edges[0]),
+                objectFromEdge(label_, "reduceRoot", n.edges[1]),
+              ] #
+              rec_(n.edges[1].outline!, position)
+            };
+            case 4 {
+              let position = @(`position(n.edges[0].actionTarget));
+              let position = A.Scene.vec3Add(position, offsets.reduce);
+              let positionM = A.Scene.vec3Add(position, offsets.merge);
+              [
+                #orb { label_; position; textFields = ""; pointerFields = [
+                "getBinary", "recL", "recR", "putMerge"
+                ]},
+                objectFromEdge(label_, "getBinary", n.edges[0]),
+                objectFromEdge(label_, "recL", n.edges[1]),
+              ] #
+              rec_(n.edges[1].outline!, position) #
+              [
+                objectFromEdge(label_, "recR", n.edges[2])
+              ] #
+              rec_(n.edges[2].outline!, position) #
+              [
+                objectFromEdge(label_, "putMerge", n.edges[3])
+              ] #
+              LazyList.sceneObjectsMergeSortStream(n.edges[3].actionTarget,
+                  positionM, offsets.merge)
+            }; 
+            case 1 {
+              let position = @(`position(n.edges[0].actionTarget));
+              let position = A.Scene.vec3Add(position, offsets.reduce);
+              [
+                #orb { label_; position; textFields = ""; pointerFields = [
+                "getElement",
+                ]},
+                objectFromEdge(label_, "getElement", n.edges[0]),
+              ]
+            };
+            case arity {
+              prim "print" arity; 
+              assert false
+            };
+          };
+        };
+      }
+    };
+    rec_(outline, position)
+  };
+
   #[listing]
-  public func sceneObjects<X>(nodeIdsByLabel : Map<Text, [NodeIds]>, tree : Pointer<SeqTree<X>>, origin : Vec3) : SceneObjects {
+  public func sceneObjects<X>(tree : Pointer<SeqTree<X>>, origin : Vec3) : SceneObjects {
     let g = geom2d(tree);
-    let label_ = (debug_show tree);
-    let position = {y = g.height * 1.618; x = origin.x; z = origin.z};
-    var objs = [];
-    let (textFields, pointerFields) = 
+    let label_ : Text = (debug_show tree);
+    let position : Vec3 = {y = origin.y + g.height * 1.618; x = origin.x; z = origin.z};
+    `position(tree) := position;
+    var objs : SceneObjects = [];
+    let (textFields : Text, pointerFields : Text) = 
       switch (@ tree) {
         case (#empty) { ("#empty", []) };
         case (#element(e)) { (
@@ -338,30 +557,26 @@ module {
             #pointer ( {from=label_# ":right"; to=(debug_show b.right)})
           ];
           assert (g.width == (g.widthLeft + g.widthRight));
-          objs #= sceneObjects(nodeIdsByLabel, b.left, {x=origin.x - (g.widthRight * 0.5); y=origin.y; z=0.0 + origin.z - 1.0});
-          objs #= sceneObjects(nodeIdsByLabel, b.right, {x=origin.x + (g.widthLeft * 0.5); y=origin.y; z=0.0 + origin.z + 1.0});
+          objs #= sceneObjects(b.left, {x=origin.x - (g.widthRight * 0.5); y=origin.y; z=origin.z});
+          objs #= sceneObjects(b.right, {x=origin.x + (g.widthLeft * 0.5); y=origin.y; z=origin.z});
           ("#binary\n\tsymbol=" # (debug_show b.symbol) # "\n\tlevel=" # (debug_show b.level),
            ["left", "right"]) 
         };
       };
-    let nodeIds = Map.get(nodeIdsByLabel, label_)!;
-    [#box({label_; position; textFields; pointerFields; nodeIds})] # objs
+    [#box({label_; position; textFields; pointerFields })] # objs
   };
 
   #[test]
   public func testSceneObjects() {
     let a = R.generateRandomInput(10, 10);
     let t = fromArray(a);
-    let evs = A.peekEvents();
-    let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(evs);
-    let objs = sceneObjects(nodeIdsByLabel, t!, A.Viz.zero);
+    let objs = sceneObjects(t!, A.Scene.zero);
     assert (objs.size() == 37);
-    // prim "print" (objs[36]);
     let last = objs[36];
     switch last {
       case (#box(b)) {
         assert b.label_ == "10-element";
-        assert (b.position == {x=4.5;y=1.618;z=2.0});
+        assert (b.position == {x=4.5;y=1.618;z=0.0});
         assert (b.textFields == "#element\n\tsymbol=10\n\telement=545");
       };
       case _ { assert false };
@@ -371,7 +586,7 @@ module {
   #[listing]
   public func geom2d<X>(tree : Pointer<SeqTree<X>>) : Geom2D {
     let oneUnit = { height=1; width=1; widthLeft=0.5; widthRight=0.5};
-    switch (@ tree) {
+    force(`geom2d(tree) := thunk { switch (@ tree) {
       case (#empty) { oneUnit };
       case (#element(e)) { oneUnit };
       case (#binary(b)) {
@@ -384,7 +599,7 @@ module {
           width = ml.width + mr.width;
         }
       };
-    }
+    }})
   };
 
   #[test]
@@ -392,7 +607,6 @@ module {
     let a = R.generateRandomInput(10, 10);
     let t = fromArray(a);
     let g = geom2d(t!);
-    // prim "print" g;
     assert (g == 
       { height = 6;
         width = 10;

@@ -42,12 +42,20 @@ module {
             };
         };
         let inputTree = force(inputTree_);
-        let lazySorted_ = do within space `lazyMergeSort {
-            Seq.lazyMergeSort(inputTree);
-        };
-        let sorted = do within space `forceSort {
+        let lazySorted_ = 
+            force(`lazyMergeSort := thunk {
+            do within space `lazyMergeSort {
+            if false { 
+                Seq.lazyMergeSort(inputTree)
+            } else {
+                Seq.lazyMergeSort_(inputTree)
+            };
+        }});
+        let sorted = 
+            force(`forceSort := thunk {
+            do within space `forceSort {
             LazyList.takeN_(lazySorted_, size);
-        };
+        }});
         let components = {
             inputArray;
             inputList_;
@@ -62,42 +70,95 @@ module {
         let scene = force(scene_);
         let history = A.peekHistory();
         let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(history.events);
-        let inputTreeObjects = Seq.Viz.sceneObjects(nodeIdsByLabel, scene.components.inputTree!, A.Viz.zero);
-        // to do:
-        // - inputListObjects
-        // - mergeSortFullDemandObjects --- we can use our own tools to anticipate how to lay these out best.
-        //    - outline of internal nodes, following geometry of input tree, but offset in space.
-        //    - each internal node either arises from a thunk calling LazyList.merge, or
-        //    - its a node that corresponds 1-1 with reducing some input tree node (the "main eager call " of lazyMergeSort).
-        //    - the "geometric data flow" is as follows:
-        //        - X-Y plane: Input tree in X-Y plane 
-        //          ==determines==> Reduction traversal position, but set back in Z, 
-        //          ==determines==> merge thunks, set further back in Z.
-        //        - Y-Z plane: Output list along Z axis
-        //          ==determines==> merge thunks "height" in the Z axis.
+
+        // - - - - Create 3D objects that represent each component - - - - -
+   
+        let inputTreeObjects =
+            Seq.Scene.sceneObjects(scene.components.inputTree!,
+            { x = 0.0; y = 0.0; z = 0.0});
+
+        let inputTreeGeom2d = Seq.Scene.geom2d(scene.components.inputTree!);
+        let height = inputTreeGeom2d.height;
+        let e = 2.71828;
+        let levelGap = height * e;
+     
+        let inputListObjects =
+            List.sceneObjectsFromThunk(scene.components.inputList_,
+            { x = 0.0 - (size + 0.0) / 2.0 ; y = 5.0; z = levelGap});
+
+        let inputTreeFromListObjects =
+            Seq.Scene.sceneObjectsFromList(A.Outline.outline(scene.components.inputTree_),
+            { x = 0.0; y = 0.0; z = levelGap / 2.0}, {
+                binary = { x = 0.0; y = 0.0; z = levelGap / 2.0};
+                leafL = { x = -(0.2 * e); y = -0.1 * e; z = 1.0};
+                leafR = { x =  (0.2 * e); y = -0.1 * e; z = 1.0};
+            });
+        // constant pointer created by the tree-of-list procedure for initializing the accumlator:
+        let inputTree_NilList = 
+            #box{
+                label_="inputTree(`(nilList))";
+                position = {x=0; y=0; z=levelGap / 2.0};
+                textFields=""; pointerFields=""
+            };
+        let lazyMergeSort_NilList = 
+            #orb{
+                label_="lazyMergeSort(`(nilList))";
+                position = {x=0; y=-1; z=-levelGap};
+                textFields=""; pointerFields=""
+            };
+     
+        let mergeGap = 1.0;
+        let lazyMergeSort = if true {
+            Seq.Scene.sceneObjectsLazyMergeSort_(A.Outline.outline(scene.components.lazySorted_),
+            { x = 0.0; y = 1.618 * height; z = -levelGap/2.0 },
+            {
+                reduce = { x = 0; y = 1; z = -levelGap/2.0; };
+                merge = { x =  0.0; y = 0.0; z = -mergeGap };
+            }) } else {};
+
         let outline = A.Outline.outline(scene_);
-        let outlineText = A.Outline.outlineIntoText(outline);
+        let outlineText = A.IntoText.outline(outline);
         prim "writeFile" (`mergeSortSceneFullDemand
                             -`seed-seed
                             -`size-size
                             -`Outline-`txt, outlineText);
+        let sceneData = {
+            history ; outline ;
+            objects = inputListObjects 
+                    # inputTreeFromListObjects
+                    # [inputTree_NilList]
+                    # inputTreeObjects
+                    # lazyMergeSort
+                    # [lazyMergeSort_NilList]
+                    ;
+        };
+        let sceneText = A.IntoJSON.fromScene(sceneData);
+        prim "writeFile" (`mergeSortSceneFullDemand
+                            -`seed-seed
+                            -`size-size
+                            -`Scene-`json, sceneText);
         {
+            sceneData ;
             components = scene.components ;
-            nodeIdsByLabel;
-            history;
-            objects = inputTreeObjects;
-            outline;
         }
     };
 
     #[test]
     public func testGenerateSceneFullDemand() {
-        let scene = generateSceneFullDemand(10, 10);
-        assert scene.history.events.size() == 409;
-        assert scene.history.nodes.size() == 175;
-        assert scene.history.edges.size() == 194;
-        assert scene.objects.size() == 37; // TO DO -- Should be closer to total nodes + edges.
-        assert ((scene.outline.1).0).value!.0 == 280; // Final Meta Time.
+        let scene = generateSceneFullDemand(10, 10).sceneData;
+        // set to true when this test fails to see the new values and compare.
+        if true { prim "print" (debug_show ({
+            _0_eventsSize = scene.history.events.size();
+            _1_nodesSize = scene.history.nodes.size();
+            _2_edgesSize = scene.history.edges.size();
+            _3_objectsSize = scene.objects.size();
+            _4_finalMetaTime = ((scene.outline.1).0).value!.0;
+        }))};
+        assert scene.history.events.size() == 534;
+        assert scene.history.nodes.size() == 197;
+        assert scene.history.edges.size() == 286;
+        assert scene.objects.size() == 200;
+        assert ((scene.outline.1).0).value!.0 == 313; // Final Meta Time.
     };
             
     public func dcg(seed : Nat, size : Nat, demand) {
@@ -134,7 +195,7 @@ module {
         prim "adaptonReset" ();
         let dcg = dcg(seed, size, demand);
         let outline = A.Outline.outline(dcg.sorted);
-        let text = A.Outline.outlineIntoText(outline);
+        let text = A.IntoText.outline(outline);
         prim "writeFile" (`demand-demandSym(demand)-`size-size-`seed-seed-`DCG-`txt, text); 
     };
 

@@ -92,7 +92,7 @@ impl QuotedClose for Pat {
                 Ok(Pat::Variant(id.quoted_close(env)?, pat.quoted_close(env)?))
             }
             Pat::Or(_, _) => todo!(),
-            Pat::AnnotPat(_, _) => todo!(),
+            Pat::AnnotPat(p, t) => Ok(Pat::AnnotPat(p.quoted_close(env)?, t.clone())),
             Pat::Annot(_) => todo!(),
             Pat::Paren(_) => todo!(),
             Pat::Unquote(i) => match env.get(&i.id.0) {

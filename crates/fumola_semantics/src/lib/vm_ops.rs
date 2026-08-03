@@ -14,6 +14,7 @@ pub fn unop(un: UnOp, v: Value_) -> Result<Value, Interruption> {
     match (&un, &*v) {
         (UnOp::Neg, Value::Nat(n)) => Ok(Value::Int(-n.to_bigint().unwrap())),
         (UnOp::Neg, Value::Int(i)) => Ok(Value::Int(-i)),
+        (UnOp::Neg, Value::Float(f)) => Ok(Value::Float(-f)),
         (unop, v) => {
             if let Ok(symbol) = v.into_sym_or(()) {
                 Ok(Value::Symbol(Shared::new(Symbol::UnOp(

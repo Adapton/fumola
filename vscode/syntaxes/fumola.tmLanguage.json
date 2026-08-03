@@ -21,6 +21,9 @@
     },
     {
       "include": "#symbols"
+    },
+    {
+      "include": "#idents"
     }
   ],
   "repository": {
@@ -36,7 +39,15 @@
         },
         {
           "name": "keyword.operator.logical.fumola",
-          "match": "(==|<=|>=|<|>|\\b(not|or|and)\\b)"
+          "match": "(==|!=|<=|>=|<|>|\\b(not|or|and)\\b)"
+        },
+        {
+          "name": "keyword.operator.string.fumola",
+          "match": "#(?![A-Za-z_])"
+        },
+        {
+          "name": "keyword.operator.arith.fumola",
+          "match": "\\b(\\+|-|/|\\*)\\b"
         },
         {
           "name": "keyword.operator.definition.fumola",
@@ -45,6 +56,10 @@
         {
           "name": "keyword.operator.sequence.fumola",
           "match": ";"
+        },
+        {
+          "name": "keyword.operator.typeass.fumola",
+          "match": ":"
         },
         {
           "name": "keyword.operator.get.fumola",
@@ -113,12 +128,26 @@
       ]
     },
     "strings": {
+      "name": "string.quoted.double.fumola",
+      "begin": "\"",
+      "end": "\"",
       "patterns": [
         {
-          "name": "string.quoted.double.fumola",
-          "begin": "\"",
-          "end": "\""
+        "name": "constant.character.escape.fumola",
+        "match": "\\\\."
         }
+      ]
+    },
+    "idents": {
+        "patterns": [
+          {
+            "name": "variable.other.lowercase.fumola",
+            "match": "\\b[a-z][A-Za-z0-9_]*\\b"
+          },
+          {
+            "name": "entity.name.type.uppercase.fumola",
+            "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+          }
       ]
     }
   }

@@ -1,8 +1,25 @@
 import Map "hashMap";
+
+/// Adapton's structures represented within Fumola.
+///
+///    A Fumola library or algorithm can use this interface to reflect its
+/// own past behavior back to it, and process it into useful output
+/// for interactive replay (web-based DCG Player).
+///
+/// - PeekInfo --- Fumola values that describe Adapton behavior and structures.
+///
+/// - Outline --- A depth-first structure over PeekInfo at some root.
+///
+/// - IntoText --- For outline printouts that are compact, and textual.
+///
+/// - Scene --- A multi-dimensional structure for exporting into a playback tool.
+///
+/// - IntoJSON --- JSON format for web-based playback tools. 
+///                Useful line breaks for VSCode mode.
+///
+/// ----------------------------------------------------------------------------
 module {
- 
-    /// Adapton's structures in Fumola.
-    ///
+
     /// PeekInfo gives the fumola value-based types for the
     /// internal state of Adapton within Fumola.
     ///
@@ -11,23 +28,26 @@ module {
     /// graphical representation of the Adapton cache.
     ///
     public module PeekInfo {
+        public type NodeHistoryItem = {
+            nodeId : NodeId;
+            metaTime: MetaTime;
+            node : Node; 
+        };
+        public type EdgeHistoryItem = {
+            edgeId : EdgeId;
+            metaTime: MetaTime;
+            edge : Edge
+        };
         public type History = {
             events : Events;
-            nodes : [{
-                nodeId : NodeId;
-                metaTime: MetaTime;
-                node : Node; 
-            }];
-            edges : [{
-                edgeId : EdgeId;
-                metaTime: MetaTime;
-                edge : Edge
-            }]
+            nodes : [NodeHistoryItem];
+            edges : [EdgeHistoryItem];
         };
         public type Events = [Event];
         public type Event = {
             #addNode : NodeId;
             #addEdge : EdgeId;
+            #updateEdge : EdgeId;
             #removeEdge : EdgeId;
             #forceBegin : NodeId;
             #forceEnd : (NodeId, EdgeId);
@@ -66,6 +86,13 @@ module {
             metaTimes : MetaTimes;
         };
 
+        public type Action = {
+            #forceBegin : Any; // forced thunk can have any type.
+            #force_ : (Any, Any); // forced thunk and result can be any types.
+            #put : Any;
+            #get : Any;
+        };
+
         public type NodeInfo = {
             node : Node;
             nodeId : NodeId;
@@ -74,24 +101,9 @@ module {
         };
     };
 
-    public func edgeActionInfo(edge : Edge) : 
-      { 
-        action: Action; 
-        putValue: ?Any; // TODO -- distinguish thunks and non-thunks
-        forcedThunk: ?Thunk<A>;
-        metaTime: MetaTime;
-      } 
-    {
-        switch (edge.action) {
-
-            case(#put(value)) {{action=#put; value; forcedThunk=null; metaTimes=edge.metaTimes}};
-            case(#get(value)) {{action=#get; value; forcedThunk=null; metaTimes=edge.metaTimes}};
-            case(#force_(t, value)) {{action=#force_; value; forcedThunk=?t; value; metaTimes=edge.metaTimes}};
-        }
-    };
-
     public func peekInfo(p : Pointer) : ?PeekInfo.NodeInfo {
-        prim "adaptonPeekCell" p
+        let p = prim "adaptonPointer" p;
+        prim "adaptonPeekCell" p;
     };
 
     #[test]
@@ -100,6 +112,22 @@ module {
         prim "print" (debug_show (peekInfo(p)))
 
         // TO DO
+    };
+
+    public func peekForce(p : Pointer) : ?(MetaTime, Any) {
+        let nodeInfo = peekInfo(p);
+        switch (nodeInfo!.node) {
+            case (#thunk_(t)) { t.result };
+            case _ { assert false };
+        }
+    };
+
+    #[test]
+    func testPeekForce() {
+        let t = `t := thunk { 137 };
+        let x = force(t);
+        assert x == 137;
+        assert ((peekForce(t)).0).1 == 137;
     };
 
     public func peekHistory() : PeekInfo.History {
@@ -151,21 +179,24 @@ module {
 
         let evs = peekEvents();
     
-        assert (evs.size() == 9);
-        assert (evs[4] == { event = #forceBegin(tId);        metaTime = 3});
-        assert (evs[5] == { event = #addNode(pId_);          metaTime = 4});
-        assert (evs[6] == { event = #addEdge(#edgeId(1003)); metaTime = 4});
-        assert (evs[7] == { event = #addEdge(#edgeId(1004)); metaTime = 5});
-        assert (evs[8] == { event = #forceEnd(tId, #edgeId(1004)); metaTime = 5});
-    
+        assert (evs.size() == 10);
+        assert (evs[4] == {event = #addEdge(#edgeId(1003)); metaTime = 3});
+        assert (evs[5] == {event = #forceBegin(#edgeId(1003), null); metaTime = 3});
+        assert (evs[6] == {event = #addNode(pId_); metaTime = 4});
+        assert (evs[7] == {event = #addEdge(#edgeId(1004)); metaTime = 4});
+        assert (evs[8] == {event = #forceEnd(#edgeId(1003)); metaTime = 5});
+        assert (evs[9] == {event = #updateEdge(#edgeId(1003)); metaTime = 5});
+     
         assert((force(t)) == p);
 
         let evs = peekEvents();
 
-        assert (evs.size() == 11);
-        assert (evs[9] == {event = #forceBegin(tId); metaTime = 6});
-        assert (evs[10] == {event = #forceEnd((tId, #edgeId(1005))); metaTime = 6});
-
+        assert (evs.size() == 12);
+    
+        assert (evs[10] == {event = #forceBegin(#edgeId(1005), ?5); metaTime = 6});
+        assert (evs[11] == {event = #forceEnd(#edgeId(1005)); metaTime = 6});
+      
+        // set to true when this test fails to see the correct output
         if false {
             prim "print" (evs.size());
             var count = 0;
@@ -179,7 +210,7 @@ module {
     // helper code:
     // this codifies a simple convention that works when every spatial name
     // is unique enough to stand without its temporal or meta-temporal components.
-    public func nodeIdsByLabelFromEvents(evs : [Event]) : Map<Text, [NodeId]> {
+    public func nodeIdsByLabelFromEvents(evs : [Event]) : Map<Text, [Text]> {
         var map = Map.new();
         for (ev in evs.vals()) {
         switch (ev.event) {
@@ -203,66 +234,12 @@ module {
         map;
     };
 
-
-    public module Viz {
-        public type Vec3 = { x : Float; y : Float; z : Float };
-        public let zero = { x = 0.0; y = 0.0; z =0.0 };
-        public type SceneObject = {
-            #orb : LabeledObject;
-            #box : LabeledObject;
-            #action : Action;
-            #pointer : Edge;
-        };
-        public type LabeledObject = {
-            label_ : Label;
-            nodeIds: [NodeId];
-            position : Vec3;
-            textFields : Text;
-            pointerFields : [Text]
-        };
-        public type Label = Text;
-        public type Edge = { from : Label ; to : Label };
-        public type Pointer = Edge;
-        public type Action = { actionType: ActionType; from: Label; to:Label } /* and Edge */ ;
-        public type ActionType = { #get ; #put ; #force_ ; #forcePut };
-
-        public func sceneIntoJSONText( objects : [SceneObject] ) : Text {
-            var objectsText = "";
-            var isFirstObject = true;
-            for (o in objects.vals()) {
-                if (isFirstObject) {
-                    isFirstObject := false;
-                } else {
-                    objectsText #= ",\n";
-                };
-                switch o {
-                case (#box(fields)) {
-                    objectsText #= 
-                    "{ \"type\": \"box\""#
-                    ", \"position\": "#(debug_show [fields.position.x, fields.position.y, fields.position.z])#
-                    ", \"label\": "#(debug_show fields.label_)#
-                    ", \"textLines\": "#(debug_show fields.textFields)#
-                    ", \"pointerFields\": "#(debug_show fields.pointerFields)#
-                    ", \"nodeIds\": " #(debug_show fields.nodeIds)#
-                    "}"
-                };
-                case (#pointer(fields)) {
-                    objectsText #= 
-                    "{ \"type\": \"pointer\", \"from\": " # (debug_show fields.from) # 
-                    ", \"to\": " # (debug_show fields.to) # 
-                    "}"
-                }
-                };
-            };
-            "{ \"objects\" : [\n" # objectsText # "\n] }"
-        };
-    };
-
+    //
+    // Outline representation.
+    // - for generating other output file formats (Text, JSON, TikZ).
+    // - or directly inspecting within the Fumola REPL.
+    // 
     public module Outline {
-        //
-        // Outline representation for printing on terminals,
-        // and for generating other output file formats (Text, HTML, TikZ).
-        //
         public type Outline = {
             #leaf : LeafNode;
             #internal : InternalNode; 
@@ -273,7 +250,7 @@ module {
             value : Any;
         };
 	    public type InternalNode = {
-            __nodeId : nodeId;      // using __ prefixes to promote in default print order.
+            __nodeId : NodeId;      // using __ prefixes to promote in default print order.
             __shape : NodeShape;
             edges : [ OutlineEdge ];
             metaTimes : MetaTimes;
@@ -284,11 +261,11 @@ module {
 	        #nonThunk;
 	    };
         
-        // Using the prefix "Show" to avoid confusion with
+        // Using the prefix "Outline" to avoid confusion with
         // types of otherwise the same name.
 
         public type OutlineEdge = {
-            action : ShowAction ;
+            action : OutlineAction ;
             actionTarget : NodeId ;
             outline : ?Outline;
             forcedThunk : ?Thunk<Any>;
@@ -299,23 +276,132 @@ module {
         // Just the "tag" of the action, where the other action information
         // is organized into the OutlineEdge type.
         //
-	    public type ShowAction = {
+	    public type OutlineAction = {
             #put ;
             #putForce ; // same as #put ; #force_ in sequence.
             #get ;
             #force_ 
         };
 
+        public func outline(root: Pointer) : Outline {
+            // To do -- 
+            // When we have sharing across forces, we'll need to check a "visited set"
+            // We skip that detail for now. 2026-05-05.
+            outlineRec(root /*, PointerSetObj.new()*/ )
+        };
+
+        public func outlineLeaf(p : Pointer) : Outline {
+            let nodeInfo = (peekInfo p)!;
+	        let nodeId = nodeInfo.nodeId;
+            let (shape, value) = switch (nodeInfo.node) {
+                case(#nonThunk(value)) { (#nonThunk, value) };
+                case(#thunk_(t)) { (#thunk_, t.body) };
+            };
+            #leaf({
+                nodeId;
+                shape; 
+                value
+            })
+        };
+
+        public func outlineRec(root : Pointer /*, visited : PointerSetOBj */) : Outline {
+            force(`outline(root) := thunk {
+            let nodeInfo = (peekInfo root)!;
+	        let nodeId = nodeInfo.nodeId;
+            switch (nodeInfo.node) {
+                case(#nonThunk(value)) {
+                    #leaf({
+                        nodeId = nodeInfo.nodeId;
+                        shape = #nonThunk; 
+                        value
+                    })
+                };
+                case(#thunk_(t)) {
+                    if (t.trace.size() == 0) {
+                        assert (nodeInfo.outgoingEdges.size() == 0);
+                        #leaf({
+                            nodeId = nodeInfo.nodeId;
+                            shape = #thunk_;
+                            value = t.result;
+                        })
+                    } else {
+                        var prevEdge = null;
+                        var edges = [var ];
+                        for ((edgeId, edge) in nodeInfo.outgoingEdges.vals()) {
+                            let edgeInfo = edgeActionInfo(edge);
+                            let actionTarget = prim "adaptonPointer" (edge.target.0);
+                            var outline = null;
+                            if (edgeInfo.action == #force_ 
+                                /* and not(visited.contains(target)) */ ) {
+                                // visited.insert(target);
+                                outline := ? outlineRec(actionTarget /*, visited */);
+                            } else {
+                                outline := ? outlineLeaf(actionTarget);
+                            };
+                            let metaTimes = edgeInfo.metaTimes;
+                            if ( edgeInfo.action == #force_ and
+                                prevEdge != null and
+                                prevEdge!.action == #put and 
+                                prevEdge!.actionTarget == actionTarget  ) {
+                                edges[edges.size() - 1] := {
+                                    edgeId; // TO DO -- 2026-05-23 -- better to combine two edgeIds into an array here?
+                                    actionTarget;
+                                    action=#putForce;
+                                    outline;
+                                    forcedThunk=edgeInfo.forcedThunk;
+                                    value=edgeInfo.value;
+                                    metaTimes=(prevEdge!.metaTimes.0, metaTimes.1); // TO DO -- 2026-05-23 -- combine into a longer array?
+                                }
+                            } else { 
+                                let edge = {
+                                    edgeId;
+                                    action=edgeInfo.action;
+                                    actionTarget;
+                                    outline;
+                                    metaTimes;
+                                    value=edgeInfo.value;
+                                    forcedThunk=edgeInfo.forcedThunk;
+                                };
+                                edges #= [ edge ];
+                                prevEdge := ?edge;
+                            }
+                        };
+                        #internal({
+                            __nodeId = nodeId;
+                            __shape = #thunk_ ;
+                            edges;
+                            value = t.result
+                            })
+                    }
+                }
+            }
+        })};
+
+        // some helper code for re-packaging certain variant-based fields into a uniform, flat record.
+        public func edgeActionInfo(edge : Edge) : { 
+            action: Action;
+            putValue: ?Any; // TODO -- distinguish thunks and non-thunks
+            forcedThunk: ?Thunk<A>;
+            metaTime: MetaTime;
+        } {
+          switch (edge.action) {
+            case(#put(value)) {{action=#put; value; forcedThunk=null; metaTimes=edge.metaTimes}};
+            case(#get(value)) {{action=#get; value; forcedThunk=null; metaTimes=edge.metaTimes}};
+            case(#force_(t, value)) {{action=#force_; value; forcedThunk=?t; value; metaTimes=edge.metaTimes}};
+            }
+        };
+    };
+
+    public module IntoText { 
         func indentText(n : Nat) : Text {
             if (n == 0) { "" } else 
-            if (n == 1) { " " }  
-            else {
+            if (n == 1) { " " } else {
             " ┆" # (indentText(n - 1))
             }
         };
 
-        public func outlineIntoTextRec(outline : Outline, indent : Nat) : Text {
-            switch outline {
+        public func outlineRec(o : Outline, indent : Nat) : Text {
+            switch o {
                 case (#leaf(n)) { debug_show (n.nodeId.0) };
                 case (#internal(n)) {
                     var text = debug_show (prim "adaptonPointer" (n.__nodeId.0));
@@ -329,7 +415,7 @@ module {
             }
         };
 
-        public func actionIntoUnicode(action : ShowAction) : Text {
+        public func actionIntoUnicode(action : OutlineAction) : Text {
             switch action {
                 case (#put)      { "───» " };
                 case (#get)      { "───> " };
@@ -353,83 +439,332 @@ module {
                 case (?internalOutline) {
                     actionIntoUnicode(edge.action) # 
                       /* debug_show edge.actionTarget # */
-                      outlineIntoTextRec(internalOutline, indent);
+                      outlineRec(internalOutline, indent);
                 }
             })
         };
 
-        public func outlineIntoText(outline : Outline) : Text {
-            outlineIntoTextRec(outline, 0) # "\n"
+        public func outline(o : Outline) : Text {
+            outlineRec(o, 0) # "\n"
         };
+    };
 
-        public func outline(root: Pointer) : Outline {
-            outlineRec(root /*, PointerSetObj.new()*/ )
+    public module Scene {
+        public type SceneObject = {
+            #orb : LabeledObject;
+            #box : LabeledObject;
+            #action : ActionEdge;
+            #pointer : Edge;
         };
+        public type LabeledObject = {
+            label_ : Label;
+            // nodeIds: [Text]; // <-- 2026-07-06 Remove this.
+            position : Vec3;
+            textFields : Text;
+            pointerFields : [Text]
+        };
+        public type Label = Text;
+        public type Edge = { from : Label ; to : Label };
+        public type Pointer = Edge;
+        public type ActionEdge = { action: SceneAction; from: Label; to:Label } /* and Edge */ ;
+        public type SceneAction = Outline.OutlineAction;
 
-        public func outlineRec(root : Pointer /*, visited : PointerSetOBj */) : Outline {
-            let nodeInfo = (peekInfo root)!;
-	        let nodeId = nodeInfo.nodeId;
-            switch (nodeInfo.node) {
-                case(#nonThunk(value)) {
-                    #leaf({
-                        nodeId = nodeInfo.nodeId;
-                        shape = #nonThunk; 
-                        value
-                    })
+        public type Vec3 = { x : Float; y : Float; z : Float };
+        public let zero = { x = 0.0; y = 0.0; z =0.0 };
+        public func vec3Add(v : Vec3, w : Vec3) : Vec3 = {
+            x = v.x + w.x;
+            y = v.y + w.y;
+            z = v.z + w.z; 
+        };
+     
+        public type Scene = {
+            objects : [ SceneObject ];
+            outline : Outline.Outline;
+            history : {
+                events : [PeekInfo.History.Event];
+                nodes : [PeekInfo.History.Node];
+                edges : [PeekInfo.History.Edge];
+            };
+        };
+    };
+
+
+    public module IntoJSON {
+
+        public func fromArray<X>(a: [X], elemIntoJSON : X -> Text) : Text {
+            var result = "[\n";
+            var isFirst = true;
+            for (elm in (a.vals())) {
+                if (isFirst) {
+                    isFirst := false;
+                } else {
+                    result #= ",\n";
                 };
-                case(#thunk_(t)) {
-                    if (t.trace.size() == 0) {
-                        assert (nodeInfo.outgoingEdges.size() == 0);
-                        #leaf({
-                            nodeId = nodeInfo.nodeId;
-                            shape = #thunk_;
-                            value = t.result;
-                        })
-                    } else {
-                        var prevEdge = null;
-                        var edges = [var ];
-                        for ((_, edge) in nodeInfo.outgoingEdges.vals()) {
-                            let edgeInfo = edgeActionInfo(edge);
-                            let actionTarget = prim "adaptonPointer" (edge.target.0);
-                            var outline = null;
-                            if (edgeInfo.action == #force_ 
-                                /* and not(visited.contains(target)) */ ) {
-                                // visited.insert(target);
-                                outline := ? outlineRec(actionTarget /*, visited */);
-                            };
-                            let metaTimes = edgeInfo.metaTimes;
-                            if ( 
-                                prevEdge != null and
-                                prevEdge!.action == #put and 
-                                prevEdge!.actionTarget == actionTarget  ) {
-                                edges[edges.size() - 1] := {
-                                    actionTarget;
-                                    action=#putForce;
-                                    outline;
-                                    value=edgeInfo.value;
-                                    metaTimes=(prevEdge!.metaTimes.0, metaTimes.1);
-                                }
-                            } else { 
-                                let edge = {
-                                    action=edgeInfo.action;
-                                    actionTarget;
-                                    outline;
-                                    metaTimes;
-                                    value=edgeInfo.value;
+                result #= elemIntoJSON(elm);
+            };
+            result # "\n]"
+        };
+
+        #[test]
+        func testArray() {
+            let actual = fromArray([1, 2, 3], func(x) { debug_show x });
+            let expected = "[\n1,\n2,\n3\n]";
+            assert actual == expected
+        };
+
+        public func fromObjects(input : [SceneObject]) : Text {
+            fromArray(input, fromObject)
+        };
+
+        public func fromEvents(input : [Event]) : Text {
+            fromArray(input, fromEvent)
+        };
+
+        public func fromNodeHistoryItems(input : [NodeHistoryItem]) : Text {
+            fromArray(input, fromNodeHistoryItem)
+        };
+
+        public func fromEdgeHistoryItems(input : [EdgeHistoryItem]) : Text {
+            fromArray(input, fromEdgeHistoryItem)
+        };
+
+        public func fromScene( s : Scene ) : Text {
+            let nodesText = "{}";
+            let edgesText = "{}";
+            "{ " # 
+            "\"objects\" : \n" # fromObjects(s.objects) # "\n,\n" #
+            "\"outline\" : \n" # fromOutline(s.outline) # "\n,\n" #
+            "\"events\": \n" # fromEvents(s.history.events) # "\n,\n" #
+            "\"nodes\": \n" # fromNodeHistoryItems(s.history.nodes) # "\n,\n" #
+            "\"edges\": \n" # fromEdgeHistoryItems(s.history.edges) # "\n\n" #
+            "}"
+        };
+   
+        public func fromObject( o : Object ) : Text {
+            //prim "print" o;
+            switch o {
+                case (#box(fields)) {
+                    "{ \"type\": \"box\"" #
+                    ", \"position\": " # debug_show [fields.position.x, fields.position.y, fields.position.z] #
+                    ", \"label\": " # debug_show fields.label_ #
+                    ", \"textLines\": " # debug_show fields.textFields #
+                    ", \"pointerFields\": " # debug_show fields.pointerFields #
+                    // ", \"nodeIds\": " # debug_show fields.nodeIds #
+                    "}"
+                };
+                case (#orb(fields)) {
+                    "{ \"type\": \"orb\"" #
+                    ", \"position\": " # debug_show [fields.position.x, fields.position.y, fields.position.z] #
+                    ", \"label\": " # debug_show fields.label_ #
+                    ", \"textLines\": " # debug_show fields.textFields #
+                    ", \"pointerFields\": " # debug_show fields.pointerFields #
+                    // ", \"nodeIds\": " # debug_show fields.nodeIds #
+                    "}"
+                };
+                case (#pointer(fields)) {
+                    "{ \"type\": \"pointer\", \"from\": " # debug_show fields.from # 
+                    ", \"to\": " # debug_show fields.to # 
+                    "}"
+                };
+                case(#action(fields)) {
+                   "{ \"type\": " # fromShowAction(fields.action) #
+                    ", \"from\": " # debug_show fields.from # 
+                    ", \"to\": " # debug_show fields.to # 
+                    ", \"edgeId\": " # fromEdgeId(fields.edgeId) #
+                    "}"
+                };
+            };
+        };
+
+        public func fromEvent( ev : Event ) : Text {
+                "{ \"metaTime\":" # debug_show ev.metaTime  # 
+                (switch(ev.event) {
+                    case (#addNode(node_id)) {
+                            ", \"type\": \"addNode\", \"nodeId\": " # fromNodeId(node_id)
+                    };
+                    case (#addEdge(edge_id)) {
+                            ", \"type\": \"addEdge\", \"edgeId\": " # fromEdgeId(edge_id)
+                    };
+                    case (#updateEdge(edge_id)) {
+                            ", \"type\": \"updateEdge\", \"edgeId\": " # fromEdgeId(edge_id)
+                    };
+                    case (#removeEdge(edge_id)) {
+                            ", \"type\": \"removeEdge\", \"edgeId\": " # fromEdgeId(edge_id)
+                    };
+                    case (#forceBegin(edge_id, cache_hit)) {
+                            ", \"type\": \"forceBegin\", \"edgeId\": " # fromEdgeId(edge_id) #
+                            (switch cache_hit {
+                                case null ", \"cacheMiss\": true";
+                                case (?meta_time) {
+                                ", \"cacheHit\": " # (debug_show meta_time)
                                 };
-                                edges #= [ edge ];
-                                prevEdge := ?edge;
-                            }
-                        };
-                        #internal({
-                            __nodeId = nodeId;
-                            __shape = #thunk_ ;
-                            edges;
-                            value = t.result
                             })
-                    }
+                    };
+                    case (#forceEnd(edge_id)) {
+                            ", \"type\": \"forceEnd\"" # 
+                            ", \"edgeId\": " # fromEdgeId(edge_id)
+                    };
+                })
+                # "}"
+            };
+        
+        public func fromNodeId(nodeId : NodeId) : Text {
+            //debug_show (debug_show nodeId)
+            let (sp, tm, mt) = nodeId;
+            "[" # debug_show (debug_show (sp.0)) 
+            # "," # debug_show (debug_show (tm.0))
+            # "," # debug_show (debug_show mt)
+            # "]"
+        };
+
+        public func fromSpace(sp : Space)  : Text {
+            fromAny(sp)
+        };
+
+        public func fromAction(action : Action) : Text {
+            (switch action {
+                case (#force_(t, v)) {
+                    "{ \"type\": \"force\" " #
+                    ", \"thunk\": " # fromAny(t) #
+                    ", \"value\": " # fromAny(v)
+                };
+                case (#forceBegin(t)) {
+                    "{ \"type\": \"forceBegin\" " #
+                    ", \"thunk\": " # fromAny(t)
+                };
+                case (#put(v)) {
+                    "{ \"type\": \"put\" " #
+                    ", \"value\": " # fromAny(v)
+                };
+                case (#get(v)) {
+                    "{ \"type\": \"get\" " #
+                    ", \"value\": " # fromAny(v)
+                }}) # "}"
+        };
+        
+        public func fromNode(node : Node) : Text {
+            (switch node {
+                case (#nonThunk(v)) {
+                    "{ \"type\": \"nonThunk\" " #
+                    ", \"value\": " # fromAny(v)
+                };
+                case (#thunk_(thunkNode)) {
+                    "{ \"type\": \"thunk\" " #
+                    ", \"body\": " # fromAny(thunkNode.body) #
+                    ", \"trace\": " # fromArray(thunkNode.trace, fromEdgeId) #
+                    ", \"space\": " # fromSpace(thunkNode.space) #
+                    ", \"result\": " # (switch (thunkNode.result) {
+                        case null "null";
+                        case (?(valueMetaTime, value)) {
+                            debug_show [valueMetaTime, debug_show value]                
+                        }})
                 }
+            }) # "}"
+        };
+
+        public func fromEdge(edge : Edge) : Text {
+            "{ \"source\":" # fromNodeId(edge.source) #
+            ", \"target\": " # fromNodeId(edge.target) #
+            ", \"action\": " # fromAction(edge.action) #
+            ", \"metaTimes\": " # fromMetaTimes(edge.metaTimes) #
+            "}"
+        };
+
+        public func fromNodeHistoryItem(item : NodeHistoryItem) : Text {
+            "{ \"metaTime\":" # debug_show item.metaTime  # 
+            ", \"nodeId\": " # fromNodeId(item.nodeId) #
+            ", \"node\": " # fromNode(item.node) #
+            "}"
+        };
+
+        public func fromEdgeHistoryItem(item : EdgeHistoryItem) : Text {
+            "{ \"metaTime\":" # debug_show item.metaTime  # 
+            ", \"edgeId\": " # fromEdgeId(item.edgeId) #
+            ", \"edge\": " # fromEdge(item.edge) #
+            "}"
+        };
+
+        public func fromEdgeId(edgeId : EdgeId) : Text {
+            fromAnyValue(edgeId)
+        };
+
+        public func fromPointer(ptr : Pointer<Any>) : Text {
+            debug_show (debug_show (ptr.0))
+        };
+
+        public func fromNodeShape(nodeShape : NodeShape) : Text {
+            debug_show (debug_show nodeShape)
+        };
+
+        public func fromShowAction(showAction : OutlineAction) : Text {
+            debug_show (debug_show showAction);
+            debug_show (switch showAction {
+                case (#get) "get";
+                case (#put) "put";
+                case (#putForce) "putForce";
+                case (#force_) "force";
+            })
+        };
+
+        public func fromOutlineEdges(outlineEdges : [OutlineEdge]) : Text {
+            fromArray(outlineEdges, fromOutlineEdge)
+        };
+
+        public func fromAnyValue(v : Any) : Text {
+            debug_show (debug_show v)
+        };
+        public let fromAny = fromAnyValue;
+
+        public func fromOutline(outline : Outline) : Text {
+            switch outline {
+                case (#leaf(leaf)) {
+                    "{ \"type\": \"outlineLeaf\" " #
+                    ", \"nodeId\":" # fromNodeId(leaf.nodeId) #
+                    ", \"shape\": " # fromNodeShape(leaf.shape) #
+                    ", \"value\": " # fromAnyValue(leaf.value) #
+                    "}"
+
+                };
+                case (#internal(internal)) {
+                    "{ \"type\": \"outlineInternal\" " #
+                    ", \"nodeId\":" # fromNodeId(internal.__nodeId) #
+                    ", \"shape\": " # fromNodeShape(internal.__shape) #
+                    ", \"edges\":" # 
+                        (if (internal.edges.size() == 0) "" else "\n") #
+                        fromOutlineEdges(internal.edges) #
+                    //", \"metaTimes\": " # (fromMetaTimes(internal.metaTimes)) #
+                    ", \"value\": " # (switch(internal.value){ case null "null"; case (?(_, v)) fromAnyValue(v) }) #
+                    ", \"valueMetaTime\": " # (switch(internal.value){ case null "null"; case (?(mt, _)) fromAnyValue(mt) }) #
+                    "}"
+                };
             }
-        }
-   }
-}
+        };
+
+        public func fromOutlineOption(outline : ?Outline) : Text {
+            switch outline {
+                case null "null";
+                case (?o) { "\n" # fromOutline(o) }
+            }
+        };
+
+        public func fromMetaTimes( metaTimes: MetaTimes) : Text {
+            if (metaTimes.0 == metaTimes.1) {
+                debug_show metaTimes.0
+            } else {
+                debug_show ([metaTimes.0, metaTimes.1])
+            }
+        };
+
+        public func fromOutlineEdge(edge : OutlineEdge) : Text {
+            "{ \"type\": \"outlineEdge\" " #
+            ", \"edgeId\":" # fromEdgeId(edge.edgeId) #
+            ", \"action\":" # fromShowAction(edge.action) #
+            ", \"actionTarget\":" # fromPointer(edge.actionTarget) #
+            ", \"forcedThunk\":" # (switch (edge.forcedThunk) { case null "null"; case (?t) fromAny(t) })  #
+            ", \"outline\": " # fromOutlineOption(edge.outline) #
+            ", \"value\": " # fromAnyValue(edge.value) #
+            ", \"metaTimes\": " # fromMetaTimes(edge.metaTimes) #
+            "}"
+        };
+    };
+};

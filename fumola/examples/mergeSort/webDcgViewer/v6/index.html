@@ -1,0 +1,2239 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>DCG Viewer</title>
+    <style>
+        :root {
+
+            /* --- BASE --- */
+
+            --bg: #111318;
+            --bg-elev: #171a20;
+            --bg-panel: #1b1f27;
+            --bg-outline-vert: #64727c;
+            --bg-outline-edge: #2a1e2d;
+            --bg-outline-edge-hover: #422b48;
+            --bg-outline-internal-result: #1e1f2d;
+            --bg-outline-internal-result-hover: #2b2c48;
+            --bg-outline-result: var(--bg-outline-edge);
+            --border: #2a2f3a;
+            --border-soft: #222733;
+
+            --text: #a1aabb;
+            --text-dim: #97a2b3;
+            --text-faint: #6f7b8d;
+
+            /* --- ACCENTS --- */
+
+            --purple: #c6a0f6;
+            --blue: #8bd5ff;
+            --green: #a6da95;
+            --brown: #e6b775;
+
+            --blue-hover: #c1e5fa;
+            --green-hover: #c4dbbc;
+
+
+            --purple-dark: #8c6fd1;
+            --blue-dark: #5ca7d9;
+            --green-dark: #7fba72;
+            --brown-dark: #875b1d;
+
+            /* --- INTERACTION --- */
+
+            --hover: #252b36;
+            --active: #303848;
+
+            --shadow:
+                0 0 0 1px rgba(255, 255, 255, 0.02),
+                0 6px 18px rgba(0, 0, 0, 0.35);
+
+            font-family:
+                Inter,
+                system-ui,
+                sans-serif;
+        }
+    </style>
+    <style>
+        html,
+        body {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+            font-family: monospace;
+            background: #0f0f0f;
+            color: #cfd8ff;
+        }
+
+        #app {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #sidebar {
+            width: 50%;
+            min-width: 220px;
+            max-width: 99%;
+            flex-direction: column;
+            height: 100vh;
+            background: #000;
+        }
+
+        .focus-detail {
+            display: none;
+        }
+
+        .focus-detail.focused {
+            margin: 2px;
+            border: 2px;
+            background-color: var(--bg-panel);
+            border-radius: 3px;
+            border-color: var(--border-soft);
+            border-style: solid;
+        }
+
+        .focus-detail.focused.inner {
+            border-style: none;
+        }
+
+        .outline-edge {
+            border-style: solid;
+            margin-top: 0px;
+            margin-bottom: 0px;
+            margin-left: 8px;
+            border: 1px;
+            border-color: white;
+            background-color: var(--bg-outline-edge);
+        }
+
+        .outline-edge:hover {
+            background-color: var(--bg-outline-edge-hover);
+        }
+
+        .outline-internal-result {
+            margin-left: 8px;
+            border: 0px;
+            border-left: 2px;
+            border-style: solid;
+            border-color: var(--bg-outline-vert);
+            background-color: var(--bg-outline-internal-result);
+        }
+
+        .outline-internal-result:hover {
+            background-color: var(--bg-outline-internal-result-hover);
+        }
+
+        .outline-node {
+            margin-left: 8px;
+            padding-left: 2px;
+            border: 0px;
+            border-left: 2px;
+            border-style: solid;
+            border-color: var(--bg-outline-vert);
+            background-color: var(--bg-outline-internal-result);
+        }
+
+        .outline-node:hover {
+            background-color: var(--bg-outline-internal-result-hover);
+        }
+
+        .outline-node-thunk-shape {
+            cursor: pointer;
+            font-size: large;
+            border-radius: 50%;
+            border-style: solid;
+            border-width: 2px;
+            margin: 2px;
+            color: var(--blue-dark);
+            border-color: transparent;
+            background-color: var(--blue-dark);
+            user-select: none;
+            padding: 2px;
+            padding-left: 6px;
+            padding-right: 6px;
+        }
+
+        .outline-node-thunk-shape:active {
+            background-color: black;
+            color: white;
+            border-color: white;
+        }
+
+        .outline-node-thunk-shape:hover {
+            border-color: white;
+        }
+
+        .outline-node-nonthunk-shape {
+            cursor: pointer;
+            font-size: large;
+            padding-left: 4px;
+            padding-right: 4px;
+            border-radius: 0px;
+            border-style: solid;
+            border-width: 2px;
+            margin: 2px;
+            color: var(--green-dark);
+            border-color: transparent;
+            background-color: var(--green-dark);
+            user-select: none;
+        }
+
+        .outline-node-nonthunk-shape:active {
+            background-color: black;
+            color: white;
+            border-color: white;
+        }
+
+        .outline-node-nonthunk-shape:hover {
+            border-color: white;
+        }
+
+
+        .thunk-body-text {
+            cursor: pointer;
+            display: flex;
+            margin: 1px;
+            border: 1px;
+            border-radius: 4px;
+            /*font-size: larger; */
+            border-style: solid;
+            border-color: transparent;
+            background-color: black;
+            color: var(--blue-dark);
+        }
+
+        .outline-forced-thunk-text {
+            cursor: pointer;
+            display: flex;
+            margin-left: 6px;
+            border: 1px;
+            border-radius: 4px;
+            padding: 4px;
+            /*font-size: larger; */
+            border-style: solid;
+            border-color: transparent;
+            background-color: black;
+            color: var(--blue-dark);
+        }
+
+        .outline-forced-thunk-text:hover {
+            /* font-size: larger; */
+            color: var(--blue-hover);
+            /* background-color: var(--hover); */
+        }
+
+        .outline-value-text {
+            cursor: pointer;
+            color: var(--green-dark);
+            display: inline-block;
+            border-radius: 2px;
+            border-width: 1px;
+            border-color: transparent;
+            border-style: solid;
+            background-color: black;
+            padding: 2px;
+            margin: 2px;
+            margin-left: 8px;
+            /* font-size: smaller; */
+        }
+
+        .outline-value-text:hover {
+            /* font-size: larger; */
+            color: var(--green-hover);
+            border-color: var(--green-hover);
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+            /* CRITICAL for scrolling in flex layouts */
+            border-bottom: 3px solid var(--border);
+        }
+
+        #outlinePanel {
+            flex: 4;
+        }
+
+        .panel-header#titlePanel {
+            flex-shrink: 0;
+            height: auto;
+            flex: 0 0 auto;
+        }
+
+
+        .splitter {
+            height: 5px;
+            background: #111;
+            cursor: row-resize;
+        }
+
+        .panel-body {
+            flex: 1;
+            min-height: 0;
+            /* CRITICAL */
+            overflow-y: auto;
+            padding: 6px;
+        }
+
+
+        /* DIVIDER */
+        #divider {
+            width: 5px;
+            cursor: col-resize;
+            background: #111;
+        }
+
+        /* VIEWPORT */
+        #viewport {
+            flex: 1;
+            background: #000;
+        }
+
+        .panel-header {
+            background: #050505;
+            color: #a8b4ff;
+            padding: 6px;
+            cursor: pointer;
+        }
+
+        .panel-header#titlePanelHeader {
+            background: #29082d;
+            color: #e2a8ff;
+            padding: 6px;
+            cursor: pointer;
+            font-size: larger;
+            flex-shrink: 0;
+            height: auto;
+            flex: 0 0 auto;
+        }
+
+        .metaTime {
+            user-select: none;
+            color: var(--blue);
+            cursor: pointer;
+            border-color: transparent;
+            border-style: solid;
+            border-radius: 33%;
+            padding: 2px;
+            margin: 2px;
+            border-width: 2px;
+            display: inline-block;
+        }
+
+        .metaTime.focused {
+            background: var(--blue-hover);
+            color: #111;
+            font-weight: bold;
+        }
+
+        .metaTime:hover {
+            color: #ffffff;
+            border-color: white;
+        }
+
+        .metaTime:hover.focused {
+            color: black;
+            background-color: white;
+        }
+
+        .metaTime.player-focused {
+            color: yellowgreen;
+            border-color: yellow;
+            background-color: black;
+        }
+
+        .metaTime.focused.player-focused {
+            background-color: yellowgreen;
+            border-color: white;
+            color: black;
+        }
+
+        .edgeId {
+            user-select: none;
+            color: var(--purple);
+            cursor: pointer;
+            border-color: var(--border-soft);
+            border-style: solid;
+            padding: 3px;
+            margin: 2px;
+            border-width: 1px;
+            border-radius: 1px;
+            display: inline-block;
+            background-color: black;
+        }
+
+        .edgeId.focused {
+            background: var(--purple-dark);
+            color: #111;
+            font-weight: bold;
+        }
+
+        .edgeId:hover {
+            color: #ffffff;
+            border-color: white;
+        }
+
+        .pointer {
+            user-select: none;
+        }
+
+        .pointerThunk {
+            color: #b5b7d7;
+            cursor: pointer;
+            border-color: var(--bg-panel);
+            border-style: solid;
+            padding: 3px;
+            margin: 2px;
+            border-width: 2px;
+            border-radius: 2px;
+            display: inline-block;
+            background-color: black;
+        }
+
+        .pointerThunk.focused {
+            background-color: var(--blue-dark);
+            color: var(--bg-panel);
+            font-weight: bold;
+        }
+
+        .pointerThunk.focused:hover {
+            color: white;
+            border-color: white;
+        }
+
+        .pointerNonThunk {
+            color: #c0d7b5;
+            cursor: pointer;
+            border-color: #899882;
+            border-style: solid;
+            padding: 3px;
+            margin: 2px;
+            border-width: 1px;
+            border-radius: 1px;
+            display: inline-block;
+            background-color: black;
+        }
+
+        .pointerNonThunk.focused {
+            background-color: var(--green-dark);
+            color: var(--bg-panel);
+            font-weight: bold;
+        }
+
+        .pointerNonThunk.focused:hover {
+            color: white;
+            border-color: white;
+        }
+
+
+        .pointerThunk:hover {
+            color: #ffffff;
+            border-color: white;
+        }
+
+        .pointerNonThunk:hover {
+            color: #ffffff;
+            border-color: white;
+        }
+
+        .action-arrow {
+            margin: 3px;
+            padding: 3px;
+            cursor: pointer;
+            font-size: large;
+            border-width: 2px;
+            border-radius: 4px;
+            border-style: solid;
+            border-color: transparent;
+            user-select: none;
+        }
+
+        .action-arrow:active {
+            background-color: black;
+            color: white;
+            border-color: white;
+        }
+
+        .action-arrow:hover {
+            border-color: white;
+            border-style: solid;
+        }
+
+
+        .result-arrow {
+            color: var(--blue-dark);
+        }
+
+        .action-put {
+            color: var(--purple-dark);
+        }
+
+        .action-putForce {
+            color: var(--purple)
+        }
+
+        .action-force {
+            color: var(--purple)
+        }
+
+        .action-get {
+            color: var(--blue-dark);
+        }
+
+
+        .nodeId {
+            color: var(--brown);
+            cursor: pointer;
+            border-color: var(--brown-dark);
+            border-style: solid;
+            border-radius: 5%;
+            padding: 3px;
+            margin: 2px;
+            border-width: 1px;
+            display: inline-block;
+            background-color: black;
+        }
+
+        .nodeId.focused {
+            background: var(--brown-dark);
+            color: #111;
+            font-weight: bold;
+        }
+
+        .nodeId:hover {
+            color: #ffffff;
+        }
+
+
+        #sidebar {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .panel-body {
+            overflow: auto;
+            min-height: 0;
+        }
+
+        /*----------*/
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+
+            background: var(--bg);
+            color: var(--text);
+
+            overflow: hidden;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        #app {
+            width: 100%;
+            height: 100%;
+
+            display: flex;
+
+            background: var(--bg);
+        }
+
+        /* --- PLAYER PANEL --- */
+
+        #playerPanel {
+            flex: 0 0 auto;
+        }
+
+        .player-body {
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background-color: var(--bg-panel)
+        }
+
+        .player-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: var(--bg-panel)
+        }
+
+
+        .player-slider-row {
+            width: 100%;
+        }
+
+        #metaSlider {
+            width: 100%;
+        }
+
+        .player-field {
+            padding-left: 16px;
+            padding-right: 16px;
+            padding-top: 1px;
+            padding-bottom: 1px;
+            font-size: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            background: var(--bg);
+            color: var(--text);
+            background-color: var(--bg-panel);
+            border-radius: 3px;
+            border-color: var(--active);
+        }
+
+
+        .bpm-field {
+            font-size: 22px;
+            background: var(--bg);
+            color: var(--text);
+            background-color: var(--bg-panel);
+            border-radius: 3px;
+            border-color: var(--active);
+            min-width: 100px;
+        }
+
+        .player-button {
+            padding-left: 16px;
+            padding-right: 16px;
+            padding-top: 6px;
+            padding-bottom: 6px;
+            font-size: 24px;
+            background-color: var(--bg-elev);
+            border-radius: 3px;
+            border-color: var(--active);
+            color: var(--text);
+        }
+
+        .player-button-small {
+            font-size: 16px;
+            color: var(--text-faint);
+        }
+
+        .player-field label {
+            font-size: 23px;
+            opacity: 0.7;
+            text-align: center;
+        }
+
+        .player-field input {
+            width: 160px;
+        }
+
+        .bpm-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        #infoPanel {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+
+        <div id="sidebar">
+
+            <div class="panel-header" id="titlePanelHeader">DCG Scene Player</div>
+
+            <div class="panel-body" id="infoPanel">
+                <!-- <div class="panel-header">Meta Times</div> -->
+                <div class="panel-focus" id="metaTimes"></div>
+
+                <!-- <div class="panel-header">Pointers / Object Labels</div> -->
+                <div class="panel-focus" id="pointers"></div>
+
+                <!-- <div class="panel-header">Edges</div> -->
+                <div class="panel-focus" id="edgeIds"></div>
+
+
+            </div>
+
+            <div class="splitter"></div>
+
+            <div class="panel" id="outlinePanel">
+                <div class="panel-header">Outline</div>
+                <div class="panel-body" id="outline">
+                </div>
+            </div>
+
+            <div class="splitter"></div>
+
+            <div class="panel" id="eventsPanel">
+                <div class="panel-header">Events</div>
+                <div class="panel-body" id="events">
+                </div>
+            </div>
+
+            <!-- NEW PLAYER PANEL -->
+
+            <div class="panel" id="playerPanel">
+
+                <div class="panel-header">Player</div>
+
+                <div class="panel-body player-body">
+
+                    <div class="player-row">
+                        <button id="gotoStartBtn" class="player-button">⏮</button>
+                        <button id="tickBackBtn" class="player-button player-button-small">▌◀</button>
+                        <button id="playPauseBtn" class="player-button">▶</button>
+                        <button id="tickForwardBtn" class="player-button player-button-small">▶ ▌</button>
+                        <button id="stopBtn" class="player-button">■</button>
+
+                        <div class="player-field">
+                            <label>MetaTime</label>
+                            <input id="metaTimeDisplay" class="player-field" type="text" readonly value="1" />
+                        </div>
+
+                        <div class="player-field bpm-field">
+                            <label>BPM</label>
+
+                            <div class="bpm-controls">
+
+                                <button id="bpmDownBtn" class="player-button">-</button>
+
+                                <input id="bpmDisplay" type="text" class="bpm-field" readonly value="1337" />
+
+                                <button id="bpmUpBtn" class="player-button">+</button>
+
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="player-slider-row">
+
+                        <input id="metaSlider" class="player-field" type="range" min="1" max="1" value="1" step="1" />
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+        <div id="divider"></div>
+        <div id="viewport"></div>
+
+    </div>
+
+    <script>
+        let activeSplitter = null;
+        let startY = 0;
+        let startHeight = 0;
+
+        document.querySelectorAll(".splitter").forEach(splitter => {
+            splitter.addEventListener("mousedown", (e) => {
+                activeSplitter = splitter;
+                startY = e.clientY;
+
+                const panel = splitter.previousElementSibling;
+                startHeight = panel.getBoundingClientRect().height;
+
+                document.body.style.cursor = "row-resize";
+            });
+        });
+
+        window.addEventListener("mousemove", (e) => {
+            if (!activeSplitter) return;
+
+            const dy = e.clientY - startY;
+            const panel = activeSplitter.previousElementSibling;
+
+            const newHeight = Math.max(50, startHeight + dy);
+            panel.style.flex = "none";
+            panel.style.height = newHeight + "px";
+        });
+
+        window.addEventListener("mouseup", () => {
+            activeSplitter = null;
+            document.body.style.cursor = "default";
+        });
+
+        /* sidebar resize */
+        const divider = document.getElementById("divider");
+        const sidebar = document.getElementById("sidebar");
+
+        let dragging = false;
+
+        divider.addEventListener("mousedown", () => dragging = true);
+        window.addEventListener("mouseup", () => dragging = false);
+
+        window.addEventListener("mousemove", (e) => {
+            if (!dragging) return;
+            const newWidth = e.clientX;
+            sidebar.style.width = newWidth + "px";
+        });
+    </script>
+
+    <script type="module">
+        import * as THREE from 'https://esm.sh/three@0.160.0';
+        import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+
+        // import { Map as IMap } from "immutable";
+        import { Map as IMap } from "https://unpkg.com/immutable@5/dist/immutable.es.js";
+
+        const inFocus = {
+            metaTime: new Set(),
+            edgeId: new Set(),
+            pointer: new Set(),
+        };
+
+
+        const color = {
+            _box: 0xaa8844,
+            _pointer: 0xaa8844,
+            box: 0x55aa44,
+            pointer: 0x55aa44,
+        };
+        const emissiveIntensity = {
+            noHoverNode: 0,
+            hoverNode: 1.0,
+        };
+
+        const data = await fetch('./scene.json').then(r => r.json());
+
+        function openDoor(type, id) {
+            console.log("openDoor", type, id);
+            if (type == "metaTime") {
+                inFocus.metaTime.add(id);
+                document.querySelectorAll(".focus-detail")
+                    .forEach(el => {
+                        if (el.dataset.type == "metaTime" && el.dataset.id == id) {
+                            el.style.display = el.dataset.displayTrue;
+                            el.classList.add("focused")
+
+                        }
+                    });
+                document.querySelectorAll(".metaTime")
+                    .forEach(el => {
+                        if (el.metaTime == id) {
+                            el.classList.add("focused-history");
+                            el.classList.add("focused")
+                        }
+                    });
+            } else if (type == "edgeId") {
+                inFocus.edgeId.add(id);
+                document.querySelectorAll(".focus-detail")
+                    .forEach(el => {
+                        if (el.dataset.type == "edgeId" && el.dataset.id == id) {
+                            el.style.display = "inline-block";
+                            el.classList.add("focused")
+
+                        }
+                    });
+                document.querySelectorAll(".edgeId")
+                    .forEach(el => {
+                        if (el.edgeId == id) {
+                            el.classList.add("focused-history");
+                            el.classList.add("focused")
+                        }
+                    });
+            } else if (type == "pointer") {
+                inFocus.pointer.add(id);
+                document.querySelectorAll(".focus-detail")
+                    .forEach(el => {
+                        if (el.dataset.type == "pointer" && el.dataset.id == id) {
+                            el.style.display = "inline-block";
+                            el.classList.add("focused")
+                        }
+                    });
+                document.querySelectorAll(".pointer")
+                    .forEach(el => {
+                        if (el.pointer == id) {
+                            el.classList.add("focused-history");
+                            el.classList.add("focused")
+                        }
+                    });
+            } else {
+                console.error("openDoor: unrecognized type", type)
+            }
+        }
+
+        function closeDoor(type, id) {
+            console.log("closeDoor", type, id);
+            if (type == "metaTime") {
+                inFocus.metaTime.delete(id);
+                document.querySelectorAll(".focus-detail")
+                    .forEach(el => {
+                        if (el.dataset.type == "metaTime" && el.dataset.id == id) {
+                            el.style.display = el.dataset.displayFalse;
+                            el.classList.remove("focused")
+                        }
+                    });
+                document.querySelectorAll(".metaTime")
+                    .forEach(el => {
+                        if (el.metaTime == id) {
+                            el.classList.remove("focused")
+                        }
+                    });
+            } else if (type == "edgeId") {
+                inFocus.edgeId.delete(id);
+                document.querySelectorAll(".focus-detail")
+                    .forEach(el => {
+                        if (el.dataset.type == "edgeId" && el.dataset.id == id) {
+                            el.style.display = "none";
+                            el.classList.remove("focused")
+                        }
+                    });
+                document.querySelectorAll(".edgeId")
+                    .forEach(el => {
+                        if (el.edgeId == id) {
+                            el.classList.remove("focused")
+                        }
+                    });
+            } else if (type == "pointer") {
+                inFocus.pointer.delete(id);
+                document.querySelectorAll(".focus-detail")
+                    .forEach(el => {
+                        if (el.dataset.type == "pointer" && el.dataset.id == id) {
+                            el.style.display = "none";
+                            el.classList.remove("focused");
+                        }
+                    });
+                document.querySelectorAll(".pointer")
+                    .forEach(el => {
+                        if (el.pointer == id) {
+                            el.classList.remove("focused")
+                        }
+                    });
+            } else {
+                console.error("closeDoor: unrecognized type", type)
+            }
+        }
+
+        function clearFocus() {
+            document.querySelectorAll(".focused")
+                .forEach(el => el.classList.remove("focused"));
+        }
+        function setFocus(t) {
+            console.log("setFocus", t);
+            if (inFocus.metaTime.has(t)) {
+                closeDoor("metaTime", t)
+            } else {
+                openDoor("metaTime", t)
+            }
+        }
+
+        function scrollToMetaTime(t, behavior) {
+            document.querySelectorAll(".metaTimeAnchor")
+                .forEach(el => {
+                    if (el.metaTime == t) {
+                        el.scrollIntoView({
+                            behavior,
+                            block: "nearest",
+                            inline: "nearest",
+                        });
+                    }
+                });
+        }
+        const playerState = {
+            isPlaying: false,
+            metaTime: 1,
+            maxMetaTime: data.events[data.events.length - 1].metaTime,
+            stopResetsTo: 1,
+            bpm: 1337,
+            timer: null,
+        };
+
+        const slider = document.getElementById("metaSlider");
+
+        slider.min = 1;
+        slider.max = playerState.maxMetaTime;
+        slider.value = playerState.metaTime;
+
+        function renderPlayerUI() {
+
+            document.getElementById("metaTimeDisplay").value =
+                playerState.metaTime + " of " + playerState.maxMetaTime;
+
+            document.getElementById("bpmDisplay").value =
+                playerState.bpm;
+
+            slider.value = playerState.metaTime;
+            slider.max = playerState.maxMetaTime;
+
+            document.getElementById("playPauseBtn").textContent =
+                playerState.isPlaying ? "⏸" : "▶";
+        }
+        renderPlayerUI();
+
+        function beatDurationMs() {
+            return (60 * 1000) / playerState.bpm;
+        }
+
+        function tickPlayback() {
+            if (!playerState.isPlaying) {
+                return;
+            }
+            playerState.metaTime++;
+            if (playerState.metaTime > playerState.maxMetaTime) {
+                playerState.metaTime = playerState.maxMetaTime;
+                stopPlayback();
+                return;
+            }
+            renderPlayerFocusAtMetaTime();
+            renderPlayerUI();
+            playerState.timer = setTimeout(
+                tickPlayback,
+                beatDurationMs()
+            );
+        }
+
+        function startPlayback() {
+            if (playerState.isPlaying) {
+                return;
+            }
+            playerState.isPlaying = true;
+            renderPlayerUI();
+            tickPlayback();
+        }
+
+        function pausePlayback() {
+            playerState.isPlaying = false;
+            clearTimeout(playerState.timer);
+            renderPlayerUI();
+        }
+
+        function stopPlayback() {
+            pausePlayback();
+            playerState.metaTime = playerState.stopResetsTo;
+            renderPlayerFocusAtMetaTime("smooth");
+            renderPlayerUI();
+            // clearFocus();
+        }
+        document.getElementById("tickBackBtn").onclick = () => {
+            pausePlayback();
+            if (playerState.metaTime > 1) {
+                playerState.metaTime = playerState.metaTime - 1;
+                playerState.stopResetsTo = playerState.metaTime;
+            }
+            renderPlayerUI();
+            renderPlayerFocusAtMetaTime("smooth");
+        }
+        document.getElementById("tickForwardBtn").onclick = () => {
+            pausePlayback();
+            if (playerState.metaTime < playerState.maxMetaTime) {
+                playerState.metaTime = playerState.metaTime + 1;
+                playerState.stopResetsTo = playerState.metaTime;
+            }
+            renderPlayerUI();
+            renderPlayerFocusAtMetaTime("smooth");
+        }
+        function setAllMeshesVisible(visible = true) {
+            sceneMeshes.forEach(mesh => {
+                mesh.visible = visible;
+            })
+        }
+        document.getElementById("gotoStartBtn").onclick = () => {
+            let isPlaying = playerState.isPlaying;
+            playerState.metaTime = 1;
+            playerState.stopResetsTo = 1;
+            playerState.isPlaying = isPlaying;
+            setAllMeshesVisible(false);
+            renderPlayerUI();
+            renderPlayerFocusAtMetaTime("smooth");
+        }
+
+        document.getElementById("playPauseBtn")
+            .onclick = () => {
+                if (playerState.isPlaying) {
+                    pausePlayback();
+                } else {
+                    startPlayback();
+                }
+            };
+
+        document.getElementById("stopBtn")
+            .onclick = stopPlayback;
+
+        document.getElementById("bpmUpBtn")
+            .onclick = () => {
+
+                playerState.bpm += 60;
+
+                renderPlayerUI();
+            };
+
+        document.getElementById("bpmDownBtn")
+            .onclick = () => {
+
+                playerState.bpm =
+                    Math.max(17, playerState.bpm - 60);
+
+                renderPlayerUI();
+            };
+
+        document.getElementById("metaSlider")
+            .oninput = (e) => {
+
+                playerState.metaTime =
+                    Number(e.target.value);
+                playerState.stopResetsTo = playerState.metaTime;
+                renderPlayerFocusAtMetaTime("smooth");
+
+                renderPlayerUI();
+            };
+
+        // --------------------------------------------------------
+        const BoxDim = 0.33;
+
+        const scene = new THREE.Scene();
+        const lightMode = false;
+
+        if (lightMode) {
+            scene.background = new THREE.Color(0xffffff);
+        } else {
+            scene.background = new THREE.Color(0x00000000);
+        }
+        // const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
+
+        const camera = new THREE.PerspectiveCamera(
+            60,
+            1,
+            0.1,
+            1000
+        );
+
+        camera.position.set(6, 4, 8);
+
+        const viewport = document.getElementById("viewport");
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+        renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+
+        viewport.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff));
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(5, 5, 5);
+        scene.add(light);
+
+        const sceneMeshes = new Set();
+        const meshByLabel = new Map();
+        const labelByMesh = new Map();
+        const pointerDotsByKey = new Map();
+        const labelByPointerSource = new Map();
+        const objectMaterials = new Map();
+
+        function addMesh(label, mesh) {
+            sceneMeshes.add(mesh);
+            scene.add(mesh);
+            labelByMesh.set(mesh, label);
+            if (!meshByLabel.get(label)) {
+                meshByLabel.set(label, [mesh])
+            } else {
+                let meshes = meshByLabel.get(label);
+                meshByLabel.set(label, [...meshes, mesh])
+            }
+        }
+
+        function makeTextTexture(text, type = "textLines", isSprite = false) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            const fontSize = 48;
+            const lineHeight = fontSize * 1.2;
+            const padding = 20;
+
+            ctx.font = `${fontSize}px monospace`;
+
+            const lines = text.split('\n');
+            const maxWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
+
+            canvas.width = maxWidth + padding * 2;
+            canvas.height = lineHeight * lines.length + padding * 2;
+
+            ctx.font = `${fontSize}px monospace`;
+
+            if (false && type === "pointerSymbol") {
+                if (lightMode) {
+                    ctx.fillStyle = '#123';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.strokeStyle = '#888';
+                    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = 'white';
+                } else {
+                    //ctx.fillStyle = 'rgba(0,0,0,1)';
+                    //ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    //ctx.strokeStyle = '#0a0';
+                    //ctx.strokeRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = 'white';
+                }
+            } else {
+                if (lightMode) {
+                    ctx.fillStyle = 'rgba(0,0,0,1)';
+                } else {
+                    ctx.fillStyle = 'white';
+                }
+            }
+            lines.forEach((line, i) => {
+                ctx.fillText(line, padding, padding + (i + 1) * lineHeight - (lineHeight - fontSize));
+            });
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            texture.minFilter = THREE.LinearFilter;
+
+            const aspect = canvas.height / canvas.width;
+
+            //var result = texture;
+            //if (isSprite) {
+            //    let material = new THREE.SpriteMaterial({ map: texture });
+            //    result = new THREE.Sprite(material);
+            // }
+            return { texture, aspect };
+        }
+        function createBoxMesh(obj) {
+            let material = new THREE.MeshStandardMaterial({
+                color: color.box, transparent: true, opacity: 0.618,
+                emissive: "white", emissiveIntensity: emissiveIntensity.noHoverNode,
+                visible: true
+            });
+            objectMaterials.set(obj.label, material);
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(BoxDim, BoxDim, BoxDim),
+                material
+            );
+            mesh.position.set(...obj.position);
+            // scene.add(mesh);
+            // sceneMeshes.add(mesh);
+            addMesh(obj.label, mesh);
+
+            const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim));
+            const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
+            const labelMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.7, 0.7 * aspect),
+                new THREE.MeshStandardMaterial({
+                    map: texture, transparent: false,
+                    emissive: "white",
+                    emissiveIntensity: 0.0,
+                })
+            );
+            labelMesh.position.copy(labelAnchor);
+            // scene.add(labelMesh);
+            // sceneMeshes.add(labelMesh);
+            addMesh(obj.label, labelMesh);
+
+            const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim));
+            const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.textLines || "", "textLines");
+            const fieldMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.5, 0.5 * fieldAspect),
+                new THREE.MeshStandardMaterial({
+                    map: fieldTexture, transparent: true, alphaTest: 0.1,
+                    emissive: "white",
+                    emissiveIntensity: 0.0,
+                })
+            );
+            fieldMesh.position.copy(fieldsAnchor);
+            // scene.add(fieldMesh);
+            // sceneMeshes.add(fieldMesh);
+            addMesh(obj.label, fieldMesh);
+
+            const dots = [];
+            if (obj.pointerFields) {
+                const spacing = 0.1;
+                const startX = mesh.position.x - (obj.pointerFields.length - 1) * spacing / 2;
+                const y = mesh.position.y - 0.17;
+                const z = mesh.position.z;
+                obj.pointerFields.forEach((fname, i) => {
+                    const dot = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.03, 12, 12),
+                        new THREE.MeshStandardMaterial({
+                            color: 0x000000, emissive: "white",
+                            emissiveIntensity: 0.0,
+                        })
+                    );
+                    dot.position.set(startX + i * spacing, y, z);
+                    scene.add(dot);
+                    sceneMeshes.add(dot);
+                    dots.push(dot);
+                    pointerDotsByKey.set(obj.label + ":" + fname, dot.position);
+                    labelByPointerSource.set(obj.label + ":" + fname, obj.label);
+                });
+            }
+
+            return mesh;
+        }
+
+        function createOrb(obj) {
+            let material = new THREE.MeshStandardMaterial({
+                color: 0x4488aa, transparent: true, opacity: 0.9, emissive: "white",
+                emissiveIntensity: 0.0,
+            });
+            objectMaterials.set(obj.label, material);
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(BoxDim * 0.618),
+                material
+            );
+            mesh.position.set(...obj.position);
+            // scene.add(mesh);
+            // sceneMeshes.add(mesh);
+            addMesh(obj.label, mesh);
+
+            const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim));
+            const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
+            const labelMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.7, 0.7 * aspect),
+                new THREE.MeshBasicMaterial({
+                    map: texture, transparent: false, emissive: "white",
+                    emissiveIntensity: 0.0,
+                })
+            );
+            labelMesh.position.copy(labelAnchor);
+            // scene.add(labelMesh);
+            // sceneMeshes.add(labelMesh);
+            addMesh(obj.label, labelMesh);
+
+            const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim));
+            const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.fields || "", "textLines");
+            const fieldMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.5, 0.5 * fieldAspect),
+                new THREE.MeshBasicMaterial({
+                    map: fieldTexture, transparent: true, alphaTest: 0.1, emissive: "white",
+                    emissiveIntensity: 0.0,
+                })
+            );
+            fieldMesh.position.copy(fieldsAnchor);
+            // scene.add(fieldMesh);
+            // sceneMeshes.add(fieldMesh);
+            addMesh(obj.label, fieldMesh);
+
+            const dots = [];
+            if (obj.pointerFields) {
+                const spacing = 0.1;
+                const startX = mesh.position.x - (obj.pointerFields.length - 1) * spacing / 2;
+                const y = mesh.position.y - 0.17;
+                const z = mesh.position.z;
+                obj.pointerFields.forEach((fname, i) => {
+                    const dot = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.03, 12, 12),
+                        material
+                    );
+                    dot.position.set(startX + i * spacing, y, z);
+                    scene.add(dot);
+                    sceneMeshes.add(dot);
+                    dots.push(dot);
+                    pointerDotsByKey.set(obj.label + ":" + fname, dot.position);
+                    labelByPointerSource.set(obj.label + ":" + fname, obj.label);
+                });
+            }
+
+            return mesh;
+        }
+
+
+        function computeEdgeFrame(a, b) {
+            const dir = new THREE.Vector3().subVectors(b, a);
+            const len = dir.length();
+            const n = dir.clone().normalize();
+            const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
+            return { dirNorm: n, length: len, quat };
+        }
+
+        function createPointerMesh(fromLabel, from, to) {
+            const start = from.clone();
+            const end = to.clone();
+            const material = new THREE.MeshStandardMaterial({
+                color: color.pointer, emissive: "white",
+                transparent: true,
+                opacity: 1,
+                emissiveIntensity: 0.0
+            });
+            const { dirNorm, length, quat } = computeEdgeFrame(start, end);
+
+            //const group = new THREE.Group();
+
+            const dot = new THREE.Mesh(
+                new THREE.SphereGeometry(0.05, 12, 12),
+                material
+            );
+            dot.position.copy(start);
+            //group.add(dot);
+            addMesh(fromLabel, dot);
+
+            const shaftLen = Math.max(0.001, length - 0.08);
+            const shaft = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.023, 0.035, shaftLen, 8),
+                material
+            );
+            const mid = start.clone().addScaledVector(dirNorm, shaftLen / 2);
+            shaft.position.copy(mid);
+            shaft.quaternion.copy(quat);
+            addMesh(fromLabel, shaft);
+            // group.add(shaft);
+
+            const cone = new THREE.Mesh(
+                new THREE.ConeGeometry(0.04, 0.08, 8),
+                material
+            );
+            const center = end.clone().addScaledVector(dirNorm, -0.04);
+            cone.position.copy(center);
+            cone.quaternion.copy(quat);
+            // group.add(cone);
+            addMesh(fromLabel, cone);
+            false && console.log("createPointerMesh addMesh", fromLabel, cone);
+            //return group;
+        }
+
+        function createActionMesh(type, source, target, label, color = 0x0088aa, hoverOffset = -BoxDim) {
+            //const group = new THREE.Group();
+            console.log("createActionMesh", type, label);
+
+            //color = 0x0088ff;
+            if (type === "put") color = 0x008877;
+            if (type == "putForce") color = 0xaaaaaa;
+
+            // Compute vector from source → target
+            const dir = new THREE.Vector3().subVectors(target, source);
+            const length = dir.length();
+            dir.normalize();
+
+            // Shaft parameters
+            let shaftRadius = 0.03;
+            if (type === "force" || type === "putForce") shaftRadius = 0.10;
+
+            const shaftLength = length + (hoverOffset * 1.6); // shorten shaft slightly so head hovers
+
+            // Place arrowhead with hoverOffset
+            const headPos = new THREE.Vector3().copy(target).addScaledVector(dir, hoverOffset);
+
+            // Shaft geometry
+            const shaftGeo = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength, 12);
+            const shaftMat = new THREE.MeshStandardMaterial({
+                color: color,
+                transparent: true || (type === "force" || type === "putForce"),
+                opacity: (type === "force" || type === "putForce") ? 0.6 : 0.8,
+                emissive: "white",
+                emissiveIntensity: 0.0,
+            });
+            const shaftMesh = new THREE.Mesh(shaftGeo, shaftMat);
+
+            // Shaft midpoint
+            const mid = new THREE.Vector3().addVectors(source, headPos).multiplyScalar(0.5);
+            shaftMesh.position.copy(mid);
+            shaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+            //group.add(shaftMesh);
+            addMesh(label, shaftMesh);
+
+            // Helper functions
+            function makeCone(radius = 0.12, height = 0.12) {
+                const coneGeo = new THREE.ConeGeometry(radius, height, 12);
+                const coneMat = new THREE.MeshStandardMaterial({
+                    color: color, emissive: "white",
+                    emissiveIntensity: 0.0,
+                });
+                const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+                addMesh(label, coneMesh);
+                return coneMesh;
+            }
+            function makeDoublePyramid(radius = 0.12, height = 0.12) {
+                const cone1 = makeCone(radius, height);
+                const cone2 = makeCone(radius, height);
+                cone2.rotateX(Math.PI);
+                const g = new THREE.Group();
+                cone1.position.y = height / 2;
+                cone2.position.y = -height / 2;
+                g.add(cone1);
+                g.add(cone2);
+                //addMesh(label, cone1);
+                //addMesh(label, cone2);
+                return g;
+            }
+
+            if (type === "get") {
+                const cone = makeCone();
+                cone.position.copy(headPos);
+                cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+            } else if (type === "put") {
+                const dp = makeDoublePyramid();
+                dp.position.copy(headPos);
+                dp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+            } else if (type === "force") {
+                const cone = makeCone();
+                cone.position.copy(headPos);
+                cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+
+                const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12);
+                const innerShaftMat = new THREE.MeshStandardMaterial({
+                    color: color, emissive: "white",
+                    emissiveIntensity: 0.0,
+                });
+                const innerShaftMesh = new THREE.Mesh(innerShaftGeo, innerShaftMat);
+                innerShaftMesh.position.copy(mid);
+                innerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                addMesh(label, innerShaftMesh);
+            } else if (type === "putForce") {
+                console.log("createActionMesh* ", type, label);
+                const coneforce = makeCone();
+                const coneput = makeDoublePyramid();
+                coneforce.position.copy(headPos);
+                coneput.position.copy(headPos);
+                coneforce.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                coneput.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                //scene.add(coneforce);
+                //scene.add(coneput);
+                const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12);
+                const innerShaftMat = new THREE.MeshStandardMaterial({
+                    color: 0x008877, emissive: "white",
+                    emissiveIntensity: 0.0,
+                });
+                const innerShaftMesh = new THREE.Mesh(innerShaftGeo, innerShaftMat);
+                innerShaftMesh.position.copy(mid);
+                innerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                addMesh(label, innerShaftMesh);
+            }
+        }
+
+        for (const obj of data.objects) {
+            if (obj.type === "box") createBoxMesh(obj);
+            if (obj.type === "orb") createOrb(obj);
+        }
+
+        false && console.log(labelByPointerSource);
+
+        for (const obj of data.objects) {
+            if (obj.type === "pointer") {
+                const from = pointerDotsByKey.get(obj.from);
+                const target = meshByLabel.get(obj.to);
+                if (!from || !target) continue;
+                const adjustedTarget = target[0].position.clone().add(new THREE.Vector3(0, BoxDim / 2, 0));
+                const fromLabel = labelByPointerSource.get(obj.from);
+                false && console.log("pointer ", obj.from, fromLabel);
+                createPointerMesh(fromLabel, from, adjustedTarget);
+                // scene.add(mesh);
+                // sceneMeshes.add(mesh);
+                // addMesh(fromLabel, mesh);
+            }
+            else if (obj.type == "get" || obj.type == "put" || obj.type == "force" || obj.type == "putForce") {
+                const from = pointerDotsByKey.get(obj.from);
+                const target = meshByLabel.get(obj.to);
+                if (!from || !target) { console.error("error connecting to action's target object: ", obj); continue };
+                createActionMesh(obj.type, from, target[0].position, obj.edgeId);
+                // scene.add(mesh)
+                // sceneMeshes.add(mesh);
+                // addMesh(obj.edgeId, mesh)
+            }
+            else if (obj.type === "box" || obj.type === "orb") { /* already handled */ }
+            else {
+                console.error("do not recognize this object type: " + obj.type);
+            }
+        }
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let camTargetPos = null;
+        let camTargetLook = null;
+        let transitionDuration = 2.3;
+        let transitionStart = 0;
+
+        function getMouseNDC(event) {
+            const rect = viewport.getBoundingClientRect();
+
+            return {
+                x: ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                y: -((event.clientY - rect.top) / rect.height) * 2 + 1
+            };
+        }
+
+        function lookAtMesh(m, distance = 3.0) {
+            console.log("lookAtMesh", m);
+            if (!m) { return };
+            camTargetPos = m.position.clone().add(new THREE.Vector3(0.0, 0.0, distance));
+            camTargetLook = m.position.clone();
+            transitionStart = performance.now() / 1000;
+        }
+
+        window.addEventListener('click', e => {
+            const pos = getMouseNDC(e);
+            mouse.x = pos.x;
+            mouse.y = pos.y;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects([...sceneMeshes]);
+            if (intersects.length) {
+                const m = intersects[0].object;
+                let label = labelByMesh.get(m);
+                console.log("calling lookAtMesh() for ", label)
+                lookAtMesh(m);
+            }
+        });
+
+
+        var hoverNode = null;
+
+        // an object to expose state to the console, set whenever hoverNode is set or reset, but never cleared after the hovering is gone, between hovers.
+        var lastHoverNode = { lastHoverNode: null };
+
+        var frames = 0;
+
+        window.addEventListener('mousemove', e => {
+            const pos = getMouseNDC(e);
+            mouse.x = pos.x;
+            mouse.y = pos.y;
+        });
+
+
+
+        function onResize() {
+            const width = viewport.clientWidth;
+            const height = viewport.clientHeight;
+
+            renderer.setSize(width, height);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+        }
+
+
+        window.addEventListener("resize", onResize);
+
+        renderer.setPixelRatio(window.devicePixelRatio);
+        viewport.appendChild(renderer.domElement);
+
+
+        function resizeRendererToViewport() {
+            const width = viewport.clientWidth;
+            const height = viewport.clientHeight;
+
+            renderer.setSize(width, height, false);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+        }
+
+        // React to ANY layout change (sidebar drag, panel collapse, etc.)
+        const ro = new ResizeObserver(() => {
+            resizeRendererToViewport();
+        });
+
+        ro.observe(viewport);
+
+        // initial size
+        resizeRendererToViewport();
+
+
+
+
+        function createFocusDetailDiv(type, id, displayTrue = "inline-block", displayFalse = "none") {
+            const focusEl = document.createElement("div");
+            focusEl.className = "focus-detail";
+            focusEl.style.display = displayFalse;
+            focusEl.dataset.type = type;
+            focusEl.dataset.id = id;
+            focusEl.dataset.displayTrue = displayTrue;
+            focusEl.dataset.displayFalse = displayFalse;
+            return focusEl;
+        };
+
+        let SCENE = null;
+
+
+
+        function elmOnClick(type, id) {
+            return (e) => {
+                if (e.shiftKey) {
+                    closeDoor(type, id)
+                }
+                else {
+                    if (type == "objectShape") {
+                        let meshes = meshByLabel.get(id);
+                        if (!meshes) { console.warn("no meshes for id", id) }
+                        meshes && lookAtMesh(meshes[0])
+                    } else {
+                        openDoor(type, id);
+                        if (type == "metaTime") {
+                            //scrollToMetaTime(id, "smooth");
+                            playerState.metaTime = id;
+                            playerState.stopResetsTo = playerState.metaTime;
+                            renderPlayerFocusAtMetaTime("smooth");
+                            renderPlayerUI();
+                        }
+                    }
+                }
+            }
+        }
+
+        function createMetaTimeAnchorElm(metaTime) {
+            const elm = document.createElement("span");
+            elm.className = "metaTimeAnchor";
+            elm.textContent = "";
+            elm.metaTime = metaTime;
+            return elm
+        }
+        function createMetaTimeElm(metaTime, isAnchor) {
+            const elm = document.createElement("span");
+            elm.className = "metaTime" + (isAnchor ? " metaTimeAnchor" : "");
+            elm.textContent = metaTime;
+            elm.metaTime = metaTime;
+            elm.onclick = elmOnClick("metaTime", metaTime);
+            return elm
+        }
+
+        function createNodeIdElm(nodeId) {
+            const elm = document.createElement("span");
+            elm.className = "nodeId pointer";
+            elm.textContent = nodeId;
+            elm.nodeId = nodeId;
+            elm.pointer = nodeId[0];
+            elm.onclick = elmOnClick("pointer", nodeId[0]);
+            return elm
+        }
+
+        function createEdgeIdElm(edgeId) {
+            const elm = document.createElement("span");
+            elm.className = "edgeId";
+            elm.textContent = edgeId;
+            elm.edgeId = edgeId;
+            elm.onclick = elmOnClick("edgeId", edgeId);
+            return elm
+        }
+
+        function createPointerElm(ptr, shape) {
+            const elm = document.createElement("span");
+            if (shape == "#thunk_") {
+                elm.className = "pointer pointerThunk";
+            }
+            else if (shape == "#nonThunk") {
+                elm.className = "pointer pointerNonThunk";
+            } else {
+                console.error("unrecognized pointer shape", shape);
+            }
+            elm.textContent = ptr;
+            elm.pointer = ptr;
+            elm.onclick = elmOnClick("pointer", ptr)
+            return elm
+        }
+
+        function createShapeElm(outlineShape = "#thunk_", actionTarget = "scene") {
+            const shapeElm = document.createElement("span");
+            if (outlineShape == "#thunk_") {
+                shapeElm.className = "outline-node-thunk-shape";
+                shapeElm.textContent = "◉";
+                shapeElm.onclick = elmOnClick("objectShape", actionTarget);
+            } else if (outlineShape == "#nonThunk") {
+                shapeElm.className = "outline-node-nonthunk-shape";
+                shapeElm.textContent = "▣";
+                shapeElm.onclick = elmOnClick("objectShape", actionTarget);
+            } else {
+                console.error("unrecognized outline node shape", outlineShape);
+            }
+            return shapeElm
+        }
+
+
+        // # Nodes
+        //
+        // Each node of a DCG corresponds to a "space",
+        // and the set of spaces is the the set of possible values for a "pointer" in Fumola.
+        // each unique space/pointer gets dynamic HTML elements.
+        //
+
+        var pointers = []; // each space/pointer mentioned by a node-based event.
+        var nodesMap = IMap();  // indexed by space: map to the node history item, or { "type": "future"; "metaTime" : _ }.
+        var nodesMap_ = IMap(); // indexed by meta time, mapping to nodesMap for that metaTime.
+        var pointerMetaTimes = new Map(); // all metaTimes relevant for a space/pointer.
+        var objectsAtMetaTime = new Map();
+
+        data.nodes.forEach(nhi => {
+            const space = nhi.nodeId[0];
+
+            if (!objectsAtMetaTime.get(nhi.metaTime)) {
+                objectsAtMetaTime.set(nhi.metaTime, [space]);
+            } else {
+                const spaces = objectsAtMetaTime.get(nhi.metaTime);
+                objectsAtMetaTime.set(nhi.metaTime, [...spaces, space]);
+            }
+
+            if (!pointerMetaTimes.get(space)) {
+                pointers = [...pointers, space];
+                pointerMetaTimes.set(space, [nhi.metaTime])
+            } else {
+                const times = pointerMetaTimes.get(space);
+                pointerMetaTimes.set(space, [...times, nhi.metaTime]);
+            }
+        });
+
+        const pointersEl = document.getElementById("pointers");
+
+        pointerMetaTimes.forEach((metaTimes, space, m) => {
+            nodesMap = nodesMap.set(space, { "type": "future", "metaTime": metaTimes[0] });
+        });
+        data.nodes.forEach(nhi => {
+            const space = nhi.nodeId[0];
+            nodesMap = nodesMap.set(space, nhi);
+            nodesMap_ = nodesMap_.set(nhi.metaTime, nodesMap);
+        });
+        pointers.forEach(sp => {
+            let metaTimes = pointerMetaTimes.get(sp);
+            let firstDef = nodesMap_.get(metaTimes[0]).get(sp);
+
+            const focusEl = createFocusDetailDiv("pointer", sp);
+            var shapeElm = null;
+            const pointerEl = document.createElement("span");
+
+            if (firstDef && firstDef.node.type == "thunk") {
+                pointerEl.classList = "pointer pointerThunk";
+                shapeElm = createShapeElm("#thunk_", sp);
+            } else if (firstDef && firstDef.node.type == "nonThunk") {
+                pointerEl.classList = "pointer pointerNonThunk";
+                shapeElm = createShapeElm("#nonThunk", sp);
+            } else {
+                console.error(sp, firstDef);
+            }
+
+            focusEl.appendChild(shapeElm);
+            focusEl.appendChild(pointerEl);
+
+            pointerEl.textContent = sp;
+            pointerEl.onclick = elmOnClick("pointer", sp);
+            pointerEl.pointer = sp;
+            pointersEl.appendChild(focusEl);
+
+            metaTimes.forEach(mt => {
+                const mtElm = createMetaTimeElm(mt);
+                const mtFocusOuter = createFocusDetailDiv("metaTime", mt, "block", "inline-block");
+                const mtFocusInner = createFocusDetailDiv("metaTime", mt, "inline-block", "none");
+                mtFocusInner.classList.add("inner");
+                focusEl.appendChild(mtFocusOuter);
+                mtFocusOuter.appendChild(mtElm);
+                mtFocusOuter.appendChild(mtFocusInner);
+                let nhi = nodesMap_.get(mt).get(sp);
+                var nhiText = "";
+                if (nhi.node.type == "thunk") {
+                    const bodyEl = document.createElement("span");
+                    bodyEl.className = "thunk-body-text";
+                    bodyEl.textContent = nhi.node.body;
+                    mtFocusInner.appendChild(bodyEl);
+
+                    const traceEl = document.createElement("div");
+                    traceEl.className = "thunk-trace";
+
+                    nhi.node.trace.forEach(edgeId => {
+                        const e = createEdgeIdElm(edgeId);
+                        traceEl.appendChild(e);
+                    });
+                    mtFocusInner.appendChild(traceEl);
+
+                    const resultEl = document.createElement("div");
+                    resultEl.className = "thunk-result";
+                    if (!nhi.node.result) {
+                        resultEl.appendChild(document.createTextNode("result undefined"));
+                    } else {
+                        const resultInnerEl = document.createElement("span");
+                        resultInnerEl.className = "thunk-result-value";
+                        resultInnerEl.textContent = nhi.node.result[1];
+                        resultEl.appendChild(resultInnerEl)
+                    }
+                    mtFocusInner.appendChild(resultEl);
+
+                } else if (nhi.node.type == "nonThunk") {
+
+                    const nhiText = "" + nhi.node.value;
+                    mtFocusInner.appendChild(document.createTextNode("" + nhiText))
+
+                } else {
+                    console.error("invalid node history item node type", nhi.node.type)
+
+                }
+            })
+        })
+
+        // # Edges
+        //
+        // process edges, producing indicies and dynamic HTML elements.
+        const edgeIdsEl = document.getElementById("edgeIds");
+        const edgeIdSet = new Map();
+
+        data.edges.forEach(ehi => {
+            if (!objectsAtMetaTime.get(ehi.metaTime)) {
+                objectsAtMetaTime.set(ehi.metaTime, [ehi.edgeId]);
+            } else {
+                const objects = objectsAtMetaTime.get(ehi.metaTime);
+                objectsAtMetaTime.set(ehi.metaTime, [...objects, ehi.edgeId]);
+            }
+            if (!edgeIdSet.has(ehi.edgeId)) {
+                edgeIdSet.set(ehi.edgeId, ehi);
+                const focusEl = createFocusDetailDiv("edgeId", ehi.edgeId);
+                const edgeIdEl = document.createElement("span");
+                edgeIdEl.textContent = ehi.edgeId;
+                edgeIdEl.className = "edgeId";
+                edgeIdEl.edgeId = ehi.edgeId;
+                edgeIdEl.onclick = elmOnClick("edgeId", ehi.edgeId);
+                focusEl.appendChild(edgeIdEl);
+                edgeIdsEl.appendChild(focusEl);
+
+            }
+        })
+
+        // --- entry point ---
+        function loadScene() {
+            renderEvents(data);
+            renderOutline(data);
+            renderPlayerFocusAtMetaTime("instant");
+            false && console.log(playerState);
+        };
+        loadScene();
+
+
+        // --- EVENTS PANEL ---
+        function renderEvents(json) {
+            const events = json.events;
+            const mtEl = document.getElementById("metaTimes");
+            const el = document.getElementById("events");
+            el.innerHTML = "";
+            var lastMetaTime = null;
+
+            events.forEach(ev => {
+                const row = document.createElement("div");
+                //row.metaTime = ev.metaTime;
+                const ts = createMetaTimeElm(ev.metaTime, (ev.metaTime != lastMetaTime));
+                lastMetaTime = ev.metaTime;
+                row.appendChild(ts);
+                row.appendChild(document.createTextNode(" " + ev.type + " "));
+                if (ev.type == "addNode") {
+                    row.appendChild(createNodeIdElm(ev.nodeId))
+                } else if (ev.type == "addEdge") {
+                    row.appendChild(createEdgeIdElm(ev.edgeId))
+                } else if (ev.type == "forceBegin") {
+                    row.appendChild(createEdgeIdElm(ev.edgeId))
+                } else if (ev.type == "updateEdge") {
+                    row.appendChild(createEdgeIdElm(ev.edgeId))
+                } else if (ev.type == "forceEnd") {
+                    row.appendChild(createEdgeIdElm(ev.edgeId));
+                } else {
+                    console.error("uknown event type", ev);
+                }
+                el.appendChild(row);
+            });
+        }
+
+        const marginFactor = 7;
+
+        function outlineMargin(depth = 0) {
+            // return (depth * 3) + "px"
+            return "9px"
+        }
+
+        function addMetaTimeElementForOutlineEdge(parentElm, outlineEdge, useEndTime = false, isAnchor = false, depth = 0) {
+            const e = outlineEdge;
+            const hasNested = typeof e.metaTimes != "number";
+
+            const metaTime = hasNested ? (useEndTime ? e.metaTimes[1] : e.metaTimes[0]) : e.metaTimes;
+            // console.log(e.metaTimes + " " + ts);
+
+            const span = document.createElement("span");
+            span.textContent = metaTime // + (useEndTime ? (isAnchor ? " }" : " {") : "");
+            span.className = "metaTime";
+            span.onclick = elmOnClick("metaTime", metaTime);
+            if (!useEndTime || isAnchor) {
+                span.metaTime = metaTime;
+            };
+            if (useEndTime && isAnchor) {
+                // begin time span
+                const span_ = document.createElement("span");
+                const beginMetaTime = e.metaTimes[0];
+                span_.textContent = beginMetaTime + ", ";
+                span_.className = "metaTime";
+                span_.onclick = elmOnClick("metaTime", metaTime);
+
+                //span.style.textDecoration = "underline";
+                //span.style.marginLeft = 0;
+                const div = document.createElement("div");
+                div.style.marginLeft = outlineMargin(depth);
+                div.appendChild(span_);
+                div.appendChild(span);
+
+                parentElm.appendChild(div)
+            } else {
+                parentElm.appendChild(span)
+            }
+        }
+
+        // --- OUTLINE PANEL (recursive) ---
+        function renderOutline(json) {
+            const outline = json.outline;
+            const panel = document.getElementById("outline");
+            var lastMetaTimeAnchor = null;
+
+            function walk(rootElm, node, depth = 0) {
+                if (!node) return;
+
+                const div = document.createElement("div");
+                //div.style.marginLeft = outlineMargin(depth);
+                div.className = "outline-node";
+                // console.log(node);
+
+                if (depth == 0) {
+                    // to do -- create nodeId div
+                    // no "edge" above the root to print this name.
+                    // otherwise, some edge already printed this out.
+                    div.appendChild(createNodeIdElm(node.nodeId));
+                }
+                rootElm.appendChild(div);
+
+                if (node.edges) {
+                    let rootElm_ = div;
+                    var edgeCount = 0;
+                    const edgetotal = node.edges.length;
+                    node.edges.forEach(e => {
+                        edgeCount += 1;
+                        let div = document.createElement("div");
+                        div.className = "outline-edge";
+                        const hasNested = typeof e.metaTimes != "number";
+                        let metaTimeBegin = hasNested ? e.metaTimes[0] : e.metaTimes;
+                        let metaTimeEnd = hasNested ? e.metaTimes[1] : e.metaTimes;
+
+                        if (!lastMetaTimeAnchor && metaTimeBegin > 1) {
+                            div.appendChild(createMetaTimeAnchorElm(1))
+                            lastMetaTimeAnchor = 1;
+                        }
+
+                        //div.style.marginLeft = outlineMargin(depth); // ???
+                        div.appendChild(createMetaTimeElm(metaTimeBegin, true));
+                        if (hasNested) {
+                            div.appendChild(document.createTextNode(", "));
+                            addMetaTimeElementForOutlineEdge(div, e, true)
+                        };
+                        div.appendChild(document.createTextNode(" "));
+                        div.appendChild(document.createTextNode("(" + edgeCount + "/" + edgetotal + ")"));
+                        //div.appendChild(document.createTextNode(" "));
+                        var edgetext = e.action + "";
+                        let arrows = {
+                            "put": " ───» ",
+                            "get": " ───> ",
+                            "putForce": " ══▷» ",
+                            "force": " ═══▷ ",
+                        };
+                        if (arrows[e.action]) {
+                            edgetext = arrows[e.action]
+                        };
+                        let arrowSpan = document.createElement("span");
+                        arrowSpan.className = "action-arrow  action-" + e.action;
+                        arrowSpan.textContent = edgetext;
+                        div.appendChild(arrowSpan);
+
+                        const shapeElm = createShapeElm(e.outline.shape, e.actionTarget);
+                        div.appendChild(shapeElm);
+
+                        div.appendChild(createPointerElm(e.actionTarget, e.outline.shape));
+                        //if (hasNested) { div.appendChild(document.createTextNode(" {")) };
+                        rootElm_.appendChild(div);
+                        walk(rootElm_, e.outline, depth + 1);
+
+                        div.appendChild(document.createTextNode(" " + e.action + " "));
+
+                        const valueNode = document.createElement("span");
+                        valueNode.textContent = e.value;
+                        valueNode.className = "outline-value-text";
+
+                        if (!hasNested) {
+                            div.appendChild(valueNode);
+                            div.appendChild(createEdgeIdElm(e.edgeId));
+                        } else {
+                            div.appendChild(createEdgeIdElm(e.edgeId));
+
+                            const thunkNode = document.createElement("span");
+                            thunkNode.textContent = e.forcedThunk; // e.outline.nodeId;
+                            // to do -- look up nodeId to get listing/env information, to display here.
+                            thunkNode.className = "outline-forced-thunk-text";
+                            div.appendChild(thunkNode)
+
+                            let arrowSpan = document.createElement("span");
+                            arrowSpan.className = "action-arrow result-arrow";
+                            arrowSpan.textContent = "╰〜〜>";
+
+                            const resultNode = document.createElement("div");
+                            resultNode.className = "outline-internal-result";
+                            //resultNode.style.marginLeft = outlineMargin(depth);
+                            resultNode.appendChild(arrowSpan);
+                            resultNode.appendChild(valueNode);
+                            rootElm_.appendChild(resultNode);
+                            addMetaTimeElementForOutlineEdge(resultNode, e, true, true);
+                        };
+                    }); // foreach edge e
+                }
+            }
+
+            walk(panel, outline);
+        }
+
+        const glowingMeshes = new Set();
+
+        function renderPlayerFocusAtMetaTime(scrollBehavior = "instant") {
+            const t = playerState.metaTime;
+            false && console.log("renderSceneAtMetaTime", t);
+            document.querySelectorAll(".player-focused")
+                .forEach(el => el.classList.remove("player-focused"));
+            document.querySelectorAll(".metaTime")
+                .forEach(el => {
+                    if (el.metaTime == t) {
+                        el.classList.add("player-focused");
+                    }
+                });
+            scrollToMetaTime(t, scrollBehavior);
+
+            var focusObjects = objectsAtMetaTime.get(t);
+            if (!focusObjects) { focusObjects = [] };
+
+            // if t's has a forceBegin event, then
+            //    for each mesh at t, set the emissive value to yellow, and the intensity to hover node.
+            //    do not add the mesh to the set of glowing meshes, so it's intensity stays constant until
+            //    the corresponding forceEnd event.
+            // each time we make something glow, we shall set the emissive color too 
+            //    (to reset yellow to white when time).
+
+            focusObjects.forEach(obj => {
+                const meshes = meshByLabel.get(obj);
+                if (meshes) {
+                    meshes.forEach(mesh => {
+                        console.log("mesh to glow: ", mesh);
+                        if (!mesh.material.emissive) {
+                            console.warn("mesh's material missing emissive property", mesh, mesh.material);
+                            mesh.visible = true;
+
+                        } else {
+                            mesh.material.emissiveIntensity = emissiveIntensity.hoverNode;
+                            mesh.visible = true;
+                            mesh.material.emissive.setHex(0xffffff);
+                            mesh.material.needsUpdate = true;
+
+                            console.log("worked");
+
+                            false && lookAtMesh(mesh, 20.0);
+                            if (!glowingMeshes.has(mesh)) {
+                                glowingMeshes.add(mesh)
+                            }
+                        }
+                    })
+                } else {
+                    console.warn("could not find mesh for object", obj);
+                }
+            })
+        }
+
+
+        async function animate() {
+            frames++;
+
+            glowingMeshes.forEach(mesh => {
+                if (mesh.material.emissiveIntensity < 0.01) {
+                    mesh.material.emissiveIntensity = emissiveIntensity.noHoverNode;
+                    glowingMeshes.delete(mesh);
+                } else {
+                    mesh.material.emissiveIntensity -= 0.01;
+                }
+            })
+
+            const now = performance.now() / 1000;
+            if (camTargetPos) {
+                const t = Math.min((now - transitionStart) / transitionDuration, 1);
+                camera.position.lerpVectors(camera.position, camTargetPos, t);
+                controls.target.lerpVectors(controls.target, camTargetLook, t);
+                if (t >= 1) camTargetPos = null;
+            }
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects([...sceneMeshes]);
+
+            function cancelHoverNode() {
+                const DEBUG = false;
+                if (!hoverNode) {
+                    console.error("no hoverNode to cancel")
+                    return
+                }
+                let label = labelByMesh.get(hoverNode);
+                if (label) {
+                    DEBUG && console.log("old hover node was " + label);
+                    // let material = objectMaterials.get(label);
+                    DEBUG && console.log("  current material uuid is " + hoverNode.material.uuid);
+                    DEBUG && console.log("  original material uuid was " + material.uuid);
+                    // hoverNode.material = material.clone();
+                    hoverNode.material.emissiveIntensity = emissiveIntensity.noHoverNode;
+                    DEBUG && console.log("  restored, and cloned original as " + material.uuid);
+                    hoverNode = null;
+                } else {
+                    DEBUG && console.log("cancelHoverNode() failed to find label.  Internal error.")
+                }
+            }
+
+            if (intersects.length) {
+                const DEBUG = true;
+                if (hoverNode !== intersects[0].object) {
+                    if (hoverNode) { cancelHoverNode() };
+
+                    hoverNode = intersects[0].object;
+                    lastHoverNode.lastHoverNode = hoverNode;
+                    DEBUG && console.log("new hover node is " + labelByMesh.get(hoverNode));
+                    DEBUG && console.log("   material uuid is " + hoverNode.material.uuid);
+
+                    // hoverNode.material = hoverNode.material.clone();
+                    //DEBUG && console.log("   material uuid is  " + hoverNode.material.uuid);
+
+                    hoverNode.material.emissiveIntensity = emissiveIntensity.hoverNode;
+                }
+            }
+            else {
+                if (hoverNode) {
+                    cancelHoverNode()
+                }
+            }
+            controls.update();
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // expose
+        window.loadScene = loadScene;
+
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        window.app = {
+            SCENE,
+            inFocus,
+            frames,
+            lastHoverNode,
+            objectMaterials,
+            meshByLabel,
+            labelByMesh,
+            data,
+            pointers,
+            nodesMap,
+            nodesMap_,
+            pointerMetaTimes,
+            scene,
+            camera,
+            renderer,
+            controls,
+            labelByPointerSource,
+        };
+
+    </script>
+
+</body>
+
+</html>

@@ -116,6 +116,9 @@ impl PeekValue for Action {
                 "force_",
                 Value::Tuple(vector![Value::Thunk(closed_exp).share(), v]).share(),
             ),
+            Action::ForceBegin(closed_exp) => {
+                variant("forceBegin", Value::Thunk(closed_exp).share())
+            }
             Action::Put(v) => variant("put", v),
             Action::Get(v) => variant("get", v),
         }
@@ -204,11 +207,13 @@ impl PeekValue for Event {
         match self {
             Event::AddNode(v) => variant("addNode", v.into_value_()),
             Event::AddEdge(edge_id) => variant("addEdge", edge_id.into_value_()),
+            Event::UpdateEdge(edge_id) => variant("updateEdge", edge_id.into_value_()),
             Event::RemoveEdge(edge_id) => variant("removeEdge", edge_id.into_value_()),
-            Event::ForceBegin(node_id) => variant("forceBegin", node_id.into_value_()),
-            Event::ForceEnd(node_id, edge_id) => {
-                variant("forceEnd", (node_id, edge_id).into_value_())
-            }
+            Event::ForceBegin(node_id, cache_hit) => variant(
+                "forceBegin",
+                (node_id.into_value_(), cache_hit.into_value_()).into_value_(),
+            ),
+            Event::ForceEnd(edge_id) => variant("forceEnd", edge_id.into_value_()),
         }
     }
 }
