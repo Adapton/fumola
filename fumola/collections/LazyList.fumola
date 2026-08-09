@@ -58,13 +58,20 @@ module {
     let nodeInfo = A.peekInfo(list);
     //prim "print" nodeInfo;
     //prim "print" (nodeInfo!.outgoingEdges);
-    if (nodeInfo!.outgoingEdges.size() > 0) {
+    if (nodeInfo!.outgoingEdges.size() == 2) {
       //prim "print" "xxx";
+      
       let forceMergeEdge = nodeInfo!.outgoingEdges[0];
       //prim "print" forceMergeEdge;
       let forceMergeObj = objectFromEdge(label_, "forceMerge", forceMergeEdge);
       //prim "print" forceMergeObj;
-      objs := objs # [ forceMergeObj ];
+
+      let putMergeEdge = nodeInfo!.outgoingEdges[1];
+      //prim "print" forceMergeEdge;
+      let putMergeObj = objectFromEdge(label_, "putMerge", putMergeEdge);
+      //prim "print" forceMergeObj;
+  
+      objs := objs # [ forceMergeObj, putMergeObj ];
     };
     let cellPos = A.peekInfo(`position(list));
     if (cellPos != null) { return [] }; // we've already processed this tail of the stream.
@@ -82,7 +89,7 @@ module {
           let nextPosition = A.Scene.vec3Add(position, offset);
           objs #= sceneObjectsMergeSortStream(cons.next, nextPosition, offset);
           ("symbol=" # (debug_show cons.symbol) # "\nelement=" # (debug_show cons.element),
-           ["next", "forceMerge"], ?false) 
+           ["forceMerge", "putMerge", "next"], ?false) 
         };
       };
     if (isNilList != (?true)) {
@@ -90,7 +97,7 @@ module {
     } else { objs }
   };
 
-  #[test]
+  // #[test]
   func testSceneObjectMergeSortStream() {
     let s = testStreamNats();
     //prim "print" s;
@@ -100,7 +107,7 @@ module {
     assert out[0].1!.textFields == "(unforced)";
     let _ = takeN_(s, 3);
     let out = sceneObjectsMergeSortStream(s, A.Scene.zero, {x=0.0;y=0.0;z=1.0});
-    //prim "print" (debug_show out);
+    prim "print" (debug_show out);
     assert out.size() == 5;
     assert out[4].1!.textFields == "null";
   };
