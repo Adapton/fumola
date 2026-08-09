@@ -157,7 +157,7 @@ module {
         assert scene.history.events.size() == 534;
         assert scene.history.nodes.size() == 197;
         assert scene.history.edges.size() == 286;
-        assert scene.objects.size() == 200;
+        assert scene.objects.size() == 291;
         assert ((scene.outline.1).0).value!.0 == 313; // Final Meta Time.
     };
             
