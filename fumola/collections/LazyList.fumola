@@ -58,13 +58,19 @@ module {
     let nodeInfo = A.peekInfo(list);
     //prim "print" nodeInfo;
     //prim "print" (nodeInfo!.outgoingEdges);
+<<<<<<< HEAD
     if (nodeInfo!.outgoingEdges.size() == 2) {
       //prim "print" "xxx";
       
+=======
+    if (nodeInfo!.outgoingEdges.size() > 0) {
+      //prim "print" "xxx";
+>>>>>>> aa00b56933d7ed6db438fceff5a0ecc44ae6524c
       let forceMergeEdge = nodeInfo!.outgoingEdges[0];
       //prim "print" forceMergeEdge;
       let forceMergeObj = objectFromEdge(label_, "forceMerge", forceMergeEdge);
       //prim "print" forceMergeObj;
+<<<<<<< HEAD
 
       let putMergeEdge = nodeInfo!.outgoingEdges[1];
       //prim "print" forceMergeEdge;
@@ -72,6 +78,9 @@ module {
       //prim "print" forceMergeObj;
   
       objs := objs # [ forceMergeObj, putMergeObj ];
+=======
+      objs := objs # [ forceMergeObj ];
+>>>>>>> aa00b56933d7ed6db438fceff5a0ecc44ae6524c
     };
     let cellPos = A.peekInfo(`position(list));
     if (cellPos != null) { return [] }; // we've already processed this tail of the stream.
@@ -89,7 +98,11 @@ module {
           let nextPosition = A.Scene.vec3Add(position, offset);
           objs #= sceneObjectsMergeSortStream(cons.next, nextPosition, offset);
           ("symbol=" # (debug_show cons.symbol) # "\nelement=" # (debug_show cons.element),
+<<<<<<< HEAD
            ["forceMerge", "putMerge", "next"], ?false) 
+=======
+           ["next", "forceMerge"], ?false) 
+>>>>>>> aa00b56933d7ed6db438fceff5a0ecc44ae6524c
         };
       };
     if (isNilList != (?true)) {
