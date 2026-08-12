@@ -97,6 +97,76 @@ public func sceneObjects<X>(list : List_<X>, position : Vec3) : SceneObjects {
         case _ { assert false };
     }
   };
-   
+
+  //
+  // Editor<X> is a pure representation that supports sequencing impure effects
+  // on an underlying list structure of type List<X>.
+  //
+  //  - next, previous
+  //  - insert, remove, replace
+  //
+  public module Edit {
+    
+    public type Editor<X> = {
+      cursor : List_<X>;
+      previous : [List_<X>];
+    };
+
+    public func cursor(c : List_<X>) {
+      {
+        cursor = c;
+        previous = [c];
+      }
+    };
+
+    public func next(editor : Editor<X>) : ?Editor<X> {
+      switch (@ (editor.cursor)) {
+        case null null;
+        case (?cell) { ?{
+          cursor = cell.next;
+          previous = editor.previous # [editor.cursor];
+        } };
+      }
+    };
+
+    public func previous(editor : Editor<X>) : ?Editor<X> {
+      if (editor.previous.size() > 0) { 
+        let (previous, cursor) = prim "arrayPopBack" editor.previous;
+        ?{ previous; cursor } 
+      } else {
+        null
+      }
+    };
+
+    public func replace(editor : Editor<X>, element : X) : ?Editor<X> {
+      let list = @(editor.cursor);
+      switch list {
+        case null null;
+        case (?{element=_; symbol; next}) {
+          editor.cursor := {element; symbol; next}
+        };
+      }
+    };
+
+    public func insert(editor : Editor<X>, symbol : Symbol, element : X) : Editor<X> {
+      let next = @(editor.cursor);
+      editor.cursor := {
+        element ;
+        symbol ;
+        next = symbol := next;  
+      }
+    };
+
+    public func remove(editor : Editor<X>) : ?(List<X>, Editor<X>) {
+      let removed = @(editor.cursor);
+      switch (removed) {
+        case null null;
+        case (?list) {
+          editor.cursor := @(list.next);
+          ?(list, editor)
+        };
+      }
+    };
+  };
 
 }
