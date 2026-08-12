@@ -178,14 +178,14 @@ module {
     #[test]
     public func test() : Editor<Nat> {
       let list = `list := fromIter([(1,1), (2,2), (3,3)].vals());
-        let editor = cursor(list);
-        let editor = next(editor)!;
-        let editor = insert(editor, 4, 4);
+        let editor = Edit.cursor(list);
+        let editor = Edit.next(editor)!;
+        let editor = Edit.insert(editor, 4, 4);
       assert (size(@(editor.cursor))) == 3;
-        let editor = insert(editor, 5, 5);
-        let editor = replace(editor, 6)!;
+        let editor = Edit.insert(editor, 5, 5);
+        let editor = Edit.replace(editor, 6)!;
       assert (size(@(editor.cursor))) == 4;
-        let (cell, editor) = remove(editor)!;
+        let (cell, editor) = Edit.remove(editor)!;
       assert (cell.element == 6);
       assert (size(@(editor.cursor))) == 3;
     };
