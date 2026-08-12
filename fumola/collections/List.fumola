@@ -2,42 +2,42 @@ import A "adapton";
 
 module {
 
-#[listing(33)]
-public type List<X> = ?{
-  element : X;
-  symbol : Symbol;
-  next : List_<X>;
-};
+  #[listing(33)]
+  public type List<X> = ?{
+    element : X;
+    symbol : Symbol;
+    next : List_<X>;
+  };
 
-public type List_<X> = Pointer<List<X>>;
+  public type List_<X> = Pointer<List<X>>;
 
-#[listing]
-public func fromIter(iter : Iter<(Symbol, X)>) : List<X> {
+  #[listing]
+  public func fromIter(iter : Iter<(Symbol, X)>) : List<X> {
     switch (iter.next()) {
         case null null;
         case (?(symbol, element)) {
             ?{symbol; element; next = symbol := fromIter(iter)}
         }
     } 
-};
+  };
 
-public func size<X>(list: List<X>) : Nat {
+  public func size<X>(list: List<X>) : Nat {
     switch list {
         case null 0;
         case (?cons) {
             1 + size(@(cons.next))
         }
     }
-};
+  };
 
-#[test]
-public func testSize() {
+  #[test]
+  public func testSize() {
     let list = fromIter([(1,1), (2,2), (3,3)].vals());
     assert (size(list) == 3);
-};
+  };
 
-#[test]
-public func testFromIter() {
+  #[test]
+  public func testFromIter() {
     let list = fromIter([(1,1), (2,2), (3,3)].vals());
     assert (list!.symbol == 1);
     assert (list!.element == 1);
@@ -46,10 +46,10 @@ public func testFromIter() {
     assert (@ (((@ (list!.next))!).next))!.symbol == 3;
     assert (@ (((@ (list!.next))!).next))!.element == 3;
     assert ((@ ((@ ((@ (list!.next))!.next))!.next)) == null);
-};
+  };
 
-#[listing]
-public func sceneObjects<X>(list : List_<X>, position : Vec3) : SceneObjects {
+  #[listing]
+  public func sceneObjects<X>(list : List_<X>, position : Vec3) : SceneObjects {
     let label_ : Text = (debug_show list);
     var objs : SceneObjects = [];
     let (textFields : Text, pointerFields : Text) = 
@@ -97,6 +97,103 @@ public func sceneObjects<X>(list : List_<X>, position : Vec3) : SceneObjects {
         case _ { assert false };
     }
   };
-   
 
+  //
+  // Editor<X> is a pure representation that supports sequencing impure effects
+  // on an underlying list structure of type List<X>.
+  //
+  //  - next, previous
+  //  - insert, remove, replace
+  //
+  public module Edit {
+    
+    public type Editor<X> = {
+      cursor : List_<X>;
+      previous : [List_<X>];
+    };
+
+    public func cursor(c : List_<X>) {
+      {
+        cursor = c;
+        previous = [];
+      }
+    };
+
+    public func next(editor : Editor<X>) : ?Editor<X> {
+      switch (@ (editor.cursor)) {
+        case null null;
+        case (?cell) { ?{
+          cursor = cell.next;
+          previous = editor.previous # [editor.cursor];
+        } };
+      }
+    };
+
+    public func previous(editor : Editor<X>) : ?Editor<X> {
+      prim "print" editor;
+      if (editor.previous.size() > 0) { 
+        let (previous, cursor) = prim "arrayPopBack" editor.previous;
+        ?{ previous; cursor } 
+      } else {
+        null
+      }
+    };
+
+    public func replace(editor : Editor<X>, element : X) : ?Editor<X> {
+      let list = @(editor.cursor);
+      switch list {
+        case null null;
+        case (?{element=_; symbol; next}) {
+          editor.cursor := ?{element; symbol; next};
+          ?editor
+        };
+      }
+    };
+
+    public func insert(editor : Editor<X>, symbol : Symbol, element : X) : Editor<X> {
+      let next = @(editor.cursor);
+      editor.cursor := ?{
+        element ;
+        symbol ;
+        next = symbol := next;  
+      };
+      editor
+    };
+
+    public func remove(editor : Editor<X>) : ?(List<X>, Editor<X>) {
+      let removed = @(editor.cursor);
+      switch (removed) {
+        case null null;
+        case (?list) {
+          editor.cursor := @(list.next);
+          ?(list, editor)
+        };
+      }
+    };
+  };  
+  
+  public module EditTest {
+    type Editor<X> = Edit.Editor<X>;
+
+    #[test]
+    public func test() : Editor<Nat> {
+      let list = `list := fromIter([(1,1), (2,2), (3,3)].vals());
+        let editor = Edit.cursor(list);
+        let editor = Edit.next(editor)!;
+        let editor = Edit.insert(editor, 4, 4);
+      assert (size(@(editor.cursor))) == 3;
+        let editor = Edit.insert(editor, 5, 5);
+        let editor = Edit.replace(editor, 6)!;
+      assert (size(@(editor.cursor))) == 4;
+        let (cell, editor) = Edit.remove(editor)!;
+      assert (cell.element == 6);
+      assert (size(@(editor.cursor))) == 3;
+    };
+
+    #[test]
+    public func testPrevious() {
+      prim "print" "TO DO";
+    };
+
+  };
 }
