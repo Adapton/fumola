@@ -115,7 +115,7 @@ public func sceneObjects<X>(list : List_<X>, position : Vec3) : SceneObjects {
     public func cursor(c : List_<X>) {
       {
         cursor = c;
-        previous = [c];
+        previous = [];
       }
     };
 
@@ -130,6 +130,7 @@ public func sceneObjects<X>(list : List_<X>, position : Vec3) : SceneObjects {
     };
 
     public func previous(editor : Editor<X>) : ?Editor<X> {
+      prim "print" editor;
       if (editor.previous.size() > 0) { 
         let (previous, cursor) = prim "arrayPopBack" editor.previous;
         ?{ previous; cursor } 
@@ -143,18 +144,20 @@ public func sceneObjects<X>(list : List_<X>, position : Vec3) : SceneObjects {
       switch list {
         case null null;
         case (?{element=_; symbol; next}) {
-          editor.cursor := {element; symbol; next}
+          editor.cursor := ?{element; symbol; next};
+          ?editor
         };
       }
     };
 
     public func insert(editor : Editor<X>, symbol : Symbol, element : X) : Editor<X> {
       let next = @(editor.cursor);
-      editor.cursor := {
+      editor.cursor := ?{
         element ;
         symbol ;
         next = symbol := next;  
-      }
+      };
+      editor
     };
 
     public func remove(editor : Editor<X>) : ?(List<X>, Editor<X>) {
@@ -166,6 +169,30 @@ public func sceneObjects<X>(list : List_<X>, position : Vec3) : SceneObjects {
           ?(list, editor)
         };
       }
+    };
+  
+  
+    public module Test {
+      #[test]
+      public func test() : Editor<Nat> {
+        let list = `list := fromIter([(1,1), (2,2), (3,3)].vals());
+        let editor = cursor(list);
+        let editor = next(editor)!;
+        let editor = insert(editor, 4, 4);
+        assert (size(@(editor.cursor))) == 3;
+        let editor = insert(editor, 5, 5);
+        let editor = replace(editor, 6)!;
+        assert (size(@(editor.cursor))) == 4;
+        let (cell, editor) = remove(editor)!;
+        assert (cell.element == 6);
+        assert (size(@(editor.cursor))) == 3;
+      };
+
+      #[test]
+      public func testPrevious() {
+        prim "print" "TO DO";
+      };
+
     };
   };
 
