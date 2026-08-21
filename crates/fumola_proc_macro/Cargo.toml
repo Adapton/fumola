@@ -1,6 +1,6 @@
 [package]
 name = "fumola_proc_macro"
-version = "0.0.29"
+version = "0.0.20"
 authors = ["Matthew Hammer", "Ryan Vandersmith"]
 edition = "2024"
 license = "Apache-2.0"
