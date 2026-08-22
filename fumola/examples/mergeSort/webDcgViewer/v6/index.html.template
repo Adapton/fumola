@@ -813,7 +813,8 @@
             hoverNode: 1.0,
         };
 
-        const data = await fetch('./scene.json').then(r => r.json());
+        const data = 103070301 /* SCENE_JSON */;
+        // const data = await fetch('./scene.json').then(r => r.json());
 
         function openDoor(type, id) {
             console.log("openDoor", type, id);
