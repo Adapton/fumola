@@ -26,7 +26,7 @@ The image above depicts the dynamic behavior of `lazyMergeSort` on 44 unsorted i
 
 ## Future work
 
-- ***Replayground*** permits live editing of the program being displayed, like in [Hazel](hazel.org).
+- ***Replayground*** permits live editing of the program being displayed, like in [Hazel](https://hazel.org).
 - Use Fumola to author the UI aspects of the ***Replayground*** experience, now created by a static file exported from Fumola demo programs into static HTML/JS.
 
 ## Contributing
