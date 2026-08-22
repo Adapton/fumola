@@ -26,8 +26,9 @@ module {
                 case (?#half) `half;
             };
 
-    public func generateSceneFullDemand(seed : Nat, size : Nat) {
-        let scene_ = `scene := thunk {
+    // Canonical scene components for mergeSort at full demand.
+    public func sceneComponentsFullDemand(seed : Nat, size : Nat) {
+        `scene := thunk {
         let inputArray = R.generateRandomInput(seed, size);
         let inputList_ = `ListFromRandomArray := thunk {
             do within space `inputList {
@@ -65,8 +66,13 @@ module {
             lazySorted_;
             sorted;
         };
-        { components }
-        };
+        // this may be a useless field indirection
+        { components };
+        } 
+    };
+
+    public func generateSceneFullDemand(seed : Nat, size : Nat) {
+        let scene_ = sceneComponentsFullDemand(seed, size);
         let scene = force(scene_);
         let history = A.peekHistory();
         let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(history.events);
@@ -117,13 +123,17 @@ module {
             }) } else {};
 
         let outline = A.Outline.outline(scene_);
-        let outlineText = A.IntoText.outline(outline);
-        prim "writeFile" (`mergeSortSceneFullDemand
+        if (false) {
+            let outlineText = A.IntoText.outline(outline);
+            prim "writeFile" (`mergeSort
+                            -`FullDemand
                             -`seed-seed
                             -`size-size
                             -`Outline-`txt, outlineText);
+        };
         let sceneData = {
-            history ; outline ;
+            history ;
+            outline ;
             objects = inputListObjects 
                     # inputTreeFromListObjects
                     # [inputTree_NilList]
@@ -132,11 +142,14 @@ module {
                     # [lazyMergeSort_NilList]
                     ;
         };
-        let sceneText = A.IntoJSON.fromScene(sceneData);
-        prim "writeFile" (`mergeSortSceneFullDemand
+        if (true) {
+            let sceneText = A.IntoJSON.fromScene(sceneData);
+            prim "writeFile" (`mergeSort
+                            -`FullDemand
                             -`seed-seed
                             -`size-size
                             -`Scene-`json, sceneText);
+        };
         {
             sceneData ;
             components = scene.components ;
