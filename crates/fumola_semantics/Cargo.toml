@@ -13,7 +13,7 @@ keywords = ["internet-computer", "fumola", "wasm"]
 include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
-fumola_syntax = { path = "../fumola_syntax" }
+fumola_syntax = { version = "0.0.29", path = "../fumola_syntax" }
 regex = "1.6.0"
 env_logger = "0.10.0"
 log = "0.4.17"
