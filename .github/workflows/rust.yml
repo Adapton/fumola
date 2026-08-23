@@ -35,9 +35,9 @@ jobs:
       - name: Run Fumola/examples/mergeSort data collection
         run: ./run-example-mergeSort.sh
 
-      - name: Run Fumola/collections/levelTree scene visualization
+      - name: Run Fumola/collections/levelTree structure visualization
         run: ./write-level-tree-scene.sh
 
-      - name: Run Fumola/collections/levelTree scene visualization
-        run: ./write-merge-sort-scene.sh
+      - name: Run Fumola/examples/mergeSort scene visualization
+        run: ./write-merge-sort-scene-larger.sh
 
