@@ -187,11 +187,11 @@ module {
             _3_objectsSize = scene.objects.size();
             _4_finalMetaTime = ((scene.outline.1).0).value!.0;
         }))};
-        assert scene.history.events.size() == 534;
-        assert scene.history.nodes.size() == 197;
-        assert scene.history.edges.size() == 286;
+        assert scene.history.events.size() == 522;
+        assert scene.history.nodes.size() == 193;
+        assert scene.history.edges.size() == 280;
         assert scene.objects.size() == 291;
-        assert ((scene.outline.1).0).value!.0 == 313; // Final Meta Time.
+        assert ((scene.outline.1).0).value!.0 == 307; // Final Meta Time.
     };
             
     public func dcg(seed : Nat, size : Nat, demand) {
