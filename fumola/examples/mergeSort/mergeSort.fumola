@@ -349,7 +349,7 @@ module {
             };
             let demand = demandSym(demand);
             prim "writeFile" (`demand-demand-`size-`dat, sizes);
-            prim "writeFile" (`demand-demand-`depth-`mdat, depths);
+            prim "writeFile" (`demand-demand-`depth-`dat, depths);
             prim "writeFile" (`demand-demand-`comparisonCount-`dat, comparisonCounts);
         };
 
