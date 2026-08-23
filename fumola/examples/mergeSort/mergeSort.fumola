@@ -27,7 +27,11 @@ module {
             };
 
     // Canonical scene components for mergeSort at full demand.
-    public func sceneComponentsFullDemand(seed : Nat, size : Nat, edits: ?List<Nat> -> ()) {
+    //
+    // todo -- edits would be more general if it had type ?(List_<Nat> -> ())
+    //         that is, when it takes the head pointer, not the list head directly.
+    //         that pointer doesn't exist yet in our scene; just the head thunk.
+    public func sceneComponentsFullDemand(seed : Nat, size : Nat, edits: ?(List<Nat> -> ())) {
         `scene := thunk {
         let inputArray = R.generateRandomInput(seed, size);
         let inputList_ = `ListFromRandomArray := thunk {
