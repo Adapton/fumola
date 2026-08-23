@@ -170,6 +170,19 @@ module {
         };
       }
     };
+
+    public func gotoSymbol(editor : Editor<X>, symbol : Symbol) : ?Editor<X> {
+      switch (@(editor.cursor)) {
+        case null null;
+        case (?list) {
+          if (list.symbol == symbol) {
+            editor
+          } else {
+            gotoSymbol(next(editor)!, symbol)
+          }
+        }
+      };
+    };
   };  
   
   public module EditTest {
@@ -178,8 +191,8 @@ module {
     #[test]
     public func test() : Editor<Nat> {
       let list = `list := fromIter([(1,1), (2,2), (3,3)].vals());
-        let editor = Edit.cursor(list);
-        let editor = Edit.next(editor)!;
+        let editor0 = Edit.cursor(list);
+        let editor = Edit.next(editor0)!;
         let editor = Edit.insert(editor, 4, 4);
       assert (size(@(editor.cursor))) == 3;
         let editor = Edit.insert(editor, 5, 5);
@@ -188,6 +201,9 @@ module {
         let (cell, editor) = Edit.remove(editor)!;
       assert (cell.element == 6);
       assert (size(@(editor.cursor))) == 3;
+
+      let editor = Edit.gotoSymbol(editor0, 2);
+      assert ((@(editor.cursor))!.element) == 2;
     };
 
     #[test]

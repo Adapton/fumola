@@ -101,6 +101,10 @@ module {
         };
     };
 
+    public func reset() {
+        prim "adaptonReset" ();
+    };
+
     public func peekInfo(p : Pointer) : ?PeekInfo.NodeInfo {
         let p = prim "adaptonPointer" p;
         prim "adaptonPeekCell" p;

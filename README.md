@@ -19,6 +19,41 @@ The image above depicts the dynamic behavior of `lazyMergeSort` on 44 unsorted i
 - To the right of this balanced tree, the sub-graph of `merge` thunks constructs the final sorted list, on demand.  It extends from left to right, horizontally.
 - The tree root's stream of `merge` nodes (longest, central row of horizontal orbs) has the 44 elements in sorted order because we've demanded the full output.
 
+***`fumola` code for the image***:
+
+```motoko
+        let seed = 10;
+        let size = 44;
+        let inputArray = R.generateRandomInput(seed, size);
+        let inputList_ = `ListFromRandomArray := thunk {
+            do within space `inputList {
+                List.fromIter(inputArray.vals())
+            }
+        };
+        let inputList = force(inputList_);
+        let inputTree_ =
+          `LevelTreeFromList := thunk {
+            do within space `inputTree {
+                Seq.fromList(inputList)
+            };
+        };
+        let inputTree = force(inputTree_);
+        let lazySorted_ = 
+            force(`lazyMergeSort := thunk {
+            do within space `lazyMergeSort {
+            if false { 
+                Seq.lazyMergeSort(inputTree)
+            } else {
+                Seq.lazyMergeSort_(inputTree)
+            };
+        }});
+        let sorted = 
+            force(`forceSort := thunk {
+            do within space `forceSort {
+            LazyList.takeN_(lazySorted_, size);
+        }});
+```
+
 ## On-going work
 
 - ***Fumola semantics*** performs ***realignment*** on DCGs via ***signaling*** and ***repair*** algorithms (Adapton Recipe semantics).
