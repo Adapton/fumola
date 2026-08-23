@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-template = Path("index.html.template").read_text()
+template = Path("index.template.html").read_text()
 scene = json.loads(Path("scene.json").read_text())
 
 scene_json = json.dumps(scene)
