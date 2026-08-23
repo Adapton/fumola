@@ -35,10 +35,8 @@ module {
                 List.fromIter(inputArray.vals())
             }
         };
-        do ? {
-            edits!()
-        };
         let inputList = force(inputList_);
+        do ? { edits!(inputList) };
         let inputTree_ =
           `LevelTreeFromList := thunk {
             do within space `inputTree {
@@ -47,19 +45,10 @@ module {
         };
         let inputTree = force(inputTree_);
         let lazySorted_ = 
-            force(`lazyMergeSort := thunk {
             do within space `lazyMergeSort {
-            if false { 
-                Seq.lazyMergeSort(inputTree)
-            } else {
                 Seq.lazyMergeSort_(inputTree)
             };
-        }});
-        let sorted = 
-            force(`forceSort := thunk {
-            do within space `forceSort {
-            LazyList.takeN_(lazySorted_, size);
-        }});
+        let sorted = LazyList.takeN_(lazySorted_, size);
         let components = {
             inputArray;
             inputList_;
