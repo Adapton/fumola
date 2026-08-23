@@ -26,13 +26,17 @@ module {
                 case (?#half) `half;
             };
 
-    public func generateSceneFullDemand(seed : Nat, size : Nat) {
-        let scene_ = `scene := thunk {
+    // Canonical scene components for mergeSort at full demand.
+    public func sceneComponentsFullDemand(seed : Nat, size : Nat, edits: ?List<Nat> -> ()) {
+        `scene := thunk {
         let inputArray = R.generateRandomInput(seed, size);
         let inputList_ = `ListFromRandomArray := thunk {
             do within space `inputList {
                 List.fromIter(inputArray.vals())
             }
+        };
+        do ? {
+            edits!()
         };
         let inputList = force(inputList_);
         let inputTree_ =
@@ -65,27 +69,40 @@ module {
             lazySorted_;
             sorted;
         };
-        { components }
-        };
+        // this may be a useless field indirection
+        { components };
+        } 
+    };
+
+    public func generateSceneFullDemand(seed : Nat, size : Nat, edits: ?List<Nat> -> ()) {
+        A.reset(); // reset so history only contains our components.
+        let scene_ = sceneComponentsFullDemand(seed, size, edits);
         let scene = force(scene_);
         let history = A.peekHistory();
-        let nodeIdsByLabel = A.nodeIdsByLabelFromEvents(history.events);
 
         // - - - - Create 3D objects that represent each component - - - - -
-   
+        // Positioning algorithm: 
+        // Step 1: input tree is oriented first, and its positions determine the positions
+        // of its producer and consumer orbs.
         let inputTreeObjects =
             Seq.Scene.sceneObjects(scene.components.inputTree!,
             { x = 0.0; y = 0.0; z = 0.0});
 
+        // Step 2: we use the height of the tree to determine the gaps between structures.
         let inputTreeGeom2d = Seq.Scene.geom2d(scene.components.inputTree!);
         let height = inputTreeGeom2d.height;
         let e = 2.71828;
         let levelGap = height * e;
      
+        // Step 3: the input list sits at depth levelGap;
         let inputListObjects =
             List.sceneObjectsFromThunk(scene.components.inputList_,
             { x = 0.0 - (size + 0.0) / 2.0 ; y = 5.0; z = levelGap});
 
+        // Step 4: tree-from-list orbs:
+        // the orbs that produce the input tree from the list sit between it, at depth levelGaph / 2.0.
+        // these orbs have interesting sub-structures and sub-cases,
+        // ...each with a geometric spacing parameter of type Vec3.
         let inputTreeFromListObjects =
             Seq.Scene.sceneObjectsFromList(A.Outline.outline(scene.components.inputTree_),
             { x = 0.0; y = 0.0; z = levelGap / 2.0}, {
@@ -93,37 +110,48 @@ module {
                 leafL = { x = -(0.2 * e); y = -0.1 * e; z = 1.0};
                 leafR = { x =  (0.2 * e); y = -0.1 * e; z = 1.0};
             });
-        // constant pointer created by the tree-of-list procedure for initializing the accumlator:
+
+        // Step 5 -- constants that represent empty structures (List and LazyList).
+        //
+        // Step 5(a) -- constant pointer created by the tree-of-list procedure for initializing the accumlator:
+        //
         let inputTree_NilList = 
             #box{
                 label_="inputTree(`(nilList))";
                 position = {x=0; y=0; z=levelGap / 2.0};
                 textFields=""; pointerFields=""
             };
+
+        //
+        // Step 5(b) -- constant pointer created by the mergeSort algorithm:
+        //
         let lazyMergeSort_NilList = 
             #orb{
                 label_="lazyMergeSort(`(nilList))";
                 position = {x=0; y=-1; z=-levelGap};
                 textFields=""; pointerFields=""
             };
-     
+
+        //
+        // Step 6 -- merge network: orbs that merge two incoming sorted streams into an output stream.
+        //
+        // - the `reduce` gap orients the reduction tree orbs to the input tree.
+        // - the `merge` gap orients the next orb in a sorted lazy list to the prior one.
+        //   each orb merges two sorted input lists into this lazy list, as the sorted output.
+        //
         let mergeGap = 1.0;
-        let lazyMergeSort = if true {
+        let lazyMergeSort =
             Seq.Scene.sceneObjectsLazyMergeSort_(A.Outline.outline(scene.components.lazySorted_),
             { x = 0.0; y = 1.618 * height; z = -levelGap/2.0 },
             {
                 reduce = { x = 0; y = 1; z = -levelGap/2.0; };
                 merge = { x =  0.0; y = 0.0; z = -mergeGap };
-            }) } else {};
+            });
 
         let outline = A.Outline.outline(scene_);
-        let outlineText = A.IntoText.outline(outline);
-        prim "writeFile" (`mergeSortSceneFullDemand
-                            -`seed-seed
-                            -`size-size
-                            -`Outline-`txt, outlineText);
         let sceneData = {
-            history ; outline ;
+            history ;
+            outline ;
             objects = inputListObjects 
                     # inputTreeFromListObjects
                     # [inputTree_NilList]
@@ -132,11 +160,23 @@ module {
                     # [lazyMergeSort_NilList]
                     ;
         };
-        let sceneText = A.IntoJSON.fromScene(sceneData);
-        prim "writeFile" (`mergeSortSceneFullDemand
+        if (false) {
+            let outlineText = A.IntoText.outline(outline);
+            prim "writeFile" (`mergeSort
+                            -`FullDemand
+                            -`seed-seed
+                            -`size-size
+                            -`Outline-`txt, outlineText);
+        };
+        // this step (generating JSON Text) takes about half of the runtime.
+        if (true) {
+            let sceneText = A.IntoJSON.fromScene(sceneData);
+            prim "writeFile" (`mergeSort
+                            -`FullDemand
                             -`seed-seed
                             -`size-size
                             -`Scene-`json, sceneText);
+        };
         {
             sceneData ;
             components = scene.components ;
@@ -145,7 +185,7 @@ module {
 
     #[test]
     public func testGenerateSceneFullDemand() {
-        let scene = generateSceneFullDemand(10, 10).sceneData;
+        let scene = generateSceneFullDemand(10, 10, null).sceneData;
         // set to true when this test fails to see the new values and compare.
         if true { prim "print" (debug_show ({
             _0_eventsSize = scene.history.events.size();
