@@ -27,13 +27,16 @@ module {
             };
 
     // Canonical scene components for mergeSort at full demand.
-    public func sceneComponentsFullDemand(seed : Nat, size : Nat) {
+    public func sceneComponentsFullDemand(seed : Nat, size : Nat, edits: ?List<Nat> -> ()) {
         `scene := thunk {
         let inputArray = R.generateRandomInput(seed, size);
         let inputList_ = `ListFromRandomArray := thunk {
             do within space `inputList {
                 List.fromIter(inputArray.vals())
             }
+        };
+        do ? {
+            edits!()
         };
         let inputList = force(inputList_);
         let inputTree_ =
@@ -71,9 +74,9 @@ module {
         } 
     };
 
-    public func generateSceneFullDemand(seed : Nat, size : Nat) {
+    public func generateSceneFullDemand(seed : Nat, size : Nat, edits: ?List<Nat> -> ()) {
         A.reset(); // reset so history only contains our components.
-        let scene_ = sceneComponentsFullDemand(seed, size);
+        let scene_ = sceneComponentsFullDemand(seed, size, edits);
         let scene = force(scene_);
         let history = A.peekHistory();
 
@@ -182,7 +185,7 @@ module {
 
     #[test]
     public func testGenerateSceneFullDemand() {
-        let scene = generateSceneFullDemand(10, 10).sceneData;
+        let scene = generateSceneFullDemand(10, 10, null).sceneData;
         // set to true when this test fails to see the new values and compare.
         if true { prim "print" (debug_show ({
             _0_eventsSize = scene.history.events.size();
