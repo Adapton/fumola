@@ -85,17 +85,21 @@ module {
             Seq.Scene.sceneObjects(scene.components.inputTree!,
             { x = 0.0; y = 0.0; z = 0.0});
 
-        // we use the height of the tree to determine the gaps between structures.
+        // Step 2: we use the height of the tree to determine the gaps between structures.
         let inputTreeGeom2d = Seq.Scene.geom2d(scene.components.inputTree!);
         let height = inputTreeGeom2d.height;
         let e = 2.71828;
         let levelGap = height * e;
      
+        // Step 3: the input list sits at depth levelGap;
         let inputListObjects =
             List.sceneObjectsFromThunk(scene.components.inputList_,
             { x = 0.0 - (size + 0.0) / 2.0 ; y = 5.0; z = levelGap});
 
-        // the orbs that produce the input tree have interesting sub-structures and sub-cases.
+        // Step 4: tree-from-list orbs:
+        // the orbs that produce the input tree from the list sit between it, at depth levelGaph / 2.0.
+        // these orbs have interesting sub-structures and sub-cases,
+        // ...each with a geometric spacing parameter of type Vec3.
         let inputTreeFromListObjects =
             Seq.Scene.sceneObjectsFromList(A.Outline.outline(scene.components.inputTree_),
             { x = 0.0; y = 0.0; z = levelGap / 2.0}, {
@@ -103,21 +107,35 @@ module {
                 leafL = { x = -(0.2 * e); y = -0.1 * e; z = 1.0};
                 leafR = { x =  (0.2 * e); y = -0.1 * e; z = 1.0};
             });
-        // constant pointer created by the tree-of-list procedure for initializing the accumlator:
+
+        // Step 5 -- constants that represent empty structures (List and LazyList).
+        //
+        // Step 5(a) -- constant pointer created by the tree-of-list procedure for initializing the accumlator:
+        //
         let inputTree_NilList = 
             #box{
                 label_="inputTree(`(nilList))";
                 position = {x=0; y=0; z=levelGap / 2.0};
                 textFields=""; pointerFields=""
             };
-        // constant pointer created by the mergeSort algorithm:
+
+        //
+        // Step 5(b) -- constant pointer created by the mergeSort algorithm:
+        //
         let lazyMergeSort_NilList = 
             #orb{
                 label_="lazyMergeSort(`(nilList))";
                 position = {x=0; y=-1; z=-levelGap};
                 textFields=""; pointerFields=""
             };
-     
+
+        //
+        // Step 6 -- merge network: orbs that merge two incoming sorted streams into an output stream.
+        //
+        // - the `reduce` gap orients the reduction tree orbs to the input tree.
+        // - the `merge` gap orients the next orb in a sorted lazy list to the prior one.
+        //   each orb merges two sorted input lists into this lazy list, as the sorted output.
+        //
         let mergeGap = 1.0;
         let lazyMergeSort =
             Seq.Scene.sceneObjectsLazyMergeSort_(A.Outline.outline(scene.components.lazySorted_),
