@@ -139,6 +139,10 @@ module {
 
         // The result of diffing two event histories is multi-dimensional:
         public type NodeValsDiff = {
+            // --- input of diff ---
+            left : NodeVals;
+            right: NodeVals;
+            // --- output of diff ---
             onlyLeft : NodeVals;
             onlyRight : NodeVals;
             equal : NodeVals;
@@ -207,6 +211,8 @@ module {
                 }
             };
             {
+                left;
+                right;
                 onlyLeft;
                 onlyRight;
                 equal;

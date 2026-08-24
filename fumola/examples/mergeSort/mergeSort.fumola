@@ -209,20 +209,54 @@ module {
     };
 
     #[test]
-    public func testDcgDiffRemove() {
+    public func testDcgDiffRemove_10_8_4() {
         let diff = dcgDiffRemove(10, 8, 4);
         let sizes = {
+            left = diff.left.size();
+            right = diff.right.size();
             onlyLeft = diff.onlyLeft.size();
             onlyRight = diff.onlyRight.size();
             equal = diff.equal.size();
             notEqual = diff.notEqual.size();
         };
+        prim "print" sizes;
         assert (sizes == {
+                left = 75;
+                right = 65;
                 equal = 50;
                 notEqual = 15;
                 onlyLeft = 10;
                 onlyRight = 0
             });
+    };
+
+
+    // for doing some quick measurements between two list inputs 
+    // when they are related by a cell removal.
+    public func dcgDiffRemoveSize(seed, size, removeSymbol) {
+        let diff = dcgDiffRemove(seed, size, removeSymbol);
+        let sizes = {
+            left = diff.left.size();
+            right = diff.right.size();
+            onlyLeft = diff.onlyLeft.size();
+            onlyRight = diff.onlyRight.size();
+            equal = diff.equal.size();
+            notEqual = diff.notEqual.size();
+        };
+        let maxSize =
+            if (sizes.left >= sizes.right) {
+                sizes.left
+            } else {
+                sizes.right
+        };
+        let diffSize =
+             sizes.onlyLeft +
+             sizes.onlyRight +
+             sizes.notEqual; 
+        { sizes;
+          maxSize;
+          diffFraction = (0.0 + diffSize) / (0.0 + maxSize);
+          diffSize };
     };
 
     // ------ old stuff below ------
