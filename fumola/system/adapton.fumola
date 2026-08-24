@@ -33,21 +33,28 @@ module {
             metaTime: MetaTime;
             node : Node; 
         };
+        
         public type EdgeHistoryItem = {
             edgeId : EdgeId;
             metaTime: MetaTime;
             edge : Edge
         };
+        
         public type EventHistoryItem = {
             metaTime: MetaTime;
             event: Event;
         };
+        
         public type Events = [EventHistoryItem];
+        public type Nodes = [NodeHistoryItem];
+        public type Edges = [EdgeHistoryItem];
+
         public type History = {
-            events : [EventHistoryItem];
-            nodes : [NodeHistoryItem];
-            edges : [EdgeHistoryItem];
+            events : Events;
+            nodes : Nodes;
+            edges : Edges;
         };
+        
         public type Event = {
             #addNode : NodeId;
             #addEdge : EdgeId;
@@ -56,6 +63,7 @@ module {
             #forceBegin : NodeId;
             #forceEnd : (NodeId, EdgeId);
         };
+        
         public type MetaTime = Nat;
        
         public type Time = { #time : Symbol }; // --- TO DO
@@ -137,14 +145,73 @@ module {
             notEqual : NodeValPairs;
         };
 
-        public func nodeValsFromEvents(events : PeekInfo.Events) : NodeVals {
-            assert false // to do
+        public func nodeValFromNode(node : PeekInfo.Node) : NodeVal {
+            switch node {
+                case (#thunk_(t)) {
+                    // to do -- Option.right
+                    let result = switch (t.result) {
+                        case null null;
+                        case (?(_l, r)) ?r;
+                    };
+                    #thunk_(t.body, result)
+                };
+                case (#nonThunk(v)) {
+                    #nonThunk(v)
+                };
+            }
+        };
+
+        public func nodeValsFromNodes(nodes : PeekInfo.Nodes) : NodeVals {
+            var nodeVals = Map.new();
+            for (node in nodes.vals()) {
+                let pointer = (node.nodeId.0).0;
+                let nodeVal = nodeValFromNode(node.node);
+                let (nodeVals_, _) = Map.put(nodeVals, pointer, nodeVal);
+                nodeVals := nodeVals_;
+            };
+            nodeVals
         };
 
         public func nodeValsDiff(left : NodeVals, right : NodeVals) : NodeValsDiff
         {
-            // to do -- need a way to get an iterator from a map.
-            assert false // to do
+            var onlyLeft = Map.new();
+            var onlyRight = Map.new();
+            var equal = Map.new();
+            var notEqual = Map.new();
+
+            // process left to populate everything except onlyRight.
+            for ((p, v) in left.vals()) {
+                let rightVal = Map.get(right, p);
+                switch rightVal {
+                    case null {
+                        let (onlyLeft_, null) = Map.put(onlyLeft, p, v);
+                        onlyLeft := onlyLeft_;
+                    };
+                    case (?rightVal) {
+                       if (v == rightVal) {
+                            let (equal_, null) = Map.put(equal, p, v);
+                            equal := equal_;
+                        } else {
+                            let (notEqual_, null) = Map.put(notEqual, p, (v, rightVal));
+                            notEqual := notEqual_;
+                        }
+                    }
+                };
+            };
+            
+            // process right after left to populate onlyRight.
+            for ((p, v) in right.vals()) {
+                if (Map.get(left, p) == null) {
+                    let (onlyRight_, null) = Map.put(onlyRight, p, v);
+                    onlyRight := onlyRight_;
+                }
+            };
+            {
+                onlyLeft;
+                onlyRight;
+                equal;
+                notEqual;
+            }
         };
     };
 

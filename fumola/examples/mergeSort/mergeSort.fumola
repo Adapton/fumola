@@ -201,12 +201,28 @@ module {
             let editor = List.Edit.gotoSymbol(editor, removeSymbol)!;
             List.Edit.remove(editor);
         }));
-        // to do -- diff the nodes of sceneA and sceneB
+
+        let nodesA = A.Diff.nodeValsFromNodes(sceneA.sceneData.history.nodes);
+        let nodesB = A.Diff.nodeValsFromNodes(sceneB.sceneData.history.nodes);
+    
+        A.Diff.nodeValsDiff(nodesA, nodesB);
     };
 
     #[test]
     public func testDcgDiffRemove() {
-        dcgDiffRemove(10, 44, 18);
+        let diff = dcgDiffRemove(10, 8, 4);
+        let sizes = {
+            onlyLeft = diff.onlyLeft.size();
+            onlyRight = diff.onlyRight.size();
+            equal = diff.equal.size();
+            notEqual = diff.notEqual.size();
+        };
+        assert (sizes == {
+                equal = 50;
+                notEqual = 15;
+                onlyLeft = 10;
+                onlyRight = 0
+            });
     };
 
     // ------ old stuff below ------
