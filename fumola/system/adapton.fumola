@@ -143,6 +143,7 @@ module {
 
         public func nodeValsDiff(left : NodeVals, right : NodeVals) : NodeValsDiff
         {
+            // to do -- need a way to get an iterator from a map.
             assert false // to do
         };
     };

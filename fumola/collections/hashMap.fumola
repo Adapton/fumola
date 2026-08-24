@@ -18,6 +18,10 @@ module {
         prim "hashMapRemove" (m, k)
     };
 
+    public func iter<K, V>(m : M<K, V>) : Iter<(K, V)> {
+        m.vals()
+    };
+
     public module Test {
         #[test]
         public func testAll() {
@@ -25,6 +29,10 @@ module {
             let (m, old) = put(m, 1, 1);
             assert old == null;            
             assert (get(m, 1) == ?1);
+            for ((k,v) in m.vals()) {
+                assert k == 1;
+                assert v == 1;
+            };
             let (m, old) = remove(m, 1);
             assert old == ?1;
             assert (m == new());
