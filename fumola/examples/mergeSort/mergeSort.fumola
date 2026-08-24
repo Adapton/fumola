@@ -193,7 +193,45 @@ module {
         assert scene.objects.size() == 291;
         assert ((scene.outline.1).0).value!.0 == 307; // Final Meta Time.
     };
-            
+
+    public func dcgDiffRemove(seed : Nat, size : Nat, removeSymbol : Symbol) {
+        let sceneA = generateSceneFullDemand(seed, size, null);
+        let sceneB = generateSceneFullDemand(seed, size, ?(func (list) {
+            let editor = List.Edit.cursor(list!.next);
+            let editor = List.Edit.gotoSymbol(editor, removeSymbol)!;
+            List.Edit.remove(editor);
+        }));
+
+        let nodesA = A.Diff.nodeValsFromNodes(sceneA.sceneData.history.nodes);
+        let nodesB = A.Diff.nodeValsFromNodes(sceneB.sceneData.history.nodes);
+    
+        A.Diff.nodeValsDiff(nodesA, nodesB);
+    };
+
+    #[test]
+    public func testDcgDiffRemove() {
+        let diff = dcgDiffRemove(10, 8, 4);
+        let sizes = {
+            onlyLeft = diff.onlyLeft.size();
+            onlyRight = diff.onlyRight.size();
+            equal = diff.equal.size();
+            notEqual = diff.notEqual.size();
+        };
+        assert (sizes == {
+                equal = 50;
+                notEqual = 15;
+                onlyLeft = 10;
+                onlyRight = 0
+            });
+    };
+
+    // ------ old stuff below ------
+    //
+    // to do -- refactor dcg() and things that use it to instead use
+    //          the same logic as above; want to acccomodate different
+    //          patterns of demand above, and simplify the spec for demand.
+    //
+
     public func dcg(seed : Nat, size : Nat, demand) {
         let inputArray = R.generateRandomInput(seed, size);
         let inputSeq = 

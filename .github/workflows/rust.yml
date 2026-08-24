@@ -26,18 +26,11 @@ jobs:
       - name: Build
         run: cargo build --verbose
 
-      - name: Run Rust tests
+      - name: Run Rust unit tests
         run: cargo test --verbose
 
-      - name: Run Fumola tests
-        run: ./test.sh
+      - name: Run Fumola unit tests
+        run: ./fumola-test.sh
 
-      - name: Run Fumola/examples/mergeSort data collection
-        run: ./run-example-mergeSort.sh
-
-      - name: Run Fumola/collections/levelTree structure visualization
-        run: ./write-level-tree-scene.sh
-
-      - name: Run Fumola/examples/mergeSort scene visualization
-        run: ./write-merge-sort-scene-larger.sh
-
+      - name: Run Fumola example scripts
+        run: ./fumola-scripts.sh
