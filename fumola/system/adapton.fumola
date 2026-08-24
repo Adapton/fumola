@@ -38,12 +38,16 @@ module {
             metaTime: MetaTime;
             edge : Edge
         };
+        public type EventHistoryItem = {
+            metaTime: MetaTime;
+            event: Event;
+        };
+        public type Events = [EventHistoryItem];
         public type History = {
-            events : Events;
+            events : [EventHistoryItem];
             nodes : [NodeHistoryItem];
             edges : [EdgeHistoryItem];
         };
-        public type Events = [Event];
         public type Event = {
             #addNode : NodeId;
             #addEdge : EdgeId;
@@ -98,6 +102,48 @@ module {
             nodeId : NodeId;
             incomingEdges : [(EdgeId, Edge)];
             outgoingEdges : [(EdgeId, Edge)];
+        };
+    };
+
+    //
+    // Diff'ing a pair of histories by looking at final node values.
+    //  
+    public module Diff {
+        // Node value (for a meaningful diff):
+        //
+        // To diff two runs, we focus on comparing each node pointer's nodes.
+        // For each node, ignore the edgeIds and metaTimes of each node,
+        // (edgeIds and metaTimes are each transient and do not affect cache reuse),
+        // and focus on the non-thunk value, or thunk-value and possible result value.
+        public type NodeVal = {
+            #nonThunk : Any;
+            #_thunk : (Any, ?Any);
+        };
+
+        // NodeVals is the map we want to diff.
+        // Each NodeVals map represents the outcome of a sequence of events, ignoring metaTimes and edgeIds.
+        public type NodeVals = Map<Pointer, NodeVal>;
+
+        // When two NodeVals maps disagree, we can represent their diff as a pairing:
+        // When analyzing the stability of an algorithm, it can be helpful to analyze
+        // the patterns within these disagreements, when they arise.
+        public type NodeValPairs = Map<Pointer, (NodeVal, NodeVal)>;
+
+        // The result of diffing two event histories is multi-dimensional:
+        public type NodeValsDiff = {
+            onlyLeft : NodeVals;
+            onlyRight : NodeVals;
+            equal : NodeVals;
+            notEqual : NodeValPairs;
+        };
+
+        public func nodeValsFromEvents(events : PeekInfo.Events) : NodeVals {
+            assert false // to do
+        };
+
+        public func nodeValsDiff(left : NodeVals, right : NodeVals) : NodeValsDiff
+        {
+            assert false // to do
         };
     };
 
