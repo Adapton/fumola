@@ -26,11 +26,11 @@ jobs:
       - name: Build
         run: cargo build --verbose
 
-      - name: Run Rust tests
+      - name: Run Rust unit tests
         run: cargo test --verbose
 
       - name: Run Fumola unit tests
         run: ./fumola-test.sh
 
-      - name: Run Fumola scripts
+      - name: Run Fumola example scripts
         run: ./fumola-scripts.sh
