@@ -32,8 +32,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install the wasm target
-        run: rustup target add wasm32-unknown-unknown
+      # Fumola needs nightly: fumola_syntax uses #![feature(negative_impls)],
+      # which stable rejects outright.
+      - name: Install nightly with the wasm target
+        run: |
+          rustup toolchain install nightly --profile minimal
+          rustup default nightly
+          rustup target add wasm32-unknown-unknown
+          rustc --version
 
       # Fumola is slow to build -- lalrpop parser generation dominates -- so
       # the cache matters more here than usual.
