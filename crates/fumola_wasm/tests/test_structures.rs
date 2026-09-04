@@ -7,7 +7,7 @@ use fumola_wasm::*;
 use serde_json::json;
 
 fn eval_value(id: FumolaInstanceId, src: &str) -> serde_json::Value {
-    let raw = fumola_eval(id, "topLevel", src);
+    let raw = fumola_eval(id, "`topLevel", src);
     let v: serde_json::Value = serde_json::from_str(&raw).expect("invalid JSON");
     assert_eq!(v["ok"], json!(true), "eval failed: {}", raw);
     v
@@ -107,7 +107,7 @@ fn records_and_tuples_compose() {
 #[test]
 fn an_untranslatable_component_fails_the_whole_value() {
     let id = fumola_create();
-    let raw = fumola_eval(id, "topLevel", "(1, 1 + `x)");
+    let raw = fumola_eval(id, "`topLevel", "(1, 1 + `x)");
     assert!(
         raw.contains("\"ok\":false"),
         "expected the tuple to fail, got {}",

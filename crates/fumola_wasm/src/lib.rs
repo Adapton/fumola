@@ -121,19 +121,56 @@ const PRELUDE: &str = concat!(
 
 /// Wrap Hazel-supplied source in the top-level thunk assignment that gives
 /// re-evaluation its incremental meaning, after the prelude.
-fn wrap(thunk_name: &str, program_text: &str) -> String {
-    format!("force(`{} := thunk {{ {} }})", thunk_name, program_text)
+fn wrap(thunk_symbol: &str, program_text: &str) -> String {
+    format!("force({} := thunk {{ {} }})", thunk_symbol, program_text)
 }
 
-/// Reject a thunk name that would not survive Fumola's lexer, so that a host
-/// cannot inject text into the wrapper through it.
-fn valid_thunk_name(name: &str) -> bool {
-    let mut chars = name.chars();
-    match chars.next() {
-        Some(c) if c.is_ascii_alphabetic() || c == '_' => {}
-        _ => return false,
+thread_local! {
+    /// A runtime kept only for turning text into symbols.
+    ///
+    /// Fumola already knows how to parse a symbol, so a host does not need to
+    /// encode one: it sends the text and this evaluates it. Separate from any
+    /// real instance, and evaluated against a throwaway copy, so a name that
+    /// happens to write to a cell cannot touch anything that matters or
+    /// accumulate here. It holds no module library, since naming a symbol
+    /// needs none.
+    static SCRATCH: RefCell<State> = RefCell::new(State::empty());
+}
+
+/// The Fumola symbol denoted by `source`, rendered back as source text.
+///
+/// Going through the runtime rather than parsing here means a host writes a
+/// symbol the way Fumola spells one -- `myThunk, 7, `a(`b) -- and every form
+/// the language supports works without this crate knowing about it. The
+/// rendering is checked on the way out, so nothing a host writes can inject
+/// text into a program.
+fn symbol_source_of(source: &str) -> Result<String, String> {
+    if source.trim().is_empty() {
+        return Err("a thunk needs a name".to_string());
     }
-    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+    SCRATCH.with(|scratch| {
+        let mut attempt = scratch.borrow().clone();
+        attempt.semantic_state.clear_cont();
+        match attempt.eval(source) {
+            Ok(value) => match value.into_sym_or(()) {
+                Ok(symbol) => symbol_to_source(&symbol),
+                Err(()) => Err(format!("`{}` does not name a symbol", source)),
+            },
+            Err(e) => Err(format!("`{}` is not a symbol: {:?}", source, e)),
+        }
+    })
+}
+
+/// Exposed so a host can tell whether a name is usable before running
+/// anything with it.
+#[wasm_bindgen]
+pub fn fumola_symbol_of(source: &str) -> String {
+    match symbol_source_of(source) {
+        Ok(rendered) => {
+            serde_json::json!({ "ok": true, "source": rendered }).to_string()
+        }
+        Err(message) => error_json(&message),
+    }
 }
 
 fn bump_next_id_past(id: FumolaInstanceId) {
@@ -222,10 +259,10 @@ pub fn fumola_eval(
     thunk_name: &str,
     program_text: &str,
 ) -> String {
-    if !valid_thunk_name(thunk_name) {
-        return error_json(&format!("`{}` is not a usable thunk name", thunk_name));
+    match symbol_source_of(thunk_name) {
+        Ok(symbol) => eval_in(id, &wrap(&symbol, program_text)),
+        Err(message) => error_json(&message),
     }
-    eval_in(id, &wrap(thunk_name, program_text))
 }
 
 /// Evaluate `program_text` at the top level of the runtime named by `id`,
