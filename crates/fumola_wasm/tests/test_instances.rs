@@ -88,3 +88,66 @@ fn non_integer_results_translate() {
     assert_eq!(v["tag"], serde_json::json!("Bool"));
     assert_eq!(v["value"], serde_json::json!(true));
 }
+
+/// A livelit's program text is a Hazel string literal, and Hazel strings have
+/// no escapes, so `prim "adaptonPointer"` cannot be written in one. The
+/// prelude makes the adapton primitives reachable without any quotes.
+#[test]
+fn the_prelude_avoids_needing_quotes() {
+    let id = fumola_create();
+    // Nothing here contains a double quote.
+    assert_eq!(eval_int(id, "1 := 2; get(1)"), "2");
+}
+
+/// `:=` coerces its left side into a pointer but `@` does not, so reading back
+/// what `1 := 2` wrote is not `@(1)`. `get` does the conversion, which is what
+/// lets state written in one edit be read in the next.
+#[test]
+fn state_written_in_one_edit_is_read_in_the_next() {
+    let id = fumola_create();
+    eval_ok(id, "1 := 2");
+    assert_eq!(eval_int(id, "get(1)"), "2");
+
+    // Overwrite in a third edit, and see the new value in a fourth.
+    eval_ok(id, "1 := 7");
+    assert_eq!(eval_int(id, "get(1)"), "7");
+}
+
+/// Symbols name cells here too, so a named cell survives edits the same way.
+#[test]
+fn named_cells_survive_edits() {
+    let id = fumola_create();
+    eval_ok(id, "`counter := 41");
+    assert_eq!(eval_int(id, "get(`counter) + 1"), "42");
+}
+
+/// `peek` reads without recording a dependency, and answers null for a name
+/// that was never written rather than failing.
+#[test]
+fn peek_reports_a_missing_cell() {
+    let id = fumola_create();
+    eval_ok(id, "1 := 2");
+    // A name that was never written peeks as null...
+    let raw = fumola_eval(id, "peek(404)");
+    let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(v["ok"], serde_json::json!(true), "peek failed: {}", raw);
+    assert_eq!(v["tag"], serde_json::json!("Null"));
+
+    // ...and one that was written peeks as an option carrying the value.
+    let raw = fumola_eval(id, "peek(1)");
+    let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(v["ok"], serde_json::json!(true), "peek failed: {}", raw);
+    assert_eq!(v["tag"], serde_json::json!("Option"));
+    assert_eq!(v["value"], serde_json::json!({"tag":"Int","value":"2"}));
+}
+
+/// Two runtimes must not see each other's cells, even under the same name.
+#[test]
+fn cells_are_per_instance() {
+    let a = fumola_create();
+    let b = fumola_create();
+    eval_ok(a, "1 := 2");
+    eval_ok(b, "1 := 99");
+    assert_eq!(eval_int(a, "get(1)"), "2");
+    assert_eq!(eval_int(b, "get(1)"), "99");
+}

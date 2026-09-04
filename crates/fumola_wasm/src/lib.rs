@@ -45,10 +45,32 @@ thread_local! {
     static NEXT_ID: RefCell<FumolaInstanceId> = const { RefCell::new(1) };
 }
 
+/// Definitions made available to every program the livelit runs.
+///
+/// These exist because a livelit's program text is stored as a Hazel string
+/// literal, and Hazel strings have no escapes -- `Token.is_string` allows at
+/// most two quote characters in the whole token. So `prim "adaptonPointer"`
+/// cannot be written in a livelit at all, and every adapton primitive needs
+/// one.
+///
+/// `get` also papers over an asymmetry that is easy to trip on: `:=` coerces
+/// its left side into a pointer, but `@` does not -- it requires something
+/// that is already a pointer. So reading back what `1 := 2` wrote is not
+/// `@(1)`; the symbol has to be converted first. `get` does that conversion,
+/// so a program can write `1 := 2` in one edit and `get(1)` in the next.
+const PRELUDE: &str = concat!(
+    r#"func pointer(s) { prim "adaptonPointer" (s) }; "#,
+    r#"func get(s) { @(prim "adaptonPointer" (s)) }; "#,
+    r#"func peek(s) { prim "adaptonPeek" (prim "adaptonPointer" (s)) }; "#,
+);
+
 /// Wrap Hazel-supplied source in the top-level thunk assignment that gives
-/// re-evaluation its incremental meaning.
+/// re-evaluation its incremental meaning, after the prelude.
 fn wrap(program_text: &str) -> String {
-    format!("force(`topLevel := thunk {{ {} }})", program_text)
+    format!(
+        "{}force(`topLevel := thunk {{ {} }})",
+        PRELUDE, program_text
+    )
 }
 
 fn bump_next_id_past(id: FumolaInstanceId) {
@@ -154,12 +176,34 @@ fn error_json(message: &str) -> String {
 /// values whose meaning depends on the runtime (functions, thunks, pointers)
 /// would need opaque handles back into this instance, which is out of scope.
 fn value_to_json(value: &Value) -> String {
-    let translated = match value {
+    match translate(value) {
+        Ok(Some((tag, value))) => {
+            serde_json::json!({ "ok": true, "tag": tag, "value": value }).to_string()
+        }
+        Ok(None) => error_json("Fumola value has no Hazel translation"),
+        Err(message) => error_json(&message),
+    }
+}
+
+type Translated = Result<Option<(&'static str, serde_json::Value)>, String>;
+
+fn translate(value: &Value) -> Translated {
+    match value {
         Value::Nat(n) => Ok(Some(("Int", serde_json::json!(n.to_string())))),
         Value::Int(i) => Ok(Some(("Int", serde_json::json!(i.to_string())))),
         Value::Bool(b) => Ok(Some(("Bool", serde_json::json!(b)))),
         Value::Text(t) => Ok(Some(("String", serde_json::json!(t.to_string())))),
         Value::Unit => Ok(Some(("Unit", serde_json::Value::Null))),
+        // `peek` answers null for a name that was never written, and ?v for
+        // one that was, so both turn up whenever a program peeks.
+        Value::Null => Ok(Some(("Null", serde_json::Value::Null))),
+        Value::Option(inner) => Ok(Some((
+            "Option",
+            match translate(inner) {
+                Ok(Some((tag, value))) => serde_json::json!({"tag": tag, "value": value}),
+                _ => serde_json::Value::Null,
+            },
+        ))),
         // Symbols are first-order data, so they cross the boundary as
         // structure rather than as a handle into this runtime.
         //
@@ -179,13 +223,6 @@ fn value_to_json(value: &Value) -> String {
         // pointer back, so cells are addressed by their symbol instead.
         Value::Pointer(p) | Value::Opaque(p) => Ok(Some(("Pointer", pointer_to_json(p)))),
         _ => Ok(None),
-    };
-    match translated {
-        Ok(Some((tag, value))) => {
-            serde_json::json!({ "ok": true, "tag": tag, "value": value }).to_string()
-        }
-        Ok(None) => error_json("Fumola value has no Hazel translation"),
-        Err(message) => error_json(&message),
     }
 }
 
