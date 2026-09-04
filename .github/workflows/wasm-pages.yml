@@ -62,7 +62,7 @@ jobs:
       - name: Install wasm-bindgen-cli
         run: |
           set -euo pipefail
-          version=$(cargo metadata --format-version 1 --locked=false             | jq -r '.packages[] | select(.name == "wasm-bindgen") | .version'             | head -1)
+          version=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "wasm-bindgen") | .version' | head -1)
           if [ -z "$version" ]; then
             echo "could not determine the wasm-bindgen version" >&2
             exit 1
