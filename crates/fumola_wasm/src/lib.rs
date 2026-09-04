@@ -210,8 +210,20 @@ pub fn fumola_eval(id: FumolaInstanceId, program_text: &str) -> String {
         // earlier edit would still be in place and the next eval would try to
         // resume it instead of running the new program.
         state.semantic_state.clear_cont();
-        match state.eval(&wrap(program_text)) {
-            Ok(value) => value_to_json(&value),
+
+        // Evaluated against a copy, which replaces the original only if it
+        // succeeds. Some failures leave the runtime unusable rather than
+        // merely unchanged -- an AssertionFailure inside a force was observed
+        // to lose every top-level binding in the instance, so a program that
+        // failed once made all later programs fail too. An edit that does not
+        // work should cost nothing.
+        let mut attempt = state.clone();
+        match attempt.eval(&wrap(program_text)) {
+            Ok(value) => {
+                let json = value_to_json(&value);
+                *state = attempt;
+                json
+            }
             Err(e) => error_json(&format!("{:?}", e)),
         }
     })
@@ -264,6 +276,17 @@ fn translate(value: &Value) -> Translated {
         // Structural values cross the boundary as structure, so that a Fumola
         // tuple arrives in Hazel as a Hazel tuple rather than as something
         // Hazel has to take apart.
+        // Arrays reach Hazel as lists. Adapton's own introspection returns
+        // them -- peekEvents, and the edge lists inside peekInfo -- so
+        // without this most of what the Adapton module reports is
+        // untranslatable.
+        Value::Array(_, items) => {
+            let mut out = Vec::with_capacity(items.len());
+            for item in items.iter() {
+                out.push(nested(item)?);
+            }
+            Ok(Some(("List", serde_json::Value::Array(out))))
+        }
         Value::Tuple(items) => {
             let mut out = Vec::with_capacity(items.len());
             for item in items.iter() {

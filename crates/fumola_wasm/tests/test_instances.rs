@@ -202,3 +202,46 @@ fn a_realized_instance_has_the_library() {
     assert!(fumola_realize(id));
     assert_eq!(eval_int(id, "Gcd.gcd(9, 6)"), "3");
 }
+
+/// Arrays reach the host as lists. Adapton's introspection returns them, so
+/// without this most of what the Adapton module reports is untranslatable.
+#[test]
+fn arrays_translate_as_lists() {
+    let id = fumola_create();
+    let v = eval_ok(id, "[1, 2, 3]");
+    assert_eq!(v["tag"], serde_json::json!("List"));
+    assert_eq!(v["value"][2], serde_json::json!({"tag":"Int","value":"3"}));
+
+    // Adapton's own introspection returns arrays too, but their elements
+    // carry adapton spaces and times, which have no translation yet -- so
+    // peekEvents still fails, on its contents rather than on being an array.
+    let raw = fumola_eval(id, "Adapton.peekEvents()");
+    assert!(raw.contains("no Hazel translation"), "unexpected: {}", raw);
+}
+
+/// A failed program must leave the instance exactly as it was. Some failures
+/// do not merely fail: an AssertionFailure inside a force was observed to
+/// lose every top-level binding, so one bad edit made all later edits fail.
+#[test]
+fn a_failed_program_does_not_break_the_instance() {
+    let id = fumola_create();
+    assert_eq!(eval_int(id, "Gcd.gcd(12, 18)"), "6");
+
+    // Fails, and used to take the instance's bindings with it.
+    let raw = fumola_eval(id, "1 := 2; Adapton.peekForce(pointer(1))");
+    assert!(raw.contains("\"ok\":false"), "expected a failure, got {}", raw);
+
+    // The library is still there, and so is the store.
+    assert_eq!(eval_int(id, "Gcd.gcd(12, 18)"), "6");
+    assert_eq!(eval_int(id, "1 := 5; get(1)"), "5");
+}
+
+/// A failed program must not commit its writes either.
+#[test]
+fn a_failed_program_does_not_write() {
+    let id = fumola_create();
+    eval_ok(id, "`kept := 1");
+    let raw = fumola_eval(id, "`kept := 2; 1 +");
+    assert!(raw.contains("\"ok\":false"), "expected a failure, got {}", raw);
+    assert_eq!(eval_int(id, "get(`kept)"), "1");
+}
