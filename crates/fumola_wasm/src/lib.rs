@@ -244,6 +244,30 @@ fn translate(value: &Value) -> Translated {
                 },
             }),
         ))),
+        // A pointer names a cell in this runtime's store. It travels as the
+        // source text of the symbol that names it, so the host can build the
+        // expression that reads it -- get(`x) -- rather than receiving an
+        // opaque handle it can do nothing with.
+        //
+        // Matched before the symbol arm below, which would otherwise claim
+        // it: `into_sym_or` turns an AdaptonPointer into the symbol it was
+        // allocated from, so a pointer would arrive indistinguishable from a
+        // plain symbol and lose the fact that it points at anything.
+        Value::AdaptonPointer(_) => match value.into_sym_or(()) {
+            Ok(symbol) => {
+                let source = symbol_to_source(&symbol)?;
+                Ok(Some((
+                    "AdaptonPointer",
+                    serde_json::json!({
+                        "source": source,
+                        "symbol": symbol_to_json(&symbol)?,
+                    }),
+                )))
+            }
+            // A pointer whose space is not a symbol cannot be named, so
+            // there is no expression that would read it.
+            Err(()) => Err("Fumola pointer has no symbolic name".to_string()),
+        },
         // Symbols are first-order data, so they cross the boundary as
         // structure rather than as a handle into this runtime.
         //
