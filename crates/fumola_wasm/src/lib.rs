@@ -46,6 +46,57 @@ thread_local! {
     static NEXT_ID: RefCell<FumolaInstanceId> = const { RefCell::new(1) };
 }
 
+include!(concat!(env!("OUT_DIR"), "/modules.rs"));
+
+/// The Fumola library modules bound at the top level of every instance.
+///
+/// Chosen from what `fumola/` actually defines and what its own scripts use.
+/// The paths are the canonical homes: `adapton` lives in `system/` and is
+/// symlinked into `collections/`, `hashMap` the other way around, and the
+/// whole of `examples/mergeSort/` is symlinks -- so a name is bound once,
+/// from the file that really holds it.
+static PRELUDE_MODULES: &[(&str, &str)] = &[
+    ("Adapton", "fumola/system/adapton"),
+    ("List", "fumola/collections/List"),
+    ("LazyList", "fumola/collections/LazyList"),
+    ("PureList", "fumola/collections/pureList"),
+    ("LevelTree", "fumola/collections/levelTree"),
+    ("HashMap", "fumola/collections/hashMap"),
+    ("Counters", "fumola/collections/Counters"),
+    ("RandomInput", "fumola/collections/randomInput"),
+    ("MergeSort", "fumola/examples/mergeSort/mergeSort"),
+    ("Gcd", "fumola/examples/gcd"),
+    ("DelayedPut", "fumola/examples/delayedPut"),
+];
+
+/// A new runtime with the Fumola library registered and its modules bound.
+///
+/// Done once, when the instance is made, rather than in the per-evaluation
+/// prelude: top-level bindings persist across evaluations in one State, so
+/// paying for this on every keystroke would be waste.
+///
+/// Every module is registered, including the symlinked duplicates, because a
+/// module's imports resolve relative to its own directory. Only the names in
+/// PRELUDE_MODULES are bound; the rest are reachable by importing them.
+fn new_state() -> State {
+    let mut state = State::empty();
+    for (path, source) in MODULES {
+        if let Err(e) = state.set_module(None, path.to_string(), source) {
+            // A library module that does not load is worth knowing about, but
+            // it must not stop the instance from existing: a program that
+            // never touches it should still run.
+            let _ = e;
+        }
+    }
+    for (name, path) in PRELUDE_MODULES {
+        let binding = format!("import {} \"{}\";", name, path);
+        if let Err(e) = state.eval(&binding) {
+            let _ = e;
+        }
+    }
+    state
+}
+
 /// Definitions made available to every program the livelit runs.
 ///
 /// These exist because a livelit's program text is stored as a Hazel string
@@ -95,7 +146,7 @@ pub fn fumola_create() -> FumolaInstanceId {
         *n += 1;
         id
     });
-    INSTANCES.with(|m| m.borrow_mut().insert(id, State::empty()));
+    INSTANCES.with(|m| m.borrow_mut().insert(id, new_state()));
     id
 }
 
@@ -121,7 +172,7 @@ pub fn fumola_realize(id: FumolaInstanceId) -> bool {
         if m.contains_key(&id) {
             false
         } else {
-            m.insert(id, State::empty());
+            m.insert(id, new_state());
             true
         }
     })

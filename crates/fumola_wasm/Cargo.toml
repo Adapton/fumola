@@ -9,6 +9,8 @@ description = "wasm-bindgen bindings exposing incremental Fumola instances to Ja
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+build = "build.rs"
+
 [dependencies]
 # The REPL feature pulls in rustyline -> fs2, which does not build for wasm32.
 fumola = { path = "../fumola", default-features = false }

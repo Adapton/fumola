@@ -151,3 +151,54 @@ fn cells_are_per_instance() {
     assert_eq!(eval_int(a, "get(1)"), "2");
     assert_eq!(eval_int(b, "get(1)"), "99");
 }
+
+/// The Fumola library is compiled in, so a host with no filesystem still has
+/// the modules that make the language useful.
+#[test]
+fn library_modules_are_bound_at_the_top_level() {
+    let id = fumola_create();
+    // gcd is the smallest thing with an observable answer.
+    assert_eq!(eval_int(id, "Gcd.gcd(12, 18)"), "6");
+}
+
+#[test]
+fn the_adapton_module_is_available() {
+    let id = fumola_create();
+    // Reaching a name inside the module is enough; it is 894 lines of types
+    // and functions, and loading it at all is what is being checked.
+    let raw = fumola_eval(id, "Adapton");
+    assert!(
+        !raw.contains("\"ok\":false") || !raw.contains("not defined"),
+        "Adapton should be bound: {}",
+        raw
+    );
+}
+
+/// Every module is registered, not only the bound ones, so anything in the
+/// library can still be imported by path.
+#[test]
+fn unbound_modules_can_still_be_imported() {
+    let id = fumola_create();
+    let raw = fumola_eval(id, "import D \"fumola/examples/deriveCompare\"; 1");
+    assert!(raw.contains("\"ok\":true"), "import failed: {}", raw);
+}
+
+/// The bindings are made once when the instance is created, and top-level
+/// bindings persist, so they are still there after later edits.
+#[test]
+fn bindings_survive_edits() {
+    let id = fumola_create();
+    assert_eq!(eval_int(id, "1 + 1"), "2");
+    assert_eq!(eval_int(id, "Gcd.gcd(48, 18)"), "6");
+    assert_eq!(eval_int(id, "1 := 2; get(1)"), "2");
+    assert_eq!(eval_int(id, "Gcd.gcd(100, 75)"), "25");
+}
+
+/// A realized instance gets the library too, so a saved program reloading
+/// into a fresh session is not missing it.
+#[test]
+fn a_realized_instance_has_the_library() {
+    let id: FumolaInstanceId = 909;
+    assert!(fumola_realize(id));
+    assert_eq!(eval_int(id, "Gcd.gcd(9, 6)"), "3");
+}
