@@ -51,15 +51,27 @@ jobs:
             ~/.cargo/git
             ~/.cargo/bin
             target
-          key: wasm-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          key: wasm-${{ runner.os }}-${{ hashFiles('**/Cargo.toml') }}
 
+      # The CLI must match the wasm-bindgen crate exactly or the bindings it
+      # generates will not load. Cargo.lock is not committed here, so the
+      # version comes from the resolved dependency graph rather than the lock
+      # file -- and an empty answer is treated as an error, since a silently
+      # skipped install shows up much later as "wasm-bindgen: command not
+      # found".
       - name: Install wasm-bindgen-cli
         run: |
-          version=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | grep '^version' | head -1 | cut -d'"' -f2)
+          set -euo pipefail
+          version=$(cargo metadata --format-version 1 --locked=false             | jq -r '.packages[] | select(.name == "wasm-bindgen") | .version'             | head -1)
+          if [ -z "$version" ]; then
+            echo "could not determine the wasm-bindgen version" >&2
+            exit 1
+          fi
           echo "wasm-bindgen $version"
           if [ "$(wasm-bindgen --version 2>/dev/null | awk '{print $2}')" != "$version" ]; then
             cargo install wasm-bindgen-cli --version "$version" --force
           fi
+          wasm-bindgen --version
 
       # --no-default-features drops the repl feature, whose rustyline
       # dependency pulls in fs2, which does not build for wasm32.
