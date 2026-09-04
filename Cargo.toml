@@ -5,9 +5,13 @@ members = [
     "crates/fumola_semantics",
     "crates/fumola_parser",
     "crates/fumola",
+    "crates/fumola_wasm",
    #"crates/fumola_proc_macro",
 ]
 
 [profile.dev]
 incremental = true
 debug = true
+[profile.release]
+# The wasm build ships to browsers; symbols are dead weight there.
+strip = true
