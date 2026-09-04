@@ -26,6 +26,7 @@ use std::collections::HashMap;
 
 use fumola::state::State;
 use fumola_semantics::value::Value;
+use fumola_syntax::ast::Id;
 use fumola_semantics::vm_types::{LocalPointer, Pointer, ScheduleChoice};
 use wasm_bindgen::prelude::*;
 
@@ -187,6 +188,17 @@ fn value_to_json(value: &Value) -> String {
 
 type Translated = Result<Option<(&'static str, serde_json::Value)>, String>;
 
+/// Translate a value that sits inside another one, as `{tag, value}`. An
+/// untranslatable component fails the whole translation rather than being
+/// quietly replaced, so a tuple is never reported as though it were complete
+/// when part of it was dropped.
+fn nested(value: &Value) -> Result<serde_json::Value, String> {
+    match translate(value)? {
+        Some((tag, value)) => Ok(serde_json::json!({"tag": tag, "value": value})),
+        None => Err("Fumola value has no Hazel translation".to_string()),
+    }
+}
+
 fn translate(value: &Value) -> Translated {
     match value {
         Value::Nat(n) => Ok(Some(("Int", serde_json::json!(n.to_string())))),
@@ -197,12 +209,40 @@ fn translate(value: &Value) -> Translated {
         // `peek` answers null for a name that was never written, and ?v for
         // one that was, so both turn up whenever a program peeks.
         Value::Null => Ok(Some(("Null", serde_json::Value::Null))),
-        Value::Option(inner) => Ok(Some((
-            "Option",
-            match translate(inner) {
-                Ok(Some((tag, value))) => serde_json::json!({"tag": tag, "value": value}),
-                _ => serde_json::Value::Null,
-            },
+        Value::Option(inner) => Ok(Some(("Option", nested(inner)?))),
+        // Structural values cross the boundary as structure, so that a Fumola
+        // tuple arrives in Hazel as a Hazel tuple rather than as something
+        // Hazel has to take apart.
+        Value::Tuple(items) => {
+            let mut out = Vec::with_capacity(items.len());
+            for item in items.iter() {
+                out.push(nested(item)?);
+            }
+            Ok(Some(("Tuple", serde_json::Value::Array(out))))
+        }
+        Value::Object(fields) => {
+            // Sorted by field name: Fumola holds these in a HashMap, whose
+            // iteration order is not stable, and a record whose fields came
+            // back in a different order on each evaluation would make the
+            // livelit's result flicker.
+            let mut names: Vec<&Id> = fields.keys().collect();
+            names.sort_by(|a, b| a.string.cmp(&b.string));
+            let mut out = serde_json::Map::new();
+            for name in names {
+                let field = fields.get(name).expect("key from this map");
+                out.insert(name.string.to_string(), nested(&field.val)?);
+            }
+            Ok(Some(("Record", serde_json::Value::Object(out))))
+        }
+        Value::Variant(name, payload) => Ok(Some((
+            "Variant",
+            serde_json::json!({
+                "name": name.string.to_string(),
+                "value": match payload {
+                    Some(v) => nested(v)?,
+                    None => serde_json::Value::Null,
+                },
+            }),
         ))),
         // Symbols are first-order data, so they cross the boundary as
         // structure rather than as a handle into this runtime.
