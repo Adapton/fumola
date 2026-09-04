@@ -212,11 +212,10 @@ fn arrays_translate_as_lists() {
     assert_eq!(v["tag"], serde_json::json!("List"));
     assert_eq!(v["value"][2], serde_json::json!({"tag":"Int","value":"3"}));
 
-    // Adapton's own introspection returns arrays too, but their elements
-    // carry adapton spaces and times, which have no translation yet -- so
-    // peekEvents still fails, on its contents rather than on being an array.
-    let raw = fumola_eval(id, "`topLevel", "Adapton.peekEvents()");
-    assert!(raw.contains("no Hazel translation"), "unexpected: {}", raw);
+    // Adapton's own introspection returns arrays too, and now that spaces
+    // and times translate, so do they.
+    let v = eval_ok(id, "Adapton.peekEvents()");
+    assert_eq!(v["tag"], serde_json::json!("List"));
 }
 
 /// A failed program must leave the instance exactly as it was. Some failures
@@ -375,4 +374,48 @@ fn errors_say_what_kind_they_are() {
         "the message should describe the failure: {}",
         v["error"]
     );
+}
+
+/// A space and a time are each mostly just a symbol, and travel as one.
+#[test]
+fn spaces_and_times_travel_as_symbols() {
+    let id = fumola_create();
+
+    let v = eval_ok(id, "Adapton.space(`s)");
+    assert_eq!(v["tag"], serde_json::json!("Variant"));
+    assert_eq!(v["value"]["name"], serde_json::json!("Symbol"));
+    // The symbol inside travels as a symbol, so it arrives as its text.
+    assert_eq!(v["value"]["value"]["tag"], serde_json::json!("Symbol"));
+}
+
+/// The cases that are not a symbol cross as the other variants of the same
+/// shape Fumola gives them, so a host can take them apart rather than losing
+/// them.
+#[test]
+fn a_space_or_time_without_a_symbol_is_its_own_variant() {
+    let id = fumola_create();
+
+    let v: serde_json::Value =
+        serde_json::from_str(&fumola_eval_top(id, "Adapton.now()")).unwrap();
+    assert_eq!(v["ok"], serde_json::json!(true), "now: {}", v);
+    assert_eq!(v["tag"], serde_json::json!("Variant"));
+    assert_eq!(v["value"]["name"], serde_json::json!("Now"));
+
+    let v: serde_json::Value =
+        serde_json::from_str(&fumola_eval_top(id, "Adapton.here()")).unwrap();
+    assert_eq!(v["ok"], serde_json::json!(true), "here: {}", v);
+    assert_eq!(v["tag"], serde_json::json!("Variant"));
+    assert_eq!(v["value"]["name"], serde_json::json!("Here"));
+}
+
+/// With spaces and times translated, Adapton's own introspection comes
+/// across: the event log is a list of records carrying both.
+#[test]
+fn the_adapton_event_log_translates() {
+    let id = fumola_create();
+    eval_ok(id, "1 := 2");
+    let raw = fumola_eval(id, "`t", "Adapton.peekEvents()");
+    let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(v["ok"], serde_json::json!(true), "peekEvents: {}", raw);
+    assert_eq!(v["tag"], serde_json::json!("List"));
 }

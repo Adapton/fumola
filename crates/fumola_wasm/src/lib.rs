@@ -25,6 +25,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use fumola::state::State;
+use fumola_semantics::adapton::{Space, Time};
 use fumola_semantics::value::Value;
 use fumola_syntax::ast::Id;
 use fumola_semantics::vm_types::{LocalPointer, Pointer, ScheduleChoice};
@@ -440,6 +441,44 @@ fn translate(value: &Value) -> Translated {
             // A pointer whose space is not a symbol cannot be named, so
             // there is no expression that would read it.
             Err(()) => Err("Fumola pointer has no symbolic name".to_string()),
+        },
+        // A space and a time are each mostly just a symbol, and cross as a
+        // variant of one -- matching how Fumola defines them, so a host can
+        // give them types of the same shape and take them apart. The symbol
+        // travels as a symbol, and so arrives as its text.
+        //
+        // Space's third case, an expression rather than a name, is left
+        // untranslated: there is no use for it on the other side.
+        Value::AdaptonSpace(space) => match space {
+            Space::Symbol(symbol) => Ok(Some((
+                "Variant",
+                serde_json::json!({
+                    "name": "Symbol",
+                    "value": {"tag": "Symbol", "value": symbol_to_json(symbol)?},
+                }),
+            ))),
+            Space::Here => Ok(Some((
+                "Variant",
+                serde_json::json!({"name": "Here", "value": serde_json::Value::Null}),
+            ))),
+            Space::Exp_(..) => Err(
+                "this adapton space is an expression rather than a name, and \
+                 has no translation"
+                    .to_string(),
+            ),
+        },
+        Value::AdaptonTime(time) => match time {
+            Time::Symbol(symbol) => Ok(Some((
+                "Variant",
+                serde_json::json!({
+                    "name": "Symbol",
+                    "value": {"tag": "Symbol", "value": symbol_to_json(symbol)?},
+                }),
+            ))),
+            Time::Now => Ok(Some((
+                "Variant",
+                serde_json::json!({"name": "Now", "value": serde_json::Value::Null}),
+            ))),
         },
         // Symbols are first-order data, so they cross the boundary as
         // structure rather than as a handle into this runtime.
