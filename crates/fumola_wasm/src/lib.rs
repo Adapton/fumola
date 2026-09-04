@@ -88,6 +88,9 @@ fn new_state() -> State {
             let _ = e;
         }
     }
+    if let Err(e) = state.eval(PRELUDE) {
+        let _ = e;
+    }
     for (name, path) in PRELUDE_MODULES {
         let binding = format!("import {} \"{}\";", name, path);
         if let Err(e) = state.eval(&binding) {
@@ -118,11 +121,19 @@ const PRELUDE: &str = concat!(
 
 /// Wrap Hazel-supplied source in the top-level thunk assignment that gives
 /// re-evaluation its incremental meaning, after the prelude.
-fn wrap(program_text: &str) -> String {
-    format!(
-        "{}force(`topLevel := thunk {{ {} }})",
-        PRELUDE, program_text
-    )
+fn wrap(thunk_name: &str, program_text: &str) -> String {
+    format!("force(`{} := thunk {{ {} }})", thunk_name, program_text)
+}
+
+/// Reject a thunk name that would not survive Fumola's lexer, so that a host
+/// cannot inject text into the wrapper through it.
+fn valid_thunk_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() || c == '_' => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 fn bump_next_id_past(id: FumolaInstanceId) {
@@ -198,8 +209,42 @@ pub fn fumola_instance_count() -> usize {
 ///
 /// The runtime is *not* rebuilt; the same persistent `State` is reused, so the
 /// adapton store survives the edit.
+/// Evaluate `program_text` as the body of a named thunk, which is what gives
+/// an edit its incremental meaning: re-assigning the same name and forcing it
+/// again reuses that thunk's execution history.
+///
+/// The name distinguishes one thunk from another. Two programs sharing a
+/// runtime must not share a name, or each would overwrite the other's thunk
+/// and neither would keep its history.
 #[wasm_bindgen]
-pub fn fumola_eval(id: FumolaInstanceId, program_text: &str) -> String {
+pub fn fumola_eval(
+    id: FumolaInstanceId,
+    thunk_name: &str,
+    program_text: &str,
+) -> String {
+    if !valid_thunk_name(thunk_name) {
+        return error_json(&format!("`{}` is not a usable thunk name", thunk_name));
+    }
+    eval_in(id, &wrap(thunk_name, program_text))
+}
+
+/// Evaluate `program_text` at the top level of the runtime named by `id`,
+/// with no thunk around it.
+///
+/// The wrapping that `fumola_eval` does is what gives an edit its incremental
+/// meaning, but it also puts the program inside a `force`, and some adapton
+/// operations cannot run there: `reset` clears the store the enclosing force
+/// is still inside, and `peekForce` asserts. Those belong at the top level,
+/// as do `import` and any binding meant to outlive the program that made it.
+///
+/// The same runtime either way, so a program evaluated here is visible to one
+/// evaluated in a thunk, and the two can be used together.
+#[wasm_bindgen]
+pub fn fumola_eval_top(id: FumolaInstanceId, program_text: &str) -> String {
+    eval_in(id, program_text)
+}
+
+fn eval_in(id: FumolaInstanceId, program: &str) -> String {
     INSTANCES.with(|m| {
         let mut m = m.borrow_mut();
         let state = match m.get_mut(&id) {
@@ -218,19 +263,36 @@ pub fn fumola_eval(id: FumolaInstanceId, program_text: &str) -> String {
         // failed once made all later programs fail too. An edit that does not
         // work should cost nothing.
         let mut attempt = state.clone();
-        match attempt.eval(&wrap(program_text)) {
+        match attempt.eval(program) {
             Ok(value) => {
                 let json = value_to_json(&value);
                 *state = attempt;
                 json
             }
-            Err(e) => error_json(&format!("{:?}", e)),
+            Err(e) => error_of(&e),
         }
     })
 }
 
 fn error_json(message: &str) -> String {
-    serde_json::json!({ "ok": false, "error": message }).to_string()
+    error_json_of_kind("runtime", message)
+}
+
+/// Errors carry a kind, because a host wants to treat them differently. A
+/// syntax error is what a half-typed program looks like and is worth staying
+/// quiet about; anything else is a program that parsed and then went wrong,
+/// which is worth saying out loud.
+fn error_json_of_kind(kind: &str, message: &str) -> String {
+    serde_json::json!({ "ok": false, "kind": kind, "error": message }).to_string()
+}
+
+fn error_of(e: &fumola::Error) -> String {
+    match e {
+        fumola::Error::SyntaxError(_) | fumola::Error::SyntaxErrorCode(_) => {
+            error_json_of_kind("syntax", &format!("{:?}", e))
+        }
+        _ => error_json_of_kind("runtime", &format!("{:?}", e)),
+    }
 }
 
 /// Translate a Fumola value into the JSON that the Hazel side decodes.
@@ -420,7 +482,7 @@ pub fn fumola_get(id: FumolaInstanceId, symbol_json: &str) -> String {
         state.semantic_state.clear_cont();
         match state.eval(&format!("@ (prim \"adaptonPointer\" ({}))", source)) {
             Ok(value) => value_to_json(&value),
-            Err(e) => error_json(&format!("{:?}", e)),
+            Err(e) => error_of(&e),
         }
     })
 }

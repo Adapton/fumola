@@ -62,7 +62,7 @@ fn a_translated_symbol_names_a_real_cell() {
 
     // Write through a symbol rendered from JSON...
     let name = to_source(json!({"tag":"Name","value":"answer"})).unwrap();
-    let raw = fumola_eval(id, &format!("let p = {} := 42; @ p", name));
+    let raw = fumola_eval(id, "topLevel", &format!("let p = {} := 42; @ p", name));
     let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
     assert_eq!(v["ok"], json!(true), "eval failed: {}", raw);
     assert_eq!(v["value"], json!("42"));
@@ -79,7 +79,7 @@ fn a_translated_symbol_names_a_real_cell() {
 #[test]
 fn numeric_symbols_name_cells() {
     let id = fumola_create();
-    let raw = fumola_eval(id, "let p = 7 := 99; @ p");
+    let raw = fumola_eval(id, "topLevel", "let p = 7 := 99; @ p");
     let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
     assert_eq!(v["ok"], json!(true), "eval failed: {}", raw);
 
@@ -94,7 +94,7 @@ fn numeric_symbols_name_cells() {
 #[test]
 fn symbols_translate_outward() {
     let id = fumola_create();
-    let raw = fumola_eval(id, "`x");
+    let raw = fumola_eval(id, "topLevel", "`x");
     let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
     assert_eq!(v["ok"], json!(true), "eval failed: {}", raw);
     assert_eq!(v["tag"], json!("Symbol"));
@@ -107,7 +107,7 @@ fn symbols_translate_outward() {
 #[test]
 fn structured_symbols_translate_outward() {
     let id = fumola_create();
-    let raw = fumola_eval(id, "`adapton(`settings)");
+    let raw = fumola_eval(id, "topLevel", "`adapton(`settings)");
     let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
     assert_eq!(v["ok"], json!(true), "eval failed: {}", raw);
     assert_eq!(v["tag"], json!("Symbol"));
@@ -149,7 +149,7 @@ fn negative_numbers_use_int() {
 fn untranslatable_symbol_forms_are_reported() {
     // `1 + `x is a symbolic BinOp, not an addition.
     let id = fumola_create();
-    let raw = fumola_eval(id, "1 + `x");
+    let raw = fumola_eval(id, "topLevel", "1 + `x");
     assert!(
         raw.contains("\"ok\":false") && raw.contains("BinOp"),
         "expected a BinOp translation failure, got {}",

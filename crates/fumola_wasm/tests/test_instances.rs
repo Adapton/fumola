@@ -5,7 +5,7 @@
 use fumola_wasm::*;
 
 fn eval_ok(id: FumolaInstanceId, src: &str) -> serde_json::Value {
-    let raw = fumola_eval(id, src);
+    let raw = fumola_eval(id, "topLevel", src);
     let v: serde_json::Value = serde_json::from_str(&raw).expect("eval returned invalid JSON");
     assert_eq!(v["ok"], serde_json::json!(true), "eval failed: {}", raw);
     v
@@ -68,14 +68,14 @@ fn dropping_an_instance_removes_it() {
     assert_eq!(eval_int(id, "1 + 2"), "3");
     fumola_drop(id);
     assert!(!fumola_has(id));
-    let raw = fumola_eval(id, "1 + 2");
+    let raw = fumola_eval(id, "topLevel", "1 + 2");
     assert!(raw.contains("\"ok\":false"), "expected failure, got {}", raw);
 }
 
 #[test]
 fn syntax_errors_are_reported_not_panicked() {
     let id = fumola_create();
-    let raw = fumola_eval(id, "1 +");
+    let raw = fumola_eval(id, "topLevel", "1 +");
     assert!(raw.contains("\"ok\":false"), "expected failure, got {}", raw);
     // The instance survives a bad edit and still evaluates afterwards.
     assert_eq!(eval_int(id, "1 + 2"), "3");
@@ -128,13 +128,13 @@ fn peek_reports_a_missing_cell() {
     let id = fumola_create();
     eval_ok(id, "1 := 2");
     // A name that was never written peeks as null...
-    let raw = fumola_eval(id, "peek(404)");
+    let raw = fumola_eval(id, "topLevel", "peek(404)");
     let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
     assert_eq!(v["ok"], serde_json::json!(true), "peek failed: {}", raw);
     assert_eq!(v["tag"], serde_json::json!("Null"));
 
     // ...and one that was written peeks as an option carrying the value.
-    let raw = fumola_eval(id, "peek(1)");
+    let raw = fumola_eval(id, "topLevel", "peek(1)");
     let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
     assert_eq!(v["ok"], serde_json::json!(true), "peek failed: {}", raw);
     assert_eq!(v["tag"], serde_json::json!("Option"));
@@ -166,7 +166,7 @@ fn the_adapton_module_is_available() {
     let id = fumola_create();
     // Reaching a name inside the module is enough; it is 894 lines of types
     // and functions, and loading it at all is what is being checked.
-    let raw = fumola_eval(id, "Adapton");
+    let raw = fumola_eval(id, "topLevel", "Adapton");
     assert!(
         !raw.contains("\"ok\":false") || !raw.contains("not defined"),
         "Adapton should be bound: {}",
@@ -179,7 +179,7 @@ fn the_adapton_module_is_available() {
 #[test]
 fn unbound_modules_can_still_be_imported() {
     let id = fumola_create();
-    let raw = fumola_eval(id, "import D \"fumola/examples/deriveCompare\"; 1");
+    let raw = fumola_eval(id, "topLevel", "import D \"fumola/examples/deriveCompare\"; 1");
     assert!(raw.contains("\"ok\":true"), "import failed: {}", raw);
 }
 
@@ -215,7 +215,7 @@ fn arrays_translate_as_lists() {
     // Adapton's own introspection returns arrays too, but their elements
     // carry adapton spaces and times, which have no translation yet -- so
     // peekEvents still fails, on its contents rather than on being an array.
-    let raw = fumola_eval(id, "Adapton.peekEvents()");
+    let raw = fumola_eval(id, "topLevel", "Adapton.peekEvents()");
     assert!(raw.contains("no Hazel translation"), "unexpected: {}", raw);
 }
 
@@ -228,7 +228,7 @@ fn a_failed_program_does_not_break_the_instance() {
     assert_eq!(eval_int(id, "Gcd.gcd(12, 18)"), "6");
 
     // Fails, and used to take the instance's bindings with it.
-    let raw = fumola_eval(id, "1 := 2; Adapton.peekForce(pointer(1))");
+    let raw = fumola_eval(id, "topLevel", "1 := 2; Adapton.peekForce(pointer(1))");
     assert!(raw.contains("\"ok\":false"), "expected a failure, got {}", raw);
 
     // The library is still there, and so is the store.
@@ -241,7 +241,105 @@ fn a_failed_program_does_not_break_the_instance() {
 fn a_failed_program_does_not_write() {
     let id = fumola_create();
     eval_ok(id, "`kept := 1");
-    let raw = fumola_eval(id, "`kept := 2; 1 +");
+    let raw = fumola_eval(id, "topLevel", "`kept := 2; 1 +");
     assert!(raw.contains("\"ok\":false"), "expected a failure, got {}", raw);
     assert_eq!(eval_int(id, "get(`kept)"), "1");
+}
+
+/// Two programs sharing a runtime must not share a thunk name, or each would
+/// overwrite the other's thunk and neither would keep its history.
+#[test]
+fn thunks_with_different_names_do_not_clobber_each_other() {
+    let id = fumola_create();
+
+    // Two thunks in one runtime, each edited, each keeping its own result.
+    let raw = fumola_eval(id, "a", "1 + 1");
+    assert!(raw.contains("\"value\":\"2\""), "a: {}", raw);
+    let raw = fumola_eval(id, "b", "10 + 10");
+    assert!(raw.contains("\"value\":\"20\""), "b: {}", raw);
+
+    // Editing b leaves a alone, and vice versa.
+    let raw = fumola_eval(id, "b", "10 + 11");
+    assert!(raw.contains("\"value\":\"21\""), "b edited: {}", raw);
+    let raw = fumola_eval(id, "a", "1 + 1");
+    assert!(raw.contains("\"value\":\"2\""), "a after b's edit: {}", raw);
+}
+
+/// The two share a runtime, so state written at the top level is visible
+/// inside a thunk and the other way round.
+#[test]
+fn top_level_and_thunk_share_the_runtime() {
+    let id = fumola_create();
+
+    // Written at the top level...
+    let raw = fumola_eval_top(id, "`handoff := 7");
+    assert!(raw.contains("\"ok\":true"), "top-level write: {}", raw);
+
+    // ...read from inside a thunk.
+    let raw = fumola_eval(id, "reader", "get(`handoff)");
+    assert!(raw.contains("\"value\":\"7\""), "read in thunk: {}", raw);
+
+    // And a binding made at the top level is in scope for the thunk.
+    let raw = fumola_eval_top(id, "let bound = 3");
+    assert!(raw.contains("\"ok\":true"), "binding: {}", raw);
+    let raw = fumola_eval(id, "reader2", "bound + 1");
+    assert!(raw.contains("\"value\":\"4\""), "use binding: {}", raw);
+}
+
+/// A thunk name that would not survive the lexer is refused, rather than
+/// being interpolated into the wrapper.
+#[test]
+fn a_bad_thunk_name_is_refused() {
+    let id = fumola_create();
+    for bad in ["", "1a", "a b", "a}); (", "a-b"] {
+        let raw = fumola_eval(id, bad, "1");
+        assert!(
+            raw.contains("\"ok\":false"),
+            "expected {:?} to be refused, got {}",
+            bad,
+            raw
+        );
+    }
+    // The instance still works afterwards.
+    let raw = fumola_eval(id, "fine", "1 + 1");
+    assert!(raw.contains("\"value\":\"2\""), "{}", raw);
+}
+
+/// Operations that cannot run inside a force work at the top level. reset
+/// clears the store the enclosing force is still inside, and peekForce
+/// asserts there.
+#[test]
+fn adapton_operations_that_need_the_top_level() {
+    let id = fumola_create();
+    fumola_eval(id, "setup", "1 := 2");
+
+    let wrapped = fumola_eval(id, "t", "Adapton.reset()");
+    assert!(wrapped.contains("\"ok\":false"), "expected failure: {}", wrapped);
+
+    let top = fumola_eval_top(id, "Adapton.reset()");
+    assert!(top.contains("\"ok\":true"), "reset at top level: {}", top);
+}
+
+/// Errors carry a kind. A syntax error is what a half-typed program looks
+/// like; anything else is a program that parsed and then went wrong, which a
+/// host may want to show rather than swallow.
+#[test]
+fn errors_say_what_kind_they_are() {
+    let id = fumola_create();
+
+    let raw = fumola_eval(id, "t", "1 +");
+    let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(v["ok"], serde_json::json!(false));
+    assert_eq!(v["kind"], serde_json::json!("syntax"));
+
+    // Parses, then fails: reset cannot run inside a force.
+    let raw = fumola_eval(id, "t", "Adapton.reset()");
+    let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(v["ok"], serde_json::json!(false));
+    assert_eq!(v["kind"], serde_json::json!("runtime"));
+    assert!(
+        v["error"].as_str().unwrap().contains("Adapton"),
+        "the message should describe the failure: {}",
+        v["error"]
+    );
 }
