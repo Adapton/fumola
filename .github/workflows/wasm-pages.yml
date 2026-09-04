@@ -1,0 +1,94 @@
+# Build the Fumola wasm runtime and publish it to GitHub Pages.
+#
+# Pages rather than a release asset, deliberately: release assets are served
+# without an Access-Control-Allow-Origin header, so a browser can never fetch
+# one cross-origin. The whole point of this artifact is to be loaded by a web
+# page (Hazel's Fumola livelit), which makes a release asset a dead end.
+# Pages serves it with CORS and the correct application/wasm content type.
+name: Publish wasm to Pages
+
+on:
+  push:
+    branches: ["main"]
+  # Lets a branch publish a runtime for its own preview before merging.
+  workflow_dispatch:
+
+concurrency:
+  group: wasm-pages
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      # Fumola is slow to build -- lalrpop parser generation dominates -- so
+      # the cache matters more here than usual.
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            target
+          key: wasm-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install wasm-bindgen-cli
+        run: |
+          version=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | grep '^version' | head -1 | cut -d'"' -f2)
+          echo "wasm-bindgen $version"
+          if [ "$(wasm-bindgen --version 2>/dev/null | awk '{print $2}')" != "$version" ]; then
+            cargo install wasm-bindgen-cli --version "$version" --force
+          fi
+
+      # --no-default-features drops the repl feature, whose rustyline
+      # dependency pulls in fs2, which does not build for wasm32.
+      - name: Build
+        run: cargo build --release --target wasm32-unknown-unknown -p fumola_wasm --no-default-features
+
+      - name: Generate bindings
+        run: |
+          mkdir -p site
+          wasm-bindgen --target web --out-dir site \
+            target/wasm32-unknown-unknown/release/fumola_wasm.wasm
+          rm -f site/*.d.ts
+          cat > site/index.html <<'HTML'
+          <!DOCTYPE html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <title>fumola wasm</title>
+            </head>
+            <body>
+              <h1>fumola wasm</h1>
+              <p>
+                The Fumola runtime compiled to WebAssembly, published here so that web
+                pages can load it. Built from the <code>fumola_wasm</code> crate by
+                <code>.github/workflows/wasm-pages.yml</code>; do not edit by hand.
+              </p>
+              <ul>
+                <li><code>fumola_wasm.js</code> &mdash; the wasm-bindgen JS glue</li>
+                <li><code>fumola_wasm_bg.wasm</code> &mdash; the runtime</li>
+              </ul>
+            </body>
+          </html>
+          HTML
+          ls -la site
+
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          publish_branch: gh-pages
+          force_orphan: true
