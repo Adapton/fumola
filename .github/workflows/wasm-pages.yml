@@ -9,7 +9,11 @@ name: Publish wasm to Pages
 
 on:
   push:
-    branches: ["main"]
+    # TEMPORARY: hazel-livelit-wasm-api is here so this branch can publish a
+    # runtime for hazelgrove/hazel#2492 to load before this merges. Drop it
+    # from this list before merging -- once the workflow is on main,
+    # workflow_dispatch covers the same need without every push republishing.
+    branches: ["main", "hazel-livelit-wasm-api"]
   # Lets a branch publish a runtime for its own preview before merging.
   workflow_dispatch:
 
