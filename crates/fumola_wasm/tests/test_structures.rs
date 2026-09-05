@@ -209,14 +209,25 @@ fn an_array_of_floats_translates() {
     assert_eq!(v["value"][1], json!({"tag":"Float","value":"1.5"}));
 }
 
-/// A thunk is not a value and has no Hazel counterpart, but it can print
-/// itself, and its source text is a far more useful thing for a reference to
-/// show than a bare hole.
+/// A thunk has no Hazel counterpart, so it crosses as opaque, carrying the
+/// source Fumola prints for it. Deliberately a success rather than a failure:
+/// as a failure, a tuple holding a thunk failed entirely, and the host had an
+/// error to show where a value should be.
 #[test]
-fn a_thunk_reports_its_own_source() {
+fn a_thunk_crosses_as_opaque_carrying_its_source() {
     let id = fumola_create();
     let raw = fumola_eval_top(id, "`g := thunk { 1 + 3 }; peek(`g)!");
-    assert!(raw.contains("\"ok\":false"), "expected no translation: {}", raw);
-    assert!(raw.contains("@thunk"), "expected the thunk keyword: {}", raw);
+    assert!(raw.contains("\"ok\":true"), "expected a translation: {}", raw);
+    assert!(raw.contains("Opaque"), "expected the opaque tag: {}", raw);
     assert!(raw.contains("1 + 3"), "expected the body: {}", raw);
+}
+
+/// And a structure holding one now translates, rather than failing whole.
+#[test]
+fn a_tuple_holding_a_thunk_still_translates() {
+    let id = fumola_create();
+    let v = eval_value(id, "let t = thunk { 1 + 3 }; (t, force(t))");
+    assert_eq!(v["tag"], json!("Tuple"));
+    assert_eq!(v["value"][0]["tag"], json!("Opaque"));
+    assert_eq!(v["value"][1], json!({"tag": "Int", "value": "4"}));
 }

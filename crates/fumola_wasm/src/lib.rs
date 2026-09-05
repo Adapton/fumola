@@ -602,14 +602,16 @@ fn translate(value: &Value) -> Translated {
         // travels outward so a Hazel program can see which cell it is
         // looking at; there is no surface syntax for injecting a raw
         // pointer back, so cells are addressed by their symbol instead.
-        // Named rather than left to the catch-all below, so that a reference
-        // to a cell holding a thunk can say what it holds. A thunk is not a
-        // value and has no Hazel counterpart, but its own source text is a
-        // far more useful thing to show than a bare hole, and Fumola can
-        // print it: Value's formatter renders a thunk as "@thunk (<body>)".
-        Value::Thunk(_) => Err(format_one_line(value)),
         Value::Pointer(p) | Value::Opaque(p) => Ok(Some(("Pointer", pointer_to_json(p)))),
-        _ => Ok(None),
+        // Everything else crosses as opaque: Hazel has no value of its own
+        // for it, so it carries Fumola's printed form instead.
+        //
+        // Not an error, which is what this used to be. A thunk is a perfectly
+        // good Fumola value and "@thunk ({ Gcd.gcd(12, 18) })" says exactly
+        // what it is; failing the translation instead meant that a tuple
+        // holding one failed entirely, and the host had nothing to show but
+        // an error where a value should be.
+        _ => Ok(Some(("Opaque", serde_json::json!(format_one_line(value))))),
     }
 }
 
