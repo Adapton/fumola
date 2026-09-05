@@ -170,3 +170,41 @@ fn pointers_translate_inside_tuples() {
     assert_eq!(v["value"][0]["value"]["source"], json!("`a"));
     assert_eq!(v["value"][1]["value"]["source"], json!("`b"));
 }
+
+/// Floats reach Hazel as text, like the integers do: a JSON number would go
+/// through an f64 round trip in the serializer, and Hazel parses the text.
+///
+/// The motivating case is `Adapton.Scene`, whose `Vec3` is three floats --
+/// without this, no scene position can cross the boundary.
+#[test]
+fn floats_translate() {
+    let id = fumola_create();
+
+    let v = eval_value(id, "0.5");
+    assert_eq!(v["tag"], json!("Float"));
+    assert_eq!(v["value"], json!("0.5"));
+
+    let v = eval_value(id, "-1.618");
+    assert_eq!(v["tag"], json!("Float"));
+    assert_eq!(v["value"], json!("-1.618"));
+}
+
+#[test]
+fn a_vec3_of_floats_reads_back_as_a_record() {
+    let id = fumola_create();
+    let v = eval_value(id, "{x = 0.0; y = 1.5; z = -2.25}");
+    assert_eq!(v["tag"], json!("Record"));
+    assert_eq!(v["value"]["x"], json!({"tag":"Float","value":"0"}));
+    assert_eq!(v["value"]["y"], json!({"tag":"Float","value":"1.5"}));
+    assert_eq!(v["value"]["z"], json!({"tag":"Float","value":"-2.25"}));
+}
+
+/// An array of floats: both halves of what a scene needs, together.
+#[test]
+fn an_array_of_floats_translates() {
+    let id = fumola_create();
+    let v = eval_value(id, "[0.5, 1.5]");
+    assert_eq!(v["tag"], json!("List"));
+    assert_eq!(v["value"][0], json!({"tag":"Float","value":"0.5"}));
+    assert_eq!(v["value"][1], json!({"tag":"Float","value":"1.5"}));
+}

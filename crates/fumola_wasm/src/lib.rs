@@ -98,6 +98,17 @@ fn new_state() -> State {
             let _ = e;
         }
     }
+    // Adapton's simple semantics, not the graphical (caching) default.
+    //
+    // Both layers here are incremental, and while it is still unclear how
+    // Hazel's re-evaluation and Adapton's repair compose, the simple
+    // semantics is the one whose behaviour a reader can predict: a force
+    // computes, rather than possibly reusing a cached result whose validity
+    // depends on a graph the reader cannot see. Last, so that nothing above
+    // has left graphical state behind.
+    if let Err(e) = state.eval("prim \"adaptonReset\" (#simple)") {
+        let _ = e;
+    }
     state
 }
 
@@ -366,6 +377,9 @@ fn translate(value: &Value) -> Translated {
     match value {
         Value::Nat(n) => Ok(Some(("Int", serde_json::json!(n.to_string())))),
         Value::Int(i) => Ok(Some(("Int", serde_json::json!(i.to_string())))),
+        // As text, like the integers above: a JSON number would go through a
+        // f64 round trip in the serializer, and Hazel parses the text anyway.
+        Value::Float(f) => Ok(Some(("Float", serde_json::json!(f.0.to_string())))),
         Value::Bool(b) => Ok(Some(("Bool", serde_json::json!(b)))),
         Value::Text(t) => Ok(Some(("String", serde_json::json!(t.to_string())))),
         Value::Unit => Ok(Some(("Unit", serde_json::Value::Null))),
