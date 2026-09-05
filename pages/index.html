@@ -223,6 +223,22 @@
       figure img { display: block; width: 100%; height: auto; border: 1px solid var(--rule); border-radius: 2px; }
       figcaption { margin-top: 0.7rem; font-size: 0.86rem; color: var(--dim); }
 
+      /* ---- publications and drafts ---------------------------------------- */
+
+      .pubs { list-style: none; margin: 0; padding: 0; }
+      .pubs li { border-top: 1px solid var(--rule); padding: 0.9rem 0; }
+      .pubs li:first-child { border-top: none; padding-top: 0.2rem; }
+      .pub-title { display: block; font-size: 0.98rem; }
+      .pub-authors { display: block; color: var(--dim); font-size: 0.88rem; margin-top: 0.2rem; }
+      .pub-venue {
+        display: block;
+        font: 400 0.79rem/1.5 var(--mono);
+        letter-spacing: 0.03em;
+        color: var(--sym);
+        margin-top: 0.25rem;
+      }
+      .pub-why { display: block; margin-top: 0.5rem; font-size: 0.91rem; }
+
       /* ---- link list ---------------------------------------------------- */
 
       .links { list-style: none; margin: 0; padding: 0; }
@@ -602,6 +618,145 @@
           this work is in rather than a settled one &mdash; the intent is for
           Hazel to default to graphical too, once the composed semantics is
           understood.
+        </p>
+      </section>
+
+      <!-- #publications and #drafts, like #hazel, are linked to from
+           elsewhere. Keep these three ids stable. -->
+      <section id="publications">
+        <h2>Publications</h2>
+        <p>
+          Two papers in particular are what Fumola implements. Between them
+          they are the primitives above: the first is the machinery, the second
+          is what makes it addressable.
+        </p>
+
+        <ul class="pubs">
+          <li>
+            <span class="pub-title"><a href="https://doi.org/10.1145/2594291.2594324">Adapton: composable, demand-driven incremental computation</a></span>
+            <span class="pub-authors">Matthew A. Hammer, Khoo Yit Phang, Michael Hicks, Jeffrey S. Foster</span>
+            <span class="pub-venue">PLDI 2014 &middot; pp. 156&ndash;166 &middot; doi:10.1145/2594291.2594324</span>
+            <span class="pub-why">
+              Adapton itself. Demand drives the computation, the demanded
+              computation graph records what that demand touched, and the graph
+              is what a later run repairs. <code>thunk</code>, <code>force</code>,
+              put and get are this paper's.
+            </span>
+          </li>
+          <li>
+            <span class="pub-title"><a href="https://doi.org/10.1145/2814270.2814305">Incremental computation with names</a></span>
+            <span class="pub-authors">Matthew A. Hammer, Jana Dunfield, Kyle Headley, Nicholas Labich, Jeffrey S. Foster, Michael Hicks, David Van Horn</span>
+            <span class="pub-venue">OOPSLA 2015 &middot; pp. 748&ndash;766 &middot; doi:10.1145/2814270.2814305</span>
+            <span class="pub-why">
+              Names, made explicit and first-class. This is the paper the
+              <a href="#primitives">symbols</a> above come from &mdash; what it
+              calls a <em>name</em>, Fumola spells with a backtick. Without
+              them a second run cannot tell which node it is looking at, and
+              nothing can be reused; with them, reuse becomes something a
+              program can control deliberately.
+            </span>
+          </li>
+        </ul>
+
+        <p class="aside">
+          Further back: Adapton descends from self-adjusting computation, whose
+          root is <a href="https://doi.org/10.1145/503272.503296">Adaptive
+          functional programming</a> (Umut A. Acar, Guy E. Blelloch, Robert
+          Harper, POPL 2002).
+        </p>
+
+        <h3>Hazel</h3>
+        <p>
+          The environment the <a href="#hazel">integration</a> above plugs into,
+          and the mechanism it plugs in through.
+        </p>
+
+        <ul class="pubs">
+          <li>
+            <span class="pub-title"><a href="https://doi.org/10.1145/3009837.3009900">Hazelnut: a bidirectionally typed structure editor calculus</a></span>
+            <span class="pub-authors">Cyrus Omar, Ian Voysey, Michael Hilton, Jonathan Aldrich, Matthew A. Hammer</span>
+            <span class="pub-venue">POPL 2017 &middot; pp. 86&ndash;99 &middot; doi:10.1145/3009837.3009900</span>
+            <span class="pub-why">
+              Every edit state has a static meaning, so an incomplete program
+              is still a program.
+            </span>
+          </li>
+          <li>
+            <span class="pub-title"><a href="https://doi.org/10.1145/3290327">Live functional programming with typed holes</a></span>
+            <span class="pub-authors">Cyrus Omar, Ian Voysey, Ravi Chugh, Matthew A. Hammer</span>
+            <span class="pub-venue">POPL 2019 &middot; PACMPL 3(POPL), 14:1&ndash;14:32 &middot; doi:10.1145/3290327</span>
+            <span class="pub-why">
+              And a dynamic meaning too, so an incomplete program still runs.
+              This is what makes a livelit's expansion evaluable while the
+              program around it is still being written.
+            </span>
+          </li>
+          <li>
+            <span class="pub-title"><a href="https://doi.org/10.1145/3453483.3454059">Filling typed holes with live GUIs</a></span>
+            <span class="pub-authors">Cyrus Omar, David Moon, Andrew Blinn, Ian Voysey, Nick Collins, Ravi Chugh</span>
+            <span class="pub-venue">PLDI 2021 &middot; pp. 511&ndash;525 &middot; doi:10.1145/3453483.3454059</span>
+            <span class="pub-why">
+              Livelits: the graphical literals a Fumola program is embedded in.
+            </span>
+          </li>
+        </ul>
+      </section>
+
+      <section id="drafts">
+        <h2>Drafts</h2>
+        <p>
+          A line of work on <strong>typing</strong> these primitives, rather
+          than only running them. If names decide what gets reused, then using
+          a name twice for two different things is a bug the type system ought
+          to catch &mdash; and the effects a computation has on the graph are
+          exactly what a type-and-effect system is for.
+        </p>
+
+        <ul class="pubs">
+          <li>
+            <span class="pub-title"><a href="https://arxiv.org/abs/1808.07826">Fungi: Typed incremental computation with names</a></span>
+            <span class="pub-authors">Matthew A. Hammer, Jana Dunfield, Kyle Headley, Monal Narasimhamurthy, Dimitrios J. Economou</span>
+            <span class="pub-venue">arXiv:1808.07826 &middot; v1, 20 August 2018 &middot; the latest version</span>
+            <span class="pub-why">
+              A type-and-effect system in which the programmer states local
+              invariants about names and the system composes them into a global
+              uniqueness property, with a bidirectional formulation and a
+              prototype in Rust.
+            </span>
+          </li>
+          <li>
+            <span class="pub-title"><a href="https://arxiv.org/abs/1610.00097">Refinement types for precisely named cache locations</a></span>
+            <span class="pub-authors">Matthew A. Hammer, Jana Dunfield, Dimitrios J. Economou, Monal Narasimhamurthy</span>
+            <span class="pub-venue">arXiv:1610.00097 &middot; v5, 21 October 2017 &middot; v1 was titled &ldquo;Typed Adapton&rdquo;</span>
+            <span class="pub-why">
+              The predecessor: refinement types ensuring each name identifies at
+              most one value or subcomputation.
+            </span>
+          </li>
+        </ul>
+
+        <p>
+          Drafts, and they stayed drafts &mdash; neither the theory nor the
+          implementation was finished at the time. The ideas in them did not
+          stop being right, though, and reviving them is current work. In 2025,
+          conversations with
+          <a href="https://www.colorado.edu/cs/bor-yuh-evan-chang">Bor-Yuh Evan
+          Chang</a> at CU Boulder gave the direction fresh support and a new
+          framework to carry it, one that still looks promising; his Fall 2025
+          graduate seminar there, <em>Program Analysis: Theory and Practice</em>
+          (CSCI 4830/7135), is where that framing is being worked out. The two
+          have been at the neighbouring problem before, in
+          <a href="https://doi.org/10.1145/2993236.2993255">A vision for online
+          verification-validation</a> (with David Van Horn, GPCE 2016).
+        </p>
+
+        <p class="aside">
+          There is a pleasing loop in this. Type-and-effect checking a Fumola
+          program is itself a computation over a structure that is edited a
+          little at a time &mdash; which is the shape of problem Fumola exists
+          to make incremental. So the checker is not just a thing to build for
+          Fumola; it is a thing to build <em>in</em> it, and one of the tasks we
+          most want to run on the graph.
         </p>
       </section>
 
