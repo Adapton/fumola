@@ -26,6 +26,7 @@ use std::collections::HashMap;
 
 use fumola::state::State;
 use fumola_semantics::adapton::{Space, Time};
+use fumola_semantics::format::format_one_line;
 use fumola_semantics::value::Value;
 use fumola_syntax::ast::Id;
 use fumola_semantics::vm_types::{LocalPointer, Pointer, ScheduleChoice};
@@ -45,6 +46,14 @@ thread_local! {
     /// Source of fresh ids. Kept ahead of every id ever realized so that
     /// `create` never collides with an id recovered from a saved program.
     static NEXT_ID: RefCell<FumolaInstanceId> = const { RefCell::new(1) };
+    /// Which Adapton semantics each instance is running.
+    ///
+    /// Recorded rather than queried so that asking for the mode an instance
+    /// already has can be a no-op. A Hazel livelit re-expands on every edit,
+    /// and a reset is destructive -- it would discard the execution history
+    /// that other livelits sharing the instance have built up.
+    static MODES: RefCell<HashMap<FumolaInstanceId, String>> =
+        RefCell::new(HashMap::new());
 }
 
 include!(concat!(env!("OUT_DIR"), "/modules.rs"));
@@ -80,6 +89,22 @@ static PRELUDE_MODULES: &[(&str, &str)] = &[
 /// module's imports resolve relative to its own directory. Only the names in
 /// PRELUDE_MODULES are bound; the rest are reachable by importing them.
 fn new_state() -> State {
+    new_state_with(DEFAULT_MODE)
+}
+
+/// The semantics a fresh instance runs unless a program asks for another.
+///
+/// Simple, not Adapton's graphical default: two incremental layers meet in
+/// the Hazel integration, and until how they compose is understood, the
+/// predictable one is the better default. Intended to become "graphical",
+/// matching Fumola itself, with simple asked for explicitly.
+pub const DEFAULT_MODE: &str = "simple";
+
+fn mode_is_known(mode: &str) -> bool {
+    mode == "simple" || mode == "graphical"
+}
+
+fn new_state_with(mode: &str) -> State {
     let mut state = State::empty();
     for (path, source) in MODULES {
         if let Err(e) = state.set_module(None, path.to_string(), source) {
@@ -97,6 +122,12 @@ fn new_state() -> State {
         if let Err(e) = state.eval(&binding) {
             let _ = e;
         }
+    }
+    // Set the Adapton semantics last, so that nothing the prelude did leaves
+    // state from the other mode behind. See DEFAULT_MODE above for why the
+    // default is not Adapton's own.
+    if let Err(e) = state.eval(&format!("prim \"adaptonReset\" (#{})", mode)) {
+        let _ = e;
     }
     state
 }
@@ -196,6 +227,7 @@ pub fn fumola_create() -> FumolaInstanceId {
         id
     });
     INSTANCES.with(|m| m.borrow_mut().insert(id, new_state()));
+    MODES.with(|m| m.borrow_mut().insert(id, DEFAULT_MODE.to_string()));
     id
 }
 
@@ -222,15 +254,85 @@ pub fn fumola_realize(id: FumolaInstanceId) -> bool {
             false
         } else {
             m.insert(id, new_state());
+            MODES.with(|d| d.borrow_mut().insert(id, DEFAULT_MODE.to_string()));
             true
         }
     })
+}
+
+/// Ensure `id` names a runtime running `mode`, and say what happened.
+///
+/// This is what the `fumola_new` livelit calls. It is idempotent on purpose:
+/// a livelit re-expands on every edit, and asking for the mode an instance
+/// already runs must not reset it -- a reset discards the execution history
+/// that the put_force and eval livelits sharing this instance have built.
+///
+/// Changing the mode of an existing instance does reset it, since that is
+/// what asking for a different semantics means.
+///
+/// The reset runs at the top level, never inside a force: a reset is an
+/// editor operation and asking for one from inside a DCG computation is not
+/// a meaningful request. Adapton refuses it with UnreachableForceEnd.
+#[wasm_bindgen]
+pub fn fumola_ensure_mode(id: FumolaInstanceId, mode: &str) -> String {
+    if !mode_is_known(mode) {
+        return error_json_of_kind(
+            "syntax",
+            &format!("unknown Adapton semantics: {}", mode),
+        );
+    }
+    bump_next_id_past(id);
+
+    let existed = INSTANCES.with(|m| m.borrow().contains_key(&id));
+    if !existed {
+        INSTANCES.with(|m| m.borrow_mut().insert(id, new_state_with(mode)));
+        MODES.with(|m| m.borrow_mut().insert(id, mode.to_string()));
+        return serde_json::json!({
+            "ok": true, "mode": mode, "created": true, "reset": false
+        })
+        .to_string();
+    }
+
+    let current = MODES.with(|m| m.borrow().get(&id).cloned());
+    if current.as_deref() == Some(mode) {
+        return serde_json::json!({
+            "ok": true, "mode": mode, "created": false, "reset": false
+        })
+        .to_string();
+    }
+
+    let reset = INSTANCES.with(|m| {
+        let mut m = m.borrow_mut();
+        match m.get_mut(&id) {
+            None => false,
+            Some(state) => state
+                .eval(&format!("prim \"adaptonReset\" (#{})", mode))
+                .is_ok(),
+        }
+    });
+    if reset {
+        MODES.with(|m| m.borrow_mut().insert(id, mode.to_string()));
+    }
+    serde_json::json!({
+        "ok": reset, "mode": mode, "created": false, "reset": reset
+    })
+    .to_string()
+}
+
+/// The semantics `id` is running, or null if there is no such instance.
+#[wasm_bindgen]
+pub fn fumola_mode(id: FumolaInstanceId) -> String {
+    match MODES.with(|m| m.borrow().get(&id).cloned()) {
+        Some(mode) => serde_json::json!({"ok": true, "mode": mode}).to_string(),
+        None => serde_json::json!({"ok": true, "mode": null}).to_string(),
+    }
 }
 
 /// Discard the runtime named by `id`.
 #[wasm_bindgen]
 pub fn fumola_drop(id: FumolaInstanceId) {
     INSTANCES.with(|m| m.borrow_mut().remove(&id));
+    MODES.with(|m| m.borrow_mut().remove(&id));
 }
 
 /// How many runtimes sigma currently holds. Exposed for tests and debugging.
@@ -366,6 +468,9 @@ fn translate(value: &Value) -> Translated {
     match value {
         Value::Nat(n) => Ok(Some(("Int", serde_json::json!(n.to_string())))),
         Value::Int(i) => Ok(Some(("Int", serde_json::json!(i.to_string())))),
+        // As text, like the integers above: a JSON number would go through a
+        // f64 round trip in the serializer, and Hazel parses the text anyway.
+        Value::Float(f) => Ok(Some(("Float", serde_json::json!(f.0.to_string())))),
         Value::Bool(b) => Ok(Some(("Bool", serde_json::json!(b)))),
         Value::Text(t) => Ok(Some(("String", serde_json::json!(t.to_string())))),
         Value::Unit => Ok(Some(("Unit", serde_json::Value::Null))),
@@ -498,7 +603,15 @@ fn translate(value: &Value) -> Translated {
         // looking at; there is no surface syntax for injecting a raw
         // pointer back, so cells are addressed by their symbol instead.
         Value::Pointer(p) | Value::Opaque(p) => Ok(Some(("Pointer", pointer_to_json(p)))),
-        _ => Ok(None),
+        // Everything else crosses as opaque: Hazel has no value of its own
+        // for it, so it carries Fumola's printed form instead.
+        //
+        // Not an error, which is what this used to be. A thunk is a perfectly
+        // good Fumola value and "@thunk ({ Gcd.gcd(12, 18) })" says exactly
+        // what it is; failing the translation instead meant that a tuple
+        // holding one failed entirely, and the host had nothing to show but
+        // an error where a value should be.
+        _ => Ok(Some(("Opaque", serde_json::json!(format_one_line(value))))),
     }
 }
 

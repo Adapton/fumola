@@ -83,28 +83,13 @@ jobs:
           wasm-bindgen --target web --out-dir site \
             target/wasm32-unknown-unknown/release/fumola_wasm.wasm
           rm -f site/*.d.ts
-          cat > site/index.html <<'HTML'
-          <!DOCTYPE html>
-          <html lang="en">
-            <head>
-              <meta charset="utf-8">
-              <title>fumola wasm</title>
-            </head>
-            <body>
-              <h1>fumola wasm</h1>
-              <p>
-                The Fumola runtime compiled to WebAssembly, published here so that web
-                pages can load it. Built from the <code>fumola_wasm</code> crate by
-                <code>.github/workflows/wasm-pages.yml</code>; do not edit by hand.
-              </p>
-              <ul>
-                <li><code>fumola_wasm.js</code> &mdash; the wasm-bindgen JS glue</li>
-                <li><code>fumola_wasm_bg.wasm</code> &mdash; the runtime</li>
-              </ul>
-            </body>
-          </html>
-          HTML
           ls -la site
+
+      # The page is checked in rather than written here: it explains Fumola
+      # and loads the runtime published beside it, which is a document to
+      # review in a diff, not a heredoc buried in a workflow.
+      - name: Add the site page
+        run: cp pages/index.html site/index.html
 
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@v4
