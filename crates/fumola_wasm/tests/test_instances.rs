@@ -461,3 +461,56 @@ fn the_graphical_semantics_can_be_asked_for() {
     let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
     assert_eq!(v["value"], serde_json::json!(false), "not graphical: {}", raw);
 }
+
+/// fumola_ensure_mode is what the fumola_new livelit calls, and it must be
+/// idempotent: a livelit re-expands on every edit, and a reset would discard
+/// the history that livelits sharing the instance have built.
+#[test]
+fn ensuring_the_mode_an_instance_already_has_changes_nothing() {
+    let id = fumola_create();
+    eval_ok(id, "`kept := 41");
+
+    let raw = fumola_ensure_mode(id, "simple");
+    let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(v["ok"], serde_json::json!(true), "{}", raw);
+    assert_eq!(v["created"], serde_json::json!(false));
+    assert_eq!(v["reset"], serde_json::json!(false), "must not reset: {}", raw);
+
+    // and the state it was asked not to disturb is still there
+    let raw = fumola_eval_top(id, "peek(`kept)");
+    assert!(raw.contains("\"tag\":\"Option\""), "state lost: {}", raw);
+}
+
+#[test]
+fn ensuring_a_different_mode_resets_the_instance() {
+    let id = fumola_create();
+    let raw = fumola_ensure_mode(id, "graphical");
+    let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(v["reset"], serde_json::json!(true), "{}", raw);
+    assert_eq!(v["mode"], serde_json::json!("graphical"));
+
+    // graphical really is in effect: the graph introspection has a graph
+    eval_ok(id, "1 := 2");
+    let v = eval_ok(id, "Adapton.peekEvents()");
+    assert_eq!(v["tag"], serde_json::json!("List"));
+}
+
+#[test]
+fn ensuring_a_mode_realizes_an_absent_instance() {
+    let id: FumolaInstanceId = 4242;
+    assert!(!fumola_has(id));
+    let raw = fumola_ensure_mode(id, "graphical");
+    let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(v["created"], serde_json::json!(true), "{}", raw);
+    assert!(fumola_has(id));
+    assert_eq!(eval_int(id, "Gcd.gcd(9, 6)"), "3", "library missing");
+}
+
+#[test]
+fn an_unknown_mode_is_refused() {
+    let id = fumola_create();
+    let raw = fumola_ensure_mode(id, "lazy");
+    assert!(raw.contains("\"ok\":false"), "{}", raw);
+    let raw = fumola_mode(id);
+    assert!(raw.contains("simple"), "mode changed anyway: {}", raw);
+}
