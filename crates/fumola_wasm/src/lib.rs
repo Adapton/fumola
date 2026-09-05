@@ -26,6 +26,7 @@ use std::collections::HashMap;
 
 use fumola::state::State;
 use fumola_semantics::adapton::{Space, Time};
+use fumola_semantics::format::format_one_line;
 use fumola_semantics::value::Value;
 use fumola_syntax::ast::Id;
 use fumola_semantics::vm_types::{LocalPointer, Pointer, ScheduleChoice};
@@ -601,6 +602,12 @@ fn translate(value: &Value) -> Translated {
         // travels outward so a Hazel program can see which cell it is
         // looking at; there is no surface syntax for injecting a raw
         // pointer back, so cells are addressed by their symbol instead.
+        // Named rather than left to the catch-all below, so that a reference
+        // to a cell holding a thunk can say what it holds. A thunk is not a
+        // value and has no Hazel counterpart, but its own source text is a
+        // far more useful thing to show than a bare hole, and Fumola can
+        // print it: Value's formatter renders a thunk as "@thunk (<body>)".
+        Value::Thunk(_) => Err(format_one_line(value)),
         Value::Pointer(p) | Value::Opaque(p) => Ok(Some(("Pointer", pointer_to_json(p)))),
         _ => Ok(None),
     }

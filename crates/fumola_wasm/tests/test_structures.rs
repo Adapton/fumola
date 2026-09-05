@@ -208,3 +208,15 @@ fn an_array_of_floats_translates() {
     assert_eq!(v["value"][0], json!({"tag":"Float","value":"0.5"}));
     assert_eq!(v["value"][1], json!({"tag":"Float","value":"1.5"}));
 }
+
+/// A thunk is not a value and has no Hazel counterpart, but it can print
+/// itself, and its source text is a far more useful thing for a reference to
+/// show than a bare hole.
+#[test]
+fn a_thunk_reports_its_own_source() {
+    let id = fumola_create();
+    let raw = fumola_eval_top(id, "`g := thunk { 1 + 3 }; peek(`g)!");
+    assert!(raw.contains("\"ok\":false"), "expected no translation: {}", raw);
+    assert!(raw.contains("@thunk"), "expected the thunk keyword: {}", raw);
+    assert!(raw.contains("1 + 3"), "expected the body: {}", raw);
+}
