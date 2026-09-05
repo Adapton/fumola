@@ -446,23 +446,27 @@
       </section>
 
       <section id="semantics">
-        <h2>Two semantics: simple and graphical</h2>
+        <h2>Two semantics: graphical and simple</h2>
         <p>
           The primitives above have two implementations in the runtime, and an
-          instance runs one or the other.
+          instance runs one or the other. <strong>Graphical</strong> is the
+          default &mdash; it is what the VM constructs, what the REPL starts
+          in, and what the examples throughout the repo run.
         </p>
         <p>
-          <strong>Simple</strong> keeps a store: cells indexed by space and
-          time, thunks with their cached results. Forcing a thunk that has
-          already run answers with what it computed. It is predictable and
-          cheap, and it keeps no graph, so there is nothing to introspect and
-          nothing to repair.
+          Graphical keeps the DCG proper: nodes, edges, each thunk's trace in
+          the order it ran, and an event history stamped with a meta-time. It
+          is the semantics the pictures on this page are drawn from, the one
+          the introspection below reports on, and the one repair will need.
         </p>
         <p>
-          <strong>Graphical</strong> keeps the DCG proper &mdash; nodes, edges,
-          each thunk's trace in the order it ran, and an event history stamped
-          with a meta-time. It is the semantics the pictures on this page are
-          drawn from, and the one repair will need.
+          <strong>Simple</strong> keeps a store and no more: cells indexed by
+          space and time, thunks with their cached results. Forcing a thunk
+          that has already run answers with what it computed. It is
+          predictable and cheap, and it keeps no graph, so there is nothing to
+          introspect and nothing to repair. It has to be asked for by name
+          &mdash; which the Hazel integration currently does, for a reason
+          given below.
         </p>
         <p>
           The graphical store reports on itself in Fumola's own value language,
@@ -485,9 +489,10 @@
       <section id="try">
         <h2>Try it</h2>
         <p>
-          The runtime this host serves, running here. One instance, in
-          graphical mode, that persists across every program you run below
-          &mdash; so a cell written by one is still there for the next. That
+          The runtime this host serves, running here. One graphical instance
+          &mdash; Fumola's default &mdash; that persists across every program
+          you run below, so a cell written by one is still there for the next.
+          That
           persistence is the whole point: it is what makes an edit an edit
           rather than a fresh start.
         </p>
@@ -591,11 +596,12 @@
         <p class="aside">
           Two incremental systems meet here, and how they compose is the open
           question: Hazel re-evaluating a program as it is edited, Adapton
-          repairing a graph underneath it. That is why a runtime made by the
-          Hazel integration defaults to the simple semantics rather than the
-          graphical one &mdash; until the composition is understood, the
-          predictable layer is the better default, and graphical is asked for
-          explicitly.
+          repairing a graph underneath it. So the Hazel integration inverts
+          Fumola's default and starts a runtime <em>simple</em>, with graphical
+          asked for by name. That is a conservative choice for the design phase
+          this work is in rather than a settled one &mdash; the intent is for
+          Hazel to default to graphical too, once the composed semantics is
+          understood.
         </p>
       </section>
 
@@ -810,8 +816,10 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
       init()
         .then(() => {
           instance = fumola_create();
-          // Graphical, so that the event log preset has a graph to report on;
-          // a fresh instance is simple by default.
+          // Graphical, which is Fumola's own default: the VM constructs one,
+          // and the REPL and the repo's examples all run it. Asked for by
+          // name only because fumola_create starts an instance simple -- a
+          // default chosen for the Hazel integration, not for here.
           fumola_ensure_mode(instance, "graphical");
           runEl.disabled = false;
           statusEl.textContent = "instance " + instance + " · graphical · ⌘↩ to run";
