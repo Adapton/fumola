@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fumola — web REPL</title>
+    <meta name="description" content="Write Fumola in the browser, with the library beside you. Highlighted by the language's own lexer.">
+    <style>
+      /* The palette is the Fumola VS Code theme's, the same one the homepage
+         uses, and the token kinds below map onto its scopes. */
+      :root {
+        --bg:     #000000;
+        --panel:  #0b0b0d;
+        --rule:   #212124;
+        --fg:     #d4d4d4;
+        --dim:    #7d7d82;
+
+        --green:  #6A9955;
+        --blue:   #569CD6;
+        --pink:   #C586C0;
+        --type:   #a989d0;
+        --sym:    #a086a5;
+        --op:     #9999dd;
+        --eff:    #ffaaaa;
+        --str:    #c87e60;
+        --var:    #f6ead2;
+
+        --ui:   system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+                "Liberation Mono", "DejaVu Sans Mono", monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font: 400 15px/1.5 var(--ui);
+        -webkit-font-smoothing: antialiased;
+        overflow: hidden;           /* each pane scrolls on its own */
+      }
+      a { color: var(--blue); text-decoration: none; }
+      a:hover { color: #7db6e8; }
+
+      /* ---- frame ------------------------------------------------------- */
+
+      .shell { display: flex; flex-direction: column; height: 100%; }
+
+      .bar {
+        display: flex; align-items: center; gap: 0.75rem;
+        padding: 0.55rem 0.9rem;
+        border-bottom: 1px solid var(--rule);
+        font: 400 0.8rem/1 var(--mono);
+        color: var(--dim);
+        flex: 0 0 auto;
+      }
+      .bar .here { color: var(--var); }
+      .bar .spacer { flex: 1; }
+      .bar label { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+      .bar input { accent-color: var(--blue); margin: 0; }
+      #status { color: var(--dim); }
+
+      .panes { flex: 1; display: flex; min-height: 0; }
+
+      /* ---- the library, on the left ------------------------------------ */
+
+      .library {
+        flex: 0 0 22rem;
+        display: flex; flex-direction: column;
+        border-right: 1px solid var(--rule);
+        /* Both needed. A flex item's min-width defaults to its content, and
+           the source below is a <pre> with long lines, so without this the
+           pane refuses to shrink to its basis and squeezes the editor out. */
+        min-width: 0; min-height: 0;
+        background: var(--panel);
+      }
+      .lib-head {
+        padding: 0.6rem 0.9rem;
+        font: 400 0.72rem/1 var(--mono);
+        letter-spacing: 0.1em; text-transform: uppercase;
+        color: var(--dim);
+        border-bottom: 1px solid var(--rule);
+        flex: 0 0 auto;
+      }
+      #modules {
+        list-style: none; margin: 0; padding: 0.35rem 0;
+        overflow-y: auto;
+        flex: 0 0 auto; max-height: 40%;
+        border-bottom: 1px solid var(--rule);
+      }
+      #modules button {
+        display: block; width: 100%; text-align: left;
+        background: none; border: 0; cursor: pointer;
+        padding: 0.22rem 0.9rem;
+        font: 400 0.78rem/1.5 var(--mono);
+        color: var(--dim);
+      }
+      #modules button:hover { color: var(--var); }
+      #modules button[aria-current="true"] { color: var(--blue); }
+
+      .source { flex: 1; min-width: 0; min-height: 0; overflow: auto; }
+      .source pre {
+        margin: 0; padding: 0.9rem;
+        font: 400 0.78rem/1.55 var(--mono);
+        white-space: pre; color: var(--fg);
+      }
+      .source .empty { padding: 0.9rem; color: var(--dim); font: italic 0.85rem/1.5 var(--ui); }
+
+      /* ---- the editor, on the right ------------------------------------ */
+
+      .work { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+      .editor { position: relative; flex: 1; min-height: 0; }
+      /* The highlighted layer and the textarea are stacked and must agree on
+         every metric, or the coloured text drifts away from the caret. */
+      .editor > pre,
+      .editor > textarea {
+        position: absolute; inset: 0;
+        margin: 0; padding: 1rem;
+        border: 0;
+        font: 400 0.86rem/1.6 var(--mono);
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow: auto;
+        tab-size: 2;
+      }
+      .editor > pre { pointer-events: none; color: var(--fg); background: var(--bg); }
+      .editor > textarea {
+        color: transparent;
+        background: transparent;
+        caret-color: var(--var);
+        resize: none; outline: none;
+      }
+      .editor > textarea::selection { background: #2a3f55; color: transparent; }
+
+      .out {
+        flex: 0 0 auto;
+        max-height: 40%;
+        overflow: auto;
+        border-top: 1px solid var(--rule);
+        padding: 0.8rem 1rem;
+        font: 400 0.84rem/1.6 var(--mono);
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: var(--panel);
+        min-height: 3.2rem;
+      }
+      .out .tag { color: var(--type); }
+      .out .err { color: var(--eff); }
+      .out .waiting { color: var(--dim); font-style: italic; }
+      .out.stale { opacity: 0.45; }
+
+      /* ---- token colours, from the theme -------------------------------- */
+
+      .c   { color: var(--green); font-style: italic; }
+      .k   { color: var(--blue);  font-weight: 600; }
+      .t   { color: var(--type);  font-weight: 600; }
+      .sy  { color: var(--sym);   font-weight: 600; }
+      .o   { color: var(--op); }
+      .eff { color: var(--eff); }
+      .st  { color: var(--str); }
+      .v   { color: var(--var); }
+
+      @media (max-width: 52rem) {
+        .panes { flex-direction: column; }
+        .library { flex: 0 0 40%; border-right: 0; border-bottom: 1px solid var(--rule); }
+        #modules { max-height: 45%; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="bar">
+        <a class="home" href="/">fumola</a>
+        <span>/</span>
+        <span class="here">web repl</span>
+        <span class="spacer"></span>
+        <label title="Keep the adapton store between runs, so an edit repairs what the last one built. Off, each run starts from a clean store.">
+          <input type="checkbox" id="persist" checked> keep state between runs
+        </label>
+        <span id="status">the runtime loads when you first type</span>
+      </header>
+
+      <div class="panes">
+        <aside class="library">
+          <div class="lib-head">the library</div>
+          <ul id="modules"></ul>
+          <div class="source" id="source">
+            <div class="empty">Pick a module to read its source.</div>
+          </div>
+        </aside>
+
+        <section class="work">
+          <div class="editor">
+            <pre aria-hidden="true"><code id="hl"></code></pre>
+            <textarea id="src" spellcheck="false" autocapitalize="off"
+              autocorrect="off" aria-label="Fumola program"></textarea>
+          </div>
+          <div class="out" id="out"></div>
+        </section>
+      </div>
+    </div>
+
+    <script type="module">
+      import init, {
+        fumola_create,
+        fumola_ensure_mode,
+        fumola_eval_top,
+        fumola_tokens,
+        fumola_modules,
+        fumola_module_source,
+      } from "../fumola_wasm.js";
+
+      const $ = (id) => document.getElementById(id);
+      const srcEl = $("src"), hlEl = $("hl"), outEl = $("out"),
+            statusEl = $("status"), persistEl = $("persist");
+
+      const START = "`n := 21;\nforce(`double := thunk { get(`n) * 2 })";
+
+      // ---- highlighting -------------------------------------------------
+      // The kinds come from the language's own lexer, so there is no grammar
+      // here to fall out of step with it.
+      const CLASS = {
+        comment: "c", keyword: "k", type: "t", symbol: "sy",
+        effect: "eff", operator: "o", literal: "st", ident: "v",
+      };
+      const esc = (s) =>
+        s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+      const highlight = (text) => {
+        let reply;
+        try { reply = JSON.parse(fumola_tokens(text)); } catch (e) { return esc(text); }
+        if (!reply.ok) return esc(text);
+        let html = "", at = 0;
+        for (const t of reply.tokens) {
+          if (t.start > at) html += esc(text.slice(at, t.start));
+          const body = esc(text.slice(t.start, t.start + t.len));
+          const cls = CLASS[t.kind];
+          html += cls ? `<span class="${cls}">${body}</span>` : body;
+          at = t.start + t.len;
+        }
+        if (at < text.length) html += esc(text.slice(at));
+        // A <pre> swallows one trailing newline; without this the last line
+        // of the highlight sits one line above the caret.
+        return html + "\n";
+      };
+
+      const paint = () => {
+        if (!ready) { hlEl.textContent = srcEl.value; return; }
+        hlEl.innerHTML = highlight(srcEl.value);
+      };
+
+      // ---- the runtime, fetched on first use ----------------------------
+      let ready = false, instance = null, starting = null;
+      const ensureRuntime = () => {
+        if (starting) return starting;
+        statusEl.textContent = "starting the runtime…";
+        starting = init()
+          .then(() => {
+            instance = fumola_create();
+            fumola_ensure_mode(instance, "graphical");
+            ready = true;
+            listModules();
+            paint();
+            note();
+          })
+          .catch((e) => {
+            statusEl.textContent = "the runtime could not be loaded";
+            starting = null;
+            throw e;
+          });
+        return starting;
+      };
+      const note = () => {
+        statusEl.textContent = persistEl.checked
+          ? `instance ${instance} · graphical · state kept`
+          : `instance ${instance} · graphical · clean store each run`;
+      };
+
+      // ---- the library --------------------------------------------------
+      const listModules = () => {
+        const reply = JSON.parse(fumola_modules());
+        if (!reply.ok) return;
+        const list = $("modules");
+        list.textContent = "";
+        for (const path of reply.modules) {
+          const li = document.createElement("li");
+          const b = document.createElement("button");
+          // The registered path is what an `import` uses; the prefix is the
+          // same on every one, so it is only noise in a list.
+          b.textContent = path.replace(/^fumola\//, "");
+          b.title = path;
+          b.addEventListener("click", () => showModule(path, b));
+          li.appendChild(b);
+          list.appendChild(li);
+        }
+      };
+
+      const showModule = (path, button) => {
+        for (const b of document.querySelectorAll("#modules button"))
+          b.removeAttribute("aria-current");
+        button.setAttribute("aria-current", "true");
+        const reply = JSON.parse(fumola_module_source(path));
+        const pane = $("source");
+        pane.textContent = "";
+        if (!reply.ok) {
+          pane.innerHTML = '<div class="empty"></div>';
+          pane.firstChild.textContent = reply.error;
+          return;
+        }
+        const pre = document.createElement("pre");
+        const code = document.createElement("code");
+        code.innerHTML = highlight(reply.source);
+        pre.appendChild(code);
+        pane.appendChild(pre);
+        pane.scrollTop = 0;
+      };
+
+      // ---- evaluation ---------------------------------------------------
+      const show = (v) => {
+        if (v === null || v === undefined) return "?";
+        switch (v.tag) {
+          case "Unit": return "()";
+          case "Null": return "null";
+          case "Option": return "?(" + show(v.value) + ")";
+          case "String": return v.value;
+          case "Symbol": return symbolSource(v.value);
+          case "List": return "[" + v.value.map(show).join(", ") + "]";
+          case "Tuple": return "(" + v.value.map(show).join(", ") + ")";
+          case "Record":
+            return "{" + Object.entries(v.value)
+              .map(([k, f]) => k + " = " + show(f)).join("; ") + "}";
+          case "Variant":
+            return "#" + v.value.name +
+              (v.value.value === null ? "" : "(" + show(v.value.value) + ")");
+          case "AdaptonPointer": return "pointer(" + v.value.source + ")";
+          case "Pointer": return JSON.stringify(v.value);
+          default: return String(v.value);
+        }
+      };
+      const symbolSource = (s) => {
+        if (s === null || typeof s !== "object") return String(s);
+        switch (s.tag) {
+          case "Num": return String(s.value);
+          case "Name": return "`" + s.value;
+          case "Call": return symbolSource(s.fun) + "(" + symbolSource(s.arg) + ")";
+          case "Dot": return symbolSource(s.left) + "." + symbolSource(s.right);
+          default: return JSON.stringify(s);
+        }
+      };
+
+      let timer = null;
+      const evaluate = async () => {
+        try { await ensureRuntime(); } catch (e) { return; }
+        const text = srcEl.value;
+        if (!text.trim()) { outEl.textContent = ""; outEl.classList.remove("stale"); return; }
+
+        // A clean store is cheaper to ask for than a fresh instance: making
+        // one rebuilds the whole module library.
+        if (!persistEl.checked) fumola_eval_top(instance, 'prim "adaptonReset" (#graphical)');
+
+        let reply;
+        try {
+          reply = JSON.parse(fumola_eval_top(instance, text));
+        } catch (e) {
+          return;
+        }
+        if (reply.ok) {
+          outEl.classList.remove("stale");
+          outEl.textContent = "";
+          const tag = document.createElement("span");
+          tag.className = "tag";
+          tag.textContent = reply.tag + "  ";
+          outEl.append(tag, show(reply));
+          return;
+        }
+        // Half-typed programs are syntax errors most of the time, and
+        // flashing red on every keystroke is worse than useless. The last
+        // good answer stays, dimmed, until this one parses.
+        if (reply.kind === "syntax") {
+          outEl.classList.add("stale");
+          return;
+        }
+        outEl.classList.remove("stale");
+        outEl.textContent = "";
+        const err = document.createElement("span");
+        err.className = "err";
+        err.textContent = reply.error;
+        outEl.append(err);
+      };
+
+      const schedule = () => {
+        clearTimeout(timer);
+        timer = setTimeout(evaluate, 300);
+      };
+
+      srcEl.addEventListener("input", () => { paint(); schedule(); });
+      srcEl.addEventListener("scroll", () => {
+        const pre = hlEl.parentElement;
+        pre.scrollTop = srcEl.scrollTop;
+        pre.scrollLeft = srcEl.scrollLeft;
+      });
+      persistEl.addEventListener("change", () => { note(); evaluate(); });
+
+      srcEl.value = START;
+      paint();
+      outEl.innerHTML = '<span class="waiting">type to evaluate</span>';
+    </script>
+  </body>
+</html>

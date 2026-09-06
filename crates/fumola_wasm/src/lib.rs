@@ -709,13 +709,27 @@ pub fn fumola_get(id: FumolaInstanceId, symbol_json: &str) -> String {
 /// theme's scopes are almost all lexical -- `entity.name.type.uppercase` is
 /// literally "identifier starting with a capital" -- so the lexer plus a
 /// couple of rules reproduces it without a second grammar to keep in step.
+/// The words the theme paints as keywords.
+///
+/// Mirrors `keyword.control.fumola` in `vscode/syntaxes/fumola.tmLanguage.json`,
+/// which is the authority for what gets the keyword colour. It is not the same
+/// set as `lexer::is_keyword`, which is inherited from Motoko and has none of
+/// Fumola's own forms -- no `thunk`, no `force`, no `within`. That list is left
+/// alone on purpose: `format.rs` uses it to decide spacing, so widening it
+/// would change how the formatter lays code out.
+const HIGHLIGHT_KEYWORDS: &[&str] = &[
+    "module", "let", "return", "import", "type", "public", "force", "func",
+    "thunk", "switch", "case", "prim", "if", "else", "var", "for", "in",
+    "with", "within", "do", "assert", "goto", "space", "time", "debug_show",
+];
+
 fn token_kind(token: &fumola_syntax::lexer_types::Token, text: &str) -> &'static str {
     use fumola_syntax::lexer_types::Token::*;
     match token {
         LineComment(_) | BlockComment(_) => "comment",
         Literal(_) => "literal",
         Ident(_) => {
-            if fumola_syntax::lexer::is_keyword(text) {
+            if HIGHLIGHT_KEYWORDS.contains(&text) || fumola_syntax::lexer::is_keyword(text) {
                 "keyword"
             } else if text.starts_with(|c: char| c.is_uppercase()) {
                 "type"
@@ -736,7 +750,10 @@ fn token_kind(token: &fumola_syntax::lexer_types::Token, text: &str) -> &'static
                 "operator"
             }
         }
-        Dot(_) | Colon(_) | Delim(_) => "punct",
+        // `;` and `:` are keyword.operator.sequence / .typeass in the theme,
+        // so they take the operator colour; `.` is not coloured at all.
+        Colon(_) | Delim(_) => "operator",
+        Dot(_) => "punct",
         Open(_) | Close(_) => "bracket",
         Wild(_) => "ident",
         Space(_) | Line(_) | MultiLine(_) => "space",

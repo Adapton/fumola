@@ -30,7 +30,7 @@ fn kinds_match_the_theme() {
         ("effect", ":="),     // put, coloured apart from other operators
         ("space", " "),
         ("literal", "1"),
-        ("punct", ";"),
+        ("operator", ";"),
         ("space", " "),
         ("comment", "// c"),
         ("space", "\n"),
@@ -47,6 +47,21 @@ fn kinds_match_the_theme() {
     ];
     let got: Vec<(&str, &str)> = got.iter().map(|(k, t)| (k.as_str(), t.as_str())).collect();
     assert_eq!(got, want);
+}
+
+/// Fumola's own keywords must colour as keywords. `lexer::is_keyword` is
+/// inherited from Motoko and has none of them, so the highlighter carries the
+/// theme's list; a regression here would leave `thunk` and `force` looking
+/// like ordinary variables, which is most of what Fumola code says.
+#[test]
+fn the_adapton_forms_are_keywords() {
+    let got = kinds("do within space `s { force(thunk { 1 }) }");
+    let keywords: Vec<&str> = got
+        .iter()
+        .filter(|(k, _)| k == "keyword")
+        .map(|(_, t)| t.as_str())
+        .collect();
+    assert_eq!(keywords, vec!["do", "within", "space", "force", "thunk"]);
 }
 
 /// The spans have to tile the source exactly, or a highlighter built on them
