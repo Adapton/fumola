@@ -1,27 +1,25 @@
-/// The prelude: the small helpers that make Adapton's primitives
-/// comfortable to write.
+import Adapton "adapton";
+
+/// The prelude: the short names for the Adapton operations a program
+/// reaches for most often.
 ///
-///    Each is a thin wrapper over something the language already has.
-/// `@` dereferences a pointer, and `prim "adaptonPointer"` turns a symbol
-/// into one; the two together are what a program usually wants, so they
-/// are named here rather than spelled out at every use.
+///    Nothing is defined here. Each of these is the operation of the same
+/// name in `system/adapton`, re-exported under a bare name so that a
+/// program can write `get(`x)` rather than `Adapton.get(`x)`.
 ///
 /// A host embedding Fumola is expected to bind these at the top level of
-/// an instance, so that a program can write `get(`x)` rather than
-/// `Prelude.get(`x)`. `crates/fumola_wasm` does exactly that.
+/// an instance; `crates/fumola_wasm` does exactly that.
 ///
 /// ----------------------------------------------------------------------------
 module {
 
-    /// The pointer that the symbol `s` names, whether or not anything has
-    /// been written there.
-    public func pointer(s) { prim "adaptonPointer" (s) };
+    /// The pointer that the symbol `s` names.
+    public func pointer(s) { Adapton.pointer(s) };
 
     /// Read the cell named `s`, recording a dependency on it.
-    public func get(s) { @(prim "adaptonPointer" (s)) };
+    public func get(s) { Adapton.get(s) };
 
-    /// Read the cell named `s` without recording anything. Answers an
-    /// option, since the cell may never have been written.
-    public func peek(s) { prim "adaptonPeek" (prim "adaptonPointer" (s)) };
+    /// Read the cell named `s` without recording anything.
+    public func peek(s) { Adapton.peek(s) };
 
 }
