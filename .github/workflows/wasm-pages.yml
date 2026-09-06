@@ -85,11 +85,17 @@ jobs:
           rm -f site/*.d.ts
           ls -la site
 
-      # The page is checked in rather than written here: it explains Fumola
-      # and loads the runtime published beside it, which is a document to
-      # review in a diff, not a heredoc buried in a workflow.
-      - name: Add the site page
-        run: cp pages/index.html site/index.html
+      # The pages are checked in rather than written here: they explain
+      # Fumola and load the runtime published beside them, which is a
+      # document to review in a diff, not a heredoc buried in a workflow.
+      #
+      # The whole tree is copied, so pages/web-repl/index.html is served at
+      # /web-repl/. A directory rather than web-repl.html because Pages does
+      # not route extensionless paths with .nojekyll in place.
+      - name: Add the site pages
+        run: |
+          cp -r pages/. site/
+          ls -R site
 
       # `cname` is not decoration: force_orphan replaces gh-pages with the
       # contents of ./site and nothing else, so without this the CNAME file

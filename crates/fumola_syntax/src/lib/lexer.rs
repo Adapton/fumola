@@ -70,13 +70,19 @@ pub fn create_token_vec(input: &str) -> LexResult<Tokens> {
     let line_col = LineColLookup::new(input);
     let mut tokens = vec![];
     // Tokenize source code (excluding comments)
-    let tokenize_source = |tokens: &mut Tokens, input: &str| {
-        tokens.extend(Token::lexer(input).spanned().map(|(t, span)| {
+    // `base` is where this segment starts in the whole input. logos reports
+    // spans relative to whatever it was handed, and this is handed one
+    // segment per gap between comments, so without the offset every token
+    // after the first comment carries a span -- and a line and column --
+    // measured from the wrong place.
+    let tokenize_source = |tokens: &mut Tokens, base: usize, segment: &str| {
+        tokens.extend(Token::lexer(segment).spanned().map(|(t, local)| {
             // Convert errors to the `Unknown` token type
             let t = match t {
-                Token::Error => Token::Unknown(input[span.clone()].to_string()),
+                Token::Error => Token::Unknown(segment[local.clone()].to_string()),
                 t => t,
             };
+            let span = (local.start + base)..(local.end + base);
             let (start_line, start_col) = line_col.get(span.start);
             let (end_line, end_col) = line_col.get(span.end);
             Loc(
@@ -95,6 +101,7 @@ pub fn create_token_vec(input: &str) -> LexResult<Tokens> {
     // Tokenize everything before the first comment (or end of input)
     tokenize_source(
         &mut tokens,
+        0,
         &input[..comment_spans.get(0).map(|s| s.start).unwrap_or(input.len())],
     );
     for (i, span) in comment_spans.iter().enumerate() {
@@ -119,6 +126,7 @@ pub fn create_token_vec(input: &str) -> LexResult<Tokens> {
         // Tokenize source after comment
         tokenize_source(
             &mut tokens,
+            span.end,
             &input[span.end
                 ..comment_spans
                     .get(i + 1)
