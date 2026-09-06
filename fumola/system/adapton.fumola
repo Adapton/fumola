@@ -312,6 +312,25 @@ module {
     };
 
     #[test]
+    func testTopLevelForces() {
+        // From a known-empty history, so this counts only its own forces.
+        reset();
+        `x := 3;
+        force(`outer := thunk { let a = force(`inner := thunk { get(`x) * 2 }); a + 1 });
+        force(`second := thunk { get(`x) + 100 });
+        let roots = Outline.topLevelForced(peekHistory());
+        // `outer` and `second`. `inner` was forced from inside `outer`, so it
+        // is already in `outer`'s tree and is not a root of its own.
+        assert roots.size() == 2;
+        assert roots[0] == space(`outer);
+        assert roots[1] == space(`second);
+        // Forcing something again does not add a second root for it: both
+        // name one node, and an outline reads the node as it stands.
+        force(pointer(`second));
+        assert Outline.topLevelForced(peekHistory()).size() == 2;
+    };
+
+    #[test]
     func testPeekEvents() {       
         let p = 1 := 1;
         let pId = (space(1), now(), 1);
@@ -544,6 +563,84 @@ module {
             case(#force_(t, value)) {{action=#force_; value; forcedThunk=?t; value; metaTimes=edge.metaTimes}};
             }
         };
+
+        //
+        // Every force tree in a session, not just the one you name.
+        //
+        //   A session forces several thunks over its life, and each force
+        // begun from outside any other is the root of its own tree. The ones
+        // begun from inside are already somewhere in a root's tree, so an
+        // outline of them would be a repeat of part of one.
+        //
+        //   Which are which is already in the event list: a `#forceBegin`
+        // seen while no force is in progress is a root. Nothing needs to ask
+        // the runtime how deep it is; counting begins against ends says it.
+        //
+
+        /// The force edges begun while no other force was in progress.
+        public func topLevelForceEdges(h : PeekInfo.History) : [EdgeId] {
+            var depth = 0;
+            var roots = [];
+            for (item in h.events.vals()) {
+                switch (item.event) {
+                    case (#forceBegin(edgeId, _cacheHit)) {
+                        if (depth == 0) { roots #= [edgeId] };
+                        depth += 1
+                    };
+                    // Guarded because a history can begin mid-force: peeking
+                    // during a run, or a reset that dropped the begins.
+                    case (#forceEnd(_)) { if (depth > 0) { depth -= 1 } };
+                    case _ { };
+                }
+            };
+            roots
+        };
+
+        /// The pointer a force edge leads to.
+        ///
+        /// First match wins: an edge appears once per meta-time it changed at,
+        /// and they all lead to the same node.
+        public func forceEdgeTarget(h : PeekInfo.History, edgeId : EdgeId) : ?Pointer {
+            var found = null;
+            for (e in h.edges.vals()) {
+                if (e.edgeId == edgeId) {
+                    switch found {
+                        case null { found := ?(e.edge.target.0) };
+                        case _ { };
+                    }
+                }
+            };
+            found
+        };
+
+        /// Every pointer forced from outside, in the order first forced.
+        ///
+        /// Without repeats: forcing the same thunk again is a second root
+        /// event, but both roots name one node, and an outline reads the node
+        /// as it stands now -- so the second would draw the same tree twice.
+        public func topLevelForced(h : PeekInfo.History) : [Pointer] {
+            var seen = [];
+            for (edgeId in topLevelForceEdges(h).vals()) {
+                switch (forceEdgeTarget(h, edgeId)) {
+                    case (?p) {
+                        var already = false;
+                        for (q in seen.vals()) { if (q == p) { already := true } };
+                        if (not already) { seen #= [p] }
+                    };
+                    case null { };
+                }
+            };
+            seen
+        };
+
+        /// One outline per top-level force, in the order they were forced.
+        public func outlines() : [(Pointer, Outline)] {
+            var out = [];
+            for (p in topLevelForced(peekHistory()).vals()) {
+                out #= [(p, outline(p))]
+            };
+            out
+        };
     };
 
     public module IntoText { 
@@ -600,6 +697,17 @@ module {
 
         public func outline(o : Outline) : Text {
             outlineRec(o, 0) # "\n"
+        };
+
+        /// Every top-level force tree, one after another.
+        ///
+        /// Each tree already begins with the name of what was forced, so
+        /// nothing is added to tell them apart -- a session reads as the list
+        /// of things it forced, in the order it forced them.
+        public func outlines(os : [(Pointer, Outline)]) : Text {
+            var text = "";
+            for (po in os.vals()) { text #= outline(po.1) };
+            text
         };
     };
 
