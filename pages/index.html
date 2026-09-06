@@ -792,6 +792,76 @@
         </p>
       </section>
 
+      <section id="views">
+        <h2>Three ways of looking</h2>
+        <p>
+          Three interfaces to the same idea, eight years apart. Each has had
+          something the other two lacked, and none has yet had everything.
+        </p>
+        <p>
+          The collaboration behind them is older than any of them. Ryan
+          Vandersmith and Matthew Hammer met at CU Boulder, in an experimental
+          class on the principles of functional programming that followed course
+          material from Ravi Chugh &mdash; who turns up again a few paragraphs
+          above, as a co-author on two of the
+          <a href="#publications">Hazel papers</a> this work is built on.
+        </p>
+
+        <h3>2018 &mdash; the derivations</h3>
+        <p>
+          Human-Fungi Interface put a Fungi program in a browser and drew what
+          the type system knew about it: the expression, its type, its effects,
+          and the kinds, index sorts and name terms underneath &mdash; then the
+          trace it produced when it ran. It is the only one of the three that
+          has ever shown the derivations. What it could not do was let you
+          change the program: it read bundles generated ahead of time.
+        </p>
+
+        <h3>Now &mdash; the graph</h3>
+        <p>
+          The <a href="http://matthewhammer.org/replayground/mergeSort44.html">replayground</a>
+          draws a whole run as a scene you move through &mdash; the
+          <a href="#mergesort">44-element mergeSort</a> above, every cell and
+          thunk and edge of it, at a scale no derivation tree would survive. It
+          shows what a computation <em>did</em>, which is the thing the 2018
+          view could only show one step at a time. It cannot let you change the
+          program either: it is a static file exported from a demo, and live
+          editing is still listed under future work.
+        </p>
+
+        <h3>Next &mdash; both, and live</h3>
+        <p>
+          <a href="#hazel">Hazel</a> is the one where the program is editable
+          and still means something while you are halfway through typing it.
+          That is the missing half of both earlier views, and it works today: a
+          livelit runs Fumola as you type and hands the result back as a Hazel
+          value. What is missing now is the picture. The event log arrives as a
+          table, not as a graph, and nothing yet draws a type the way the 2018
+          interface did.
+        </p>
+
+        <p>
+          So: the first had the types and not the editing, the second has the
+          graph and not the editing, the third has the editing and not yet the
+          picture. Two out of three, three times over. One view with all of it
+          is the point of the exercise.
+        </p>
+
+        <p class="aside">
+          Eight years separate the first of these from the third, and most of
+          that time went elsewhere. Two children arrived along the way; a career
+          entirely academic until January 2019, then a decision to leave
+          academia for four and a half years at DFINITY &mdash; working from
+          home a year before everybody did &mdash; and then a return to
+          independent research.
+          The interval left more than a gap, though. This repository's history
+          starts in July 2022, and it starts as Motoko's Rust interpreter: the
+          industry work is the substrate Fumola runs on. Every crate here still carries the same two authors as
+          that interpreter did &mdash; Matthew Hammer and Ryan Vandersmith, the
+          pair who built the first of these three views in 2018.
+        </p>
+      </section>
+
       <section id="runtime">
         <h2>The runtime this host serves</h2>
         <p>
