@@ -5,7 +5,7 @@ borrowed from Motoko — functions, records, variants, modules — and its execu
 model is **Adapton**: a program's run leaves behind a demanded computation graph
 of what it named, read and demanded, and that graph is what a later run reuses.
 
-**[adapton.github.io/fumola](https://adapton.github.io/fumola/)** — what the
+**[fumola.org](https://fumola.org)** — what the
 primitives are, where they come from, the papers, the project's history, and a
 Fumola console you can run in the browser.
 
@@ -93,7 +93,7 @@ The runtime is published as a wasm module on every push to `main`:
 
 ```js
 import init, { fumola_create, fumola_eval_top }
-  from "https://adapton.github.io/fumola/fumola_wasm.js";
+  from "https://fumola.org/fumola_wasm.js";
 
 await init();
 const id = fumola_create();

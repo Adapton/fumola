@@ -924,12 +924,20 @@
           and the right content type.
         </p>
         <pre><code><span class="k">import</span> init, { fumola_create, fumola_eval_top }
-  <span class="k">from</span> <span class="st">"https://adapton.github.io/fumola/fumola_wasm.js"</span>;
+  <span class="k">from</span> <span class="st">"https://fumola.org/fumola_wasm.js"</span>;
 
 <span class="k">await</span> init();
 <span class="k">const</span> id = fumola_create();
 fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
 <span class="c">// -> {"ok":true,"tag":"Int","value":"42"}</span></code></pre>
+        <p>
+          Fetch them from <code>fumola.org</code>, which is where this site
+          lives. The older <code>adapton.github.io/fumola</code> path still
+          works for a link, but it now redirects here, and a Pages
+          custom-domain redirect carries no
+          <code>Access-Control-Allow-Origin</code> &mdash; so it can no longer
+          be fetched cross-origin, which is the one thing this artifact is for.
+        </p>
         <p>
           The glue and the <code>.wasm</code> are generated together and will
           not load if their versions disagree, so take both from the same
