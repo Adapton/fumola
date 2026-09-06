@@ -27,6 +27,7 @@
 //! `UnOp`, `BinOp` and `QuotedAst` are deliberately not translated yet: they
 //! are reported as untranslatable rather than approximated.
 
+use fumola_semantics::format::format_one_line;
 use fumola_semantics::value::Symbol;
 use fumola_syntax::ast::Id;
 use fumola_syntax::shared::Shared;
@@ -49,8 +50,20 @@ pub fn symbol_to_json(symbol: &Symbol) -> Result<Json, String> {
             "left": symbol_to_json(l)?,
             "right": symbol_to_json(r)?,
         })),
-        Symbol::UnOp(..) => Err("symbol uses UnOp, which has no Hazel translation yet".into()),
-        Symbol::BinOp(..) => Err("symbol uses BinOp, which has no Hazel translation yet".into()),
+        // Operators carry their source text rather than a tag of their own:
+        // there is no Hazel-side datatype for a Fumola operator, and the text
+        // is what a host would need to write the symbol back out anyway.
+        Symbol::UnOp(op, arg) => Ok(json!({
+            "tag": "UnOp",
+            "op": format_one_line(op),
+            "arg": symbol_to_json(arg)?,
+        })),
+        Symbol::BinOp(left, op, right) => Ok(json!({
+            "tag": "BinOp",
+            "op": format_one_line(op),
+            "left": symbol_to_json(left)?,
+            "right": symbol_to_json(right)?,
+        })),
         Symbol::QuotedAst(_) => {
             Err("symbol uses QuotedAst, which has no Hazel translation yet".into())
         }
@@ -143,8 +156,19 @@ pub fn symbol_to_source(symbol: &Symbol) -> Result<String, String> {
             symbol_to_source(a)?
         )),
         Symbol::Dot(l, r) => Ok(format!("{}.{}", symbol_to_source(l)?, symbol_to_source(r)?)),
-        Symbol::UnOp(..) | Symbol::BinOp(..) | Symbol::QuotedAst(_) => {
-            Err("symbol has no source rendering yet".into())
+        // Each operand carries its own backtick, which is how these are
+        // written and how they read back: `merge-`symbol parses, and prints
+        // as merge-symbol. The operator's text comes from the formatter, so
+        // there is no second table of operator spellings here.
+        Symbol::UnOp(op, arg) => Ok(format!("{}{}", format_one_line(op), symbol_to_source(arg)?)),
+        Symbol::BinOp(left, op, right) => Ok(format!(
+            "{}{}{}",
+            symbol_to_source(left)?,
+            format_one_line(op),
+            symbol_to_source(right)?
+        )),
+        Symbol::QuotedAst(_) => {
+            Err("symbol is a quoted AST, which has no source rendering yet".into())
         }
     }
 }

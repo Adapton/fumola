@@ -102,17 +102,28 @@ fn records_and_tuples_compose() {
     assert_eq!(v["value"]["flag"], json!({"tag":"Bool","value":true}));
 }
 
-/// An untranslatable component fails the whole translation, rather than the
-/// tuple being reported as complete with a piece quietly dropped.
+/// `1 + `x` is a symbol built with an operator. It used to be untranslatable,
+/// and this test asserted that it failed the whole tuple rather than being
+/// quietly dropped from it. Operator symbols now cross, so the example no
+/// longer fails -- and the tuple carries it.
+///
+/// The property the old test guarded still holds in the code: `nested()`
+/// propagates an error rather than dropping a component. What is gone is a
+/// way to provoke it from source. Everything reachable now translates, down
+/// to an `Opaque` carrying Fumola's printed form; the remaining failures are
+/// a quoted-AST symbol and an adapton space that is an expression, neither of
+/// which can be written here.
 #[test]
-fn an_untranslatable_component_fails_the_whole_value() {
+fn an_operator_symbol_travels_inside_a_tuple() {
     let id = fumola_create();
     let raw = fumola_eval(id, "`topLevel", "(1, 1 + `x)");
-    assert!(
-        raw.contains("\"ok\":false"),
-        "expected the tuple to fail, got {}",
-        raw
-    );
+    let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(v["ok"], true, "got {}", raw);
+    assert_eq!(v["value"][1]["tag"], "Symbol");
+    assert_eq!(v["value"][1]["value"]["tag"], "BinOp");
+    assert_eq!(v["value"][1]["value"]["op"], "+");
+    assert_eq!(v["value"][1]["value"]["left"], json!({"tag":"Num","value":"1"}));
+    assert_eq!(v["value"][1]["value"]["right"], json!({"tag":"Name","value":"x"}));
 }
 
 /// A pointer travels as the source text of the symbol that names it, so the

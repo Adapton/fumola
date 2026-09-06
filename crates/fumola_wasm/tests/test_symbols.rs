@@ -145,14 +145,57 @@ fn negative_numbers_use_int() {
     assert_eq!(symbol_to_json(&sym).unwrap(), json!({"tag":"Num","value":"-5"}));
 }
 
+/// `1 + `x` is a symbolic BinOp, not an addition. It used to be reported as
+/// untranslatable; it now crosses, carrying the operator as its source text
+/// because there is no Hazel-side datatype for a Fumola operator.
 #[test]
-fn untranslatable_symbol_forms_are_reported() {
-    // `1 + `x is a symbolic BinOp, not an addition.
+fn operator_symbols_translate() {
     let id = fumola_create();
     let raw = fumola_eval(id, "`topLevel", "1 + `x");
-    assert!(
-        raw.contains("\"ok\":false") && raw.contains("BinOp"),
-        "expected a BinOp translation failure, got {}",
-        raw
+    let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(v["ok"], true, "got {}", raw);
+    assert_eq!(v["tag"], "Symbol");
+    assert_eq!(
+        v["value"],
+        json!({
+            "tag": "BinOp",
+            "op": "+",
+            "left": {"tag": "Num", "value": "1"},
+            "right": {"tag": "Name", "value": "x"},
+        })
     );
+}
+
+/// Symbols built with an operator used to have no source rendering at all,
+/// so any pointer named with one failed to cross -- `symbol has no source
+/// rendering yet`. They are ordinary in the library: levelTree names a space
+/// `` `merge-`symbol ``, combining a literal symbol with one it was passed.
+#[test]
+fn operator_symbols_render_and_round_trip() {
+    // Each operand carries its own backtick, which is what parses and what
+    // prints back as merge-symbol. fumola_symbol_of parses and re-renders,
+    // so this is the round trip in one call.
+    let v: serde_json::Value =
+        serde_json::from_str(&fumola_symbol_of("`merge-`symbol")).unwrap();
+    assert_eq!(v["ok"], true, "should parse and render: {}", v);
+    assert_eq!(v["source"], "`merge-`symbol");
+
+    // A unary one too.
+    let u: serde_json::Value = serde_json::from_str(&fumola_symbol_of("-`x")).unwrap();
+    assert_eq!(u["ok"], true, "got {}", u);
+    assert_eq!(u["source"], "-`x");
+}
+
+#[test]
+fn a_pointer_named_with_an_operator_symbol_crosses() {
+    let id = fumola_create();
+    // This is the shape that failed: the value is a pointer, and translating
+    // it needs both the source rendering and the JSON.
+    let raw = fumola_eval_top(id, "(`merge-`symbol) := 1");
+    let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(v["ok"], true, "got {}", raw);
+    assert_eq!(v["tag"], "AdaptonPointer");
+    assert_eq!(v["value"]["source"], "`merge-`symbol");
+    assert_eq!(v["value"]["symbol"]["tag"], "BinOp");
+    assert_eq!(v["value"]["symbol"]["op"], "-");
 }
