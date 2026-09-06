@@ -91,6 +91,11 @@ jobs:
       - name: Add the site page
         run: cp pages/index.html site/index.html
 
+      # `cname` is not decoration: force_orphan replaces gh-pages with the
+      # contents of ./site and nothing else, so without this the CNAME file
+      # GitHub writes when the custom domain is set would be deleted by the
+      # next publish, silently dropping the domain and moving the site back
+      # to adapton.github.io/fumola.
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
@@ -98,3 +103,4 @@ jobs:
           publish_dir: ./site
           publish_branch: gh-pages
           force_orphan: true
+          cname: fumola.org
