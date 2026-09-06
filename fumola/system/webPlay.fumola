@@ -1,0 +1,52 @@
+import A "adapton";
+
+/// What a program hands to the web playground.
+///
+///    A scene is three things: an outline, some objects in space, and a
+/// history. Only two of them are judgements.
+///
+///    The history is mechanical. Events, nodes and edges are what the runtime
+/// recorded while the program ran, and it can hand them over without being
+/// asked and without being told how. Nothing is decided there.
+///
+///    The outline and the objects are not mechanical. Which force tree is
+/// worth looking at, and where its parts belong in space, are claims about
+/// what the computation means -- and the program is the only thing that knows
+/// them. A visualiser given the history alone can draw a graph; it cannot
+/// know that this subtree is the input list and that one is the merge
+/// network, or that they should sit a level apart. That is the idea an
+/// `#[example]` is for: a program decides how to portray itself, rather than
+/// some automation guessing on its behalf.
+///
+/// ----------------------------------------------------------------------------
+module {
+
+    /// What an `#[example]` returns.
+    ///
+    /// An example runs without error, and CI can treat it as a test for that
+    /// reason. What makes it an example rather than a test is that it also
+    /// says how to look at what it did.
+    public type ExampleOutput = {
+        outline : A.Outline.Outline;
+        objects : [ A.Scene.SceneObject ];
+    };
+
+    /// An example's output, plus the history the runtime kept: the whole
+    /// scene, ready to render.
+    ///
+    /// Call this from outside the example, after it has run, so that the
+    /// history is the one the example produced.
+    public func scene(e : ExampleOutput) : A.Scene.Scene {
+        {
+            outline = e.outline;
+            objects = e.objects;
+            history = A.peekHistory()
+        }
+    };
+
+    /// The same, as the JSON a renderer eats.
+    public func sceneJSON(e : ExampleOutput) : Text {
+        A.IntoJSON.fromScene(scene(e))
+    };
+
+}

@@ -3,6 +3,7 @@ import LazyList "LazyList";
 import List "List";
 import A "adapton";
 import R "randomInput";
+import W "webPlay";
 
 module {
     public func report( outputs ) {
@@ -174,6 +175,18 @@ module {
             sceneData ;
             components = scene.components ;
         }
+    };
+
+    /// The merge-sort scene, as the program's own account of itself.
+    ///
+    /// The history is left out on purpose: events, nodes and edges are what
+    /// the runtime recorded and it can supply them unasked. What only this
+    /// program knows is which force tree is worth looking at and where its
+    /// parts belong in space, and those are the two things returned.
+    #[example]
+    public func exampleMergeSort() : W.ExampleOutput {
+        let s = generateSceneFullDemand(10, 10, null).sceneData;
+        { outline = s.outline; objects = s.objects }
     };
 
     #[test]
