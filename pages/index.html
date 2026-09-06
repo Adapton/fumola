@@ -737,8 +737,37 @@
 
         <p>
           Drafts, and they stayed drafts &mdash; neither the theory nor the
-          implementation was finished at the time. The ideas in them did not
-          stop being right, though, and reviving them is current work. In 2025,
+          implementation was finished at the time.
+        </p>
+        <p>
+          Something did get built, though, and it is the reason this page
+          exists. <a href="https://github.com/rvanasa/fungi-vis">Human-Fungi
+          Interface</a>, by <a href="https://ryanvandersmith.com">Ryan
+          Vandersmith</a> &mdash; a listed author on every crate in this
+          repository &mdash; was the web interface to Fungi: it pretty-printed
+          the code and its traces, highlighted variables, let you inspect the
+          AST, the context and the types, and ran the program in the browser.
+          Its first commit is dated the day before the Fungi implementation's
+          own. The language and a way of looking at it started together.
+        </p>
+        <p>
+          Its build instructions say
+          <code>rustup target add wasm32-unknown-unknown</code> &mdash; the same
+          line this repository's publish workflow runs. Eight years apart, the
+          same machine: a Rust incremental runtime compiled to wasm, executing
+          in a browser, with the interface reading the trace back out and
+          drawing it. What has changed is the setting. Hazel stands where the
+          hand-written JavaScript was, and a program that can read its own event
+          log stands where the trace pretty-printer was. Its demo is gone
+          &mdash; the free host it lived on stopped existing, and no archive
+          caught it &mdash; so the source is what remains of it, and the
+          <a href="#hazel">Hazel integration</a> is the project taken up again.
+          The reason to take it up is not only that it was unfinished. It was a
+          pleasure the first time.
+        </p>
+        <p>
+          The ideas in the drafts did not
+          stop being right, either, and reviving them is current work. In 2025,
           conversations with
           <a href="https://www.colorado.edu/cs/bor-yuh-evan-chang">Bor-Yuh Evan
           Chang</a> at CU Boulder gave the direction fresh support and a new
