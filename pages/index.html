@@ -580,7 +580,7 @@
           <textarea id="src" spellcheck="false" aria-label="Fumola program"></textarea>
           <div class="controls">
             <button class="run" id="run" disabled>Run</button>
-            <span class="status" id="status">loading the runtime&hellip;</span>
+            <span class="status" id="status">the runtime loads when you first run something</span>
           </div>
           <div class="out" id="out"></div>
         </div>
@@ -1090,7 +1090,7 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
         b.textContent = label;
         b.addEventListener("click", () => {
           srcEl.value = program;
-          if (!runEl.disabled) run();
+          run();
         });
         $("presets").appendChild(b);
       }
@@ -1139,8 +1139,42 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
         }
       };
 
-      const run = () => {
-        if (instance === null) return;
+      // The runtime is 5 MB and most readers never run anything, so it is
+      // fetched on the first attempt rather than on page load. The static
+      // import above costs only the 16 KB of wasm-bindgen glue; init() is
+      // what pulls the binary.
+      let starting = null;
+      const ensureRuntime = () => {
+        if (starting) return starting;
+        statusEl.textContent = "starting the runtime\u2026";
+        starting = init()
+          .then(() => {
+            instance = fumola_create();
+            // Graphical, which is Fumola's own default: the VM constructs
+            // one, and the REPL and the repo's examples all run it. Asked
+            // for by name only because fumola_create starts an instance
+            // simple -- a default chosen for the Hazel integration, not for
+            // here.
+            fumola_ensure_mode(instance, "graphical");
+            statusEl.textContent =
+              "instance " + instance + " \u00b7 graphical \u00b7 \u2318\u21a9 to run";
+          })
+          .catch((e) => {
+            statusEl.textContent = "the runtime could not be loaded";
+            outEl.innerHTML = '<span class="hint"></span>';
+            outEl.firstChild.textContent = String(e);
+            starting = null; // let a later click try again
+            throw e;
+          });
+        return starting;
+      };
+
+      const run = async () => {
+        try {
+          await ensureRuntime();
+        } catch (e) {
+          return; // ensureRuntime has already said so in the status line
+        }
         let reply;
         try {
           reply = JSON.parse(fumola_eval_top(instance, srcEl.value));
@@ -1172,22 +1206,10 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
         if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run();
       });
 
-      init()
-        .then(() => {
-          instance = fumola_create();
-          // Graphical, which is Fumola's own default: the VM constructs one,
-          // and the REPL and the repo's examples all run it. Asked for by
-          // name only because fumola_create starts an instance simple -- a
-          // default chosen for the Hazel integration, not for here.
-          fumola_ensure_mode(instance, "graphical");
-          runEl.disabled = false;
-          statusEl.textContent = "instance " + instance + " · graphical · ⌘↩ to run";
-        })
-        .catch((e) => {
-          statusEl.textContent = "the runtime could not be loaded";
-          outEl.innerHTML = '<span class="hint"></span>';
-          outEl.firstChild.textContent = String(e);
-        });
+      // Nothing is loaded until asked for. The button is live from the start;
+      // the first press fetches the runtime and then evaluates.
+      runEl.disabled = false;
+      statusEl.textContent = "\u2318\u21a9 to run";
     </script>
   </body>
 </html>
