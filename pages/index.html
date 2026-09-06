@@ -161,6 +161,22 @@
       }
       .aside code { color: var(--sym); }
 
+      /* ---- footnotes: an aside is collapsed until asked for ------------- */
+
+      details.aside > summary {
+        cursor: pointer;
+        width: fit-content;
+        font: 400 0.82rem/1.5 var(--mono);
+        color: var(--dim);
+        list-style: none;
+      }
+      details.aside > summary::-webkit-details-marker { display: none; }
+      details.aside > summary::marker { content: ""; }
+      details.aside > summary:hover { color: var(--fg); }
+      details.aside > summary:focus-visible { outline: 1px solid var(--rule); outline-offset: 3px; }
+      details.aside[open] > summary { margin-bottom: 0.6rem; }
+      details.aside > p { margin: 0; }
+
       /* ---- try it ------------------------------------------------------ */
 
       .repl { margin-top: 1.4rem; }
@@ -273,7 +289,7 @@
           This host also serves the Fumola runtime compiled to WebAssembly
           &mdash; <code>fumola_wasm.js</code> and
           <code>fumola_wasm_bg.wasm</code>, in this directory. It is what the
-          <a href="#hazel">Hazel Fumola livelit</a> loads, and what the
+          <a href="#hazel">Hazel Fumola livelit</a> can load, and what the
           <a href="#try">box below</a> is running.
         </p>
       </header>
@@ -293,21 +309,22 @@
           primitives come from
           <a href="https://github.com/matthewhammer/adapton-recipe">The Extended
           Adapton Recipe</a>, including <strong>Demanded Computation
-          Graphs</strong> extended with symbolic space and time. They are the
-          subject of the rest of this page.
+          Graphs</strong> extended with symbolic space and time. 
         </p>
         <pre><code><span class="k">public func</span> <span class="v">gcd</span>(<span class="v">a</span> : <span class="t">Nat</span>, <span class="v">b</span> : <span class="t">Nat</span>) : <span class="t">Nat</span> {
   <span class="k">if</span> (<span class="v">b</span> <span class="o">==</span> <span class="n">0</span>) { <span class="v">a</span> } <span class="k">else</span> {
     <span class="v">gcd</span>(<span class="v">b</span>, <span class="v">a</span> <span class="o">%</span> <span class="v">b</span>)
   }
 }</code></pre>
-        <p class="aside">
+        <details class="aside">
+          <summary>footnote: nothing incremental here</summary>
+          <p>
           That is the whole of <code>Gcd</code>, one of the library modules
           compiled into the runtime. Nothing about it is incremental &mdash;
-          it reads no cells, so there is nothing for Adapton to reuse. Most
-          Fumola code looks like this. The primitives are what you reach for
+          it reads no cells, so there is nothing for Adapton to reuse. The primitives are what you reach for
           when you want a computation to survive being edited.
         </p>
+        </details>
       </section>
 
       <section id="adapton">
@@ -330,7 +347,9 @@
           run after the edit has to recognise the node it is about to
           recompute as the same node as last time, and a name is how it does.
         </p>
-        <p class="aside">
+        <details class="aside">
+          <summary>footnote: repair, so far</summary>
+          <p>
           Repair is where Fumola's own work is. The graph, its event history
           and its introspection are implemented; the realignment of a graph
           across an edit &mdash; signaling and repair, in the Recipe's terms
@@ -338,6 +357,7 @@
           feature. What the runtime does today is reuse a thunk's cached result
           on a cache hit, and record what it did either way.
         </p>
+        </details>
       </section>
 
       <section id="primitives">
@@ -396,12 +416,13 @@
           </tr>
         </table>
 
-        <p class="aside">
+        <details class="aside">
+          <summary>footnote: why these colours</summary>
+          <p>
           The Fumola VS Code theme paints <code>:=</code> and <code>@</code> in
-          their own color, distinct from every other operator. That is not
-          decoration: put and get are the two effects the graph is a record of,
-          and it is useful to see them from across the room.
+          their own color, distinct from every other operator. Put and get are two of the effects the graph is a record of.
         </p>
+        </details>
 
         <h3>Names are values</h3>
         <p>
@@ -433,27 +454,23 @@
       </section>
 
       <section id="modes">
-        <h2>Two modes, and why the distinction is load-bearing</h2>
+        <h2>Two modes</h2>
         <p>
           A Fumola program runs in one of two modes, and which one it is in is
-          decided by a single fact: whether a force is underway.
+          decided by whether a force is underway.
         </p>
         <p>
           The <strong>archivist</strong> runs inside a force. Its operations are
           the tracked ones &mdash; put, get, and force itself &mdash; because
           there is a computation in progress for a dependency to be recorded
-          <em>against</em>. Every edge in the graph is drawn by an archivist.
+          <em>against</em>. An edge recorded while a computation is in progress belongs to that computation; a put or get made outside a force is recorded against the graph's root instead.
         </p>
         <p>
           The <strong>editor</strong> is the more general mode, and always runs
-          on a force-free stack. It is where changes come from. Resetting the
-          store and reading the graph belong to it alone: asking for a reset
-          from inside a force is not a meaningful request &mdash; it would pull
-          the store out from under the computation making it &mdash; and
-          Adapton refuses it.
+          on a force-free stack. It is where changes come from. Resetting the store and reading the graph belong to it alone: a reset from inside a force pulls the store out from under the computation making it, and nothing in the runtime prevents that.
         </p>
         <p>
-          <code>peek</code> is the interesting case. It belongs to the editor,
+          <code>peek</code> belongs to the editor,
           but it stays available inside a force on purpose, because reading a
           cell without recording a dependency is exactly how you look at a
           computation while it runs. A peek in a thunk is meaningful; it is
@@ -493,7 +510,7 @@
 <span class="t">Adapton</span>.<span class="v">peekInfo</span>(<span class="v">p</span>)    <span class="c">// one node, and the edges either side of it</span>
 <span class="t">Adapton</span>.<span class="v">peekHistory</span>()   <span class="c">// events, nodes and edges together</span></code></pre>
         <p>
-          That is the hinge the rest of the tooling hangs on. Because the graph
+           Because the graph
           is readable as data <em>from inside the language</em>, a Fumola
           library can process its own past behavior into something to look at
           &mdash; the outlines, scenes and JSON exports in
@@ -508,14 +525,12 @@
           The runtime this host serves, running here. One graphical instance
           &mdash; Fumola's default &mdash; that persists across every program
           you run below, so a cell written by one is still there for the next.
-          That
-          persistence is the whole point: it is what makes an edit an edit
-          rather than a fresh start.
+          That persistence is what makes an edit an edit rather than a fresh start.
         </p>
         <p>
           Take <em>a named thunk</em>, change the <code>21</code>, and run it
           again. Same name, same thunk, re-forced &mdash; which is exactly what
-          a Hazel livelit does to itself every time you type in it.
+          a Hazel livelit does to itself as you edit it.
         </p>
 
         <div class="repl">
@@ -530,7 +545,7 @@
       </section>
 
       <section id="mergesort">
-        <h2>A graph worth looking at</h2>
+        <h2>mergeSort, drawn as a graph</h2>
         <p>
           Demand-driven <code>mergeSort</code> on 44 unsorted elements, drawn
           as its DCG. The input list is the column of green boxes on the left;
@@ -585,8 +600,7 @@
 
 <span class="d">^^probe_table</span>(<span class="v">events</span>);</code></pre>
         <p>
-          The three do different jobs, and the split is the archivist/editor
-          distinction wearing editor clothes.
+          The three do different jobs, and the split follows the archivist/editor distinction.
           <code>^fumola_put_force</code> wraps its program as
           <code>force(`n := thunk { … })</code>, so it runs on a forceful stack
           &mdash; archivist mode, where the tracked operations live. That
@@ -609,7 +623,9 @@
           them, and <code>force</code> is what turns one into something Hazel
           does have a value for.
         </p>
-        <p class="aside">
+        <details class="aside">
+          <summary>footnote: two layers meeting</summary>
+          <p>
           Two incremental systems meet here, and how they compose is the open
           question: Hazel re-evaluating a program as it is edited, Adapton
           repairing a graph underneath it. So the Hazel integration inverts
@@ -619,6 +635,7 @@
           Hazel to default to graphical too, once the composed semantics is
           understood.
         </p>
+        </details>
       </section>
 
       <!-- #publications and #drafts, like #hazel, are linked to from
@@ -626,7 +643,7 @@
       <section id="publications">
         <h2>Publications</h2>
         <p>
-          Two papers in particular are what Fumola implements. Between them
+          Fumola's primitives come from two papers in particular. Between them
           they are the primitives above: the first is the machinery, the second
           is what makes it addressable.
         </p>
@@ -650,20 +667,20 @@
             <span class="pub-why">
               Names, made explicit and first-class. This is the paper the
               <a href="#primitives">symbols</a> above come from &mdash; what it
-              calls a <em>name</em>, Fumola spells with a backtick. Without
-              them a second run cannot tell which node it is looking at, and
-              nothing can be reused; with them, reuse becomes something a
-              program can control deliberately.
+              calls a <em>name</em>, Fumola spells with a backtick. Without them a second run has to infer which node is which; with them, reuse becomes something a program can control deliberately.
             </span>
           </li>
         </ul>
 
-        <p class="aside">
+        <details class="aside">
+          <summary>footnote: the earlier lineage</summary>
+          <p>
           Further back: Adapton descends from self-adjusting computation, whose
           root is <a href="https://doi.org/10.1145/503272.503296">Adaptive
           functional programming</a> (Umut A. Acar, Guy E. Blelloch, Robert
           Harper, POPL 2002).
         </p>
+        </details>
 
         <h3>Hazel</h3>
         <p>
@@ -741,8 +758,7 @@
         </p>
         <h3 id="human-fungi-interface">Human-Fungi Interface</h3>
         <p>
-          Something did get built, though, and it is the reason this page
-          exists. <a href="https://github.com/rvanasa/fungi-vis">Human-Fungi
+          Something did get built, though. <a href="https://github.com/rvanasa/fungi-vis">Human-Fungi
           Interface</a>, by <a href="https://ryanvandersmith.com">Ryan
           Vandersmith</a>, was the web interface to Fungi: it pretty-printed
           the code and its traces, highlighted variables, ran the program in
@@ -751,13 +767,12 @@
           sorts, name terms and contexts. The drafts above are about typing
           these programs; that was where you went to see the types.
           Its first commit is dated the day before the Fungi implementation's
-          own. The language and a way of looking at it started together.
+          own. 
         </p>
         <p>
           Its build instructions say
           <code>rustup target add wasm32-unknown-unknown</code> &mdash; the same
-          line this repository's publish workflow runs. Eight years apart, the
-          same machine: a Rust incremental runtime compiled to wasm, executing
+          line this repository's publish workflow runs. Both are the same arrangement: a Rust incremental runtime compiled to wasm, executing
           in a browser, with the interface reading the trace back out and
           drawing it. What has changed is the setting. Hazel stands where the
           hand-written JavaScript was, and a program that can read its own event
@@ -769,12 +784,10 @@
           pleasure the first time.
         </p>
         <p>
-          The ideas in the drafts did not
-          stop being right, either, and reviving them is current work. In 2025,
+           In 2025,
           conversations with
           <a href="https://www.colorado.edu/cs/bor-yuh-evan-chang">Bor-Yuh Evan
-          Chang</a> at CU Boulder gave the direction fresh support and a new
-          framework to carry it, one that still looks promising; his Fall 2025
+          Chang</a> at CU Boulder pointed to a new framework for it; his Fall 2025
           graduate seminar there, <em>Program Analysis: Theory and Practice</em>
           (CSCI 4830/7135), is where that framing is being worked out. The two
           have been at the neighbouring problem before, in
@@ -782,14 +795,16 @@
           verification-validation</a> (with David Van Horn, GPCE 2016).
         </p>
 
-        <p class="aside">
-          There is a pleasing loop in this. Type-and-effect checking a Fumola
+        <details class="aside">
+          <summary>footnote: checking, made incremental</summary>
+          <p>
+           Type-and-effect checking a Fumola
           program is itself a computation over a structure that is edited a
           little at a time &mdash; which is the shape of problem Fumola exists
           to make incremental. So the checker is not just a thing to build for
-          Fumola; it is a thing to build <em>in</em> it, and one of the tasks we
-          most want to run on the graph.
+          Fumola; it is a thing to build <em>in</em> it.
         </p>
+        </details>
       </section>
 
       <section id="views">
@@ -799,11 +814,10 @@
           something the other two lacked, and none has yet had everything.
         </p>
         <p>
-          The collaboration behind them is older than any of them. Ryan
+           Ryan
           Vandersmith and Matthew Hammer met at CU Boulder, in an experimental
           class on the principles of functional programming that followed course
-          material from Ravi Chugh &mdash; who turns up again a few paragraphs
-          above, as a co-author on two of the
+          material from Ravi Chugh &mdash; who is also a co-author on two of the
           <a href="#publications">Hazel papers</a> this work is built on.
         </p>
 
@@ -813,7 +827,7 @@
           the type system knew about it: the expression, its type, its effects,
           and the kinds, index sorts and name terms underneath &mdash; then the
           trace it produced when it ran. It is the only one of the three that
-          has ever shown the derivations. What it could not do was let you
+          has shown the derivations. It could not let you
           change the program: it read bundles generated ahead of time.
         </p>
 
@@ -822,7 +836,7 @@
           The <a href="http://matthewhammer.org/replayground/mergeSort44.html">replayground</a>
           draws a whole run as a scene you move through &mdash; the
           <a href="#mergesort">44-element mergeSort</a> above, every cell and
-          thunk and edge of it, at a scale no derivation tree would survive. It
+          thunk and edge of it, at a scale a derivation tree could not show. It
           shows what a computation <em>did</em>, which is the thing the 2018
           view could only show one step at a time. It cannot let you change the
           program either: it is a static file exported from a demo, and live
@@ -843,26 +857,24 @@
         <p>
           So: the first had the types and not the editing, the second has the
           graph and not the editing, the third has the editing and not yet the
-          picture. Two out of three, three times over. One view with all of it
-          is the point of the exercise.
+          picture. 
         </p>
 
-        <p class="aside">
-          Eight years separate the first of these from the third, and most of
-          that time went elsewhere. Two children arrived along the way; a career
+        <details class="aside">
+          <summary>footnote: the intervening years</summary>
+          <p>
+          Most of that time went elsewhere. Two children arrived along the way; a career
           entirely academic until January 2019, then a decision to leave
-          academia for four and a half years at DFINITY &mdash; working from
-          home a year before everybody did &mdash; and then a return to
+          academia for four and a half years at DFINITY and then a return to
           independent research.
-          The interval left more than a gap, though. This repository's history
+           This repository's history
           starts in July 2022, and it starts as Motoko's Rust interpreter: the
           industry work is the substrate Fumola runs on. Every crate this repository inherited from that
           interpreter still carries the same two authors it did &mdash; Matthew
-          Hammer and Ryan Vandersmith, the pair who built the first of these
-          three views in 2018. Exactly one crate carries a single name, and it
-          is the newest: the one that compiles Fumola for a browser, which is
+          Hammer and Ryan Vandersmith. The newest crate carries a single name: the one that compiles Fumola for a browser, which is
           what runs the console above.
         </p>
+        </details>
       </section>
 
       <section id="runtime">
