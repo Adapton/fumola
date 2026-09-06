@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Fumola</title>
     <meta name="description" content="Fumola: an experimental language whose execution model is Adapton. This host also serves the Fumola runtime, compiled to WebAssembly.">
-    <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:ital,wght@0,400;0,600;1,400&display=swap">
     <style>
       /* Palette taken from the Fumola VS Code theme, vscode/themes/fumola-color-theme.json.
          Same colors, same roles: what the editor paints, this page paints. */
@@ -27,19 +25,29 @@
         --str:     #c87e60;  /* string       */
         --var:     #f6ead2;  /* identifier   */
 
-        --ui:   "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
-        --mono: "Source Code Pro", ui-monospace, SFMono-Regular, Menlo, monospace;
+        /* Whatever the reader already has. Nothing is fetched. */
+        --ui:   system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+                "Liberation Mono", "DejaVu Sans Mono", monospace;
       }
 
       * { box-sizing: border-box; }
 
-      html { background: var(--bg); }
+      /* The whole page is sized in rem, so this is the only knob: text and
+         the column widen together on a big screen, which keeps the line
+         length steady instead of leaving a small column in the middle of it.
+         Unchanged below roughly 1100px, so phones and the narrow layout are
+         exactly as they were. */
+      html {
+        background: var(--bg);
+        font-size: clamp(16px, 11px + 0.55vw, 22px);
+      }
 
       body {
         margin: 0;
         background: var(--bg);
         color: var(--fg);
-        font: 400 15px/1.65 var(--ui);
+        font: 400 0.95rem/1.65 var(--ui);
         -webkit-font-smoothing: antialiased;
       }
 
@@ -53,11 +61,13 @@
 
       header { margin-bottom: 4.5rem; }
 
+      h1, h2, h3 { color: var(--var); font-family: var(--ui); font-weight: 600; }
+
       h1 {
-        font: 600 2.6rem/1 var(--mono);
+        font-size: 2.4rem;
+        line-height: 1.1;
         letter-spacing: -0.02em;
         margin: 0 0 0.9rem;
-        color: var(--var);
       }
       h1 .tick { color: var(--sym); }
 
@@ -81,16 +91,14 @@
       section { border-top: 1px solid var(--rule); padding-top: 2rem; margin-top: 3.25rem; }
 
       h2 {
-        font: 400 0.78rem/1 var(--mono);
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: var(--green);
-        margin: 0 0 1.6rem;
+        font-size: 1.5rem;
+        line-height: 1.25;
+        margin: 0 0 1.2rem;
       }
 
       h3 {
-        font: 600 0.98rem/1.4 var(--ui);
-        color: var(--var);
+        font-size: 1.08rem;
+        line-height: 1.4;
         margin: 2.2rem 0 0.6rem;
       }
 
@@ -142,13 +150,6 @@
       td.form { white-space: nowrap; width: 12.5rem; font-family: var(--mono); font-size: 0.85rem; }
       caption { caption-side: bottom; text-align: left; padding-top: 1rem; font-size: 0.86rem; color: var(--dim); }
 
-      .group-label {
-        font: 400 0.72rem/1 var(--mono);
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: var(--dim);
-        padding-top: 1.5rem;
-      }
 
       /* ---- aside ------------------------------------------------------- */
 
