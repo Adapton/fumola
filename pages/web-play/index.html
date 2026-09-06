@@ -381,6 +381,17 @@
         background: var(--panel);
         min-height: 3.2rem;
       }
+      .work { position: relative; }
+      /* Only while what is in the editor is still the preset it came from. */
+      .share {
+        position: absolute; right: 0.7rem; bottom: 0.6rem;
+        font: 400 0.72rem/1 var(--mono); letter-spacing: 0.06em;
+        color: var(--dim); background: var(--panel);
+        border: 1px solid var(--rule); border-radius: 2px;
+        padding: 0.3rem 0.55rem; cursor: pointer;
+      }
+      .share:hover { color: var(--var); border-color: #3a3a40; }
+      .share.done { color: var(--green); border-color: #3a4a3a; }
       .out .tag { color: var(--type); }
       .out .err { color: var(--eff); }
       .out .waiting { color: var(--dim); font-style: italic; }
@@ -467,6 +478,10 @@
               autocorrect="off" aria-label="Fumola program"></textarea>
           </div>
           <div class="out" id="out"></div>
+          <!-- Outside .out on purpose: every evaluation clears that panel's
+               contents, and a button living inside it would be cleared too. -->
+          <button type="button" id="share" class="share" hidden
+                  title="Copy a link to this example"></button>
         </section>
       </div>
     </div>
@@ -666,7 +681,9 @@
             listModules();
             paint();          // the first paint was plain: the lexer is here now
             note();
-            evaluate();       // show the starter program's answer straight away
+            // A link names a library test; carrying it out replaces the
+            // starter program and runs that instead.
+            if (!openFromHash()) evaluate();
           })
           .catch((e) => {
             statusEl.textContent = "the runtime could not be loaded";
@@ -916,6 +933,7 @@
           for (const t of testsIn(src.source)) {
             const dirs = path.replace(/^fumola\//, "").split("/");
             const call = invocationFor(path, t);
+            presets.set(presetKey(path, t), { path, test: t });
             place(tests, dirs, {
               name: (t.scope ? t.scope + "." : "") + t.name,
               title: call.split("\n")[1],
@@ -1117,8 +1135,51 @@
 
       // Loading a test is the same action whether it is clicked in the tree
       // or in the source, so both go through here.
+      /// Which library preset the editor is currently showing, if any.
+      ///
+      /// An anchor names a test by where it is defined -- the module it lives
+      /// in and its name inside that module -- and by nothing else. Not a line
+      /// number, which every edit to the file would invalidate, and not an
+      /// index, which reordering would. A link therefore survives the module
+      /// being edited around the test, and breaks only when the test moves to
+      /// a different module, which is the one case where it should.
+      ///
+      /// `text` is what was put in the editor. The moment the editor differs
+      /// from it, this page is no longer showing that example, and the link
+      /// would be a claim about something that is not there -- so the anchor
+      /// goes.
+      let preset = null;
+      const presets = new Map();   // "path:Qualified.name" -> {path, test}
+
+      const presetKey = (path, test) =>
+        `${path.replace(/^fumola\//, "")}:` +
+        `${test.scope ? test.scope + "." : ""}${test.name}`;
+
+      const setPreset = (kind, path, test) => {
+        preset = { kind, key: presetKey(path, test), text: srcEl.value };
+        const hash = `#${kind}=${preset.key}`;
+        history.replaceState(null, "", location.pathname + location.search + hash);
+        showShare();
+      };
+
+      /// The editor no longer holds what the anchor says it holds.
+      const clearPreset = () => {
+        if (!preset) return;
+        preset = null;
+        history.replaceState(null, "", location.pathname + location.search);
+        showShare();
+      };
+
+      const showShare = () => {
+        const b = $("share");
+        b.hidden = !preset;
+        b.classList.remove("done");
+        if (preset) b.textContent = preset.kind === "body" ? "share body" : "share";
+      };
+
       const loadTest = (path, test) => {
         srcEl.value = invocationFor(path, test);
+        setPreset("test", path, test);
         paint();
         evaluate();
       };
@@ -1145,6 +1206,7 @@
           `\n// ${name}` +
           (changed ? ", with its own module's names qualified" : "") +
           `\n${text}`;
+        setPreset("body", path, test);
         paint();
         evaluate();
       };
@@ -1154,7 +1216,8 @@
       const showModule = (path, button, focus) => {
         for (const b of document.querySelectorAll("#modules button"))
           b.removeAttribute("aria-current");
-        button.setAttribute("aria-current", "true");
+        // A link arrives with no button to mark; a click brings its own.
+        if (button) button.setAttribute("aria-current", "true");
         libEl.classList.add("has-source");
         $("current").textContent = path.replace(/^fumola\//, "");
         // Picking a file is the end of navigating, so the outline gets out of
@@ -1330,7 +1393,54 @@
         timer = setTimeout(evaluate, 300);
       };
 
-      srcEl.addEventListener("input", () => { paint(); schedule(); });
+      srcEl.addEventListener("input", () => {
+        // Typing makes the anchor a claim about something that is no longer
+        // here, so it stops being one.
+        if (preset && srcEl.value !== preset.text) clearPreset();
+        paint();
+        schedule();
+      });
+
+      $("share").addEventListener("click", async () => {
+        const b = $("share");
+        try {
+          await navigator.clipboard.writeText(location.href);
+          b.textContent = "copied";
+          b.classList.add("done");
+          setTimeout(showShare, 1400);
+        } catch (e) {
+          // Without clipboard permission the address bar already holds it.
+          b.textContent = "in the address bar";
+          setTimeout(showShare, 1800);
+        }
+      });
+
+      /// Open whatever the anchor names, once the library is known.
+      ///
+      /// The anchor is carried out and then left alone: it keeps standing as
+      /// long as the editor still holds what it named, and the first edit
+      /// takes it away.
+      const openFromHash = () => {
+        const m = /^#(test|body)=(.+)$/.exec(decodeURIComponent(location.hash));
+        if (!m) return false;
+        const found = presets.get(m[2]);
+        if (!found) {
+          // Say so rather than silently showing the starter program: a link
+          // that no longer resolves is worth knowing about, and moving a test
+          // between modules is exactly what breaks one.
+          outEl.textContent = "";
+          const err = document.createElement("span");
+          err.className = "err";
+          err.textContent = `No library test named ${m[2]}.`;
+          outEl.append(err);
+          return true;
+        }
+        const { path, test } = found;
+        showModule(path, null, test);
+        if (m[1] === "body") loadTestBody(path, test);
+        else loadTest(path, test);
+        return true;
+      };
       srcEl.addEventListener("scroll", syncScroll);
       persistEl.addEventListener("change", () => { note(); evaluate(); });
 
@@ -1445,6 +1555,13 @@
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", up);
       });
+
+      // A link pasted into a tab that is already open changes the fragment
+      // and nothing else -- the browser does not reload for that -- so the
+      // page has to act on it itself. `history.replaceState` is what sets and
+      // clears the anchor elsewhere, and that does not fire this, so there is
+      // no loop to guard against.
+      window.addEventListener("hashchange", () => { if (ready) openFromHash(); });
 
       $("outline-toggle").addEventListener("click", () =>
         setOutline(libEl.dataset.outline === "closed"));
