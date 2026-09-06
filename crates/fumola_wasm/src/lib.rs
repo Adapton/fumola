@@ -145,10 +145,28 @@ fn new_state_with(mode: &str) -> State {
 /// that is already a pointer. So reading back what `1 := 2` wrote is not
 /// `@(1)`; the symbol has to be converted first. `get` does that conversion,
 /// so a program can write `1 := 2` in one edit and `get(1)` in the next.
+/// The prelude, bound at the top level of every instance.
+///
+/// The definitions themselves live in `fumola/system/prelude.fumola`, beside
+/// the rest of the system library, rather than as Rust string literals here.
+/// A host is not the right place to define language-level helpers, and a
+/// Fumola programmer looking for `get` should find it in Fumola -- until now
+/// these three existed only inside this crate, so anyone using the CLI or the
+/// REPL simply did not have them.
+///
+/// Bound unqualified, because that is what programs already write: `get(`x)`,
+/// not `Prelude.get(`x)`. Every Hazel card and the console on the project page
+/// depend on the short names.
+///
+/// Note that this now depends on a module resolving, which a string literal
+/// could not. The failure is still swallowed by the caller, so a broken
+/// prelude degrades an instance rather than preventing it from existing; the
+/// wasm tests exercise `get` and `peek` and would catch it.
 const PRELUDE: &str = concat!(
-    r#"func pointer(s) { prim "adaptonPointer" (s) }; "#,
-    r#"func get(s) { @(prim "adaptonPointer" (s)) }; "#,
-    r#"func peek(s) { prim "adaptonPeek" (prim "adaptonPointer" (s)) }; "#,
+    r#"import Prelude "fumola/system/prelude"; "#,
+    r#"let pointer = Prelude.pointer; "#,
+    r#"let get = Prelude.get; "#,
+    r#"let peek = Prelude.peek; "#,
 );
 
 /// Wrap Hazel-supplied source in the top-level thunk assignment that gives

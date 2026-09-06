@@ -276,6 +276,36 @@ module {
         prim "adaptonSpace" s
     };
 
+    /// The pointer that the symbol `s` names, whether or not anything has
+    /// been written there.
+    public func pointer(s : Symbol) : Pointer {
+        prim "adaptonPointer" (s)
+    };
+
+    /// Read the cell that `s` names, recording a dependency on it.
+    ///
+    /// A tracked operation: it belongs to the archivist, and means what it
+    /// says only while a computation is in progress to record it against.
+    public func get(s : Symbol) : Any {
+        @(prim "adaptonPointer" (s))
+    };
+
+    /// Read the cell that `s` names without recording anything. Answers an
+    /// option, since the cell may never have been written.
+    public func peek(s : Symbol) : ?Any {
+        prim "adaptonPeek" (prim "adaptonPointer" (s))
+    };
+
+    #[test]
+    func testPointerGetPeek() {
+        `cell := 41;
+        assert get(`cell) == 41;
+        assert peek(`cell) == ?41;
+        assert peek(`neverWritten) == null;
+        // `:=` evaluates to the pointer it wrote, and `pointer` names the
+        // same cell, so the two agree.
+        assert pointer(`cell) == (`cell := 41);
+    };
     #[test]
     func testSpace() {
         assert (debug_show(space(`x)) == "@adaptonSpace (x)")

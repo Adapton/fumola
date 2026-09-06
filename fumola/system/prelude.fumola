@@ -1,0 +1,25 @@
+import Adapton "adapton";
+
+/// The prelude: the short names for the Adapton operations a program
+/// reaches for most often.
+///
+///    Nothing is defined here. Each of these is the operation of the same
+/// name in `system/adapton`, re-exported under a bare name so that a
+/// program can write `get(`x)` rather than `Adapton.get(`x)`.
+///
+/// A host embedding Fumola is expected to bind these at the top level of
+/// an instance; `crates/fumola_wasm` does exactly that.
+///
+/// ----------------------------------------------------------------------------
+module {
+
+    /// The pointer that the symbol `s` names.
+    public func pointer(s) { Adapton.pointer(s) };
+
+    /// Read the cell named `s`, recording a dependency on it.
+    public func get(s) { Adapton.get(s) };
+
+    /// Read the cell named `s` without recording anything.
+    public func peek(s) { Adapton.peek(s) };
+
+}
