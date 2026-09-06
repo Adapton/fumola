@@ -115,6 +115,11 @@ fn new_state_with(mode: &str) -> State {
         }
     }
     if let Err(e) = state.eval(PRELUDE) {
+        // Loud in tests, survivable in release. The prelude depends on a
+        // module resolving, which the old string literal could not fail at,
+        // so a silent swallow here would hide a broken build behind an
+        // instance that merely lacks `get`.
+        debug_assert!(false, "the prelude failed to load: {:?}", e);
         let _ = e;
     }
     for (name, path) in PRELUDE_MODULES {
