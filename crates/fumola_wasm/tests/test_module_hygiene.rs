@@ -79,3 +79,35 @@ fn the_prelude_still_works_at_the_top_level() {
     let v = eval_top_ok(id, "`cell := 41; get(`cell)");
     assert_eq!(v["value"], serde_json::json!("41"), "got {}", v);
 }
+
+/// A program that prints keeps its output no matter how deep the value it
+/// returns is.
+///
+/// The reply used to be reparsed to attach `printed`, and serde's default
+/// recursion limit is 128. A scene value nests past 200, so exactly the
+/// programs whose printed output is most wanted -- the ones building a big
+/// structure -- were the ones that lost it, silently.
+#[test]
+fn printed_output_survives_a_deeply_nested_result() {
+    let id = fumola_create();
+    // Deliberately size 44: at 16 the reply nests to about 122, just under
+    // serde's default limit of 128, and the old code passed. This one nests
+    // past 200.
+    let raw = fumola_eval_top(
+        id,
+        r#"import M "fumola/examples/mergeSort/mergeSort";
+           print("before the scene");
+           M.generateSceneFullDemand(10, 44, null).sceneData"#,
+    );
+    // Checked on the raw reply rather than a parsed one, because
+    // `serde_json::from_str` cannot read this reply either -- the same
+    // recursion limit, in the harness this time. A browser's `JSON.parse`
+    // has no such limit, so the reply is usable where it is actually used;
+    // it is Rust's parser that needs opting out, and a test does not need to.
+    assert!(
+        raw.contains(r#""printed":["before the scene"]"#),
+        "printed output lost from a deep reply; it begins: {}",
+        &raw[..160.min(raw.len())]
+    );
+    assert!(raw.contains(r#""ok":true"#), "the program itself failed");
+}

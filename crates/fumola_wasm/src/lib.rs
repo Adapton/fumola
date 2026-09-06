@@ -502,14 +502,38 @@ fn with_print(json: String, printed: Vec<String>) -> String {
     if printed.is_empty() {
         return json;
     }
-    let mut value = match serde_json::from_str::<serde_json::Value>(&json) {
-        Ok(v) => v,
-        Err(_) => return json,
-    };
-    if let Some(map) = value.as_object_mut() {
-        map.insert("printed".into(), serde_json::json!(printed));
+    insert_key(json, "printed", serde_json::json!(printed))
+}
+
+/// Add one key to a JSON object without parsing the object.
+///
+/// The obvious route -- `from_str`, insert, `to_string` -- loses the key in
+/// silence on exactly the values worth printing about. serde's default
+/// recursion limit is 128 and a scene value nests past 200, so the parse
+/// fails and the old code returned the reply unchanged: a program that
+/// printed its way through building a scene had its output dropped, with
+/// nothing to say so. It would also re-serialise a value that can run to
+/// megabytes, to add a few hundred bytes.
+///
+/// Splicing after the opening brace does neither, and assumes only what is
+/// always true here: the reply is a JSON object.
+fn insert_key(json: String, key: &str, value: serde_json::Value) -> String {
+    let trimmed = json.trim_start();
+    if !trimmed.starts_with('{') {
+        return json;
     }
-    value.to_string()
+    let at = json.len() - trimmed.len() + 1;
+    let was_empty = trimmed[1..].trim_start().starts_with('}');
+    let mut out = String::with_capacity(json.len() + 128);
+    out.push_str(&json[..at]);
+    out.push_str(&serde_json::Value::String(key.to_string()).to_string());
+    out.push(':');
+    out.push_str(&value.to_string());
+    if !was_empty {
+        out.push(',');
+    }
+    out.push_str(&json[at..]);
+    out
 }
 
 /// The same error, with the frame dump the CLI prints beside it.
@@ -523,14 +547,11 @@ fn with_print(json: String, printed: Vec<String>) -> String {
 /// Only on the failing path, and only from the copy that failed -- the live
 /// instance is left alone, as it was before.
 fn error_of_with_trace(e: &fumola::Error, state: &mut State) -> String {
-    let mut value = match serde_json::from_str::<serde_json::Value>(&error_of(e)) {
-        Ok(v) => v,
-        Err(_) => return error_of(e),
-    };
-    if let Some(map) = value.as_object_mut() {
-        map.insert("trace".into(), serde_json::Value::String(trace_of(state)));
-    }
-    value.to_string()
+    insert_key(
+        error_of(e),
+        "trace",
+        serde_json::Value::String(trace_of(state)),
+    )
 }
 
 fn truncate_debug<T: std::fmt::Debug>(value: &T, max_len: usize) -> String {

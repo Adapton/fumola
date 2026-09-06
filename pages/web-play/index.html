@@ -160,7 +160,7 @@
       .view-tab[aria-current="true"] { color: var(--var); border-color: #3a3a40; }
       /* Lit while the panel has something in it, so a program that prints
          says so even when the outline is the view in front. */
-      .view-tab.has-output { color: var(--key); border-color: #3a4a3a; }
+      .view-tab.has-output { color: var(--green); border-color: #3a4a3a; }
       .view-tab.has-output::after { content: " \2022"; }
 
       /* Only one of the three shows at a time. */
@@ -444,7 +444,6 @@
 
     <script type="module">
       import init, {
-        fumola_create,
         fumola_ensure_mode,
         fumola_eval_top,
         fumola_reset,
