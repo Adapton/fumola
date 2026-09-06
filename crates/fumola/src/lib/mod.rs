@@ -38,4 +38,5 @@ impl From<Interruption> for Error {
 pub mod check;
 pub mod eval;
 pub mod package;
+pub mod prelude;
 pub mod state;

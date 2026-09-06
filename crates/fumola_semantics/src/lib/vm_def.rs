@@ -1,6 +1,6 @@
 use crate::value::{ActorId, Closed, ClosedFunction, Value, Value_};
 use crate::vm_types::{
-    Active, ActiveBorrow, Cont, Core, Interruption, Limits, LocalPointer, ModuleFile,
+    Active, ActiveBorrow, Cont, Core, Env, Interruption, Limits, LocalPointer, ModuleFile,
     ModuleFileState, ModulePath, NamedPointer, Pointer, ScheduleChoice,
     def::{
         Actor as ActorDef, Ctx, CtxId, Def, Defs, Field as FieldDef, Function as FunctionDef,
@@ -298,6 +298,33 @@ pub mod def {
                 };
                 let importing_package = active.package().clone();
                 *active.package() = package_name;
+                // A module body is elaborated with no ambient environment.
+                //
+                // Every `func` field snapshots `active.env()` as its closure
+                // environment (see `insert_static_field` below), and
+                // `var_step` consults that environment before it consults the
+                // lexical def chain. So whatever the host had bound at its top
+                // level when a module was first imported became invisible
+                // extra scope inside that module -- outranking the module's
+                // own definitions, which live in Defs and are only the
+                // fallback.
+                //
+                // That is what made a host prelude clobber the library: with
+                // `get` bound at the top level, `get(m, 1)` inside
+                // `hashMap`'s nested `Test` module reached the prelude's
+                // one-argument `get` rather than hashMap's own two-argument
+                // one, and the whole `(m, 1)` arrived at `adaptonPointer` as
+                // a tuple. A prelude is supposed to be the layer everything
+                // else shadows; through this capture it was the layer that
+                // shadowed everything.
+                //
+                // Clearing it here makes a module closed over its own text,
+                // which is what `fumola test` has effectively been doing all
+                // along -- `Core::call_function_def` passes an empty
+                // environment (vm_core.rs), which is why the suite passed on
+                // functions that crashed when a program called them.
+                let importing_env = active.env().fast_clone();
+                *active.env() = Env::new();
                 let (saved, ctxid) = active.defs().enter_context(init.id.clone(), true);
                 for dec in init.outer_decs.iter() {
                     let dec = dec.clone();
@@ -341,6 +368,7 @@ pub mod def {
                     None,
                 )?;
                 active.defs().leave_context(saved, &ctxid);
+                *active.env() = importing_env;
                 *active.package() = importing_package;
                 if let Some(top_path) = active.module_files().import_stack.pop_back() {
                     debug!("Popping {:?}", top_path);

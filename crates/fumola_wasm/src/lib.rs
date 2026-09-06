@@ -150,7 +150,7 @@ fn new_state_with(mode: &str) -> State {
         debug_assert!(false, "could not set the adapton semantics: {:?}", e);
         let _ = e;
     }
-    if let Err(e) = state.eval(PRELUDE) {
+    if let Err(e) = state.eval(&prelude_binding()) {
         // Loud in tests, survivable in release. The prelude depends on a
         // module resolving, which the old string literal could not fail at,
         // so a silent swallow here would hide a broken build behind an
@@ -197,13 +197,12 @@ fn new_state_with(mode: &str) -> State {
 /// could not. The failure is still swallowed by the caller, so a broken
 /// prelude degrades an instance rather than preventing it from existing; the
 /// wasm tests exercise `get` and `peek` and would catch it.
-const PRELUDE: &str = concat!(
-    r#"import Prelude "fumola/system/prelude"; "#,
-    r#"let pointer = Prelude.pointer; "#,
-    r#"let get = Prelude.get; "#,
-    r#"let peek = Prelude.peek; "#,
-    r#"let print = Prelude.print; "#,
-);
+/// Built from the one list in `fumola::prelude`, so the CLI and this host
+/// cannot bind different sets of names -- which they briefly did, leaving
+/// `print` available in the browser and unbound in a terminal.
+fn prelude_binding() -> String {
+    fumola::prelude::binding()
+}
 
 /// Wrap Hazel-supplied source in the top-level thunk assignment that gives
 /// re-evaluation its incremental meaning, after the prelude.
