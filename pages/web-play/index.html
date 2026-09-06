@@ -987,8 +987,33 @@
       // this can refresh on every evaluation without disturbing what it is
       // showing.
       const eventsEl = $("events");
+      /// Lit while the panel has something in it, the same as print.
+      const setEventsLight = (n) => {
+        document
+          .querySelector('.view-tab[data-view="events"]')
+          .classList.toggle("has-output", n > 0);
+      };
+
+      /// How many events there are, without building the table.
+      ///
+      /// The tab has to know whether it is empty even while another view is
+      /// in front -- which is exactly when the hint is worth having, and
+      /// exactly when the renderer below bails out. Only the count crosses:
+      /// rendering costs a `fumola_tokens` call per row, and the list itself
+      /// can be thousands of entries on a graph of any size.
+      const countEvents = () => {
+        if (!ready) return;
+        try {
+          const reply = JSON.parse(
+            fumola_eval_top(instance, "Adapton.peekEvents().size()")
+          );
+          setEventsLight(reply.ok ? Number(reply.value) : 0);
+        } catch (e) { /* a half-typed program is not worth a report */ }
+      };
+
       const refreshEvents = () => {
-        if (libEl.dataset.view !== "events" || !ready) return;
+        if (!ready) return;
+        if (libEl.dataset.view !== "events") { countEvents(); return; }
         const body = $("events-body");
         const empty = $("events-empty");
 
@@ -1001,6 +1026,7 @@
           empty.hidden = false;
           // A simple-semantics instance keeps no graph to report on.
           empty.textContent = reply.ok ? "No events to show." : reply.error;
+          setEventsLight(0);
           return;
         }
 
@@ -1028,6 +1054,7 @@
           body.appendChild(tr);
         }
         empty.hidden = reply.value.length > 0;
+        setEventsLight(reply.value.length);
         empty.textContent = "No events yet.";
         if (atEnd) eventsEl.scrollTop = eventsEl.scrollHeight;
       };
