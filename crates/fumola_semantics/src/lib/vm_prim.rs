@@ -50,11 +50,8 @@ pub fn call_prim_function<A: Active>(
     match pf {
         SymbolLevel => {
             if let Ok(symbol) = args.as_ref().into_sym_or(()) {
-                let mut hasher = hash_map::DefaultHasher::new();
-                symbol.as_ref().hash(&mut hasher);
-                let hash = hasher.finish();
                 //let level = geometric_levels::<4>(hash);
-                let level = geometric_pack(hash);
+                let level = geometric_pack(symbol.as_ref().portable_hash());
 
                 *active.cont() = Cont::Value_(Value::Nat(level.into()).into());
                 Ok(Step {})

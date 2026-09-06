@@ -114,6 +114,37 @@ pub enum Symbol {
     Dot(Symbol_, Symbol_),
 }
 
+impl Symbol {
+    /// A hash of this symbol that does not depend on the target's pointer
+    /// width.
+    ///
+    /// `#[derive(Hash)]` writes an enum's discriminant as an `isize` -- eight
+    /// bytes on x86_64, four on wasm32 -- so the derived hash of a symbol
+    /// differs between a native build and a wasm one. That would be invisible
+    /// if the hash only chose hash-map buckets, but `prim "symbolLevel"` turns
+    /// it into a level-tree level, and a level decides the tree's shape. The
+    /// same program therefore built a differently-shaped DCG in the CLI and in
+    /// a browser, from byte-identical input, and every graph statistic
+    /// downstream of it differed.
+    ///
+    /// Hashing the source rendering sidesteps the whole class: a `str` hashes
+    /// identically on every target, and the rendering already exists and is
+    /// canonical. Doing it variant by variant instead would mean making
+    /// `UnOp`, `BinOp` and the whole of `QuotedAst` portable one type at a
+    /// time, for a primitive used only to balance a tree.
+    ///
+    /// Two distinct symbols could in principle render alike; that is harmless
+    /// here, because a level is a balancing hint and never an identity. Symbol
+    /// equality is `PartialEq`, which this does not touch, and neither does it
+    /// touch the derived `Hash` that hash maps elsewhere still use.
+    pub fn portable_hash(&self) -> u64 {
+        use std::hash::Hasher;
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        hasher.write(crate::format::format_one_line(self).as_bytes());
+        hasher.finish()
+    }
+}
+
 pub type Value_ = Shared<Value>;
 
 pub type Pointer = crate::vm_types::Pointer;
