@@ -105,7 +105,33 @@ fn the_library_is_readable() {
     let v: serde_json::Value = serde_json::from_str(&fumola_modules()).unwrap();
     let mods = v["modules"].as_array().unwrap();
     assert!(mods.len() > 10, "expected the whole library, got {}", mods.len());
-    assert!(mods.iter().any(|m| m == "fumola/system/prelude"));
+    assert!(mods.iter().any(|m| m["path"] == "fumola/system/prelude"));
+
+    // The symlinked copies are reported, and flagged, so a host can list the
+    // library without showing the same module several times.
+    let links: Vec<&str> = mods
+        .iter()
+        .filter(|m| m["link"] == true)
+        .map(|m| m["path"].as_str().unwrap())
+        .collect();
+    assert!(
+        links.contains(&"fumola/examples/mergeSort/adapton"),
+        "mergeSort/adapton is a symlink to system/adapton; got {:?}",
+        links
+    );
+    assert!(
+        links.contains(&"fumola/collections/adapton"),
+        "collections/adapton is a symlink to system/adapton; got {:?}",
+        links
+    );
+    // The real homes must not be flagged.
+    for real in ["fumola/system/adapton", "fumola/collections/hashMap",
+                 "fumola/examples/mergeSort/mergeSort", "fumola/system/prelude"] {
+        assert!(!links.contains(&real), "{} is a real file, not a link", real);
+    }
+    // Every path is still registered, links included: a module's imports
+    // resolve relative to its own directory, which is what they are for.
+    assert!(mods.iter().any(|m| m["path"] == "fumola/examples/mergeSort/adapton"));
 
     let p: serde_json::Value =
         serde_json::from_str(&fumola_module_source("fumola/system/prelude")).unwrap();

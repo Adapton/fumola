@@ -822,7 +822,19 @@ pub fn fumola_tokens(source: &str) -> String {
 pub fn fumola_modules() -> String {
     let mut paths: Vec<&str> = MODULES.iter().map(|(path, _)| *path).collect();
     paths.sort();
-    serde_json::json!({ "ok": true, "modules": paths }).to_string()
+    let modules: Vec<serde_json::Value> = paths
+        .iter()
+        .map(|path| {
+            serde_json::json!({
+                "path": path,
+                // True for the copies that exist only so that a module's
+                // neighbours are importable without "../..". Listing them
+                // shows the same file several times over.
+                "link": SYMLINKED.contains(path),
+            })
+        })
+        .collect();
+    serde_json::json!({ "ok": true, "modules": modules }).to_string()
 }
 
 /// The source of one library module, by the path `fumola_modules` reports.

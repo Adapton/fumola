@@ -78,6 +78,9 @@
       /* ---- the library, on the left ------------------------------------ */
 
       .library {
+        /* Only this pane's text. The editor is deliberately larger and is
+           left alone by the controls in the header. */
+        --lib-font: 0.84rem;
         flex: 0 0 var(--lib-w);
         display: flex; flex-direction: column;
         border-right: 1px solid var(--rule);
@@ -159,14 +162,14 @@
       #modules ul { list-style: none; margin: 0; padding: 0; }
       #modules .dir {
         padding: 0.24rem 0.9rem;
-        font: 400 0.84rem/1.5 var(--mono);
+        font: 400 var(--lib-font)/1.5 var(--mono);
         color: var(--sym);
       }
       #modules button {
         display: block; width: 100%; text-align: left;
         background: none; border: 0; cursor: pointer;
         padding: 0.24rem 0.9rem;
-        font: 400 0.84rem/1.5 var(--mono);
+        font: 400 var(--lib-font)/1.5 var(--mono);
         color: var(--dim);
       }
       #modules button:hover { color: var(--var); }
@@ -175,7 +178,7 @@
       .source { flex: 1; min-width: 0; min-height: 0; overflow: auto; }
       .source pre {
         margin: 0; padding: 0.9rem;
-        font: 400 0.84rem/1.6 var(--mono);
+        font: 400 var(--lib-font)/1.6 var(--mono);
         white-space: pre; color: var(--fg);
       }
       .source .empty { padding: 0.9rem; color: var(--dim); font: italic 0.85rem/1.5 var(--ui); }
@@ -264,6 +267,8 @@
             </button>
             <span class="current" id="current"></span>
             <span class="snaps">
+              <button type="button" id="lib-smaller" title="Smaller library text">A&minus;</button>
+              <button type="button" id="lib-bigger"  title="Larger library text">A+</button>
               <button type="button" data-snap="full"  title="Fill the window">full</button>
               <button type="button" data-snap="half"  title="Half the window">half</button>
               <button type="button" data-snap="close" title="Hide the library">hide</button>
@@ -374,7 +379,14 @@
         // Group by path segment, so shared prefixes become shared parents.
         // The `fumola/` prefix is on every module, so it is only noise.
         const root = { dirs: new Map(), files: [] };
-        for (const path of reply.modules) {
+        for (const m of reply.modules) {
+          // Skip the symlinked copies. They exist so that a module's
+          // neighbours are importable without "../.." in the path, not
+          // because the file lives there, and listing them shows the same
+          // module up to three times. See Adapton/fumola for the underlying
+          // import-path limitation.
+          if (m.link) continue;
+          const path = m.path;
           const parts = path.replace(/^fumola\//, "").split("/");
           let node = root;
           for (const dir of parts.slice(0, -1)) {
@@ -537,6 +549,25 @@
       });
       persistEl.addEventListener("change", () => { note(); evaluate(); });
 
+      // ---- the library's own text size, independent of the editor --------
+      const LIB_STEPS = ["0.62rem", "0.7rem", "0.78rem", "0.84rem",
+                         "0.92rem", "1rem", "1.12rem", "1.25rem"];
+      const LIB_FONT_KEY = "fumola.web-repl.libFont";
+      let libStep = 3;
+      const applyLibFont = () => {
+        document.querySelector(".library")
+          .style.setProperty("--lib-font", LIB_STEPS[libStep]);
+        try { localStorage.setItem(LIB_FONT_KEY, String(libStep)); } catch (e) {}
+      };
+      const stepLibFont = (by) => {
+        libStep = Math.max(0, Math.min(LIB_STEPS.length - 1, libStep + by));
+        applyLibFont();
+      };
+      try {
+        const saved = localStorage.getItem(LIB_FONT_KEY);
+        if (saved !== null) libStep = Math.max(0, Math.min(LIB_STEPS.length - 1, Number(saved)));
+      } catch (e) {}
+
       // ---- the library pane: drag to size, or snap -----------------------
       const shell = document.querySelector(".shell");
       const libEl = document.querySelector(".library");
@@ -589,6 +620,10 @@
         const saved = localStorage.getItem(REMEMBER);
         if (saved !== null) setWidth(Number(saved));
       } catch (e) {}
+
+      $("lib-smaller").addEventListener("click", () => stepLibFont(-1));
+      $("lib-bigger").addEventListener("click", () => stepLibFont(+1));
+      applyLibFont();
 
       $("outline-toggle").addEventListener("click", () =>
         setOutline(libEl.dataset.outline === "closed"));
