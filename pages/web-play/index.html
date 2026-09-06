@@ -151,8 +151,7 @@
       .hgrip:hover, .hgrip.dragging { background: #2b3f52; }
       .library:not(.has-source) .hgrip,
       .library[data-outline="closed"] .hgrip,
-      .library[data-view="events"] .hgrip,
-      .library[data-view="print"] .hgrip { display: none; }
+      .library:not([data-view="library"]) .hgrip { display: none; }
       body.dragging-v { cursor: row-resize; user-select: none; }
       .library[data-outline="closed"] #modules { display: none; }
 
@@ -163,17 +162,32 @@
       .view-tab.has-output { color: var(--green); border-color: #3a4a3a; }
       .view-tab.has-output::after { content: " \2022"; }
 
-      /* Only one of the three shows at a time. */
-      .library[data-view="events"] #modules,
-      .library[data-view="events"] .source,
-      .library[data-view="events"] .outline-toggle,
-      .library[data-view="print"] #modules,
-      .library[data-view="print"] .source,
-      .library[data-view="print"] .outline-toggle { display: none; }
-      .library[data-view="outline"] .events,
-      .library[data-view="print"] .events { display: none; }
-      .library[data-view="outline"] .print,
-      .library[data-view="events"] .print { display: none; }
+      /* One view at a time. Any view but the library hides the library's
+         own parts, and a panel shows only under the view that names it. */
+      .library:not([data-view="library"]) #modules,
+      .library:not([data-view="library"]) .source,
+      .library:not([data-view="library"]) .lib-path,
+      .library:not([data-view="library"]) .outline-toggle { display: none; }
+      .events, .print, .scene { display: none; }
+      .library[data-view="events"] .events,
+      .library[data-view="print"] .print,
+      .library[data-view="objects"] #objects-panel,
+      .library[data-view="outline"] #outline-panel { display: block; }
+
+      /* The two scene panels: what a program said about how to look at it. */
+      .scene { flex: 1; min-height: 0; overflow: auto; }
+      .scene-body {
+        margin: 0; padding: 0.7rem 0.9rem;
+        font: 400 var(--lib-font)/1.6 var(--mono);
+        white-space: pre-wrap; word-break: break-word; color: var(--fg);
+      }
+      /* An empty panel says what would fill it, in the language's own terms. */
+      .schema {
+        margin: 0.6rem 0 0; padding: 0.7rem 0.9rem;
+        font: 400 var(--lib-font)/1.6 var(--mono);
+        white-space: pre-wrap; color: var(--fg);
+        background: var(--panel); border: 1px solid var(--rule); border-radius: 2px;
+      }
 
       .print { flex: 1; min-height: 0; overflow: auto; }
       .print ol {
@@ -230,8 +244,7 @@
       /* Only once a file is open; there is nothing to name before that, and
          an empty strip would just be a second border. */
       .library:not(.has-source) .lib-path,
-      .library[data-view="events"] .lib-path,
-      .library[data-view="print"] .lib-path { display: none; }
+
       .current {
         display: block;
         font: 400 0.78rem/1.2 var(--mono);
@@ -436,7 +449,9 @@
         <aside class="library">
           <div class="lib-head">
             <span class="views">
-              <button type="button" class="view-tab" data-view="outline">library</button>
+              <button type="button" class="view-tab" data-view="library">library</button>
+              <button type="button" class="view-tab" data-view="objects">objects</button>
+              <button type="button" class="view-tab" data-view="outline">outline</button>
               <button type="button" class="view-tab" data-view="events">events</button>
               <button type="button" class="view-tab" data-view="print">print</button>
             </span>
@@ -462,6 +477,14 @@
             <table><tbody id="events-body"></tbody></table>
             <div class="empty" id="events-empty">No events yet.</div>
           </div>
+          <div class="scene" id="objects-panel">
+            <div class="scene-body" id="objects-body"></div>
+            <div class="empty" id="objects-empty"></div>
+          </div>
+          <div class="scene" id="outline-panel">
+            <div class="scene-body" id="outline-body"></div>
+            <div class="empty" id="outline-empty"></div>
+          </div>
           <div class="print" id="print">
             <ol id="print-body"></ol>
             <div class="empty" id="print-empty">
@@ -472,7 +495,7 @@
         </aside>
         <div class="grip" id="grip" role="separator" aria-orientation="vertical"
              aria-label="Resize the library"></div>
-        <button class="reopen" id="reopen" hidden>navigation &middot; library, tests, events, print</button>
+        <button class="reopen" id="reopen" hidden>navigation &middot; library, objects, outline, events, print</button>
 
         <section class="work">
           <div class="editor">
@@ -1093,7 +1116,7 @@
         // Asking for the outline means wanting to see it. After picking a
         // module the tree is collapsed, and without this the tab looked
         // dead: it switched to a view whose tree was still shut.
-        if (view === "outline") setOutline(true);
+        if (view === "library") setOutline(true);
         for (const t of document.querySelectorAll(".view-tab"))
           t.setAttribute("aria-current", String(t.dataset.view === view));
         if (view === "events") refreshEvents();
@@ -1245,6 +1268,72 @@
       };
 
       const showHush = (on) => { $("hush").hidden = !on; };
+
+      /// What a program says about how to look at it.
+      ///
+      /// A scene is not extracted from a program; a program offers one, by
+      /// evaluating to `#scene`. Seeing that come back from the editor is the
+      /// whole trigger -- nothing reads the code, and nothing guesses. An
+      /// `#[example]` is how a library function opts into producing one.
+      ///
+      /// The two components are `A.Scene.Scene`'s own, minus its history:
+      /// an array of objects placed in space, and an optional outline. Either
+      /// may be left out, and left out means the author did not offer it.
+      const SCENE_SCHEMA =
+        'import W "fumola/system/webPlay";\n' +
+        "\n" +
+        "#scene {\n" +
+        "  objects : [ Adapton.Scene.SceneObject ];\n" +
+        "  outline : ? Adapton.Outline.Outline;\n" +
+        "}";
+
+      const sceneOf = (reply) =>
+        reply.ok && reply.tag === "Variant" && reply.value &&
+        reply.value.name === "scene" && reply.value.value
+          ? reply.value.value
+          : null;
+
+      const fillScenePanel = (name, component, count, lead) => {
+        const body = $(name + "-body");
+        const empty = $(name + "-empty");
+        const tab = document.querySelector(`.view-tab[data-view="${name}"]`);
+        if (count) {
+          body.innerHTML = highlight(show(component)).replace(/\n$/, "");
+          body.hidden = false;
+          empty.hidden = true;
+        } else {
+          body.textContent = "";
+          body.hidden = true;
+          empty.textContent = "";
+          const p = document.createElement("div");
+          p.textContent = lead;
+          const code = document.createElement("pre");
+          code.className = "schema";
+          code.innerHTML = highlight(SCENE_SCHEMA).replace(/\n$/, "");
+          empty.append(p, code);
+          empty.hidden = false;
+        }
+        tab.classList.toggle("has-output", count > 0);
+      };
+
+      const showScene = (reply) => {
+        const scene = sceneOf(reply);
+        const fields = scene && scene.value ? scene.value : {};
+        const objects = fields.objects;
+        const outline = fields.outline;
+        fillScenePanel(
+          "objects",
+          objects,
+          objects && Array.isArray(objects.value) ? objects.value.length : 0,
+          "Nothing placed in space. A program offers objects by evaluating to:"
+        );
+        fillScenePanel(
+          "outline",
+          outline,
+          outline && outline.tag !== "Null" ? 1 : 0,
+          "No outline. A program offers one by evaluating to:"
+        );
+      };
 
       const showShare = () => {
         const b = $("share");
@@ -1428,6 +1517,7 @@
         if (reply.ok) {
           markLine(0);
           showHush(false);
+          showScene(reply);
           outEl.classList.remove("stale");
           outEl.textContent = "";
           const tag = document.createElement("span");
@@ -1452,6 +1542,7 @@
         outEl.classList.remove("stale");
         outEl.textContent = "";
         // Where in what was typed, if the failure reaches back into it at all.
+        showScene(reply);
         const at = frameInProgram(reply.frames, text);
         markLine(at ? at.line : 0);
         // Offered for any assertion that came from this text, whether the
@@ -1651,7 +1742,8 @@
         setOutline(libEl.dataset.outline === "closed"));
       for (const t of document.querySelectorAll(".view-tab"))
         t.addEventListener("click", () => setView(t.dataset.view));
-      setView("outline");
+      setView("library");
+      showScene({ ok: false });
 
       srcEl.value = START;
       paint();

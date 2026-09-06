@@ -616,10 +616,10 @@ module {
     let buildTree = `buildTree := thunk { fromArray(array) };
     let tree = force buildTree;
     A.scratch(thunk {
-      {
-        outline = A.Outline.outline(buildTree);
-        objects = Scene.sceneObjects(tree!, A.Scene.zero)
-      }
+      W.scene(
+        Scene.sceneObjects(tree!, A.Scene.zero),
+        A.Outline.outline(buildTree)
+      )
     })
   };
 

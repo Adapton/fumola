@@ -9,44 +9,83 @@ import A "adapton";
 /// recorded while the program ran, and it can hand them over without being
 /// asked and without being told how. Nothing is decided there.
 ///
-///    The outline and the objects are not mechanical. Which force tree is
-/// worth looking at, and where its parts belong in space, are claims about
-/// what the computation means -- and the program is the only thing that knows
-/// them. A visualiser given the history alone can draw a graph; it cannot
-/// know that this subtree is the input list and that one is the merge
-/// network, or that they should sit a level apart. That is the idea an
-/// `#[example]` is for: a program decides how to portray itself, rather than
-/// some automation guessing on its behalf.
+///    The outline and the objects are not mechanical. Which force trees are
+/// worth looking at, and where the parts of a structure belong in space, are
+/// claims about what the computation means -- and the program is the only
+/// thing that knows them. A viewer given the history alone can draw a graph;
+/// it cannot know that this subtree is the input list and that one is the
+/// merge network, or that they should sit a level apart.
+///
+///    So nothing here is extracted from a program against its will. An
+/// `#[example]` is a piece of code opting in, and its author decides what
+/// goes in each component. Either may be left empty; an empty component is
+/// one the author did not offer, and the playground simply has nothing to
+/// show in that panel.
+///
+///    An example takes `()` and must succeed when applied to `()`. One that
+/// does not is not an example, and is a thing for CI and the CLI to report.
 ///
 /// ----------------------------------------------------------------------------
 module {
 
+    /// The components of a scene that a program supplies for itself.
+    ///
+    /// These are `A.Scene.Scene` minus its history, and they conform to it:
+    /// `objects` is its array of `SceneObject`, `outline` is its
+    /// `Outline.Outline`. The one addition is that the outline is optional,
+    /// which is the shape adapton already uses for an outline that may be
+    /// absent (`Outline.OutlineEdge.outline`). An empty array and a null
+    /// outline each mean the same thing -- a component this example did not
+    /// offer -- and the playground has nothing to show in that panel.
+    public type SceneComponents = {
+        objects : [ A.Scene.SceneObject ];
+        outline : ?A.Outline.Outline;
+    };
+
     /// What an `#[example]` returns.
     ///
-    /// An example runs without error, and CI can treat it as a test for that
-    /// reason. What makes it an example rather than a test is that it also
-    /// says how to look at what it did.
-    public type ExampleOutput = {
-        outline : A.Outline.Outline;
-        objects : [ A.Scene.SceneObject ];
+    /// A variant, so the playground can tell a scene from any other value a
+    /// program might evaluate to. Seeing `#scene` come back from the editor
+    /// is the whole trigger: nothing inspects the code, and nothing guesses.
+    public type ExampleOutput = { #scene : SceneComponents };
+
+    /// Both components.
+    public func scene(objects, outline) : ExampleOutput {
+        #scene { objects ; outline = ?outline }
     };
 
-    /// An example's output, plus the history the runtime kept: the whole
-    /// scene, ready to render.
+    /// Objects, and no outline.
+    public func sceneOfObjects(objects) : ExampleOutput {
+        #scene { objects ; outline = null }
+    };
+
+    /// An outline, and no objects.
+    public func sceneOfOutline(outline) : ExampleOutput {
+        #scene { objects = [] ; outline = ?outline }
+    };
+
+    /// An example's components, plus the history the runtime kept: an
+    /// `A.Scene.Scene`, exactly as that type stands.
     ///
-    /// Call this from outside the example, after it has run, so that the
-    /// history is the one the example produced.
-    public func scene(e : ExampleOutput) : A.Scene.Scene {
-        {
-            outline = e.outline;
-            objects = e.objects;
-            history = A.peekHistory()
+    /// Optional because a Scene requires an outline and an example need not
+    /// have offered one; an example of objects alone is not a Scene, and
+    /// saying so is better than inventing an outline for it.
+    ///
+    /// Call this from outside the example, after it has run, so the history
+    /// is the one the example produced. An example that lays itself out
+    /// inside `A.scratch` keeps that history to the subject rather than to
+    /// the drawing of it.
+    public func withHistory(e : ExampleOutput) : ?A.Scene.Scene {
+        switch e {
+            case (#scene(s)) {
+                switch (s.outline) {
+                    case (?outline) {
+                        ?{ outline ; objects = s.objects ; history = A.peekHistory() }
+                    };
+                    case null { null };
+                }
+            }
         }
-    };
-
-    /// The same, as the JSON a renderer eats.
-    public func sceneJSON(e : ExampleOutput) : Text {
-        A.IntoJSON.fromScene(scene(e))
     };
 
 }

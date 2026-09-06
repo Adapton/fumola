@@ -186,7 +186,10 @@ module {
     #[example]
     public func exampleMergeSort() : W.ExampleOutput {
         let s = generateSceneFullDemand(10, 10, null).sceneData;
-        { outline = s.outline; objects = s.objects }
+        // Objects only. The outline component is left empty here, which is a
+        // choice rather than an omission: what this example is for is the
+        // shape of the merge network in space.
+        W.sceneOfObjects(s.objects)
     };
 
     #[test]
