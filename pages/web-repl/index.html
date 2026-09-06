@@ -31,12 +31,20 @@
       }
 
       * { box-sizing: border-box; }
-      html, body { height: 100%; }
+      /* One knob, as on the homepage: everything below is in rem, so the
+         whole app grows on a large screen instead of sitting small. The floor
+         is a little above the homepage's, because this is a working surface
+         rather than prose and was too small to read at no zoom. */
+      html {
+        height: 100%;
+        font-size: clamp(17px, 12px + 0.55vw, 23px);
+      }
       body {
+        height: 100%;
         margin: 0;
         background: var(--bg);
         color: var(--fg);
-        font: 400 15px/1.5 var(--ui);
+        font: 400 0.95rem/1.5 var(--ui);
         -webkit-font-smoothing: antialiased;
         overflow: hidden;           /* each pane scrolls on its own */
       }
@@ -63,10 +71,14 @@
 
       .panes { flex: 1; display: flex; min-height: 0; }
 
+      /* The pane width lives in a variable so the drag handle and the snap
+         buttons are setting the same thing. */
+      .shell { --lib-w: 26rem; }
+
       /* ---- the library, on the left ------------------------------------ */
 
       .library {
-        flex: 0 0 22rem;
+        flex: 0 0 var(--lib-w);
         display: flex; flex-direction: column;
         border-right: 1px solid var(--rule);
         /* Both needed. A flex item's min-width defaults to its content, and
@@ -76,13 +88,47 @@
         background: var(--panel);
       }
       .lib-head {
-        padding: 0.6rem 0.9rem;
+        display: flex; align-items: center; gap: 0.5rem;
+        padding: 0.5rem 0.7rem;
         font: 400 0.72rem/1 var(--mono);
         letter-spacing: 0.1em; text-transform: uppercase;
         color: var(--dim);
         border-bottom: 1px solid var(--rule);
         flex: 0 0 auto;
       }
+      .lib-head .snaps { margin-left: auto; display: flex; gap: 0.3rem; }
+      .lib-head button {
+        background: none; border: 1px solid var(--rule); border-radius: 2px;
+        color: var(--dim); cursor: pointer;
+        font: 400 0.68rem/1 var(--mono);
+        letter-spacing: 0.06em; text-transform: none;
+        padding: 0.25rem 0.45rem;
+      }
+      .lib-head button:hover { color: var(--var); border-color: #3a3a40; }
+
+      /* The drag handle. Wider than it looks, so it is easy to grab. */
+      .grip {
+        flex: 0 0 7px;
+        margin: 0 -3px;              /* overlap the border, keep the layout */
+        cursor: col-resize;
+        background: transparent;
+        position: relative; z-index: 2;
+      }
+      .grip:hover, .grip.dragging { background: #2b3f52; }
+      body.dragging { cursor: col-resize; user-select: none; }
+      /* While dragging, the textarea must not swallow the pointer. */
+      body.dragging .editor > textarea { pointer-events: none; }
+
+      /* When the library is shut, a thin way back. */
+      .reopen {
+        flex: 0 0 auto;
+        writing-mode: vertical-rl;
+        background: var(--panel); border: 0; border-right: 1px solid var(--rule);
+        color: var(--dim); cursor: pointer;
+        font: 400 0.7rem/1 var(--mono);
+        letter-spacing: 0.1em; padding: 0.8rem 0.35rem;
+      }
+      .reopen:hover { color: var(--var); }
       #modules {
         list-style: none; margin: 0; padding: 0.35rem 0;
         overflow-y: auto;
@@ -92,8 +138,8 @@
       #modules button {
         display: block; width: 100%; text-align: left;
         background: none; border: 0; cursor: pointer;
-        padding: 0.22rem 0.9rem;
-        font: 400 0.78rem/1.5 var(--mono);
+        padding: 0.24rem 0.9rem;
+        font: 400 0.84rem/1.5 var(--mono);
         color: var(--dim);
       }
       #modules button:hover { color: var(--var); }
@@ -102,7 +148,7 @@
       .source { flex: 1; min-width: 0; min-height: 0; overflow: auto; }
       .source pre {
         margin: 0; padding: 0.9rem;
-        font: 400 0.78rem/1.55 var(--mono);
+        font: 400 0.84rem/1.6 var(--mono);
         white-space: pre; color: var(--fg);
       }
       .source .empty { padding: 0.9rem; color: var(--dim); font: italic 0.85rem/1.5 var(--ui); }
@@ -119,7 +165,7 @@
         position: absolute; inset: 0;
         margin: 0; padding: 1rem;
         border: 0;
-        font: 400 0.86rem/1.6 var(--mono);
+        font: 400 0.92rem/1.65 var(--mono);
         white-space: pre-wrap;
         word-break: break-word;
         overflow: auto;
@@ -140,7 +186,7 @@
         overflow: auto;
         border-top: 1px solid var(--rule);
         padding: 0.8rem 1rem;
-        font: 400 0.84rem/1.6 var(--mono);
+        font: 400 0.9rem/1.6 var(--mono);
         white-space: pre-wrap;
         word-break: break-word;
         background: var(--panel);
@@ -184,12 +230,22 @@
 
       <div class="panes">
         <aside class="library">
-          <div class="lib-head">the library</div>
+          <div class="lib-head">
+            <span>the library</span>
+            <span class="snaps">
+              <button type="button" data-snap="full"  title="Fill the window">full</button>
+              <button type="button" data-snap="half"  title="Half the window">half</button>
+              <button type="button" data-snap="close" title="Hide the library">hide</button>
+            </span>
+          </div>
           <ul id="modules"></ul>
           <div class="source" id="source">
             <div class="empty">Pick a module to read its source.</div>
           </div>
         </aside>
+        <div class="grip" id="grip" role="separator" aria-orientation="vertical"
+             aria-label="Resize the library"></div>
+        <button class="reopen" id="reopen" hidden>the library</button>
 
         <section class="work">
           <div class="editor">
@@ -402,6 +458,59 @@
         pre.scrollLeft = srcEl.scrollLeft;
       });
       persistEl.addEventListener("change", () => { note(); evaluate(); });
+
+      // ---- the library pane: drag to size, or snap -----------------------
+      const shell = document.querySelector(".shell");
+      const libEl = document.querySelector(".library");
+      const gripEl = $("grip");
+      const reopenEl = $("reopen");
+      const REMEMBER = "fumola.web-repl.libWidth";
+
+      const setWidth = (px) => {
+        const max = window.innerWidth;
+        // Snapped shut, or dragged so far it may as well be: show the spine
+        // instead of a sliver nobody can read.
+        const w = Math.max(0, Math.min(px, max));
+        const shut = w < 40;
+        shell.style.setProperty("--lib-w", shut ? "0px" : w + "px");
+        libEl.hidden = shut;
+        gripEl.hidden = shut;
+        reopenEl.hidden = !shut;
+        try { localStorage.setItem(REMEMBER, String(shut ? 0 : w)); } catch (e) {}
+      };
+
+      for (const b of document.querySelectorAll("[data-snap]")) {
+        b.addEventListener("click", () => {
+          const to = b.dataset.snap;
+          setWidth(to === "full" ? window.innerWidth
+                 : to === "half" ? Math.round(window.innerWidth / 2)
+                 : 0);
+        });
+      }
+      reopenEl.addEventListener("click", () =>
+        setWidth(Math.round(window.innerWidth / 2)));
+
+      gripEl.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        gripEl.setPointerCapture(e.pointerId);
+        gripEl.classList.add("dragging");
+        document.body.classList.add("dragging");
+        const move = (ev) => setWidth(ev.clientX - libEl.getBoundingClientRect().left);
+        const up = () => {
+          gripEl.classList.remove("dragging");
+          document.body.classList.remove("dragging");
+          gripEl.removeEventListener("pointermove", move);
+          gripEl.removeEventListener("pointerup", up);
+        };
+        gripEl.addEventListener("pointermove", move);
+        gripEl.addEventListener("pointerup", up);
+      });
+
+      // Restore the last width, if this browser remembers one.
+      try {
+        const saved = localStorage.getItem(REMEMBER);
+        if (saved !== null) setWidth(Number(saved));
+      } catch (e) {}
 
       srcEl.value = START;
       paint();
