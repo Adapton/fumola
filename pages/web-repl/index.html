@@ -135,6 +135,12 @@
         flex: 0 0 auto; max-height: 40%;
         border-bottom: 1px solid var(--rule);
       }
+      #modules ul { list-style: none; margin: 0; padding: 0; }
+      #modules .dir {
+        padding: 0.24rem 0.9rem;
+        font: 400 0.84rem/1.5 var(--mono);
+        color: var(--sym);
+      }
       #modules button {
         display: block; width: 100%; text-align: left;
         background: none; border: 0; cursor: pointer;
@@ -225,7 +231,7 @@
         <label title="Keep the adapton store between runs, so an edit repairs what the last one built. Off, each run starts from a clean store.">
           <input type="checkbox" id="persist" checked> keep state between runs
         </label>
-        <span id="status">the runtime loads when you first type</span>
+        <span id="status">starting the runtime…</span>
       </header>
 
       <div class="panes">
@@ -318,8 +324,9 @@
             fumola_ensure_mode(instance, "graphical");
             ready = true;
             listModules();
-            paint();
+            paint();          // the first paint was plain: the lexer is here now
             note();
+            evaluate();       // show the starter program's answer straight away
           })
           .catch((e) => {
             statusEl.textContent = "the runtime could not be loaded";
@@ -338,18 +345,54 @@
       const listModules = () => {
         const reply = JSON.parse(fumola_modules());
         if (!reply.ok) return;
+
+        // Group by path segment, so shared prefixes become shared parents.
+        // The `fumola/` prefix is on every module, so it is only noise.
+        const root = { dirs: new Map(), files: [] };
+        for (const path of reply.modules) {
+          const parts = path.replace(/^fumola\//, "").split("/");
+          let node = root;
+          for (const dir of parts.slice(0, -1)) {
+            if (!node.dirs.has(dir)) node.dirs.set(dir, { dirs: new Map(), files: [] });
+            node = node.dirs.get(dir);
+          }
+          node.files.push({ name: parts[parts.length - 1], path });
+        }
+
         const list = $("modules");
         list.textContent = "";
-        for (const path of reply.modules) {
+        renderTree(root, list, 0);
+      };
+
+      // Fully expanded: the library is small enough to take in at a glance,
+      // and a fold would only hide it.
+      const renderTree = (node, into, depth) => {
+        const indent = (el) => {
+          el.style.paddingLeft = 0.9 + depth * 0.9 + "rem";
+        };
+        const byName = (a, b) => String(a).localeCompare(String(b));
+
+        for (const name of [...node.dirs.keys()].sort(byName)) {
+          const li = document.createElement("li");
+          const label = document.createElement("div");
+          label.className = "dir";
+          label.textContent = name + "/";
+          indent(label);
+          li.appendChild(label);
+          const sub = document.createElement("ul");
+          renderTree(node.dirs.get(name), sub, depth + 1);
+          li.appendChild(sub);
+          into.appendChild(li);
+        }
+        for (const f of node.files.sort((a, b) => byName(a.name, b.name))) {
           const li = document.createElement("li");
           const b = document.createElement("button");
-          // The registered path is what an `import` uses; the prefix is the
-          // same on every one, so it is only noise in a list.
-          b.textContent = path.replace(/^fumola\//, "");
-          b.title = path;
-          b.addEventListener("click", () => showModule(path, b));
+          b.textContent = f.name;
+          b.title = f.path;         // the full path an `import` would use
+          indent(b);
+          b.addEventListener("click", () => showModule(f.path, b));
           li.appendChild(b);
-          list.appendChild(li);
+          into.appendChild(li);
         }
       };
 
@@ -514,7 +557,14 @@
 
       srcEl.value = START;
       paint();
-      outEl.innerHTML = '<span class="waiting">type to evaluate</span>';
+      outEl.innerHTML = '<span class="waiting">starting…</span>';
+
+      // Fetched immediately, unlike the console on the homepage. There, most
+      // readers never run anything and the 5 MB is worth deferring; here,
+      // opening the page is the request -- and the library list and the
+      // highlighting both come out of the runtime, so deferring it left the
+      // page looking broken until the first keystroke.
+      ensureRuntime().catch(() => {});
     </script>
   </body>
 </html>
