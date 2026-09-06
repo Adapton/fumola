@@ -246,6 +246,7 @@
         border-bottom: 1px dotted #3f5f3f;
       }
       .run-here:hover { color: var(--var); border-bottom-color: var(--var); }
+      .run-here[aria-current="true"] { color: var(--var); background: #1c2a1c; }
 
       .source .empty { padding: 0.9rem; color: var(--dim); font: italic 0.85rem/1.5 var(--ui); }
 
@@ -573,9 +574,9 @@
               name: (t.scope ? t.scope + "." : "") + t.name,
               title: call.split("\n")[1],
               pick: (b) => {
-                for (const other of document.querySelectorAll("#modules button"))
-                  other.removeAttribute("aria-current");
-                b.setAttribute("aria-current", "true");
+                // Both halves: run it, and open its module at the marker, so
+                // the test can be read as well as run.
+                showModule(path, b, t);
                 loadTest(path, t);
               },
             });
@@ -713,7 +714,7 @@
         evaluate();
       };
 
-      const showModule = (path, button) => {
+      const showModule = (path, button, focus) => {
         for (const b of document.querySelectorAll("#modules button"))
           b.removeAttribute("aria-current");
         button.setAttribute("aria-current", "true");
@@ -740,12 +741,28 @@
         code.innerHTML = highlight(reply.source, marks);
         pre.appendChild(code);
         pane.appendChild(pre);
-        for (const b of code.querySelectorAll(".run-here")) {
+        const links = code.querySelectorAll(".run-here");
+        for (const b of links) {
           const t = tests[Number(b.dataset.test)];
           b.title = "Run " + invocationFor(path, t).split("\n")[1];
           b.addEventListener("click", () => loadTest(path, t));
         }
+
         pane.scrollTop = 0;
+        // Arriving from the tests tree: put that test's marker on the top
+        // line, so the source opens at the thing that was clicked rather
+        // than at the top of the file.
+        if (focus) {
+          const i = tests.findIndex(
+            (t) => t.name === focus.name && t.scope === focus.scope
+          );
+          const el = i >= 0 ? links[i] : null;
+          if (el) {
+            el.setAttribute("aria-current", "true");
+            pane.scrollTop +=
+              el.getBoundingClientRect().top - pane.getBoundingClientRect().top;
+          }
+        }
       };
 
       // ---- evaluation ---------------------------------------------------
