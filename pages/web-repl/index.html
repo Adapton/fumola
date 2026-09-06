@@ -306,19 +306,32 @@
 
       .editor { position: relative; flex: 1; min-height: 0; }
       /* The highlighted layer and the textarea are stacked and must agree on
-         every metric, or the coloured text drifts away from the caret. */
+         every metric, or the coloured text drifts away from the caret.
+         
+         `pre`, not `pre-wrap`: soft wrapping was the drift. The highlighted
+         layer is one span per token, and a break inside a word is decided
+         per inline box, so a long line wrapped in a different place there
+         than in the textarea over it -- one line's worth of offset, and
+         every line below it inherited the error. Not wrapping at all is the
+         only way the two can be relied on to agree. Long lines scroll
+         sideways instead, both layers together. */
       .editor > pre,
       .editor > textarea {
         position: absolute; inset: 0;
         margin: 0; padding: 1rem;
         border: 0;
         font: 400 0.92rem/1.65 var(--mono);
-        white-space: pre-wrap;
-        word-break: break-word;
+        white-space: pre;
         overflow: auto;
         tab-size: 2;
       }
       .editor > pre { pointer-events: none; color: var(--fg); background: var(--bg); }
+      /* The browser's own stylesheet sets `code { font-family: monospace }`,
+         which beats what `pre` inherits down -- so the highlighted layer was
+         drawn in a different typeface from the textarea over it, at the same
+         size, and every character was a slightly different width. The caret
+         drifted further from its text the further along a line it went. */
+      .editor > pre > code { font: inherit; letter-spacing: inherit; }
       .editor > textarea {
         color: transparent;
         background: transparent;
@@ -442,7 +455,8 @@
 
       const $ = (id) => document.getElementById(id);
       const srcEl = $("src"), hlEl = $("hl"), outEl = $("out"),
-            statusEl = $("status"), persistEl = $("persist");
+            statusEl = $("status"), persistEl = $("persist"),
+            preEl = hlEl.parentElement;
 
       // This page owns the runtime, so a fixed id is enough.
       const REPL_INSTANCE = 1;
@@ -491,9 +505,21 @@
         return html + "\n";
       };
 
+      /// Both layers are scrollable and only one of them is scrolled by
+      /// typing, so the highlighted text has to be told where the caret went.
+      /// Without this the whole layer sits at the top while the textarea
+      /// moves down it -- the drift is the scroll distance, which is why it
+      /// only showed up once programs were longer than the box.
+      const syncScroll = () => {
+        preEl.scrollTop = srcEl.scrollTop;
+        preEl.scrollLeft = srcEl.scrollLeft;
+      };
+
       const paint = () => {
         if (!ready) { hlEl.textContent = srcEl.value; return; }
         hlEl.innerHTML = highlight(srcEl.value);
+        // Replacing the content resets the layer's own scroll.
+        syncScroll();
       };
 
       // ---- the runtime, fetched on first use ----------------------------
@@ -1134,11 +1160,7 @@
       };
 
       srcEl.addEventListener("input", () => { paint(); schedule(); });
-      srcEl.addEventListener("scroll", () => {
-        const pre = hlEl.parentElement;
-        pre.scrollTop = srcEl.scrollTop;
-        pre.scrollLeft = srcEl.scrollLeft;
-      });
+      srcEl.addEventListener("scroll", syncScroll);
       persistEl.addEventListener("change", () => { note(); evaluate(); });
 
       // ---- the library's own text size, independent of the editor --------
