@@ -438,7 +438,43 @@ pub fn fumola_eval_top(id: FumolaInstanceId, program_text: &str) -> String {
     eval_in(id, program_text)
 }
 
+/// What becomes of a program's effects when it succeeds.
+enum Effects {
+    /// They become the instance's state. The ordinary case: a program's
+    /// bindings and its writes to the store are what the next program sees.
+    Keep,
+    /// They are dropped with the branch they happened on. The instance is
+    /// left exactly as it was, and nothing the program allocated survives
+    /// its answer.
+    Discard,
+}
+
+/// Evaluate a program for its answer alone, leaving the instance untouched.
+///
+/// Some programs are worth running and not worth keeping. Building a scene is
+/// the case in hand: `generateSceneFullDemand` opens with `A.reset()`, so
+/// asking for a scene from inside a session would wipe the graph that session
+/// was about -- and the result runs to megabytes that would then sit in the
+/// store for the rest of the instance's life.
+///
+/// A `Core` is built from persistent structures, so the branch this runs on
+/// shares everything with the original and costs about nothing to make. What
+/// the program allocates hangs off the branch alone; when the branch is
+/// dropped the allocation goes with it, and the instance never held the
+/// dataset at any point.
+///
+/// This is the editor's way of looking at a computation, like `peek`: it is
+/// performed from outside, and it leaves no trace of having looked.
+#[wasm_bindgen]
+pub fn fumola_eval_scratch(id: FumolaInstanceId, program_text: &str) -> String {
+    eval_against(id, program_text, Effects::Discard)
+}
+
 fn eval_in(id: FumolaInstanceId, program: &str) -> String {
+    eval_against(id, program, Effects::Keep)
+}
+
+fn eval_against(id: FumolaInstanceId, program: &str, effects: Effects) -> String {
     INSTANCES.with(|m| {
         let mut m = m.borrow_mut();
         let state = match m.get_mut(&id) {
@@ -464,7 +500,9 @@ fn eval_in(id: FumolaInstanceId, program: &str) -> String {
         match outcome {
             Ok(value) => {
                 let json = with_print(value_to_json(&value), printed);
-                *state = attempt;
+                if let Effects::Keep = effects {
+                    *state = attempt;
+                }
                 json
             }
             Err(e) => with_print(error_of_with_trace(&e, &mut attempt), printed),
