@@ -277,10 +277,24 @@
       #modules button[aria-current="true"] { color: var(--blue); }
 
       .source { flex: 1; min-width: 0; min-height: 0; overflow: auto; }
+      /* The gutter and the code are one row so they share a scroll, and the
+         gutter sticks to the left so a long line scrolls under it rather than
+         taking the numbers with it. `min-width: max-content` keeps the row as
+         wide as its widest line, which is what gives the sticky gutter
+         something to stick against. */
+      .code-lines { display: flex; align-items: flex-start; min-width: max-content; }
       .source pre {
         margin: 0; padding: 0.9rem;
         font: 400 var(--lib-font)/1.6 var(--mono);
         white-space: pre; color: var(--fg);
+      }
+      .gutter {
+        position: sticky; left: 0; z-index: 1;
+        padding-right: 0.7rem !important;
+        color: var(--dim); text-align: right;
+        user-select: none; -webkit-user-select: none;
+        background: var(--panel);
+        border-right: 1px solid var(--rule);
       }
       /* An attribute reads as one annotation, delimiters included. */
       .at { color: var(--pink); }
@@ -343,6 +357,13 @@
         resize: none; outline: none;
       }
       .editor > textarea::selection { background: #2a3f55; color: transparent; }
+      /* The line an error stopped on. Behind both layers, so the text and the
+         caret sit on top of it. */
+      .rowmark {
+        position: absolute; left: 0; right: 0; height: 0;
+        background: #3a1c1c; border-left: 2px solid var(--eff);
+        pointer-events: none; z-index: 0;
+      }
 
       .out {
         flex: 0 0 auto;
@@ -457,9 +478,16 @@
       } from "../fumola_wasm.js";
 
       const $ = (id) => document.getElementById(id);
+      const rowEl = document.createElement("div");
+      rowEl.className = "rowmark";
+      rowEl.hidden = true;
+
       const srcEl = $("src"), hlEl = $("hl"), outEl = $("out"),
             statusEl = $("status"), persistEl = $("persist"),
             preEl = hlEl.parentElement;
+      // Behind both layers: first child of .editor, which is the positioned
+      // ancestor the mark is placed against.
+      preEl.parentElement.insertBefore(rowEl, preEl);
 
       // This page owns the runtime, so a fixed id is enough.
       const REPL_INSTANCE = 1;
@@ -566,6 +594,45 @@
       const syncScroll = () => {
         preEl.scrollTop = srcEl.scrollTop;
         preEl.scrollLeft = srcEl.scrollLeft;
+        placeRowMark();
+      };
+
+      /// Put a band behind the line an error stopped on.
+      ///
+      /// Both layers are `white-space: pre` and neither wraps, so line N is
+      /// always the same distance down and the band can be positioned by
+      /// arithmetic rather than by measuring the text.
+      let markedLine = 0;
+      const placeRowMark = () => {
+        if (!markedLine) { rowEl.hidden = true; return; }
+        const style = getComputedStyle(srcEl);
+        const lh = parseFloat(style.lineHeight);
+        const top = parseFloat(style.paddingTop);
+        rowEl.style.height = `${lh}px`;
+        rowEl.style.top = `${top + (markedLine - 1) * lh - srcEl.scrollTop}px`;
+        rowEl.hidden = false;
+      };
+
+      const markLine = (line) => { markedLine = line || 0; placeRowMark(); };
+
+      /// The innermost frame that is in the program, if any is.
+      ///
+      /// A frame carries a line and a byte span but not a file, so the runtime
+      /// cannot say whether it is in what was just typed or in a library
+      /// module that was called. This can: a frame reaching past the end of
+      /// the program is not in the program. Frames arrive innermost first, so
+      /// the first that fits is the nearest place in the program to where it
+      /// actually stopped -- which is the line worth pointing at even when the
+      /// failure itself happened further in.
+      const frameInProgram = (frames, text) => {
+        if (!Array.isArray(frames)) return null;
+        const bytes = new TextEncoder().encode(text).length;
+        const lines = text.split("\n").length;
+        return (
+          frames.find(
+            (f) => f && f.end <= bytes && f.line >= 1 && f.line <= lines
+          ) || null
+        );
       };
 
       const paint = () => {
@@ -1075,11 +1142,19 @@
         const marks = new Map();
         tests.forEach((t, i) => marks.set(t.start, { end: t.end, index: i }));
 
+        const row = document.createElement("div");
+        row.className = "code-lines";
+        const gutter = document.createElement("pre");
+        gutter.className = "gutter";
+        gutter.setAttribute("aria-hidden", "true");
+        const lines = reply.source.split("\n").length;
+        gutter.textContent = Array.from({ length: lines }, (_, i) => i + 1).join("\n");
         const pre = document.createElement("pre");
         const code = document.createElement("code");
         code.innerHTML = highlight(reply.source, marks);
         pre.appendChild(code);
-        pane.appendChild(pre);
+        row.append(gutter, pre);
+        pane.appendChild(row);
         currentSource = reply.source;
         for (const b of code.querySelectorAll(".body-here")) {
           b.addEventListener("click", () =>
@@ -1181,6 +1256,7 @@
           if (reply.printed) for (const line of reply.printed) console.log(line);
         }
         if (reply.ok) {
+          markLine(0);
           outEl.classList.remove("stale");
           outEl.textContent = "";
           const tag = document.createElement("span");
@@ -1204,9 +1280,12 @@
         }
         outEl.classList.remove("stale");
         outEl.textContent = "";
+        // Where in what was typed, if the failure reaches back into it at all.
+        const at = frameInProgram(reply.frames, text);
+        markLine(at ? at.line : 0);
         const err = document.createElement("span");
         err.className = "err";
-        err.textContent = reply.error;
+        err.textContent = at ? `line ${at.line}: ${reply.error}` : reply.error;
         outEl.append(err);
         // The panel has room for the error and no more. The frame dump that
         // the CLI prints to stderr goes to the console instead, so a failure

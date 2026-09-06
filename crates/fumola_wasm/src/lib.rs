@@ -585,11 +585,47 @@ fn insert_key(json: String, key: &str, value: serde_json::Value) -> String {
 /// Only on the failing path, and only from the copy that failed -- the live
 /// instance is left alone, as it was before.
 fn error_of_with_trace(e: &fumola::Error, state: &mut State) -> String {
-    insert_key(
+    let with_trace = insert_key(
         error_of(e),
         "trace",
         serde_json::Value::String(trace_of(state)),
-    )
+    );
+    insert_key(with_trace, "frames", frames_of(state))
+}
+
+/// Where each stack frame is, innermost first, for a host that wants to point
+/// at the line rather than print a dump.
+///
+/// A `SourceKnown` carries lines, columns and a byte span, and no file. So
+/// nothing here can say whether a frame is in the program the host just sent
+/// or somewhere in the library that program called. The host is the one able
+/// to tell: it has the program text, and a frame whose span runs past the end
+/// of it is not in it. Frames without a known source are skipped rather than
+/// reported as position zero, which would point at the first line of whatever
+/// the host chose to blame.
+fn frames_of(state: &mut State) -> serde_json::Value {
+    let mut out = Vec::new();
+    let here = state.semantic_state.cont_source().clone();
+    let mut add = |source: &fumola_syntax::ast::Source| {
+        if let fumola_syntax::ast::Source::Known(k) = source {
+            out.push(serde_json::json!({
+                "line": k.start_line,
+                "col": k.start_col,
+                "endLine": k.end_line,
+                "endCol": k.end_col,
+                "start": k.span.start,
+                "end": k.span.end,
+            }));
+        }
+    };
+    // Where it stopped comes first: that is the innermost position of all.
+    add(&here);
+    if let Ok(stack) = state.semantic_state.agent_stack() {
+        for frame in stack.iter().rev() {
+            add(&frame.source);
+        }
+    }
+    serde_json::Value::Array(out)
 }
 
 fn truncate_debug<T: std::fmt::Debug>(value: &T, max_len: usize) -> String {
