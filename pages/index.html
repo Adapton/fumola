@@ -412,10 +412,12 @@
             not anything has been written there.</td>
           </tr>
           <tr>
-            <td class="form"><span class="eff">@</span><span class="v">p</span> &nbsp;&nbsp; <span class="v">get</span>(<span class="sy">`n</span>)</td>
+            <td class="form"><span class="eff">@</span> <span class="v">p</span> &nbsp;&nbsp; <span class="v">get</span>(<span class="sy">`n</span>)</td>
             <td><strong>get</strong>. Read a cell, <em>recording a
             dependency</em>: an edge from the thunk doing the reading to the
-            cell read. <code>get(`n)</code> is just <code>@pointer(`n)</code>.</td>
+            cell read. <code>get(`n)</code> is <code>@(pointer(`n))</code>
+            &mdash; note the space in <code>@ p</code>, and the brackets
+            here.</td>
           </tr>
           <tr>
             <td class="form"><span class="k">force</span>(<span class="v">p</span>)</td>
@@ -441,6 +443,20 @@
             it again with the same name is what an <em>edit</em> is.</td>
           </tr>
         </table>
+
+        <p>
+          Two things to know about writing <code>@</code>. It must be separated
+          from what it reads &mdash; <code>@ p</code>, not <code>@p</code>
+          &mdash; because an identifier may begin with <code>@</code>, so
+          <code>@p</code> is a single name rather than a read of <code>p</code>.
+          Those names are reserved: Fumola inherits them from the Motoko lineage
+          its syntax comes from, where a program may use the ones the language
+          defines but never define its own. <code>@here</code> and
+          <code>@now</code>, which Fumola adds, are exactly that. And
+          <code>@</code> takes one nullary expression, so reading the result of
+          a call needs brackets: <code>@(pointer(`n))</code>, not
+          <code>@ pointer(`n)</code>.
+        </p>
 
         <details class="aside">
           <summary>footnote: why these colours</summary>
