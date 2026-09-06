@@ -129,11 +129,32 @@
         letter-spacing: 0.1em; padding: 0.8rem 0.35rem;
       }
       .reopen:hover { color: var(--var); }
+      /* With nothing open the outline has the pane to itself. Once a module
+         is showing it takes half, and it can be shut entirely -- reading a
+         file is the common case, and the outline is only in the way then. */
       #modules {
         list-style: none; margin: 0; padding: 0.35rem 0;
         overflow-y: auto;
-        flex: 0 0 auto; max-height: 40%;
+        flex: 1 1 auto; min-height: 0;
         border-bottom: 1px solid var(--rule);
+      }
+      .library.has-source #modules { flex: 0 0 50%; }
+      .library[data-outline="closed"] #modules { display: none; }
+
+      .outline-toggle::before {
+        content: "\25be";           /* a caret, turned when shut */
+        display: inline-block;
+        margin-right: 0.35rem;
+        transition: transform 0.12s;
+      }
+      .library[data-outline="closed"] .outline-toggle::before {
+        transform: rotate(-90deg);
+      }
+      .current {
+        font: 400 0.72rem/1 var(--mono);
+        color: var(--sym);
+        text-transform: none; letter-spacing: 0;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       }
       #modules ul { list-style: none; margin: 0; padding: 0; }
       #modules .dir {
@@ -237,7 +258,11 @@
       <div class="panes">
         <aside class="library">
           <div class="lib-head">
-            <span>the library</span>
+            <button type="button" id="outline-toggle" class="outline-toggle"
+                    aria-expanded="true" title="Show or hide the outline">
+              outline
+            </button>
+            <span class="current" id="current"></span>
             <span class="snaps">
               <button type="button" data-snap="full"  title="Fill the window">full</button>
               <button type="button" data-snap="half"  title="Half the window">half</button>
@@ -396,10 +421,20 @@
         }
       };
 
+      const setOutline = (open) => {
+        libEl.dataset.outline = open ? "open" : "closed";
+        $("outline-toggle").setAttribute("aria-expanded", String(open));
+      };
+
       const showModule = (path, button) => {
         for (const b of document.querySelectorAll("#modules button"))
           b.removeAttribute("aria-current");
         button.setAttribute("aria-current", "true");
+        libEl.classList.add("has-source");
+        $("current").textContent = path.replace(/^fumola\//, "");
+        // Picking a file is the end of navigating, so the outline gets out of
+        // the way. The toggle brings it back at half.
+        setOutline(false);
         const reply = JSON.parse(fumola_module_source(path));
         const pane = $("source");
         pane.textContent = "";
@@ -554,6 +589,9 @@
         const saved = localStorage.getItem(REMEMBER);
         if (saved !== null) setWidth(Number(saved));
       } catch (e) {}
+
+      $("outline-toggle").addEventListener("click", () =>
+        setOutline(libEl.dataset.outline === "closed"));
 
       srcEl.value = START;
       paint();
