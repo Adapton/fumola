@@ -151,18 +151,44 @@
       .hgrip:hover, .hgrip.dragging { background: #2b3f52; }
       .library:not(.has-source) .hgrip,
       .library[data-outline="closed"] .hgrip,
-      .library[data-view="events"] .hgrip { display: none; }
+      .library[data-view="events"] .hgrip,
+      .library[data-view="print"] .hgrip { display: none; }
       body.dragging-v { cursor: row-resize; user-select: none; }
       .library[data-outline="closed"] #modules { display: none; }
 
       .views { display: flex; gap: 0.25rem; }
       .view-tab[aria-current="true"] { color: var(--var); border-color: #3a3a40; }
+      /* Lit while the panel has something in it, so a program that prints
+         says so even when the outline is the view in front. */
+      .view-tab.has-output { color: var(--key); border-color: #3a4a3a; }
+      .view-tab.has-output::after { content: " \2022"; }
 
       /* Only one of the three shows at a time. */
       .library[data-view="events"] #modules,
       .library[data-view="events"] .source,
-      .library[data-view="events"] .outline-toggle { display: none; }
-      .library[data-view="outline"] .events { display: none; }
+      .library[data-view="events"] .outline-toggle,
+      .library[data-view="print"] #modules,
+      .library[data-view="print"] .source,
+      .library[data-view="print"] .outline-toggle { display: none; }
+      .library[data-view="outline"] .events,
+      .library[data-view="print"] .events { display: none; }
+      .library[data-view="outline"] .print,
+      .library[data-view="events"] .print { display: none; }
+
+      .print { flex: 1; min-height: 0; overflow: auto; }
+      .print ol {
+        margin: 0; padding: 0.4rem 0.6rem 0.4rem 3.2rem; list-style: decimal;
+      }
+      .print li {
+        font: 400 var(--lib-font)/1.5 var(--mono);
+        color: var(--fg); padding: 0.1rem 0; white-space: pre-wrap;
+        word-break: break-word; tab-size: 4;
+      }
+      .print li::marker { color: var(--dim); font-size: 0.85em; }
+      /* Each run is a block, so a program that printed twice reads as two
+         runs rather than one long list. */
+      .print li.run-start { border-top: 1px solid var(--rule); margin-top: 0.35rem;
+        padding-top: 0.45rem; }
 
       .events { flex: 1; min-height: 0; overflow: auto; }
       .events table { width: 100%; border-collapse: collapse; }
@@ -191,11 +217,28 @@
       .library[data-outline="closed"] .outline-toggle::before {
         transform: rotate(-90deg);
       }
+      /* A line of its own. Three view tabs, the outline toggle and six
+         sizing buttons already fill the row above, and a path is the one
+         thing there that has no fixed width -- squeezed in beside them it
+         was the first thing to be cut to an ellipsis. */
+      .lib-path {
+        padding: 0.4rem 0.7rem;
+        border-bottom: 1px solid var(--rule);
+        flex: 0 0 auto;
+        min-width: 0;
+      }
+      /* Only once a file is open; there is nothing to name before that, and
+         an empty strip would just be a second border. */
+      .library:not(.has-source) .lib-path,
+      .library[data-view="events"] .lib-path,
+      .library[data-view="print"] .lib-path { display: none; }
       .current {
-        font: 400 0.72rem/1 var(--mono);
+        display: block;
+        font: 400 0.78rem/1.2 var(--mono);
         color: var(--sym);
         text-transform: none; letter-spacing: 0;
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        direction: rtl; text-align: left;      /* keep the filename when it clips */
       }
       #modules ul { list-style: none; margin: 0; padding: 0; }
       /* The tests are a second library, and the one you come here to use, so
@@ -247,6 +290,13 @@
       }
       .run-here:hover { color: var(--var); border-bottom-color: var(--var); }
       .run-here[aria-current="true"] { color: var(--var); background: #1c2a1c; }
+      .body-here {
+        font: inherit; font-size: 0.85em; font-style: normal;
+        color: var(--dim); background: none; cursor: pointer;
+        border: 1px solid var(--rule); border-radius: 2px;
+        padding: 0 0.3em; margin-left: 0.5em;
+      }
+      .body-here:hover { color: var(--var); border-color: #3a3a40; }
 
       .source .empty { padding: 0.9rem; color: var(--dim); font: italic 0.85rem/1.5 var(--ui); }
 
@@ -330,12 +380,12 @@
         <aside class="library">
           <div class="lib-head">
             <span class="views">
-              <button type="button" class="view-tab" data-view="outline">outline</button>
+              <button type="button" class="view-tab" data-view="outline">library</button>
               <button type="button" class="view-tab" data-view="events">events</button>
+              <button type="button" class="view-tab" data-view="print">print</button>
             </span>
             <button type="button" id="outline-toggle" class="outline-toggle"
                     aria-expanded="true" title="Show or hide the outline"></button>
-            <span class="current" id="current"></span>
             <span class="snaps">
               <button type="button" id="lib-smaller" title="Smaller library text">A&minus;</button>
               <button type="button" id="lib-default" title="Default library text size">A0</button>
@@ -345,6 +395,7 @@
               <button type="button" data-snap="close" title="Hide the library">hide</button>
             </span>
           </div>
+          <div class="lib-path"><span class="current" id="current"></span></div>
           <ul id="modules"></ul>
           <div class="hgrip" id="hgrip" role="separator" aria-orientation="horizontal"
                aria-label="Resize the outline"></div>
@@ -355,10 +406,17 @@
             <table><tbody id="events-body"></tbody></table>
             <div class="empty" id="events-empty">No events yet.</div>
           </div>
+          <div class="print" id="print">
+            <ol id="print-body"></ol>
+            <div class="empty" id="print-empty">
+              Nothing printed yet. Call <code>print("hello")</code>, or
+              <code>print</code> any value, and it appears here.
+            </div>
+          </div>
         </aside>
         <div class="grip" id="grip" role="separator" aria-orientation="vertical"
              aria-label="Resize the library"></div>
-        <button class="reopen" id="reopen" hidden>navigation &middot; library, tests, events</button>
+        <button class="reopen" id="reopen" hidden>navigation &middot; library, tests, events, print</button>
 
         <section class="work">
           <div class="editor">
@@ -416,7 +474,9 @@
           const mark = marks && marks.get(t.start);
           if (mark) {
             html += `<button class="run-here" data-test="${mark.index}" ` +
-                    `title="Run this test">${esc(text.slice(t.start, mark.end))}</button>`;
+                    `title="Run this test">${esc(text.slice(t.start, mark.end))}</button>` +
+                    `<button class="body-here" data-test="${mark.index}" ` +
+                    `title="Put this test's code in the editor">body</button>`;
             at = mark.end;
             continue;
           }
@@ -522,10 +582,138 @@
               // Where `#[test]` sits, so the source view can make it a link.
               start: t[i].start,
               end: t[i + 3].start + t[i + 3].len,
+              // And where its body is, so the source view can hand it over
+              // to be edited. Found by matching braces from the first `{`
+              // after the signature.
+              body: bodyRange(t, text, i + 6),
             });
           }
         }
         return found;
+      };
+
+      /// The span inside the braces of the function whose name is at `from`.
+      const bodyRange = (t, text, from) => {
+        let j = from;
+        while (j < t.length && text(j) !== "{") j += 1;
+        if (j >= t.length) return null;
+        let depth = 0;
+        for (let k = j; k < t.length; k += 1) {
+          const w = text(k);
+          if (w === "{") depth += 1;
+          else if (w === "}") {
+            depth -= 1;
+            if (depth === 0) {
+              return { start: t[j].start + 1, end: t[k].start };
+            }
+          }
+        }
+        return null;
+      };
+
+      /// Every `public` binding, with the module scope it sits in.
+      const exportsOf = (source) => {
+        let reply;
+        try { reply = JSON.parse(fumola_tokens(source)); } catch (e) { return []; }
+        if (!reply.ok) return [];
+        const t = reply.tokens.filter((x) => x.kind !== "space" && x.kind !== "comment");
+        const text = (i) => (t[i] ? source.slice(t[i].start, t[i].start + t[i].len) : "");
+        const out = [];
+        const scopes = [];
+        let depth = 0, pending = null;
+        for (let i = 0; i < t.length; i += 1) {
+          const w = text(i);
+          if (w === "{") {
+            depth += 1;
+            if (pending !== null) { scopes.push({ depth, name: pending }); pending = null; }
+            continue;
+          }
+          if (w === "}") {
+            while (scopes.length && scopes[scopes.length - 1].depth >= depth) scopes.pop();
+            depth -= 1;
+            continue;
+          }
+          if (w !== "public") continue;
+          const kind = text(i + 1);
+          if (!["func", "module", "let", "var", "type"].includes(kind)) continue;
+          out.push({ name: text(i + 2), scope: scopes.map((sc) => sc.name).join(".") });
+          if (kind === "module") pending = text(i + 2);
+        }
+        return out;
+      };
+
+      /// The module's own imports, as the editor would have to write them.
+      /// Every import path in the library is a bare name resolved in the
+      /// importing file's directory -- which is what the symlinks under
+      /// `fumola/` are working around -- so re-addressing one from the top
+      /// level is just putting that directory in front of it.
+      const importsOf = (source, path) => {
+        const dir = path.replace(/\/[^/]*$/, "");
+        const out = [];
+        const re = /\bimport\s+([A-Za-z_][A-Za-z0-9_]*)\s+"([^"]*)"/g;
+        let m;
+        while ((m = re.exec(source)) !== null)
+          out.push({ alias: m[1], path: m[2].includes("/") ? m[2] : `${dir}/${m[2]}` });
+        return out;
+      };
+
+      /// Inside the module, a test calls its neighbours by their bare names.
+      /// Outside it, those names are gone, so the pasted body would be red
+      /// on arrival. Put the module back in front of the ones that came from
+      /// it, and leave everything else -- locals, the prelude, the private
+      /// helpers we cannot reach anyway -- untouched.
+      const qualify = (body, test, source) => {
+        const all = exportsOf(source);
+        const prefix = new Map();
+        for (const e of all) if (!e.scope) prefix.set(e.name, "M.");
+        // A name in the test's own module is the nearer one, so it wins.
+        if (test.scope)
+          for (const e of all)
+            if (e.scope === test.scope) prefix.set(e.name, `M.${test.scope}.`);
+        if (!prefix.size) return { text: body, changed: 0 };
+
+        let reply;
+        try { reply = JSON.parse(fumola_tokens(body)); } catch (e) { return { text: body, changed: 0 }; }
+        if (!reply.ok) return { text: body, changed: 0 };
+        const t = reply.tokens.filter((x) => x.kind !== "space" && x.kind !== "comment");
+        const text = (i) => (t[i] ? body.slice(t[i].start, t[i].start + t[i].len) : "");
+
+        // Anything the body binds for itself shadows the module's version.
+        const local = new Set();
+        for (let i = 0; i < t.length; i += 1) {
+          const w = text(i);
+          if (w === "func" || w === "module") { local.add(text(i + 1)); continue; }
+          if (w !== "let" && w !== "var") continue;
+          for (let j = i + 1; j < t.length; j += 1) {
+            const u = text(j);
+            if (u === "=" || u === ";" || u === "in") break;
+            if (t[j].kind === "ident") local.add(u);
+          }
+        }
+
+        const DECL = ["func", "module", "type", "let", "var", "label", "."];
+        let out = "", at = 0, changed = 0;
+        for (let i = 0; i < t.length; i += 1) {
+          const w = text(i);
+          if (t[i].kind !== "ident" && t[i].kind !== "type") continue;
+          if (!prefix.has(w) || local.has(w)) continue;
+          if (i > 0 && (DECL.includes(text(i - 1)) || text(i - 1) === "`")) continue;
+          if (text(i + 1) === "=") continue;          // a field, or a binding
+          out += body.slice(at, t[i].start) + prefix.get(w);
+          at = t[i].start;
+          changed += 1;
+        }
+        return { text: out + body.slice(at), changed };
+      };
+
+      /// Strip the indentation the body had inside its module.
+      const dedent = (block) => {
+        const lines = block.replace(/^\n/, "").replace(/\s+$/, "").split("\n");
+        const indents = lines
+          .filter((l) => l.trim())
+          .map((l) => l.match(/^[ \t]*/)[0].length);
+        const cut = indents.length ? Math.min(...indents) : 0;
+        return lines.map((l) => l.slice(cut)).join("\n");
       };
 
       // Clicking one writes the call that runs it from outside the module,
@@ -701,6 +889,42 @@
         if (view === "events") refreshEvents();
       };
 
+      /// Fumola's lexer recognises `\n` and `\t` well enough to know they do
+      /// not end a string, but never turns them into the characters they name
+      /// -- so a printed line arrives holding a backslash and an `n`. Showing
+      /// them as the line break and tab they were written for is a display
+      /// convention here, not an unescaping: there is no escaped form in the
+      /// value to undo.
+      const unescapeText = (line) =>
+        line.replace(/\\([nt\\])/g, (_, c) =>
+          c === "n" ? "\n" : c === "t" ? "\t" : "\\");
+
+      /// What `prim "print"` wrote during the run that just finished.
+      ///
+      /// The CLI puts these on stdout, and they are often the whole reason a
+      /// test prints at all -- the numbers it is about to assert on. There is
+      /// no stdout in a browser, so they come here instead.
+      ///
+      /// This run's, not every run's. The program is re-evaluated on each
+      /// keystroke, so accumulating would add another copy of the same lines
+      /// per character typed; what is wanted is what the program prints now.
+      const showPrint = (lines) => {
+        const body = $("print-body");
+        body.textContent = "";
+        for (const line of lines || []) {
+          const li = document.createElement("li");
+          li.textContent = unescapeText(line);
+          body.appendChild(li);
+        }
+        const any = !!(lines && lines.length);
+        $("print-empty").hidden = any;
+        // Lit exactly while there is something to read, so the tab answers
+        // "is there anything in there?" without being opened.
+        document
+          .querySelector('.view-tab[data-view="print"]')
+          .classList.toggle("has-output", any);
+      };
+
       const setOutline = (open) => {
         libEl.dataset.outline = open ? "open" : "closed";
         $("outline-toggle").setAttribute("aria-expanded", String(open));
@@ -713,6 +937,34 @@
         paint();
         evaluate();
       };
+
+      // The test's own code, ready to change, rather than a call to it. The
+      // import comes too, since the body will lean on the module's names --
+      // and where it leans on them unqualified, that is the first thing to
+      // fix by hand, which is the point of having it here.
+      const loadTestBody = (path, test) => {
+        if (!test.body) return;
+        const name = `${test.scope ? test.scope + "." : ""}${test.name}`;
+        const { text, changed } = qualify(
+          dedent(currentSource.slice(test.body.start, test.body.end)), test, currentSource
+        );
+        // Only the imports this body actually reaches for; the module's
+        // other six would be noise around three lines of test.
+        const used = importsOf(currentSource, path).filter((im) =>
+          new RegExp(`\\b${im.alias}\\b`).test(text)
+        );
+        srcEl.value =
+          [`import M "${path}";`]
+            .concat(used.map((im) => `import ${im.alias} "${im.path}";`))
+            .join("\n") +
+          `\n// ${name}` +
+          (changed ? ", with its own module's names qualified" : "") +
+          `\n${text}`;
+        paint();
+        evaluate();
+      };
+
+      let currentSource = "";
 
       const showModule = (path, button, focus) => {
         for (const b of document.querySelectorAll("#modules button"))
@@ -741,6 +993,11 @@
         code.innerHTML = highlight(reply.source, marks);
         pre.appendChild(code);
         pane.appendChild(pre);
+        currentSource = reply.source;
+        for (const b of code.querySelectorAll(".body-here")) {
+          b.addEventListener("click", () =>
+            loadTestBody(path, tests[Number(b.dataset.test)]));
+        }
         const links = code.querySelectorAll(".run-here");
         for (const b of links) {
           const t = tests[Number(b.dataset.test)];
@@ -825,6 +1082,17 @@
         } catch (e) {
           return;
         }
+        // Both places: the panel is where it is meant to be read, the
+        // console is where a browser's own tooling can search it.
+        //
+        // Not while the program is half-typed, though. A syntax error runs
+        // nothing and so prints nothing, and blanking the panel on every
+        // keystroke mid-edit would make it flicker; the last good run's
+        // output stands until this one parses, as the answer below does.
+        if (reply.kind !== "syntax") {
+          showPrint(reply.printed);
+          if (reply.printed) for (const line of reply.printed) console.log(line);
+        }
         if (reply.ok) {
           outEl.classList.remove("stale");
           outEl.textContent = "";
@@ -853,6 +1121,10 @@
         err.className = "err";
         err.textContent = reply.error;
         outEl.append(err);
+        // The panel has room for the error and no more. The frame dump that
+        // the CLI prints to stderr goes to the console instead, so a failure
+        // here can be read the same way as one in a terminal.
+        if (reply.trace) console.error(`${reply.error}\n\n${reply.trace}`);
         refreshEvents();   // the failed program may still have written
       };
 
