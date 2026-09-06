@@ -383,8 +383,11 @@
       }
       .work { position: relative; }
       /* Only while what is in the editor is still the preset it came from. */
-      .share {
+      .corner {
         position: absolute; right: 0.7rem; bottom: 0.6rem;
+        display: flex; gap: 0.4rem;
+      }
+      .share {
         font: 400 0.72rem/1 var(--mono); letter-spacing: 0.06em;
         color: var(--dim); background: var(--panel);
         border: 1px solid var(--rule); border-radius: 2px;
@@ -480,8 +483,12 @@
           <div class="out" id="out"></div>
           <!-- Outside .out on purpose: every evaluation clears that panel's
                contents, and a button living inside it would be cleared too. -->
-          <button type="button" id="share" class="share" hidden
-                  title="Copy a link to this example"></button>
+          <div class="corner">
+            <button type="button" id="hush" class="share" hidden
+                    title="Comment out every assert, to re-introduce them one at a time">// assert</button>
+            <button type="button" id="share" class="share" hidden
+                    title="Copy a link to this example"></button>
+          </div>
         </section>
       </div>
     </div>
@@ -1170,6 +1177,75 @@
         showShare();
       };
 
+      /// Comment out every assertion in the editor.
+      ///
+      /// Editing a test body means its assertions describe the old code, and
+      /// they fail one at a time in whatever order the program happens to
+      /// reach them -- which tells you about the first one and hides the rest.
+      /// Commenting them all out gets the body running again, and they come
+      /// back one at a time, as choices.
+      ///
+      /// Only lines that start with `assert`, and only in the editor: the
+      /// library on the left is read-only.
+      /// Where each `assert` statement begins and ends.
+      ///
+      /// A whole statement, not a line: an assertion can run over several,
+      /// and levelTree's testGeom2d does --
+      ///     assert (g ==
+      ///       { height = 8;
+      ///         width = 10; ... });
+      /// -- so commenting only the first line leaves an orphaned record
+      /// behind and the program is worse off than before. The end is the `;`
+      /// that closes it at bracket depth zero, found over the token stream so
+      /// that a brace inside a string or a comment cannot move it.
+      const assertStatements = (text) => {
+        let reply;
+        try { reply = JSON.parse(fumola_tokens(text)); } catch (e) { return []; }
+        if (!reply.ok) return [];
+        const t = reply.tokens.filter(
+          (x) => x.kind !== "space" && x.kind !== "comment"
+        );
+        const at = (i) => (t[i] ? text.slice(t[i].start, t[i].start + t[i].len) : "");
+        const STARTS = [";", "{", "}"];
+        const out = [];
+        for (let i = 0; i < t.length; i += 1) {
+          if (at(i) !== "assert") continue;
+          if (i > 0 && !STARTS.includes(at(i - 1))) continue;
+          let depth = 0, end = t[i].start + t[i].len;
+          for (let j = i; j < t.length; j += 1) {
+            const w = at(j);
+            if (w === "(" || w === "{" || w === "[") depth += 1;
+            else if (w === ")" || w === "}" || w === "]") depth -= 1;
+            if (depth < 0) break;              // the block around it closed
+            end = t[j].start + t[j].len;
+            if (w === ";" && depth === 0) break;
+          }
+          out.push({ start: t[i].start, end });
+        }
+        return out;
+      };
+
+      const commentAsserts = () => {
+        const text = srcEl.value;
+        const spans = assertStatements(text);
+        if (!spans.length) return;
+        const lineOf = (off) => text.slice(0, off).split("\n").length - 1;
+        const hush = new Set();
+        for (const sp of spans)
+          for (let l = lineOf(sp.start); l <= lineOf(Math.max(sp.start, sp.end - 1)); l += 1)
+            hush.add(l);
+        srcEl.value = text
+          .split("\n")
+          .map((l, i) => (hush.has(i) ? l.replace(/^(\s*)/, "$1// ") : l))
+          .join("\n");
+        // The editor no longer holds what a link would claim it holds.
+        clearPreset();
+        paint();
+        evaluate();
+      };
+
+      const showHush = (on) => { $("hush").hidden = !on; };
+
       const showShare = () => {
         const b = $("share");
         b.hidden = !preset;
@@ -1351,6 +1427,7 @@
         }
         if (reply.ok) {
           markLine(0);
+          showHush(false);
           outEl.classList.remove("stale");
           outEl.textContent = "";
           const tag = document.createElement("span");
@@ -1377,6 +1454,11 @@
         // Where in what was typed, if the failure reaches back into it at all.
         const at = frameInProgram(reply.frames, text);
         markLine(at ? at.line : 0);
+        // Offered for any assertion that came from this text, whether the
+        // text is an edited test body or something written from scratch.
+        showHush(
+          /AssertionFailure/.test(reply.error) && /^\s*assert\b/m.test(text)
+        );
         const err = document.createElement("span");
         err.className = "err";
         err.textContent = at ? `line ${at.line}: ${reply.error}` : reply.error;
@@ -1400,6 +1482,8 @@
         paint();
         schedule();
       });
+
+      $("hush").addEventListener("click", commentAsserts);
 
       $("share").addEventListener("click", async () => {
         const b = $("share");
