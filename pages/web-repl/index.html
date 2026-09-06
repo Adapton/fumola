@@ -144,6 +144,33 @@
       .library.has-source #modules { flex: 0 0 50%; }
       .library[data-outline="closed"] #modules { display: none; }
 
+      .views { display: flex; gap: 0.25rem; }
+      .view-tab[aria-current="true"] { color: var(--var); border-color: #3a3a40; }
+
+      /* Only one of the three shows at a time. */
+      .library[data-view="events"] #modules,
+      .library[data-view="events"] .source,
+      .library[data-view="events"] .outline-toggle { display: none; }
+      .library[data-view="outline"] .events { display: none; }
+
+      .events { flex: 1; min-height: 0; overflow: auto; }
+      .events table { width: 100%; border-collapse: collapse; }
+      .events td {
+        font: 400 var(--lib-font)/1.5 var(--mono);
+        padding: 0.15rem 0.5rem;
+        vertical-align: baseline;
+      }
+      /* One band per meta-time, alternating -- so a group of events that
+         happened at the same moment reads as one block. */
+      .events tr.band0 td { background: #0d0d11; }
+      .events tr.band1 td { background: #16161c; }
+      .events td.mt {
+        text-align: right; color: var(--dim);
+        width: 3.5em; white-space: nowrap;
+        border-right: 1px solid var(--rule);
+      }
+      .events td.ev { white-space: pre-wrap; word-break: break-word; }
+
       .outline-toggle::before {
         content: "\25be";           /* a caret, turned when shut */
         display: inline-block;
@@ -262,10 +289,12 @@
       <div class="panes">
         <aside class="library">
           <div class="lib-head">
+            <span class="views">
+              <button type="button" class="view-tab" data-view="outline">outline</button>
+              <button type="button" class="view-tab" data-view="events">events</button>
+            </span>
             <button type="button" id="outline-toggle" class="outline-toggle"
-                    aria-expanded="true" title="Show or hide the outline">
-              outline
-            </button>
+                    aria-expanded="true" title="Show or hide the outline"></button>
             <span class="current" id="current"></span>
             <span class="snaps">
               <button type="button" id="lib-smaller" title="Smaller library text">A&minus;</button>
@@ -278,6 +307,10 @@
           <ul id="modules"></ul>
           <div class="source" id="source">
             <div class="empty">Pick a module to read its source.</div>
+          </div>
+          <div class="events" id="events">
+            <table><tbody id="events-body"></tbody></table>
+            <div class="empty" id="events-empty">No events yet.</div>
           </div>
         </aside>
         <div class="grip" id="grip" role="separator" aria-orientation="vertical"
@@ -435,6 +468,63 @@
         }
       };
 
+      // ---- the event log, watched as you edit ---------------------------
+      // Asking for the events does not add any -- peekEvents is a read -- so
+      // this can refresh on every evaluation without disturbing what it is
+      // showing.
+      const eventsEl = $("events");
+      const refreshEvents = () => {
+        if (libEl.dataset.view !== "events" || !ready) return;
+        const body = $("events-body");
+        const empty = $("events-empty");
+
+        let reply;
+        try {
+          reply = JSON.parse(fumola_eval_top(instance, "Adapton.peekEvents()"));
+        } catch (e) { return; }
+        if (!reply.ok || reply.tag !== "List") {
+          body.textContent = "";
+          empty.hidden = false;
+          // A simple-semantics instance keeps no graph to report on.
+          empty.textContent = reply.ok ? "No events to show." : reply.error;
+          return;
+        }
+
+        // Follow the tail, but do not yank the view away from someone who has
+        // scrolled up to read.
+        const atEnd =
+          eventsEl.scrollHeight - eventsEl.scrollTop - eventsEl.clientHeight < 40;
+
+        body.textContent = "";
+        let band = 0, lastMeta = null;
+        for (const row of reply.value) {
+          const fields = row && row.value ? row.value : {};
+          const meta = fields.metaTime ? String(fields.metaTime.value) : "";
+          if (meta !== lastMeta) { band = 1 - band; lastMeta = meta; }
+
+          const tr = document.createElement("tr");
+          tr.className = "band" + band;
+          const mt = document.createElement("td");
+          mt.className = "mt";
+          mt.textContent = meta;
+          const ev = document.createElement("td");
+          ev.className = "ev";
+          ev.innerHTML = highlight(show(fields.event)).replace(/\n$/, "");
+          tr.append(mt, ev);
+          body.appendChild(tr);
+        }
+        empty.hidden = reply.value.length > 0;
+        empty.textContent = "No events yet.";
+        if (atEnd) eventsEl.scrollTop = eventsEl.scrollHeight;
+      };
+
+      const setView = (view) => {
+        libEl.dataset.view = view;
+        for (const t of document.querySelectorAll(".view-tab"))
+          t.setAttribute("aria-current", String(t.dataset.view === view));
+        if (view === "events") refreshEvents();
+      };
+
       const setOutline = (open) => {
         libEl.dataset.outline = open ? "open" : "closed";
         $("outline-toggle").setAttribute("aria-expanded", String(open));
@@ -526,6 +616,7 @@
           const body = document.createElement("span");
           body.innerHTML = highlight(show(reply)).replace(/\n$/, "");
           outEl.append(tag, body);
+          refreshEvents();
           return;
         }
         // Half-typed programs are syntax errors most of the time, and
@@ -541,6 +632,7 @@
         err.className = "err";
         err.textContent = reply.error;
         outEl.append(err);
+        refreshEvents();   // the failed program may still have written
       };
 
       const schedule = () => {
@@ -634,6 +726,9 @@
 
       $("outline-toggle").addEventListener("click", () =>
         setOutline(libEl.dataset.outline === "closed"));
+      for (const t of document.querySelectorAll(".view-tab"))
+        t.addEventListener("click", () => setView(t.dataset.view));
+      setView("outline");
 
       srcEl.value = START;
       paint();
