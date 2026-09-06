@@ -345,11 +345,15 @@
       }
       .editor > pre { pointer-events: none; color: var(--fg); background: var(--bg); }
       /* The browser's own stylesheet sets `code { font-family: monospace }`,
-         which beats what `pre` inherits down -- so the highlighted layer was
-         drawn in a different typeface from the textarea over it, at the same
-         size, and every character was a slightly different width. The caret
-         drifted further from its text the further along a line it went. */
-      .editor > pre > code { font: inherit; letter-spacing: inherit; }
+         which beats what `pre` inherits down. Same size, different typeface,
+         and therefore different metrics -- which goes wrong twice over.
+         In the editor the caret drifted further from its text the further
+         along a line it went. In the library it drifted DOWNWARD: the real
+         line boxes came out at 27.1px against the gutter's 25.59px, so over
+         439 lines of mergeSort the numbers ran out 26 lines early. Both are
+         the same missing declaration. */
+      .editor > pre > code,
+      .source pre > code { font: inherit; letter-spacing: inherit; }
       .editor > textarea {
         color: transparent;
         background: transparent;
