@@ -161,6 +161,32 @@
       }
       .aside code { color: var(--sym); }
 
+      /* ---- copyable heading anchors -------------------------------------- */
+
+      h2, h3 { position: relative; }
+      .anchor {
+        margin-left: 0.6ch;
+        border-bottom: none;
+        color: var(--dim);
+        opacity: 0;
+        font-weight: 400;
+        text-transform: none;
+        transition: opacity 0.12s ease;
+      }
+      h2:hover .anchor, h3:hover .anchor, .anchor:focus-visible { opacity: 1; }
+      .anchor:hover { color: var(--blue); border-bottom: none; }
+      /* absolutely positioned so confirming a copy never nudges the layout */
+      .anchor[data-copied]::after {
+        content: "link copied";
+        position: absolute;
+        margin-left: 0.8ch;
+        font: 400 0.68rem/1.6 var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: none;
+        white-space: nowrap;
+        color: var(--green);
+      }
+
       /* ---- footnotes: an aside is collapsed until asked for ------------- */
 
       details.aside > summary {
@@ -295,7 +321,7 @@
       </header>
 
       <section id="language">
-        <h2>The language</h2>
+        <h2>The language<a class="anchor" href="#language" aria-label="Copy link to this heading">#</a></h2>
         <p>
           Fumola is two things joined. Its surface is conventional and
           borrowed: functions, records, variants, modules, pattern matching,
@@ -328,7 +354,7 @@
       </section>
 
       <section id="adapton">
-        <h2>Adapton, briefly</h2>
+        <h2>Adapton, briefly<a class="anchor" href="#adapton" aria-label="Copy link to this heading">#</a></h2>
         <p>
           Adapton is a way of running a program so that changing its input does
           not mean running it again. As the program executes it builds a
@@ -361,7 +387,7 @@
       </section>
 
       <section id="primitives">
-        <h2>The primitives</h2>
+        <h2>The primitives<a class="anchor" href="#primitives" aria-label="Copy link to this heading">#</a></h2>
         <p>
           There are not many. Two ways to make a node, two ways to depend on
           one, one way to look without depending, and a way to say where the
@@ -424,7 +450,7 @@
         </p>
         </details>
 
-        <h3>Names are values</h3>
+        <h3 id="names-are-values">Names are values<a class="anchor" href="#names-are-values" aria-label="Copy link to this heading">#</a></h3>
         <p>
           A name in Fumola is a <strong>symbol</strong>, and symbols are
           first-order data. An identifier is a symbol, written with a leading
@@ -437,7 +463,7 @@
 <span class="n">7</span>                      <span class="c">// a number is a symbol too</span>
 <span class="sy">`adapton</span>(<span class="sy">`settings</span>)    <span class="c">// application, and it nests</span></code></pre>
 
-        <h3>Space and time</h3>
+        <h3 id="space-and-time">Space and time<a class="anchor" href="#space-and-time" aria-label="Copy link to this heading">#</a></h3>
         <p>
           The Recipe's extension is that a name has two dimensions, not one.
           <strong>Space</strong> is where a cell lives: put <code>`x</code>
@@ -454,7 +480,7 @@
       </section>
 
       <section id="modes">
-        <h2>Two modes</h2>
+        <h2>Two modes<a class="anchor" href="#modes" aria-label="Copy link to this heading">#</a></h2>
         <p>
           A Fumola program runs in one of two modes, and which one it is in is
           decided by whether a force is underway.
@@ -479,7 +505,7 @@
       </section>
 
       <section id="semantics">
-        <h2>Two semantics: graphical and simple</h2>
+        <h2>Two semantics: graphical and simple<a class="anchor" href="#semantics" aria-label="Copy link to this heading">#</a></h2>
         <p>
           The primitives above have two implementations in the runtime, and an
           instance runs one or the other. <strong>Graphical</strong> is the
@@ -520,7 +546,7 @@
       </section>
 
       <section id="try">
-        <h2>Try it</h2>
+        <h2>Try it<a class="anchor" href="#try" aria-label="Copy link to this heading">#</a></h2>
         <p>
           The runtime this host serves, running here. One graphical instance
           &mdash; Fumola's default &mdash; that persists across every program
@@ -545,7 +571,7 @@
       </section>
 
       <section id="mergesort">
-        <h2>mergeSort, drawn as a graph</h2>
+        <h2>mergeSort, drawn as a graph<a class="anchor" href="#mergesort" aria-label="Copy link to this heading">#</a></h2>
         <p>
           Demand-driven <code>mergeSort</code> on 44 unsorted elements, drawn
           as its DCG. The input list is the column of green boxes on the left;
@@ -571,7 +597,7 @@
       </section>
 
       <section id="hazel">
-        <h2>Fumola in Hazel</h2>
+        <h2>Fumola in Hazel<a class="anchor" href="#hazel" aria-label="Copy link to this heading">#</a></h2>
         <p>
           <a href="https://hazel.org">Hazel</a> is a live functional programming
           environment: every edit state has a meaning, so a program has a result
@@ -641,7 +667,7 @@
       <!-- #publications and #drafts, like #hazel, are linked to from
            elsewhere. Keep these three ids stable. -->
       <section id="publications">
-        <h2>Publications</h2>
+        <h2>Publications<a class="anchor" href="#publications" aria-label="Copy link to this heading">#</a></h2>
         <p>
           Fumola's primitives come from two papers in particular. Between them
           they are the primitives above: the first is the machinery, the second
@@ -682,7 +708,7 @@
         </p>
         </details>
 
-        <h3>Hazel</h3>
+        <h3 id="hazel-papers">Hazel<a class="anchor" href="#hazel-papers" aria-label="Copy link to this heading">#</a></h3>
         <p>
           The environment the <a href="#hazel">integration</a> above plugs into,
           and the mechanism it plugs in through.
@@ -720,7 +746,7 @@
       </section>
 
       <section id="drafts">
-        <h2>Drafts</h2>
+        <h2>Drafts<a class="anchor" href="#drafts" aria-label="Copy link to this heading">#</a></h2>
         <p>
           A line of work on <strong>typing</strong> these primitives, rather
           than only running them. If names decide what gets reused, then using
@@ -756,7 +782,7 @@
           Drafts, and they stayed drafts &mdash; neither the theory nor the
           implementation was finished at the time.
         </p>
-        <h3 id="human-fungi-interface">Human-Fungi Interface</h3>
+        <h3 id="human-fungi-interface">Human-Fungi Interface<a class="anchor" href="#human-fungi-interface" aria-label="Copy link to this heading">#</a></h3>
         <p>
           Something did get built, though. <a href="https://github.com/rvanasa/fungi-vis">Human-Fungi
           Interface</a>, by <a href="https://ryanvandersmith.com">Ryan
@@ -783,7 +809,7 @@
           The reason to take it up is not only that it was unfinished. It was a
           pleasure the first time.
         </p>
-        <h3 id="abstract-interpretation">Abstract interpretation as another lens (beyond just types)</h3>
+        <h3 id="abstract-interpretation">Abstract interpretation as another lens (beyond just types)<a class="anchor" href="#abstract-interpretation" aria-label="Copy link to this heading">#</a></h3>
         <p>
           In 2025, conversations with
           <a href="https://www.colorado.edu/cs/bor-yuh-evan-chang">Bor-Yuh Evan
@@ -812,7 +838,7 @@
       </section>
 
       <section id="views">
-        <h2>Three ways of looking</h2>
+        <h2>Three ways of looking<a class="anchor" href="#views" aria-label="Copy link to this heading">#</a></h2>
         <p>
           Three interfaces to the same idea, eight years apart. Each has had
           something the other two lacked, and none has yet had everything.
@@ -825,7 +851,7 @@
           <a href="#publications">Hazel papers</a> this work is built on.
         </p>
 
-        <h3>2018 &mdash; the derivations</h3>
+        <h3 id="the-derivations">2018 &mdash; the derivations<a class="anchor" href="#the-derivations" aria-label="Copy link to this heading">#</a></h3>
         <p>
           Human-Fungi Interface put a Fungi program in a browser and drew what
           the type system knew about it: the expression, its type, its effects,
@@ -835,7 +861,7 @@
           change the program: it read bundles generated ahead of time.
         </p>
 
-        <h3>Now &mdash; the graph</h3>
+        <h3 id="the-graph">Now &mdash; the graph<a class="anchor" href="#the-graph" aria-label="Copy link to this heading">#</a></h3>
         <p>
           The <a href="http://matthewhammer.org/replayground/mergeSort44.html">replayground</a>
           draws a whole run as a scene you move through &mdash; the
@@ -847,7 +873,7 @@
           editing is still listed under future work.
         </p>
 
-        <h3>Next &mdash; both, and live</h3>
+        <h3 id="both-and-live">Next &mdash; both, and live<a class="anchor" href="#both-and-live" aria-label="Copy link to this heading">#</a></h3>
         <p>
           <a href="#hazel">Hazel</a> is the one where the program is editable
           and still means something while you are halfway through typing it.
@@ -882,7 +908,7 @@
       </section>
 
       <section id="runtime">
-        <h2>The runtime this host serves</h2>
+        <h2>The runtime this host serves<a class="anchor" href="#runtime" aria-label="Copy link to this heading">#</a></h2>
         <p>
           Alongside this page: <code>fumola_wasm.js</code>, the wasm-bindgen
           glue, and <code>fumola_wasm_bg.wasm</code>, the runtime. Both are
@@ -913,7 +939,7 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
       </section>
 
       <section id="links">
-        <h2>Where to go next</h2>
+        <h2>Where to go next<a class="anchor" href="#links" aria-label="Copy link to this heading">#</a></h2>
         <ul class="links">
           <li>
             <span class="what">Adapton/fumola</span>
@@ -976,6 +1002,39 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
     </main>
 
     <script type="module">
+      // Heading anchors. They are real links, so they work with JavaScript
+      // off; this only adds the clipboard copy on top.
+      document.addEventListener("click", (e) => {
+        const a = e.target.closest(".anchor");
+        if (!a) return;
+        const url = location.origin + location.pathname + new URL(a.href).hash;
+        const done = () => {
+          a.setAttribute("data-copied", "");
+          setTimeout(() => a.removeAttribute("data-copied"), 1400);
+        };
+        // The async clipboard needs a secure origin and, in most browsers, a
+        // real user gesture. Both hold for an actual click on https or
+        // localhost -- but not always, so fall back to the old textarea
+        // trick rather than leave the click looking like it did nothing.
+        const fallback = () => {
+          const t = document.createElement("textarea");
+          t.value = url;
+          t.setAttribute("readonly", "");
+          t.style.cssText = "position:fixed;top:-9999px;opacity:0";
+          document.body.appendChild(t);
+          t.select();
+          let okay = false;
+          try { okay = document.execCommand("copy"); } catch (_) {}
+          t.remove();
+          if (okay) done();
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(done, fallback);
+        } else {
+          fallback();
+        }
+      });
+
       import init, {
         fumola_create,
         fumola_ensure_mode,
