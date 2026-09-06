@@ -89,9 +89,10 @@ jobs:
       # Fumola and load the runtime published beside them, which is a
       # document to review in a diff, not a heredoc buried in a workflow.
       #
-      # The whole tree is copied, so pages/web-repl/index.html is served at
-      # /web-repl/. A directory rather than web-repl.html because Pages does
-      # not route extensionless paths with .nojekyll in place.
+      # The whole tree is copied, so pages/web-play/index.html is served at
+      # /web-play/. A directory rather than web-play.html because Pages does
+      # not route extensionless paths with .nojekyll in place. pages/web-repl/
+      # is a redirect to it, kept because links to the old path were shared.
       - name: Add the site pages
         run: |
           cp -r pages/. site/

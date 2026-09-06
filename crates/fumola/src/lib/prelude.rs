@@ -3,7 +3,7 @@
 //! Two hosts bind these names at the top level of a runtime -- the CLI in
 //! `bin/fumola.rs`, and `fumola_wasm` for its JavaScript hosts -- and they had
 //! each kept their own list. The lists drifted the moment `print` was added to
-//! `fumola/system/prelude.fumola`: the web REPL bound it and the CLI did not,
+//! `fumola/system/prelude.fumola`: the browser bound it and the CLI did not,
 //! so `print("hello")` worked in one and was an unbound identifier in the
 //! other. One list, in one place, so that cannot happen again. `names_match`
 //! is the guard that keeps it honest against the `.fumola` file itself.
