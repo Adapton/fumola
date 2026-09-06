@@ -731,16 +731,33 @@ impl Exp {
         fields.vec.push_front(field1);
         Exp::Object((None, Some(fields)))
     }
-    pub fn obj_base_bases(base1: Exp_, bases: Option<Delim<Exp_>>, efs: Option<ExpFields>) -> Exp {
+    /// A brace body that is a single expression, with no `and` and no
+    /// `with`, is only meaningful when that expression is a variable: it is
+    /// the punning form, `{ x }` for `{ x = x }`. Anything else -- `{ 1 }` --
+    /// is malformed.
+    ///
+    /// Returned as an error rather than raised with `unimplemented!`, which
+    /// panicked: `{ 1 }` is ordinary enough to type by accident, and a
+    /// malformed program should reach the user as a message. The grammar
+    /// turns this into `ParseError::User`, which `SyntaxError::from_parse_error`
+    /// already carries as `SyntaxError::Custom`.
+    pub fn obj_base_bases(
+        base1: Exp_,
+        bases: Option<Delim<Exp_>>,
+        efs: Option<ExpFields>,
+    ) -> Result<Exp, &'static str> {
         match (bases, efs) {
             (None, None) => match &base1.0 {
-                Exp::Var(x) => Exp::obj_id_fields(x.clone(), Delim::new()),
-                _ => unimplemented!("parse error"),
+                Exp::Var(x) => Ok(Exp::obj_id_fields(x.clone(), Delim::new())),
+                _ => Err(
+                    "a lone expression in braces must be a variable, as in `{ x }`; \
+                     write `{ x = e }` for a field, or extend a base with `and` / `with`",
+                ),
             },
-            (None, efs) => Exp::Object((Some(Delim::one(base1)), efs)),
+            (None, efs) => Ok(Exp::Object((Some(Delim::one(base1)), efs))),
             (Some(mut bs), efs) => {
                 bs.vec.push_front(base1);
-                Exp::Object((Some(bs), efs))
+                Ok(Exp::Object((Some(bs), efs)))
             }
         }
     }

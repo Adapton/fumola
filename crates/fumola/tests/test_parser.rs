@@ -467,3 +467,28 @@ fn test_multiline_text() {
 fn test_misc() {
     assert_to(r#"'\"'; //abc"#, r#"'\"';"#);
 }
+
+/// A lone non-variable in braces used to reach `unimplemented!("parse error")`
+/// in `Exp::obj_base_bases` and panic. It is a syntax error now.
+///
+/// `{ 1 }` is the minimal case; the others are the shapes it was found
+/// through, including the form the printer emits for a thunk.
+#[test]
+fn test_brace_body_is_an_error_not_a_panic() {
+    assert_parse_err("{ 1 }");
+    assert_parse_err("({ 1 })");
+    assert_parse_err("f ({ 1 })");
+    assert_parse_err("@thunk ({ 1 })");
+}
+
+/// The brace forms that are meaningful must keep parsing: `{ x }` is the
+/// punning shorthand the error message points at, and the base-extension
+/// syntax is what the same grammar rule exists for.
+#[test]
+fn test_brace_bodies_that_are_meaningful_still_parse() {
+    assert_parse_ok("{ x }");
+    assert_parse_ok("{ x = 1 }");
+    assert_parse_ok("{ x with y = 1 }");
+    assert_parse_ok("{ x and y }");
+    assert_parse_ok("thunk { 1 }");
+}
