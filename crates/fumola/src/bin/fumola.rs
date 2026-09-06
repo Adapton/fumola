@@ -139,15 +139,19 @@ fn main() -> OurResult<()> {
         .module_files()
         .map
         .keys()
-        .any(|p| p.local_path.ends_with(PRELUDE_MODULE_SUFFIX));
+        .any(|p| p.local_path.ends_with(fumola::prelude::PRELUDE_MODULE_SUFFIX));
     if prelude_imported {
-        if let Err(e) = state.eval(PRELUDE_BINDING) {
+        if let Err(e) = state.eval(&fumola::prelude::binding()) {
             return Err(OurError::String(format!(
                 "could not bind the prelude from {}: {:?}",
-                PRELUDE_MODULE_SUFFIX, e
+                fumola::prelude::PRELUDE_MODULE_SUFFIX,
+                e
             )));
         }
-        info!("Bound the prelude: pointer, get, peek.");
+        info!(
+            "Bound the prelude: {}.",
+            fumola::prelude::PRELUDE_NAMES.join(", ")
+        );
     }
 
     info!("{:?} ...", &cli_opt.command);
@@ -178,22 +182,6 @@ fn main() -> OurResult<()> {
     Ok(())
 }
 
-/// The prelude's module path suffix, as the module registry holds it.
-///
-/// `set_module` strips the `.fumola` extension, so this is the same name an
-/// `import` uses. Matched as a suffix, since the registered path depends on
-/// how the file was named on the command line.
-const PRELUDE_MODULE_SUFFIX: &str = "system/prelude";
-
-/// Bring the prelude's three helpers into scope unqualified, matching what
-/// `crates/fumola_wasm` does for its JavaScript hosts. The definitions
-/// themselves live in `fumola/system/adapton`; the prelude only renames them.
-const PRELUDE_BINDING: &str = concat!(
-    r#"import Prelude "fumola/system/prelude"; "#,
-    r#"let pointer = Prelude.pointer; "#,
-    r#"let get = Prelude.get; "#,
-    r#"let peek = Prelude.peek; "#,
-);
 
 fn test(state: &mut State) {
     let mut state_ = state.clone();
