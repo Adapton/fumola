@@ -698,3 +698,121 @@ pub fn fumola_get(id: FumolaInstanceId, symbol_json: &str) -> String {
         }
     })
 }
+
+// ---------------------------------------------------------------------------
+// Syntax highlighting, and the library's source
+// ---------------------------------------------------------------------------
+
+/// Classify one token for highlighting.
+///
+/// The kinds are the ones the Fumola VS Code theme gives a colour to, and the
+/// theme's scopes are almost all lexical -- `entity.name.type.uppercase` is
+/// literally "identifier starting with a capital" -- so the lexer plus a
+/// couple of rules reproduces it without a second grammar to keep in step.
+fn token_kind(token: &fumola_syntax::lexer_types::Token, text: &str) -> &'static str {
+    use fumola_syntax::lexer_types::Token::*;
+    match token {
+        LineComment(_) | BlockComment(_) => "comment",
+        Literal(_) => "literal",
+        Ident(_) => {
+            if fumola_syntax::lexer::is_keyword(text) {
+                "keyword"
+            } else if text.starts_with(|c: char| c.is_uppercase()) {
+                "type"
+            } else {
+                "ident"
+            }
+        }
+        // Bare `=` binds a field, which the theme treats as an ordinary
+        // operator.
+        Assign(_) => "operator",
+        // `:=` and `@` are the two tracked adapton effects, and the theme
+        // gives them a colour of their own. `:=` arrives here rather than as
+        // Assign, since the operator regex claims it.
+        Operator(_) => {
+            if text == ":=" || text == "@" {
+                "effect"
+            } else {
+                "operator"
+            }
+        }
+        Dot(_) | Colon(_) | Delim(_) => "punct",
+        Open(_) | Close(_) => "bracket",
+        Wild(_) => "ident",
+        Space(_) | Line(_) | MultiLine(_) => "space",
+        Unknown(_) | Error => "unknown",
+    }
+}
+
+/// The token stream for `source`, as JSON, for a host that wants to highlight
+/// Fumola without reimplementing its grammar.
+///
+/// `{"ok": true, "tokens": [{"kind": ..., "start": ..., "len": ...}, ...]}`,
+/// with byte offsets into `source`. A token the lexer cannot place is
+/// reported as `unknown` rather than dropped, so the spans always tile.
+#[wasm_bindgen]
+pub fn fumola_tokens(source: &str) -> String {
+    let tokens = match fumola_syntax::lexer::create_token_vec(source) {
+        Ok(tokens) => tokens,
+        Err(()) => return error_json("could not lex this source"),
+    };
+    // Flatten to (kind, start, end) first, then fix up the two characters the
+    // lexer has no token for: a backtick, which introduces a symbol, and `@`,
+    // which is the get effect. Both arrive as `unknown`.
+    let mut flat: Vec<(&'static str, usize, usize)> = Vec::new();
+    for fumola_syntax::ast::Loc(token, src) in tokens.iter() {
+        let span = match src.span() {
+            Some(span) => span,
+            None => continue,
+        };
+        let text = source.get(span.start..span.end).unwrap_or("");
+        flat.push((token_kind(token, text), span.start, span.end));
+    }
+
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < flat.len() {
+        let (kind, start, end) = flat[i];
+        let text = source.get(start..end).unwrap_or("");
+        if kind == "unknown" && text == "`" {
+            // A backtick and the name after it are one symbol, so that
+            // `adapton colours as a unit rather than as a stray tick.
+            if let Some(&(next_kind, next_start, next_end)) = flat.get(i + 1) {
+                if next_start == end && matches!(next_kind, "ident" | "type" | "keyword") {
+                    out.push(serde_json::json!({
+                        "kind": "symbol", "start": start, "len": next_end - start,
+                    }));
+                    i += 2;
+                    continue;
+                }
+            }
+            out.push(serde_json::json!({"kind": "symbol", "start": start, "len": end - start}));
+        } else if kind == "unknown" && text == "@" {
+            out.push(serde_json::json!({"kind": "effect", "start": start, "len": end - start}));
+        } else {
+            out.push(serde_json::json!({"kind": kind, "start": start, "len": end - start}));
+        }
+        i += 1;
+    }
+    serde_json::json!({ "ok": true, "tokens": out }).to_string()
+}
+
+/// Every module of the Fumola library, by the path an `import` uses.
+///
+/// The text is already in this binary -- `build.rs` compiles it in -- so a
+/// host can show the library without fetching anything further.
+#[wasm_bindgen]
+pub fn fumola_modules() -> String {
+    let mut paths: Vec<&str> = MODULES.iter().map(|(path, _)| *path).collect();
+    paths.sort();
+    serde_json::json!({ "ok": true, "modules": paths }).to_string()
+}
+
+/// The source of one library module, by the path `fumola_modules` reports.
+#[wasm_bindgen]
+pub fn fumola_module_source(path: &str) -> String {
+    match MODULES.iter().find(|(p, _)| *p == path) {
+        Some((_, source)) => serde_json::json!({ "ok": true, "source": source }).to_string(),
+        None => error_json(&format!("no module at {}", path)),
+    }
+}
