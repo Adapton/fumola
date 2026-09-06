@@ -810,6 +810,13 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             *active.cont() = Cont::Value_(v);
             Ok(Step {})
         }
+        Scratch(saved) => {
+            // The branch ends here. What it computed comes back; what it did
+            // to the graph does not.
+            active.adapton().restore(*saved);
+            *active.cont() = Cont::Value_(v);
+            Ok(Step {})
+        }
         ForceAdaptonPointer => {
             active.adapton().force_end(v.clone())?;
             *active.cont() = Cont::Value_(v);

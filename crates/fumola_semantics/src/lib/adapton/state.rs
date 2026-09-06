@@ -3,6 +3,8 @@ use crate::adapton::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::adapton::MetaTime;
+use crate::adapton::graphical::EdgeId;
 use crate::adapton::graphical;
 use crate::adapton::reserved::{self, ReservedSymbol};
 use crate::adapton::simple::{self};
@@ -152,6 +154,54 @@ impl State {
             ReservedSymbol::Counts => self.counts.clone().to_motoko_shared(),
         }
         .map_err(|_e| Error::Unreachable)
+    }
+}
+
+impl State {
+    /// Put a saved state back, keeping the counters that name things
+    /// monotone.
+    ///
+    /// Everything that *describes* the session is restored: the nodes, the
+    /// edges, the stack, the cursor, the settings. Everything that *names* a
+    /// node or an edge goes forward instead -- `meta_time` and `next_edge_id`
+    /// keep the larger of the saved and the reached value.
+    ///
+    /// The distinction is the whole correctness of this operation. A value
+    /// computed on a branch can carry node ids and edge ids out with it. If
+    /// the counters are rolled back, the session re-issues those exact ids to
+    /// different nodes, and the escaped value then reads back somebody else's
+    /// content with no error of any kind -- a wrong picture rather than a
+    /// failure. Carried forward, an escaped id names nothing, which peeks as
+    /// null and is a thing you can find.
+    pub fn restore(&mut self, saved: State) {
+        let reached = self.naming_high_water();
+        *self = saved;
+        self.advance_naming_to(reached);
+    }
+
+    /// The counters that hand out identities, as they now stand.
+    fn naming_high_water(&self) -> Option<(MetaTime, EdgeId)> {
+        match &self.inner {
+            InnerState::Graphical(g) => Some((g.meta_time.clone(), g.next_edge_id.clone())),
+            // The simple semantics keeps no graph, so it names nothing that
+            // could escape.
+            InnerState::Simple(_) => None,
+        }
+    }
+
+    fn advance_naming_to(&mut self, reached: Option<(MetaTime, EdgeId)>) {
+        let (meta_time, next_edge_id) = match reached {
+            Some(pair) => pair,
+            None => return,
+        };
+        if let InnerState::Graphical(g) = &mut self.inner {
+            if meta_time.0 > g.meta_time.0 {
+                g.meta_time = meta_time;
+            }
+            if next_edge_id.0 > g.next_edge_id.0 {
+                g.next_edge_id = next_edge_id;
+            }
+        }
     }
 }
 

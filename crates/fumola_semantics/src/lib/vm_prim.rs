@@ -6,6 +6,7 @@ use fumola_syntax::ast::{CollectionFunction, FastRandIterFunction, HashMapFuncti
 use fumola_syntax::ast::{Inst, Literal, Pat};
 
 use crate::type_mismatch;
+use fumola_syntax::shared::FastClone;
 use crate::vm_step::{cont_value, cont_value_, unit_step};
 use im_rc::HashMap;
 use std::collections::hash_map;
@@ -48,6 +49,34 @@ pub fn call_prim_function<A: Active>(
 ) -> Result<Step, Interruption> {
     use PrimFunction::*;
     match pf {
+        AdaptonScratch => {
+            // Evaluate a thunk on a branch of the adapton state.
+            //
+            // The bracket is the same one `force` uses -- push a frame, swap
+            // in the thunk's closure, step into its body -- with the state to
+            // put back carried on the frame. See `FrameCont::Scratch`, whose
+            // completion arm restores it.
+            //
+            // The argument arrives already evaluated, so unlike `force` this
+            // needs no second frame to fetch the operand.
+            if let Value::Thunk(thunk_body) = &*args {
+                let saved = Box::new(active.adapton().clone());
+                let env = active.env().fast_clone();
+                let context = active.defs().active_ctx.clone();
+                active.stack().push_front(crate::vm_types::stack::Frame {
+                    context,
+                    env,
+                    cont: crate::vm_types::stack::FrameCont::Scratch(saved),
+                    cont_prim_type: None,
+                    source: fumola_syntax::ast::Source::Evaluation,
+                });
+                *active.env() = thunk_body.env.fast_clone();
+                *active.ctx_id() = thunk_body.ctx.clone();
+                crate::vm_step::exp_step(active, thunk_body.content.fast_clone())
+            } else {
+                type_mismatch!(file!(), line!())
+            }
+        }
         SymbolLevel => {
             if let Ok(symbol) = args.as_ref().into_sym_or(()) {
                 //let level = geometric_levels::<4>(hash);

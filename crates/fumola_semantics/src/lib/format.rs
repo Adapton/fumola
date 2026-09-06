@@ -296,6 +296,7 @@ impl ToDoc for PrimFunction {
             PrimFunction::AdaptonHere => str("\"adaptonHere\""),
             PrimFunction::AdaptonSpace => str("\"adaptonSpace\""),
             PrimFunction::AdaptonTime => str("\"adaptonTime\""),
+            PrimFunction::AdaptonScratch => str("\"adaptonScratch\""),
             PrimFunction::AtSignVar(s) => kwd("@").append(str(s.as_str())),
             PrimFunction::DebugPrint => str("\"debugPrint\""),
             PrimFunction::NatToText => str("\"natToText\""),

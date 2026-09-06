@@ -587,8 +587,64 @@ impl Core {
             match self.step(limits) {
                 Ok(Step {}) => {}
                 Err(Interruption::Done(v)) => return Ok(v),
-                Err(i) => return Err(i),
+                Err(i) => {
+                    if Self::ends_the_computation(&i) {
+                        self.unwind_scratch();
+                    }
+                    return Err(i);
+                }
             }
+        }
+    }
+
+    /// Whether an interruption is the end of this computation, or a pause in
+    /// it that the caller is expected to resume from.
+    fn ends_the_computation(i: &Interruption) -> bool {
+        !matches!(
+            i,
+            Interruption::Done(_)
+                | Interruption::Send(..)
+                | Interruption::Response(_)
+                | Interruption::Breakpoint(_)
+                | Interruption::Limit(_)
+        )
+    }
+
+    /// Put the adapton state back if a scratch was in progress when this
+    /// failed.
+    ///
+    /// Nothing unwinds the stack on an interruption -- it is left standing
+    /// deliberately, so an error report can read it -- which means a scratch
+    /// frame's completion arm never runs. Without this, a branch that failed
+    /// half way through left its writes in the session: measured, a scratch
+    /// that wrote ``kept := 999`` and then failed an assertion left the
+    /// session reading `?999` where it had held 41.
+    ///
+    /// The outermost scratch is the one to restore from. Its save predates
+    /// every nested one, so putting it back undoes them all at once. Frames
+    /// are pushed at the front, so the outermost is the last one found.
+    fn unwind_scratch(&mut self) {
+        // Only where there is a stack to read. An actor that is not running
+        // has no active part, and `stack()` unwraps it -- so an interruption
+        // raised while such an actor is the scheduled one would turn into a
+        // panic here rather than the error it is. Two actor tests found this.
+        let reachable = match &self.schedule_choice {
+            ScheduleChoice::Agent => true,
+            ScheduleChoice::Actor(n) => self
+                .actors
+                .map
+                .get(n)
+                .map_or(false, |a| a.active.is_some()),
+        };
+        if !reachable {
+            return;
+        }
+        let saved = self.stack().iter().rev().find_map(|f| match &f.cont {
+            vm_types::stack::FrameCont::Scratch(s) => Some((**s).clone()),
+            _ => None,
+        });
+        if let Some(saved) = saved {
+            self.adapton().restore(saved);
         }
     }
 

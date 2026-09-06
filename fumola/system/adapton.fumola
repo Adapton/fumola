@@ -296,6 +296,58 @@ module {
         prim "adaptonPeek" (prim "adaptonPointer" (s))
     };
 
+    /// Run a thunk on a branch of the graph: keep what it computed, discard
+    /// what it did.
+    ///
+    ///    This is `peek`'s idea one level further in. A peek reads a cell
+    /// without recording that it read it; a scratch runs a whole computation
+    /// without the graph keeping any of it. Both are how a layer outside a
+    /// computation looks at it without becoming part of what it sees.
+    ///
+    ///    It exists because portrayal is itself computation. Laying a scene
+    /// out -- walking a tree, placing its parts in space -- runs in Fumola and
+    /// the graph records it like anything else, and it records far more of it
+    /// than of the thing being portrayed: measured on mergeSort, 504 events
+    /// for the subject and 2043 by the time it had been drawn. A picture
+    /// mostly of itself is not the picture anyone wanted.
+    ///
+    ///    What the thunk returns comes back. What it wrote does not, and
+    /// neither does the graph it built. It is safe inside a force: the whole
+    /// state is put back, the enclosing force included, so the force carries
+    /// on as though nothing happened. A failure inside is put back too.
+    ///
+    ///    Two things to know. The names it minted -- node ids, edge ids --
+    /// point at nothing afterwards, on purpose: the counters that hand them
+    /// out are kept moving forward so that an id which escapes names nothing
+    /// rather than naming something else. And a pointer that escapes a
+    /// scratch is dangling, so a scene must carry the values it wants to
+    /// show, not the pointers to them.
+    public func scratch(t) { prim "adaptonScratch" t };
+
+    #[test]
+    func testScratchKeepsTheValueNotTheEffects() {
+        reset();
+        `kept := 41;
+        let v = scratch(thunk { `kept := 999; `onlyInScratch := 1; 7 });
+        assert v == 7;
+        assert peek(`kept) == ?41;
+        assert peek(`onlyInScratch) == null;
+    };
+
+    #[test]
+    func testScratchInsideAForce() {
+        reset();
+        `x := 3;
+        // The enclosing force is part of the state that gets put back, so it
+        // carries on as though the branch never happened.
+        let r = force(`outer := thunk {
+            let a = scratch(thunk { `scribble := 1; 10 });
+            a + get(`x)
+        });
+        assert r == 13;
+        assert peek(`scribble) == null;
+    };
+
     #[test]
     func testPointerGetPeek() {
         `cell := 41;

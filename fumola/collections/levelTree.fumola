@@ -4,6 +4,7 @@ import LazyList "LazyList";
 import R "randomInput";
 import A "adapton";
 import Map "hashMap";
+import W "webPlay";
 
 module { 
     
@@ -600,6 +601,26 @@ module {
         }
       };
     }})
+  };
+
+  /// A level tree, and the program's own account of how to look at it.
+  ///
+  /// Two phases, and the difference between them is the point. Building the
+  /// tree is the subject: it runs in the session and the graph records it.
+  /// Laying it out is the portrayal: it runs in a scratch, so the graph
+  /// records none of it, and the history the runtime hands over afterwards is
+  /// of the tree rather than of the drawing of the tree.
+  #[example]
+  public func exampleLevelTree() : W.ExampleOutput {
+    let array = R.generateRandomInput(10, 10);
+    let buildTree = `buildTree := thunk { fromArray(array) };
+    let tree = force buildTree;
+    A.scratch(thunk {
+      {
+        outline = A.Outline.outline(buildTree);
+        objects = Scene.sceneObjects(tree!, A.Scene.zero)
+      }
+    })
   };
 
   #[test]

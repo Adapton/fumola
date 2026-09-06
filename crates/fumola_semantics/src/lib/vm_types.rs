@@ -256,6 +256,9 @@ pub mod stack {
         Force1,
         ForceAdaptonPointer,
         ForceThunk,
+        /// A thunk being evaluated on a branch of the adapton state, with the
+        /// state to put back when its value comes through.
+        Scratch(Box<crate::adapton::state::State>),
         Assert,
         Ignore,
         Debug,
