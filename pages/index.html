@@ -319,6 +319,11 @@
           <a href="#hazel">Hazel Fumola livelit</a> can load, and what the
           <a href="#try">box below</a> is running.
         </p>
+        <p class="masthead-note">
+          There is also a <a href="/web-repl/"><strong>web REPL</strong></a>:
+          the same runtime full-screen, with the library beside you, syntax
+          highlighting, and no button to press.
+        </p>
       </header>
 
       <section id="language">
@@ -574,6 +579,13 @@
           Take <em>a named thunk</em>, change the <code>21</code>, and run it
           again. Same name, same thunk, re-forced &mdash; which is exactly what
           a Hazel livelit does to itself as you edit it.
+        </p>
+        <p>
+          This box is deliberately small. The
+          <a href="/web-repl/">web REPL</a> is the same runtime with room to
+          work: the library on the left to read as you go, highlighting from
+          the language's own lexer, and evaluation as you type rather than on
+          a button.
         </p>
 
         <div class="repl">
@@ -956,6 +968,10 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
           be fetched cross-origin, which is the one thing this artifact is for.
         </p>
         <p>
+          The <a href="/web-repl/">web REPL</a> on this host loads them the
+          same way, from a relative path rather than across an origin.
+        </p>
+        <p>
           The glue and the <code>.wasm</code> are generated together and will
           not load if their versions disagree, so take both from the same
           place. Hazel prefers a locally built pair when there is one and falls
@@ -966,6 +982,11 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
       <section id="links">
         <h2>Where to go next<a class="anchor" href="#links" aria-label="Copy link to this heading">#</a></h2>
         <ul class="links">
+          <li>
+            <span class="what">/web-repl/</span>
+            <span class="desc"><a href="/web-repl/">The web REPL</a>
+            <small>Write Fumola in the browser with the library beside you. Nothing to install.</small></span>
+          </li>
           <li>
             <span class="what">Adapton/fumola</span>
             <span class="desc"><a href="https://github.com/Adapton/fumola">The language</a>
