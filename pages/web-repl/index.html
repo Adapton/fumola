@@ -141,7 +141,18 @@
         flex: 1 1 auto; min-height: 0;
         border-bottom: 1px solid var(--rule);
       }
-      .library.has-source #modules { flex: 0 0 50%; }
+      .library.has-source #modules { flex: 0 0 var(--outline-h, 50%); }
+      /* Drag this to give either the outline or the source the whole pane. */
+      .hgrip {
+        flex: 0 0 7px; margin: -3px 0;
+        cursor: row-resize; background: transparent;
+        position: relative; z-index: 2;
+      }
+      .hgrip:hover, .hgrip.dragging { background: #2b3f52; }
+      .library:not(.has-source) .hgrip,
+      .library[data-outline="closed"] .hgrip,
+      .library[data-view="events"] .hgrip { display: none; }
+      body.dragging-v { cursor: row-resize; user-select: none; }
       .library[data-outline="closed"] #modules { display: none; }
 
       .views { display: flex; gap: 0.25rem; }
@@ -228,6 +239,14 @@
         font: 400 var(--lib-font)/1.6 var(--mono);
         white-space: pre; color: var(--fg);
       }
+      /* A `#[test]` in the source runs it, like its entry in the tree. */
+      .run-here {
+        font: inherit; color: var(--green); font-style: italic;
+        background: none; border: 0; padding: 0; cursor: pointer;
+        border-bottom: 1px dotted #3f5f3f;
+      }
+      .run-here:hover { color: var(--var); border-bottom-color: var(--var); }
+
       .source .empty { padding: 0.9rem; color: var(--dim); font: italic 0.85rem/1.5 var(--ui); }
 
       /* ---- the editor, on the right ------------------------------------ */
@@ -326,6 +345,8 @@
             </span>
           </div>
           <ul id="modules"></ul>
+          <div class="hgrip" id="hgrip" role="separator" aria-orientation="horizontal"
+               aria-label="Resize the outline"></div>
           <div class="source" id="source">
             <div class="empty">Pick a module to read its source.</div>
           </div>
@@ -336,7 +357,7 @@
         </aside>
         <div class="grip" id="grip" role="separator" aria-orientation="vertical"
              aria-label="Resize the library"></div>
-        <button class="reopen" id="reopen" hidden>the library</button>
+        <button class="reopen" id="reopen" hidden>navigation &middot; library, tests, events</button>
 
         <section class="work">
           <div class="editor">
@@ -364,6 +385,9 @@
       const srcEl = $("src"), hlEl = $("hl"), outEl = $("out"),
             statusEl = $("status"), persistEl = $("persist");
 
+      // This page owns the runtime, so a fixed id is enough.
+      const REPL_INSTANCE = 1;
+
       const START = "`n := 21;\nforce(`double := thunk { get(`n) * 2 })";
 
       // ---- highlighting -------------------------------------------------
@@ -377,13 +401,24 @@
       const esc = (s) =>
         s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
-      const highlight = (text) => {
+      // `marks` maps a start offset to {end, index}: that range is wrapped in
+      // a button rather than coloured, so a `#[test]` in the source can be
+      // clicked the same way its entry in the tree can.
+      const highlight = (text, marks) => {
         let reply;
         try { reply = JSON.parse(fumola_tokens(text)); } catch (e) { return esc(text); }
         if (!reply.ok) return esc(text);
         let html = "", at = 0;
         for (const t of reply.tokens) {
           if (t.start > at) html += esc(text.slice(at, t.start));
+          if (at > t.start) continue;               // inside a mark already emitted
+          const mark = marks && marks.get(t.start);
+          if (mark) {
+            html += `<button class="run-here" data-test="${mark.index}" ` +
+                    `title="Run this test">${esc(text.slice(t.start, mark.end))}</button>`;
+            at = mark.end;
+            continue;
+          }
           const body = esc(text.slice(t.start, t.start + t.len));
           const cls = CLASS[t.kind];
           html += cls ? `<span class="${cls}">${body}</span>` : body;
@@ -407,7 +442,14 @@
         statusEl.textContent = "starting the runtime…";
         starting = init()
           .then(() => {
-            instance = fumola_create();
+            // Graphical throughout, and built that way rather than created
+            // simple and switched. Simple is the wasm default because Hazel
+            // has a re-evaluation semantics of its own to compose with;
+            // presenting Fumola on its own, that caution only gets in the
+            // way, and library code written for Fumola's own default failed
+            // under it. ensure_mode creates the instance if the id is free,
+            // so this is one build, not two.
+            instance = REPL_INSTANCE;
             fumola_ensure_mode(instance, "graphical");
             ready = true;
             listModules();
@@ -476,6 +518,9 @@
               name: text(i + 6),
               // A test inside `public module EditTest` is reached through it.
               scope: scopes.map((sc) => sc.name).join("."),
+              // Where `#[test]` sits, so the source view can make it a link.
+              start: t[i].start,
+              end: t[i + 3].start + t[i + 3].len,
             });
           }
         }
@@ -531,9 +576,7 @@
                 for (const other of document.querySelectorAll("#modules button"))
                   other.removeAttribute("aria-current");
                 b.setAttribute("aria-current", "true");
-                srcEl.value = call;
-                paint();
-                evaluate();
+                loadTest(path, t);
               },
             });
             count += 1;
@@ -662,6 +705,14 @@
         $("outline-toggle").setAttribute("aria-expanded", String(open));
       };
 
+      // Loading a test is the same action whether it is clicked in the tree
+      // or in the source, so both go through here.
+      const loadTest = (path, test) => {
+        srcEl.value = invocationFor(path, test);
+        paint();
+        evaluate();
+      };
+
       const showModule = (path, button) => {
         for (const b of document.querySelectorAll("#modules button"))
           b.removeAttribute("aria-current");
@@ -679,11 +730,21 @@
           pane.firstChild.textContent = reply.error;
           return;
         }
+        // Every `#[test]` above a public test becomes a link that runs it.
+        const tests = testsIn(reply.source);
+        const marks = new Map();
+        tests.forEach((t, i) => marks.set(t.start, { end: t.end, index: i }));
+
         const pre = document.createElement("pre");
         const code = document.createElement("code");
-        code.innerHTML = highlight(reply.source);
+        code.innerHTML = highlight(reply.source, marks);
         pre.appendChild(code);
         pane.appendChild(pre);
+        for (const b of code.querySelectorAll(".run-here")) {
+          const t = tests[Number(b.dataset.test)];
+          b.title = "Run " + invocationFor(path, t).split("\n")[1];
+          b.addEventListener("click", () => loadTest(path, t));
+        }
         pane.scrollTop = 0;
       };
 
@@ -844,18 +905,20 @@
 
       gripEl.addEventListener("pointerdown", (e) => {
         e.preventDefault();
-        gripEl.setPointerCapture(e.pointerId);
+        // Best effort: a failed capture must not abort the drag before the
+        // listeners below are attached.
+        try { gripEl.setPointerCapture(e.pointerId); } catch (_) {}
         gripEl.classList.add("dragging");
         document.body.classList.add("dragging");
         const move = (ev) => setWidth(ev.clientX - libEl.getBoundingClientRect().left);
         const up = () => {
           gripEl.classList.remove("dragging");
           document.body.classList.remove("dragging");
-          gripEl.removeEventListener("pointermove", move);
-          gripEl.removeEventListener("pointerup", up);
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", up);
         };
-        gripEl.addEventListener("pointermove", move);
-        gripEl.addEventListener("pointerup", up);
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
       });
 
       // Restore the last width, if this browser remembers one.
@@ -871,6 +934,29 @@
         applyLibFont();
       });
       applyLibFont();
+
+      // Drag the split so either the outline or the source can have the
+      // whole pane, without losing the other entirely.
+      const hgripEl = $("hgrip");
+      hgripEl.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        try { hgripEl.setPointerCapture(e.pointerId); } catch (_) {}
+        hgripEl.classList.add("dragging");
+        document.body.classList.add("dragging-v");
+        const top = $("modules").getBoundingClientRect().top;
+        const move = (ev) => {
+          const h = Math.max(0, ev.clientY - top);
+          libEl.style.setProperty("--outline-h", h + "px");
+        };
+        const up = () => {
+          hgripEl.classList.remove("dragging");
+          document.body.classList.remove("dragging-v");
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", up);
+        };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+      });
 
       $("outline-toggle").addEventListener("click", () =>
         setOutline(libEl.dataset.outline === "closed"));

@@ -353,26 +353,19 @@ pub fn fumola_ensure_mode(id: FumolaInstanceId, mode: &str) -> String {
         .to_string();
     }
 
-    let reset = INSTANCES.with(|m| {
-        let mut m = m.borrow_mut();
-        match m.get_mut(&id) {
-            None => false,
-            Some(state) => state
-                .eval(&format!("prim \"adaptonReset\" (#{})", mode))
-                .is_ok(),
-        }
-    });
-    if reset {
-        MODES.with(|m| m.borrow_mut().insert(id, mode.to_string()));
-        // The pristine copy has to follow the mode, or a later fumola_reset
-        // would restore an instance running the semantics this call just
-        // changed away from -- and the two would disagree with MODES.
-        let now = INSTANCES.with(|m| m.borrow().get(&id).cloned());
-        if let Some(mut now) = now {
-            now.semantic_state.clear_cont();
-            PRISTINE.with(|p| p.borrow_mut().insert(id, now));
-        }
-    }
+    // Rebuilt, not reset in place. Asking for different semantics already
+    // discards the store, so nothing is lost by it -- and resetting in place
+    // was wrong in a way that was hard to see. An instance is created in
+    // DEFAULT_MODE, which is `simple`, so its library loads under simple
+    // semantics; flipping the mode afterwards left every module that
+    // establishes adapton state as it loads holding references into a store
+    // the flip had just replaced. Library code written for Fumola's own
+    // default -- graphical -- then failed inside this host while passing in
+    // the CLI. Building the instance in the mode asked for means the modules
+    // load under it.
+    install(id, new_state_with(mode));
+    MODES.with(|m| m.borrow_mut().insert(id, mode.to_string()));
+    let reset = true;
     serde_json::json!({
         "ok": reset, "mode": mode, "created": false, "reset": reset
     })
