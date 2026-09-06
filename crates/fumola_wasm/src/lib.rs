@@ -29,7 +29,7 @@ use fumola_semantics::adapton::{Space, Time};
 use fumola_semantics::format::format_one_line;
 use fumola_semantics::value::Value;
 use fumola_syntax::ast::Id;
-use fumola_semantics::vm_types::{LocalPointer, Pointer, ScheduleChoice};
+use fumola_semantics::vm_types::{ActiveBorrow, LocalPointer, Pointer, ScheduleChoice};
 use wasm_bindgen::prelude::*;
 
 pub mod symbol;
@@ -202,6 +202,7 @@ const PRELUDE: &str = concat!(
     r#"let pointer = Prelude.pointer; "#,
     r#"let get = Prelude.get; "#,
     r#"let peek = Prelude.peek; "#,
+    r#"let print = Prelude.print; "#,
 );
 
 /// Wrap Hazel-supplied source in the top-level thunk assignment that gives
@@ -457,13 +458,17 @@ fn eval_in(id: FumolaInstanceId, program: &str) -> String {
         // failed once made all later programs fail too. An edit that does not
         // work should cost nothing.
         let mut attempt = state.clone();
-        match attempt.eval(program) {
+        let outcome = attempt.eval(program);
+        // Drained either way: a program that failed still printed whatever it
+        // printed before it failed, and that is usually the interesting part.
+        let printed = drain_print(&mut attempt);
+        match outcome {
             Ok(value) => {
-                let json = value_to_json(&value);
+                let json = with_print(value_to_json(&value), printed);
                 *state = attempt;
                 json
             }
-            Err(e) => error_of(&e),
+            Err(e) => with_print(error_of_with_trace(&e, &mut attempt), printed),
         }
     })
 }
@@ -478,6 +483,90 @@ fn error_json(message: &str) -> String {
 /// which is worth saying out loud.
 fn error_json_of_kind(kind: &str, message: &str) -> String {
     serde_json::json!({ "ok": false, "kind": kind, "error": message }).to_string()
+}
+
+/// Take the `prim "print"` output the program produced, as the CLI does in
+/// `post_eval`. Nothing consumes this buffer in a browser otherwise, so the
+/// lines would accumulate in the instance and never be seen.
+fn drain_print(state: &mut State) -> Vec<String> {
+    let lines: Vec<String> = state
+        .semantic_state
+        .debug_print_out
+        .iter()
+        .map(|line| line.text.to_string())
+        .collect();
+    state.semantic_state.debug_print_out.clear();
+    lines
+}
+
+fn with_print(json: String, printed: Vec<String>) -> String {
+    if printed.is_empty() {
+        return json;
+    }
+    let mut value = match serde_json::from_str::<serde_json::Value>(&json) {
+        Ok(v) => v,
+        Err(_) => return json,
+    };
+    if let Some(map) = value.as_object_mut() {
+        map.insert("printed".into(), serde_json::json!(printed));
+    }
+    value.to_string()
+}
+
+/// The same error, with the frame dump the CLI prints beside it.
+///
+/// A browser has no stderr, so `Interruption(AssertionFailure)` arrives with
+/// nothing to say which assertion failed. The CLI answers that question with
+/// `report_error` in `crates/fumola/src/bin/fumola.rs`; this is that output,
+/// in the same format, carried across as a string so a failure in the console
+/// can be read against one in a terminal.
+///
+/// Only on the failing path, and only from the copy that failed -- the live
+/// instance is left alone, as it was before.
+fn error_of_with_trace(e: &fumola::Error, state: &mut State) -> String {
+    let mut value = match serde_json::from_str::<serde_json::Value>(&error_of(e)) {
+        Ok(v) => v,
+        Err(_) => return error_of(e),
+    };
+    if let Some(map) = value.as_object_mut() {
+        map.insert("trace".into(), serde_json::Value::String(trace_of(state)));
+    }
+    value.to_string()
+}
+
+fn truncate_debug<T: std::fmt::Debug>(value: &T, max_len: usize) -> String {
+    let s = format!("{:?}", value);
+    if s.chars().count() > max_len {
+        s.chars().take(max_len).collect::<String>() + "..."
+    } else {
+        s
+    }
+}
+
+fn trace_of(state: &mut State) -> String {
+    let cont = state.semantic_state.cont().clone();
+    let cont_source = state.semantic_state.cont_source().clone();
+    let mut out = format!(
+        "Current continuation is\n[{:_>17}]: {}\n",
+        &format!("{}", cont_source),
+        truncate_debug(&cont, 63)
+    );
+    match state.semantic_state.agent_stack() {
+        Ok(stack) => {
+            let frames_len = stack.len();
+            out.push_str(&format!("\nNon-empty stack ({} frames total):\n", frames_len));
+            for (i, frame) in stack.iter().enumerate() {
+                out.push_str(&format!(
+                    "{:>3} [{:_>17}]: {}\n",
+                    frames_len - i,
+                    &format!("{}", &frame.source),
+                    truncate_debug(&frame.cont, 63)
+                ));
+            }
+        }
+        Err(_) => out.push_str("\n(No stack available to print)\n"),
+    }
+    out
 }
 
 fn error_of(e: &fumola::Error) -> String {
