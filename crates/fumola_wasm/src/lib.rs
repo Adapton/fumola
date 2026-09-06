@@ -804,6 +804,20 @@ pub fn fumola_tokens(source: &str) -> String {
                 }
             }
             out.push(serde_json::json!({"kind": "symbol", "start": start, "len": end - start}));
+        } else if kind == "operator" && text == "#" {
+            // A variant tag: `#` and the name after it are one thing, as the
+            // theme has it (entity.name.tag.variant). A bare `#` with no name
+            // is the string operator and stays an operator.
+            if let Some(&(next_kind, next_start, next_end)) = flat.get(i + 1) {
+                if next_start == end && matches!(next_kind, "ident" | "type" | "keyword") {
+                    out.push(serde_json::json!({
+                        "kind": "variant", "start": start, "len": next_end - start,
+                    }));
+                    i += 2;
+                    continue;
+                }
+            }
+            out.push(serde_json::json!({"kind": "operator", "start": start, "len": end - start}));
         } else if kind == "unknown" && text == "@" {
             out.push(serde_json::json!({"kind": "effect", "start": start, "len": end - start}));
         } else {

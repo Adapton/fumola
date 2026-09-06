@@ -237,6 +237,7 @@
       .eff { color: var(--eff); }
       .st  { color: var(--str); }
       .v   { color: var(--var); }
+      .tg  { color: #a586a5; font-weight: 600; }
 
       @media (max-width: 52rem) {
         .panes { flex-direction: column; }
@@ -316,6 +317,7 @@
       const CLASS = {
         comment: "c", keyword: "k", type: "t", symbol: "sy",
         effect: "eff", operator: "o", literal: "st", ident: "v",
+        variant: "tg",
       };
       const esc = (s) =>
         s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
@@ -518,7 +520,12 @@
           const tag = document.createElement("span");
           tag.className = "tag";
           tag.textContent = reply.tag + "  ";
-          outEl.append(tag, show(reply));
+          // show() renders the value as Fumola writes it, so the same lexer
+          // colours it. Worth it for anything structured -- an event log is
+          // a wall of identical grey without it.
+          const body = document.createElement("span");
+          body.innerHTML = highlight(show(reply)).replace(/\n$/, "");
+          outEl.append(tag, body);
           return;
         }
         // Half-typed programs are syntax errors most of the time, and

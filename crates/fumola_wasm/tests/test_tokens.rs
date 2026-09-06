@@ -64,6 +64,23 @@ fn the_adapton_forms_are_keywords() {
     assert_eq!(keywords, vec!["do", "within", "space", "force", "thunk"]);
 }
 
+/// Variant tags are one token, not `#` plus a name. Adapton's own output is
+/// almost entirely variants, so this is most of what makes a large result
+/// readable.
+#[test]
+fn variant_tags_are_one_token() {
+    let got = kinds("#addNode((#Symbol(`n), #Now, 1))");
+    let tags: Vec<&str> = got
+        .iter()
+        .filter(|(k, _)| k == "variant")
+        .map(|(_, t)| t.as_str())
+        .collect();
+    assert_eq!(tags, vec!["#addNode", "#Symbol", "#Now"]);
+    // A bare `#` is the string operator, and stays one.
+    let bare = kinds("a # b");
+    assert!(bare.iter().any(|(k, t)| k == "operator" && t == "#"), "got {:?}", bare);
+}
+
 /// The spans have to tile the source exactly, or a highlighter built on them
 /// drops or duplicates text.
 #[test]
