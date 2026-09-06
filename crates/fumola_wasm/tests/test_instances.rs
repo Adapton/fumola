@@ -514,3 +514,59 @@ fn an_unknown_mode_is_refused() {
     let raw = fumola_mode(id);
     assert!(raw.contains("simple"), "mode changed anyway: {}", raw);
 }
+
+/// "Start clean" has to mean the instance as it was before anything ran, not
+/// just an empty adapton store. A `let` at the top level of one program used
+/// to still be bound in the next, so a run was never independent of the ones
+/// before it.
+#[test]
+fn a_reset_forgets_bindings_as_well_as_the_store() {
+    let id = fumola_create();
+
+    // A top-level binding, and a cell.
+    assert_eq!(eval_int(id, "let carried = 7; carried"), "7");
+    fumola_eval_top(id, "`kept := 1");
+    assert!(fumola_eval_top(id, "peek(`kept)").contains("\"ok\":true"));
+
+    assert!(fumola_reset(id), "the instance should exist");
+
+    // The cell is gone.
+    let peeked: serde_json::Value =
+        serde_json::from_str(&fumola_eval_top(id, "peek(`kept)")).unwrap();
+    assert_eq!(peeked["tag"], "Null", "the store should be empty: {}", peeked);
+
+    // And so is the binding, which an adapton reset would have left behind.
+    let raw = fumola_eval_top(id, "carried");
+    assert!(
+        raw.contains("\"ok\":false"),
+        "`carried` should be unbound after a reset, got {}",
+        raw
+    );
+
+    // The library is still there: a reset restores, it does not empty.
+    assert_eq!(eval_int(id, "Gcd.gcd(12, 18)"), "6");
+    // And so is the prelude.
+    assert_eq!(eval_int(id, "`n := 41; get(`n) + 1"), "42");
+}
+
+/// A reset must leave the instance usable. Restoring a snapshot that still
+/// held the continuation of the last import broke every later program with a
+/// type mismatch inside the stack machine.
+#[test]
+fn an_instance_still_works_after_a_reset() {
+    let id = fumola_create();
+    // Graphical, or there is no graph for peekEvents to report on -- a fresh
+    // instance is simple by default.
+    fumola_ensure_mode(id, "graphical");
+    fumola_eval_top(id, "`n := 5; force(`d := thunk { get(`n) })");
+    assert!(fumola_reset(id));
+    for program in ["1 + 2", "`n := 5; force(`d := thunk { get(`n) })", "Gcd.gcd(12, 18)"] {
+        let raw = fumola_eval_top(id, program);
+        assert!(raw.contains("\"ok\":true"), "{} failed after a reset: {}", program, raw);
+    }
+    // And the graph is being recorded again, from empty.
+    let n: serde_json::Value =
+        serde_json::from_str(&fumola_eval_top(id, "Adapton.peekEvents().size()")).unwrap();
+    assert_eq!(n["ok"], true, "{}", n);
+    assert_ne!(n["value"], "0", "events should have been recorded after the reset");
+}

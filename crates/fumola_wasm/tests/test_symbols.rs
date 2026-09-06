@@ -199,3 +199,26 @@ fn a_pointer_named_with_an_operator_symbol_crosses() {
     assert_eq!(v["value"]["symbol"]["tag"], "BinOp");
     assert_eq!(v["value"]["symbol"]["op"], "-");
 }
+
+/// Every symbol form now crosses. This matters more than it sounds: one
+/// untranslatable name anywhere in a value fails the whole value, so a single
+/// quoted-AST name in the adapton graph made the entire event log
+/// untranslatable, and the events panel showed an error instead of a table.
+#[test]
+fn no_symbol_form_fails_a_whole_value() {
+    let id = fumola_create();
+    fumola_ensure_mode(id, "graphical");
+    // levelTree names nodes with operator and quoted-AST symbols.
+    let raw = fumola_eval_top(
+        id,
+        "import M \"fumola/collections/levelTree\"; M.testFromList()",
+    );
+    assert!(raw.contains("\"ok\":true"), "the test itself should run: {}", raw);
+
+    let events = fumola_eval_top(id, "Adapton.peekEvents()");
+    assert!(
+        events.contains("\"ok\":true"),
+        "the whole event log must translate, got {}",
+        &events[..events.len().min(220)]
+    );
+}

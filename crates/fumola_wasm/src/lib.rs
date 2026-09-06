@@ -46,6 +46,18 @@ thread_local! {
     /// Source of fresh ids. Kept ahead of every id ever realized so that
     /// `create` never collides with an id recovered from a saved program.
     static NEXT_ID: RefCell<FumolaInstanceId> = const { RefCell::new(1) };
+    /// The instance as it was once its modules were loaded and before a
+    /// single program ran.
+    ///
+    /// Kept so that "start clean" can mean what it says. Resetting the
+    /// adapton store is not enough: a `let` at the top level of one program
+    /// is still bound in the next, so a run is not independent of the ones
+    /// before it. Restoring this is.
+    ///
+    /// Cheap to hold and to restore -- a State is built from persistent
+    /// structures, so the clone shares them.
+    static PRISTINE: RefCell<HashMap<FumolaInstanceId, State>> =
+        RefCell::new(HashMap::new());
     /// Which Adapton semantics each instance is running.
     ///
     /// Recorded rather than queried so that asking for the mode an instance
@@ -92,6 +104,19 @@ fn new_state() -> State {
     new_state_with(DEFAULT_MODE)
 }
 
+/// Put an instance in place, keeping a pristine copy of it beside the live
+/// one so that `fumola_reset` can bring it back.
+fn install(id: FumolaInstanceId, mut state: State) {
+    // Snapshot an idle machine. Building the instance leaves the continuation
+    // and stack of the last import in place -- eval_in clears them before
+    // every program for exactly this reason -- and restoring a snapshot that
+    // still held them left the instance unusable, every later program failing
+    // with a type mismatch deep in the stack machine.
+    state.semantic_state.clear_cont();
+    PRISTINE.with(|p| p.borrow_mut().insert(id, state.clone()));
+    INSTANCES.with(|m| m.borrow_mut().insert(id, state));
+}
+
 /// The semantics a fresh instance runs unless a program asks for another.
 ///
 /// Simple, not Adapton's graphical default: two incremental layers meet in
@@ -114,6 +139,17 @@ fn new_state_with(mode: &str) -> State {
             let _ = e;
         }
     }
+    // The semantics is chosen before anything is evaluated, because a reset
+    // replaces the adapton store wholesale. Setting it afterwards wiped the
+    // store out from under the modules imported below -- any module that
+    // establishes adapton state as it loads, and LevelTree does, was left
+    // holding references into a store that no longer existed, and its code
+    // failed at the first assertion. Nothing has run yet at this point, so
+    // there is no state of the other mode to leave behind.
+    if let Err(e) = state.eval(&format!("prim \"adaptonReset\" (#{})", mode)) {
+        debug_assert!(false, "could not set the adapton semantics: {:?}", e);
+        let _ = e;
+    }
     if let Err(e) = state.eval(PRELUDE) {
         // Loud in tests, survivable in release. The prelude depends on a
         // module resolving, which the old string literal could not fail at,
@@ -127,12 +163,6 @@ fn new_state_with(mode: &str) -> State {
         if let Err(e) = state.eval(&binding) {
             let _ = e;
         }
-    }
-    // Set the Adapton semantics last, so that nothing the prelude did leaves
-    // state from the other mode behind. See DEFAULT_MODE above for why the
-    // default is not Adapton's own.
-    if let Err(e) = state.eval(&format!("prim \"adaptonReset\" (#{})", mode)) {
-        let _ = e;
     }
     state
 }
@@ -249,7 +279,7 @@ pub fn fumola_create() -> FumolaInstanceId {
         *n += 1;
         id
     });
-    INSTANCES.with(|m| m.borrow_mut().insert(id, new_state()));
+    install(id, new_state());
     MODES.with(|m| m.borrow_mut().insert(id, DEFAULT_MODE.to_string()));
     id
 }
@@ -271,16 +301,15 @@ pub fn fumola_has(id: FumolaInstanceId) -> bool {
 #[wasm_bindgen]
 pub fn fumola_realize(id: FumolaInstanceId) -> bool {
     bump_next_id_past(id);
-    INSTANCES.with(|m| {
-        let mut m = m.borrow_mut();
-        if m.contains_key(&id) {
-            false
-        } else {
-            m.insert(id, new_state());
-            MODES.with(|d| d.borrow_mut().insert(id, DEFAULT_MODE.to_string()));
-            true
-        }
-    })
+    // install() borrows INSTANCES itself, so the check has to finish first.
+    let exists = INSTANCES.with(|m| m.borrow().contains_key(&id));
+    if exists {
+        false
+    } else {
+        install(id, new_state());
+        MODES.with(|d| d.borrow_mut().insert(id, DEFAULT_MODE.to_string()));
+        true
+    }
 }
 
 /// Ensure `id` names a runtime running `mode`, and say what happened.
@@ -308,7 +337,7 @@ pub fn fumola_ensure_mode(id: FumolaInstanceId, mode: &str) -> String {
 
     let existed = INSTANCES.with(|m| m.borrow().contains_key(&id));
     if !existed {
-        INSTANCES.with(|m| m.borrow_mut().insert(id, new_state_with(mode)));
+        install(id, new_state_with(mode));
         MODES.with(|m| m.borrow_mut().insert(id, mode.to_string()));
         return serde_json::json!({
             "ok": true, "mode": mode, "created": true, "reset": false
@@ -335,6 +364,14 @@ pub fn fumola_ensure_mode(id: FumolaInstanceId, mode: &str) -> String {
     });
     if reset {
         MODES.with(|m| m.borrow_mut().insert(id, mode.to_string()));
+        // The pristine copy has to follow the mode, or a later fumola_reset
+        // would restore an instance running the semantics this call just
+        // changed away from -- and the two would disagree with MODES.
+        let now = INSTANCES.with(|m| m.borrow().get(&id).cloned());
+        if let Some(mut now) = now {
+            now.semantic_state.clear_cont();
+            PRISTINE.with(|p| p.borrow_mut().insert(id, now));
+        }
     }
     serde_json::json!({
         "ok": reset, "mode": mode, "created": false, "reset": reset
@@ -355,6 +392,7 @@ pub fn fumola_mode(id: FumolaInstanceId) -> String {
 #[wasm_bindgen]
 pub fn fumola_drop(id: FumolaInstanceId) {
     INSTANCES.with(|m| m.borrow_mut().remove(&id));
+    PRISTINE.with(|p| p.borrow_mut().remove(&id));
     MODES.with(|m| m.borrow_mut().remove(&id));
 }
 
@@ -455,6 +493,28 @@ fn error_of(e: &fumola::Error) -> String {
             error_json_of_kind("syntax", &format!("{:?}", e))
         }
         _ => error_json_of_kind("runtime", &format!("{:?}", e)),
+    }
+}
+
+/// Return an instance to how it was before anything ran: the library loaded,
+/// the prelude bound, the semantics set, and nothing else.
+///
+/// This is what "start from a clean state" has to mean. Clearing the adapton
+/// store leaves every top-level binding from previous programs in place, so a
+/// run still depends on the ones before it; restoring the pristine copy does
+/// not.
+///
+/// Returns true if the instance existed.
+#[wasm_bindgen]
+pub fn fumola_reset(id: FumolaInstanceId) -> bool {
+    let fresh = PRISTINE.with(|p| p.borrow().get(&id).cloned());
+    match fresh {
+        Some(mut state) => {
+            state.semantic_state.clear_cont();
+            INSTANCES.with(|m| m.borrow_mut().insert(id, state));
+            true
+        }
+        None => false,
     }
 }
 

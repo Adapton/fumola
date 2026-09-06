@@ -64,9 +64,14 @@ pub fn symbol_to_json(symbol: &Symbol) -> Result<Json, String> {
             "left": symbol_to_json(left)?,
             "right": symbol_to_json(right)?,
         })),
-        Symbol::QuotedAst(_) => {
-            Err("symbol uses QuotedAst, which has no Hazel translation yet".into())
-        }
+        // Carried as its printed source, like the operators above. There is
+        // no Hazel datatype for a quoted AST, and refusing it failed the
+        // whole value it sat in -- one such name in the graph made the entire
+        // event log untranslatable.
+        Symbol::QuotedAst(q) => Ok(json!({
+            "tag": "QuotedAst",
+            "source": format_one_line(q),
+        })),
     }
 }
 
@@ -167,8 +172,9 @@ pub fn symbol_to_source(symbol: &Symbol) -> Result<String, String> {
             format_one_line(op),
             symbol_to_source(right)?
         )),
-        Symbol::QuotedAst(_) => {
-            Err("symbol is a quoted AST, which has no source rendering yet".into())
-        }
+        // Printed rather than refused, for the same reason. Note this is the
+        // formatter's rendering of the quoted term; unlike the forms above it
+        // is not known to parse back to the same symbol.
+        Symbol::QuotedAst(q) => Ok(format_one_line(q)),
     }
 }
