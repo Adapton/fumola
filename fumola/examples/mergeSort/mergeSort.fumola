@@ -187,11 +187,14 @@ module {
             _3_objectsSize = scene.objects.size();
             _4_finalMetaTime = ((scene.outline.1).0).value!.0;
         }))};
-        assert scene.history.events.size() == 522;
-        assert scene.history.nodes.size() == 193;
-        assert scene.history.edges.size() == 280;
-        assert scene.objects.size() == 291;
-        assert ((scene.outline.1).0).value!.0 == 307; // Final Meta Time.
+        // Downstream of the level tree, so downstream of `prim "symbolLevel"`.
+        // These moved when that hash stopped depending on the target's pointer
+        // width, and they now hold on every target.
+        assert scene.history.events.size() == 504;
+        assert scene.history.nodes.size() == 184;
+        assert scene.history.edges.size() == 271;
+        assert scene.objects.size() == 279;
+        assert ((scene.outline.1).0).value!.0 == 295; // Final Meta Time.
     };
 
     public func dcgDiffRemove(seed : Nat, size : Nat, removeSymbol : Symbol) {
@@ -220,12 +223,14 @@ module {
             notEqual = diff.notEqual.size();
         };
         prim "print" sizes;
+        // Also downstream of `prim "symbolLevel"`; portable since that hash
+        // stopped depending on the target's pointer width.
         assert (sizes == {
-                left = 75;
-                right = 65;
-                equal = 50;
-                notEqual = 15;
-                onlyLeft = 10;
+                left = 76;
+                right = 68;
+                equal = 54;
+                notEqual = 14;
+                onlyLeft = 8;
                 onlyRight = 0
             });
     };

@@ -607,11 +607,16 @@ module {
     let a = R.generateRandomInput(10, 10);
     let t = fromArray(a);
     let g = geom2d(t!);
+    // These are a function of `prim "symbolLevel"`, which hashes a symbol.
+    // They changed when that hash was made independent of the target's
+    // pointer width, and they are now the same on every target -- which is
+    // the point: before, this tree was 6/10/8/2 natively and 6/10/4/6 under
+    // wasm32, from the same input.
     assert (g == 
-      { height = 6;
+      { height = 8;
         width = 10;
-        widthLeft = 8;
-        widthRight = 2 });
+        widthLeft = 2;
+        widthRight = 8 });
   };
 
   }; 
