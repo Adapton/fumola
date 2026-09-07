@@ -589,14 +589,19 @@
       // This page owns the runtime, so a fixed id is enough.
       const REPL_INSTANCE = 1;
 
-      // What the page opens on. A scene rather than a two-line program:
-      // the objects panel is the thing here that a description cannot
-      // substitute for, and arriving at a drawn merge-sort network says more
-      // about what this is for than anything written above it would. The
-      // homepage's console keeps the two-line program, where the point is
-      // that a runtime is running at all.
-      const START =
-        'import M "fumola/examples/mergeSort/mergeSort";\nM.exampleMergeSort()';
+      // What the page opens on: the body of one example, not a call to it.
+      //
+      // A scene rather than a two-line program, because the objects panel is
+      // the thing here a description cannot substitute for. And the body
+      // rather than `exampleMergeSort()`, because the body shows the
+      // arguments -- the seed and the size are the first things anyone will
+      // want to change, and a unit-argument call hides them.
+      //
+      // Named rather than written out, so the text comes from the library
+      // through the same path the `body` button uses and cannot drift from
+      // it. The homepage's console keeps the two-line program, where the
+      // point is only that a runtime is running at all.
+      const START_BODY = "examples/mergeSort/mergeSort:exampleMergeSort";
 
       // ---- highlighting -------------------------------------------------
       // The kinds come from the language's own lexer, so there is no grammar
@@ -766,9 +771,10 @@
             listModules();
             paint();          // the first paint was plain: the lexer is here now
             note();
-            // A link names a library test; carrying it out replaces the
-            // starter program and runs that instead.
-            if (!openFromHash()) evaluate();
+            // A link names a library test or example; carrying it out
+            // replaces the starter program. With no link, open the body the
+            // page starts on.
+            if (!openFromHash() && !openBody(START_BODY)) evaluate();
           })
           .catch((e) => {
             statusEl.textContent = "the runtime could not be loaded";
@@ -1776,10 +1782,25 @@
         }
 
         // Frame whatever was built, rather than assuming where it is.
+        //
+        // Fit the bounding sphere to the frame. The distance at which a
+        // sphere of radius r just fills a field of view is r / sin(fov/2),
+        // and there are two fields of view: the camera's `fov` is the
+        // vertical one, and the horizontal follows from the aspect. Fitting
+        // only the vertical one clipped a wide scene in a narrow pane, so
+        // take whichever needs more room.
+        //
+        // The direction is a diagonal, so the depth of the thing reads on
+        // arrival rather than needing a drag to discover.
         const centre = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
-        const span = Math.max(size.x, size.y, size.z, 1);
-        camera.position.set(centre.x + span, centre.y + span * 0.8, centre.z + span * 1.6);
+        const radius = Math.max(size.length() / 2, 0.5);
+        const vHalf = (camera.fov * Math.PI) / 360;
+        const hHalf = Math.atan(camera.aspect * Math.tan(vHalf));
+        const fit = Math.max(radius / Math.sin(vHalf), radius / Math.sin(hHalf));
+        const away = new THREE.Vector3(0.45, 0.35, 1).normalize()
+          .multiplyScalar(fit * 0.85);
+        camera.position.copy(centre).add(away);
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.target.copy(centre);
         controls.enableDamping = true;
@@ -2161,6 +2182,15 @@
       /// The anchor is carried out and then left alone: it keeps standing as
       /// long as the editor still holds what it named, and the first edit
       /// takes it away.
+      /// Put a named example's body in the editor, as the `body` button does.
+      const openBody = (key) => {
+        const found = presets.get(key);
+        if (!found) return false;
+        showModule(found.path, null, found.test);
+        loadTestBody(found.path, found.test);
+        return true;
+      };
+
       const openFromHash = () => {
         const m = /^#(test|example|body)=(.+)$/.exec(decodeURIComponent(location.hash));
         if (!m) return false;
@@ -2314,8 +2344,8 @@
       setView("objects");
       showScene({ ok: false });
 
-      srcEl.value = START;
-      paint();
+      // The editor is filled once the runtime is up, from the library --
+      // see START_BODY. Until then there is nothing to paint.
       outEl.innerHTML = '<span class="waiting">starting…</span>';
 
       // Fetched immediately, unlike the console on the homepage. There, most
