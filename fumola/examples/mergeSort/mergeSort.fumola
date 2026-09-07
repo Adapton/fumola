@@ -214,6 +214,59 @@ module {
         assert ((scene.outline[0].1).0).value!.0 == 295; // Final Meta Time.
     };
 
+    /// One run of mergeSort, and the same run with one cell removed.
+    ///
+    ///    What this is for: mergeSort as written here is not stable under an
+    /// edit, and the reason is naming rather than algorithm. A merge thunk is
+    /// named for the input-tree node whose stream it is built from, so a
+    /// symbol's influence is proportional to how many streams descend from
+    /// its node -- largest at the root, and not bounded by anything. Slide
+    /// between the two runs and the input tree mostly glides while the merge
+    /// network is rebuilt around it.
+    ///
+    ///    Which cell is removed decides how bad it is, and that is the whole
+    /// argument. Measured over twelve seeds at size 16: removing cell 3
+    /// changes 69.5% of the merge network, and a typical cell changes 15-18%.
+    /// Cell 3 is not special to the algorithm; it is the symbol whose level
+    /// happens to root every tree over positional symbols (#72), so the most
+    /// expensive edit in the program is decided by a hash.
+    ///
+    ///    A naming that gave each merge thunk the pair of input cells whose
+    /// comparison produced it should bound any one symbol to O(log n) nodes.
+    /// This example is the before; it exists to be compared against the after.
+    public func pairAfterRemoving(seed : Nat, size : Nat, cell : Symbol) : W.ExamplePairOutput {
+        W.pair(
+            generateSceneFullDemand(seed, size, null).sceneData,
+            generateSceneFullDemand(seed, size, ?(func (list) {
+                let editor = List.Edit.cursor(list!.next);
+                let editor = List.Edit.gotoSymbol(editor, cell)!;
+                List.Edit.remove(editor);
+            })).sceneData
+        )
+    };
+
+    /// Removing the cell that roots the tree: the expensive case.
+    #[examplePair]
+    public func examplePairMergeSortRootCell() : W.ExamplePairOutput {
+        let seed = 10;
+        let size = 16;
+        // The cell whose symbol roots the input tree, at this size.
+        let removed = 3;
+        pairAfterRemoving(seed, size, removed)
+    };
+
+    /// Removing an ordinary cell, for contrast. Same program, same size, same
+    /// seed; only the name that goes is different, and that is the point.
+    #[examplePair]
+    public func examplePairMergeSortTypicalCell() : W.ExamplePairOutput {
+        let seed = 10;
+        let size = 16;
+        // An ordinary cell, for contrast. Change this one and the other
+        // example's `removed` to compare any two edits.
+        let removed = 13;
+        pairAfterRemoving(seed, size, removed)
+    };
+
     public func dcgDiffRemove(seed : Nat, size : Nat, removeSymbol : Symbol) {
         let sceneA = generateSceneFullDemand(seed, size, null);
         let sceneB = generateSceneFullDemand(seed, size, ?(func (list) {

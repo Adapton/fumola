@@ -244,6 +244,68 @@
         font: 400 0.7rem/1.4 var(--mono); color: var(--dim);
         pointer-events: none;
       }
+      /* What is being looked at, named on the picture itself. A screenshot
+         travels without its URL, so the picture has to say what it is. */
+      .viewport .caption {
+        position: absolute; left: 0.7rem; top: 0.55rem;
+        font: 400 0.72rem/1.5 var(--mono); color: var(--fg);
+        background: rgba(8, 8, 11, 0.66); padding: 0.2rem 0.45rem;
+        border-radius: 3px; pointer-events: none; max-width: 70%;
+      }
+      .viewport .caption .kind { color: var(--dim); }
+      /* Where the camera is, so a view can be described and returned to. */
+      .viewport .camera {
+        position: absolute; left: 0.7rem; bottom: 1.9rem;
+        font: 400 0.68rem/1.4 var(--mono); color: var(--dim);
+        pointer-events: none;
+      }
+
+      /* How strongly the glide indicators show. Vertical and on the left,
+         away from the crossfader: it sets how the picture is drawn rather
+         than what it shows, so it should not sit beside the control that
+         does. */
+      .viewport .trail {
+        position: absolute; left: 0.6rem; top: 50%;
+        transform: translateY(-50%);
+        display: flex; flex-direction: column; align-items: center;
+        gap: 0.35rem;
+        font: 400 0.62rem/1.3 var(--mono); color: var(--dim);
+        background: rgba(8, 8, 11, 0.6); padding: 0.4rem 0.3rem;
+        border: 1px solid var(--rule); border-radius: 3px;
+      }
+      .viewport .trail input[type="range"] {
+        writing-mode: vertical-lr;
+        direction: rtl;
+        appearance: slider-vertical;
+        -webkit-appearance: slider-vertical;
+        width: 0.85rem; height: 6.5rem; margin: 0;
+        accent-color: var(--green);
+      }
+
+      /* Walking around the scene: where to stand, how fast to circle, how
+         far out. Top right, the corner the other controls left free. */
+      .viewport .orbit {
+        position: absolute; right: 0.7rem; top: 0.55rem;
+        display: flex; flex-direction: column; gap: 0.3rem;
+        font: 400 0.64rem/1.3 var(--mono); color: var(--dim);
+        background: rgba(8, 8, 11, 0.72); padding: 0.35rem 0.45rem;
+        border: 1px solid var(--rule); border-radius: 3px;
+      }
+      .viewport .orbit .where { display: flex; gap: 0.25rem; }
+      .viewport .orbit button {
+        font: inherit; color: var(--fg); background: none; cursor: pointer;
+        border: 1px solid var(--rule); border-radius: 2px;
+        padding: 0.1rem 0.35rem;
+      }
+      .viewport .orbit button:hover { border-color: var(--green); }
+      .viewport .orbit button[aria-pressed="true"] {
+        color: var(--bg); background: var(--green); border-color: var(--green);
+      }
+      .viewport .orbit label { display: flex; align-items: center; gap: 0.3rem; }
+      .viewport .orbit input[type="range"] {
+        width: 5rem; margin: 0; accent-color: var(--green);
+      }
+
       /* The crossfader, opposite the hint: two runs in one canvas, and a
          slider to dissolve between them. */
       .viewport .fader {
@@ -411,13 +473,21 @@
       }
       .run-here:hover { color: var(--var); border-bottom-color: var(--var); }
       .run-here[aria-current="true"] { color: var(--var); background: #2a1c29; }
+      /* The link most often wanted while reading, so it is the one that
+         looks clickable: a brighter outline and the foreground colour,
+         against the dim border it used to share with every rule on the
+         page. */
       .body-here {
         font: inherit; font-size: 0.85em; font-style: normal;
-        color: var(--dim); background: none; cursor: pointer;
-        border: 1px solid var(--rule); border-radius: 2px;
+        color: var(--fg); background: none; cursor: pointer;
+        border: 1px solid var(--green); border-radius: 2px;
         padding: 0 0.3em; margin-left: 0.5em;
+        opacity: 0.85;
       }
-      .body-here:hover { color: var(--var); border-color: #3a3a40; }
+      .body-here:hover {
+        color: var(--bg); background: var(--green);
+        border-color: var(--green); opacity: 1;
+      }
 
       .source .empty { padding: 0.9rem; color: var(--dim); font: italic 0.85rem/1.5 var(--ui); }
 
@@ -611,6 +681,10 @@
       import init, {
         fumola_ensure_mode,
         fumola_eval_top,
+        fumola_eval_scratch,
+        fumola_eval_top_limited,
+        fumola_resume,
+        fumola_abandon,
         fumola_reset,
         fumola_tokens,
         fumola_modules,
@@ -1109,10 +1183,20 @@
               name: (t.scope ? t.scope + "." : "") + t.name,
               title: call.split("\n")[1],
               pick: (b) => {
-                // Both halves: run it, and open its module at the marker, so
-                // the test can be read as well as run.
+                // Both halves: open its module at the marker, so it can be
+                // read, and put it in the editor so it can be run.
+                //
+                // The body rather than the call. A call is a name and a pair
+                // of brackets: it runs, and there is almost nothing in it to
+                // change. The body shows the arguments and the shape of the
+                // work, which is what someone who clicked an example wants to
+                // see and to edit. The landing view has always opened on a
+                // body for that reason; this makes the library agree with it.
+                //
+                // `showModule` first: it sets the source the body is cut from.
                 showModule(path, b, t);
-                loadTest(path, t);
+                if (t.body) loadTestBody(path, t);
+                else loadTest(path, t);
               },
             });
           }
@@ -1269,6 +1353,7 @@
         for (const t of document.querySelectorAll(".view-tab"))
           t.setAttribute("aria-current", String(t.dataset.view === view));
         if (view === "events") refreshEvents();
+        if (view === "outline") refreshPairOutlines();
       };
 
       /// Fumola's lexer recognises `\n` and `\t` well enough to know they do
@@ -1446,6 +1531,55 @@
           : null;
       };
 
+      /// What the two runs do not agree about, in one colour: a node that
+      /// changed, and a node only one of them has. Both are the edit showing
+      /// itself, and giving them separate hues asked the eye to learn a
+      /// three-way code for what is really one fact.
+      const PAIR_DISAGREE = 0xff66bb;
+
+      /// A program's imports, and the expression they are there for.
+      ///
+      /// A pair's outlines are fetched separately from its objects, which
+      /// means asking the same question again with a different projection --
+      /// so the invocation has to be separable from the imports it needs.
+      const splitProgram = (text) => {
+        const lines = String(text).split("\n");
+        let i = 0;
+        while (i < lines.length && /^\s*(import\b|\/\/|$)/.test(lines[i])) i += 1;
+        return {
+          head: lines.slice(0, i).join("\n"),
+          expr: lines.slice(i).join("\n").trim(),
+        };
+      };
+
+      /// The pair without its outlines, which is most of what it costs.
+      ///
+      /// Measured on the tree pair: the whole value is 0.355 MB and 178 ms,
+      /// and 90% of that is the two outlines. They are also the part nobody
+      /// reads first -- two outlines side by side are hard to compare, and
+      /// the objects are what a pair is for. So they are left behind until
+      /// the panel that shows them is opened, the way the events panel has
+      /// always fetched its own contents.
+      const lightPairProgram = (text) => {
+        const { head, expr } = splitProgram(text);
+        if (!expr) return null;
+        return `${head}\ndo { let __p = (${expr});\n` +
+          `  { left = { objects = __p.left.objects ; outline = [] } ;\n` +
+          `    right = { objects = __p.right.objects ; outline = [] } ;\n` +
+          `    sizes = __p.sizes ; keys = __p.keys } }`;
+      };
+
+      const pairOutlinesProgram = (text) => {
+        const { head, expr } = splitProgram(text);
+        if (!expr) return null;
+        return `${head}\ndo { let __p = (${expr});\n` +
+          `  { left = __p.left.outline ; right = __p.right.outline } }`;
+      };
+
+      /// The invocation a light pair came from, so its outlines can be asked
+      /// for later. Null when what is showing is not a pair fetched that way.
+      let pairSource = null;
+
       /// An `#[examplePair]` answers with two scenes and their node diff.
       /// Recognised by having those three fields, the way a scene is
       /// recognised by having `objects` and `outline` -- no tag to carry.
@@ -1453,7 +1587,7 @@
         if (!reply.ok || reply.tag !== "Record") return null;
         const f = reply.value || {};
         return f.left !== undefined && f.right !== undefined &&
-               f.nodes !== undefined && f.sizes !== undefined ? f : null;
+               f.sizes !== undefined && f.keys !== undefined ? f : null;
       };
 
       /// The four numbers, from the pair's `sizes`, plus what they imply.
@@ -1685,6 +1819,10 @@
         mounted.renderer.domElement.remove();
         mounted.hint.remove();
         if (mounted.fader) mounted.fader.remove();
+        if (mounted.trail) mounted.trail.remove();
+        if (mounted.orbit) mounted.orbit.remove();
+        if (mounted.caption) mounted.caption.remove();
+        if (mounted.readout) mounted.readout.remove();
         mounted = null;
       };
 
@@ -1694,8 +1832,17 @@
       /// WebGL context to look at the same structure twice is a lot of
       /// machinery for a comparison that reads better as a dissolve. Each
       /// side goes under its own group, and `setMix` fades between them.
-      const mountObjects = async (input) => {
+      const mountObjects = async (input, diffKeys) => {
         const sides = Array.isArray(input) ? input : [{ list: input }];
+        // Names the two runs named but disagreed about. Everything else they
+        // either agree on or only one of them has, and the geometry says
+        // which. From `W.DiffKeys`, whose names are the same `Text` an object
+        // carries as its label.
+        const disagreed = new Set(
+          ((diffKeys && diffKeys.value && diffKeys.value.notEqual &&
+            diffKeys.value.notEqual.value) || [])
+            .map((t) => (t && t.value !== undefined ? String(t.value) : ""))
+        );
         const parsed = sides.map((s) => readObjects(s.list));
         const anything = parsed.some(
           (d) => d.shapes.length || d.links.length || d.actions.length);
@@ -1738,6 +1885,18 @@
         const sideGroups = [];
         let root = scene;
         let sideMats = materials;
+
+        // What each object is made of, so a matched object can be moved as a
+        // whole. An object is a mesh plus its label, its fields and its
+        // pointer dots, all placed in absolute coordinates; moving it means
+        // moving every part by the same delta.
+        const parts = [];
+        const edges = [];
+        const acts = [];
+        const sideAt = [];
+        // Box or orb, so a glide indicator can take the colour of the thing
+        // it belongs to rather than a colour of its own.
+        const kindOf = new Map();
 
         /// Text as a texture, the way the replayground does it: draw the
         /// lines onto a canvas and hand the canvas to a plane. There is no
@@ -1813,21 +1972,28 @@
           mesh.position.set(sh.at[0], sh.at[1], sh.at[2]);
           mesh.userData.label = sh.label;
           root.add(mesh);
-          at.set(sh.label, mesh.position);
+          at.set(sh.label, mesh.position.clone());
           box.expandByPoint(mesh.position);
+          if (sideIx === 0) kindOf.set(sh.label, sh.kind);
+          const own = (obj) => {
+            if (obj) parts.push({
+              side: sideIx, key: sh.label, obj, base: obj.position.clone(),
+            });
+          };
+          own(mesh);
 
           // The label, up and to the left; the fields, to the right. The same
           // offsets the replayground uses, so a scene sits the same way.
-          textPlane(
+          own(textPlane(
             sh.label,
             mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim)),
             0.7
-          );
-          textPlane(
+          ));
+          own(textPlane(
             sh.text,
             mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim)),
             0.5
-          );
+          ));
 
           const spacing = 0.1;
           const startX = mesh.position.x - ((sh.fields.length - 1) * spacing) / 2;
@@ -1835,7 +2001,8 @@
             const dot = new THREE.Mesh(dotGeo, dotMat);
             dot.position.set(startX + i * spacing, mesh.position.y - 0.17, mesh.position.z);
             root.add(dot);
-            dots.set(sh.label + ":" + name, dot.position);
+            dots.set(sh.label + ":" + name, dot.position.clone());
+            own(dot);
           });
         }
 
@@ -1847,7 +2014,19 @@
           const to = b.clone().add(new THREE.Vector3(0, BoxDim / 2, 0));
           const geo = new THREE.BufferGeometry().setFromPoints([a.clone(), to]);
           geometries.push(geo);
-          root.add(new THREE.Line(geo, lineMat));
+          const pointerLine = new THREE.Line(geo, lineMat);
+          root.add(pointerLine);
+          // A line is drawn between two objects rather than owned by one, so
+          // it follows both ends. Without this the boxes glide and their
+          // pointers stay where they were.
+          edges.push({
+            side: sideIx, geo, line: pointerLine,
+            // Identity, not endpoints: an edge is the same edge in both runs
+            // only if it runs from the same slot to the same object.
+            id: String(link.from) + " -> " + String(link.to),
+            fromKey: String(link.from).split(":")[0], toKey: link.to,
+            fromBase: a.clone(), toBase: to.clone(),
+          });
         }
 
         // Action edges: what the computation did, rather than what it points
@@ -1897,6 +2076,7 @@
 
           const coneGeo = new THREE.ConeGeometry(0.12, 0.12, 10);
           geometries.push(coneGeo);
+          let marker = null;
           if (act.kind === "put" || act.kind === "putForce") {
             // Two cones back to back: a put goes the other way from a get.
             const group = new THREE.Group();
@@ -1909,14 +2089,28 @@
             group.position.copy(head);
             group.quaternion.setFromUnitVectors(UP, dir);
             root.add(group);
+            marker = group;
           } else {
             const cone = new THREE.Mesh(coneGeo, mat);
             cone.position.copy(head);
             cone.quaternion.setFromUnitVectors(UP, dir);
             root.add(cone);
+            marker = cone;
           }
+          // An action spans two objects like a pointer does, so it has to
+          // follow both ends. Its length changes as well as its place, and a
+          // cylinder's length is baked into its geometry -- so it is scaled
+          // rather than rebuilt.
+          acts.push({
+            side: sideIx,
+            id: act.kind + " " + String(act.from) + " -> " + String(act.to),
+            fromKey: String(act.from).split(":")[0], toKey: act.to,
+            fromBase: a.clone(), toBase: b.clone(),
+            shaft, marker, baseLen: shaftLength, hover: hoverOffset,
+          });
         }
 
+        sideAt[sideIx] = at;
         materials.push(...sideMats);
         }
 
@@ -1940,6 +2134,10 @@
         const away = new THREE.Vector3(0.45, 0.35, 1).normalize()
           .multiplyScalar(fit * 0.85);
         camera.position.copy(centre).add(away);
+        // What the fit chose. The distance control moves relative to this
+        // rather than in absolute units, so it means the same thing whatever
+        // the scene's size.
+        const fittedDistance = away.length();
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.target.copy(centre);
         controls.enableDamping = true;
@@ -1957,70 +2155,410 @@
         const fade = (u) =>
           u <= 0.5 ? 1 - 0.6 * u : Math.max(0, 0.7 - 1.4 * (u - 0.5));
 
-        /// White emissive, at the strength the replayground uses to mark a
-        /// node under the cursor. Here it marks the side being faded *into*:
-        /// the fader says how much of each run is visible, and the glow says
-        /// which way you are going, which the opacities alone do not.
+        /// A side, painted. Opacity only.
         ///
-        /// One thing scales it: movement. Every nudge of the fader relights
-        /// the side being entered and pushes the decay back, so the glow
-        /// holds while the fader is moving and falls away once it stops. It
-        /// is a cue about motion, so a fader at rest does not carry it.
+        ///    There used to be a white glow here, lighting whichever run the
+        /// fader was moving towards. It is gone: the trails say which way you
+        /// are going and the gliding says what is moving, so a third signal
+        /// for the same thing was noise.
         ///
-        /// The strength does not depend on where the fader is. Tying it to
-        /// how near an end you were made the same gesture mean different
-        /// things in different places, and the cue is about direction, which
-        /// is the same claim wherever it is made. So the brightness is
-        /// constant and only its lifetime varies.
+        ///    It was also half broken, which is what prompted looking at it.
+        /// Matched objects are drawn from the left run only, so lighting the
+        /// right run lit things that are hidden -- moving left glowed and
+        /// moving right did nothing.
         ///
-        /// The decay is long on purpose. A glow that goes out as soon as the
-        /// fader stops reads as a flicker rather than as a direction, and the
-        /// gesture it marks is a slow one -- you push the fader, look at what
-        /// arrived, and push again.
-        ///
-        /// Only the lit materials take it. Boxes, orbs, pointer dots and
-        /// action arrows are Lambert and have an emissive channel; the
-        /// pointer lines and the text planes are Basic and do not, so they
-        /// fade without glowing.
-        const GLOW_PEAK = 1.0;
-        const GLOW_MS = 2000;
-
+        ///    No `needsUpdate`: that asks three.js to recompile the shader,
+        /// and opacity is a uniform. Setting it per material per fader move
+        /// cost about a second a move on the mergeSort pair, which has some
+        /// nine hundred materials. `transparent` does affect compilation, so
+        /// it is set once when the material is made.
         const paintSide = (s) => {
           s.group.visible = s.opacity > 0.01;
-          for (const m of s.mats) {
-            m.transparent = true;
-            m.opacity = s.opacity;
-            if (m.emissive) {
-              m.emissive.setHex(0xffffff);
-              m.emissiveIntensity = s.glow * GLOW_PEAK;
+          for (const m of s.mats) m.opacity = s.opacity;
+        };
+
+        /// Where every matched object has to travel, and which objects are
+        /// not matched at all.
+        ///
+        ///    Most of a pair is the same objects in different places: for the
+        /// tree pair, 54 of 61 differ only in position. So the two runs are
+        /// not two pictures to dissolve between, they are one picture whose
+        /// parts move, and the fader reads as a journey from the old layout
+        /// to the new one rather than as a crossfade.
+        ///
+        ///    An object matched in both runs is drawn once, from the left
+        /// run, and slid to where the right run puts it. Its counterpart in
+        /// the right run is never shown, or the same object would appear
+        /// twice. Only the objects one run has and the other does not are
+        /// left to fade, and there are few of them.
+        const shift = new Map();
+        if (sideAt.length === 2 && sideAt[0] && sideAt[1]) {
+          for (const [key, here] of sideAt[0]) {
+            const there = sideAt[1].get(key);
+            if (there) shift.set(key, there.clone().sub(here));
+          }
+        }
+        const matched = (key) => shift.has(key);
+
+        const ALONG_Y = new THREE.Vector3(0, 1, 0);
+        let mixNow = 0.5;
+        ///    An indicator for a node both runs agree about takes the colour
+        /// of the object it belongs to -- green for a box, blue for an orb --
+        /// and not white. White is what a moving object glows, so white
+        /// indicators competed with the things they were about; in the
+        /// object's own colour they read as its wake. Emissive either way, so
+        /// they still light rather than merely tint.
+        const BOX_COLOUR = 0x55aa44;
+        const ORB_COLOUR = 0x4488aa;
+        const PATH_DISAGREE = PAIR_DISAGREE;
+        const PATH_RADIUS = 0.055;
+        const PATH_OPACITY_AGREE = 0.22;
+        const PATH_OPACITY_DISAGREE = 0.45;
+        const PATH_SEGMENTS = 10;
+        // How long a segment takes to cool after the fader has gone through
+        // it. Long enough to see a trail from an ordinary drag.
+        const TRAIL_MS = 900;
+        // What an unlit segment still shows, so a path reads as a path.
+        const TRAIL_FLOOR = 0.12;
+        // How much of it to show, under the viewer's hand. The default is
+        // above 1 because the faint version proved too faint to notice, and
+        // how much is too much depends on the scene and the screen.
+        let trailGain = 2.5;
+        const paths = [];
+        if (shift.size) {
+          const along = new THREE.Vector3(0, 1, 0);
+          for (const [key, delta] of shift) {
+            const span = delta.length();
+            if (span < 0.01) continue;
+            const from = sideAt[0].get(key);
+            if (!from) continue;
+            const differs = disagreed.has(key);
+            const hue = differs
+              ? PATH_DISAGREE
+              : kindOf.get(key) === "orb" ? ORB_COLOUR : BOX_COLOUR;
+            const dir = delta.clone().normalize();
+            const turn = new THREE.Quaternion().setFromUnitVectors(along, dir);
+            // One geometry for the whole indicator; the segments differ only
+            // in where they sit and how brightly they are lit.
+            const geo = new THREE.CylinderGeometry(
+              PATH_RADIUS, PATH_RADIUS, span / PATH_SEGMENTS, 8
+            );
+            geometries.push(geo);
+            for (let i = 0; i < PATH_SEGMENTS; i += 1) {
+              const at = (i + 0.5) / PATH_SEGMENTS;
+              const mat = new THREE.MeshLambertMaterial({
+                color: hue,
+                transparent: true,
+                opacity: 0,
+                depthWrite: false,
+              });
+              materials.push(mat);
+              const seg = new THREE.Mesh(geo, mat);
+              seg.position.copy(from).addScaledVector(delta, at);
+              seg.quaternion.copy(turn);
+              sideGroups[0].group.add(seg);
+              paths.push({ mat, differs, hue, at, heat: 0 });
             }
-            m.needsUpdate = true;
+          }
+        }
+
+        /// Show the paths while the fader is moving, and let them go with the
+        /// glow. They answer "what is moving where", which is a question
+        /// about the gesture, not about the picture at rest.
+        /// Paint the indicators from each segment's own heat, plus a faint
+        /// baseline while the fader is in motion at all.
+        const showPaths = (strength) => {
+          for (const p of paths) {
+            const base = p.differs ? PATH_OPACITY_DISAGREE : PATH_OPACITY_AGREE;
+            const lit = Math.max(p.heat, TRAIL_FLOOR * strength);
+            p.mat.opacity = Math.min(1, base * lit * trailGain);
+            p.mat.visible = p.mat.opacity > 0.005;
+            if (p.mat.emissive) {
+              p.mat.emissive.setHex(p.hue);
+              p.mat.emissiveIntensity = Math.min(2, p.heat * 0.9 * trailGain);
+            }
           }
         };
 
+        /// Light whichever segments the fader has just gone through.
+        ///
+        /// Every segment between where it was and where it is, not only the
+        /// one it landed on: a fader can jump -- a click on the track, or a
+        /// fast drag between frames -- and a trail with holes in it looks
+        /// like a fault rather than a gesture.
+        const heatTrail = (from, to) => {
+          const lo = Math.min(from, to) - 0.5 / PATH_SEGMENTS;
+          const hi = Math.max(from, to) + 0.5 / PATH_SEGMENTS;
+          for (const p of paths) {
+            if (p.at >= lo && p.at <= hi) p.heat = 1;
+          }
+        };
+
+        /// Move the left run's objects along their paths, and redraw the
+        /// lines between them from wherever their ends now are.
+        const glide = (t) => {
+          for (const p of parts) {
+            if (p.side !== 0) continue;
+            const d = shift.get(p.key);
+            if (d) p.obj.position.copy(p.base).addScaledVector(d, t);
+          }
+          for (const e of edges) {
+            const df = shift.get(e.fromKey);
+            const dt = shift.get(e.toKey);
+            if (!df && !dt) continue;
+            // The left run's bases are where things start, the right run's
+            // are where they end, so each side reaches the same place from
+            // its own end: L + d*t is R - d*(1 - t).
+            const k = e.side === 0 ? t : -(1 - t);
+            const a = e.fromBase.clone();
+            const b = e.toBase.clone();
+            if (df) a.addScaledVector(df, k);
+            if (dt) b.addScaledVector(dt, k);
+            // Written in place: `setFromPoints` allocates a new attribute
+            // every call, once per edge per fader move.
+            const pos = e.geo.attributes.position;
+            pos.setXYZ(0, a.x, a.y, a.z);
+            pos.setXYZ(1, b.x, b.y, b.z);
+            pos.needsUpdate = true;
+          }
+          for (const a of acts) {
+            const df = shift.get(a.fromKey);
+            const dt = shift.get(a.toKey);
+            if (!df && !dt) continue;
+            const k = a.side === 0 ? t : -(1 - t);
+            const from = a.fromBase.clone();
+            const to = a.toBase.clone();
+            if (df) from.addScaledVector(df, k);
+            if (dt) to.addScaledVector(dt, k);
+            const dir = new THREE.Vector3().subVectors(to, from);
+            const span = dir.length();
+            if (span < 1e-6) continue;
+            dir.normalize();
+            const head = to.clone().addScaledVector(dir, a.hover);
+            const want = Math.max(0.001, span + a.hover * 1.6);
+            a.shaft.position.copy(from).add(head).multiplyScalar(0.5);
+            a.shaft.quaternion.setFromUnitVectors(ALONG_Y, dir);
+            // Scaled, not rebuilt: the cylinder's length is in its geometry.
+            a.shaft.scale.y = want / a.baseLen;
+            if (a.marker) {
+              a.marker.position.copy(head);
+              a.marker.quaternion.setFromUnitVectors(ALONG_Y, dir);
+            }
+          }
+        };
+
+        /// An object only one run has gets its own material, because the
+        /// fade and the colour below apply to it alone and the rest of its
+        /// side shares one material per shape kind.
+        const lone = [];
+        const loneEdges = [];
+        const loneActs = [];
+        if (shift.size) {
+          for (const p of parts) {
+            const isLone = !matched(p.key);
+            if (!isLone) continue;
+            p.obj.material = p.obj.material.clone();
+            p.obj.material.transparent = true;
+            sideGroups[p.side].mats.push(p.obj.material);
+            materials.push(p.obj.material);
+            lone.push(p);
+          }
+          // Whether an edge survives is a question about the edge, not about
+          // its ends. Removing a cell rewires the tree: for the tree pair, 25
+          // edges are in both runs, 5 only in the left and 3 only in the
+          // right -- and some of those have ends present in both. Testing the
+          // ends drew the left run's wiring at the right run's positions,
+          // which produced a tree that was not a binary tree.
+          const idsOf = (list, side) =>
+            new Set(list.filter((e) => e.side === side).map((e) => e.id));
+          const leftIds = idsOf(edges, 0);
+          const rightIds = idsOf(edges, 1);
+          for (const e of edges) {
+            const inBoth = leftIds.has(e.id) && rightIds.has(e.id);
+            e.shared = inBoth;
+            if (inBoth) continue;
+            // Only in one run, so it has to arrive or leave.
+            e.line.material = e.line.material.clone();
+            e.line.material.transparent = true;
+            sideGroups[e.side].mats.push(e.line.material);
+            materials.push(e.line.material);
+            loneEdges.push(e);
+          }
+          // The same for actions, which had been drawn from both runs at
+          // once: every shared action appeared twice, one copy over the
+          // other, and neither moved.
+          const leftActs = idsOf(acts, 0);
+          const rightActs = idsOf(acts, 1);
+          for (const a of acts) {
+            a.shared = leftActs.has(a.id) && rightActs.has(a.id);
+            if (a.shared) continue;
+            const own = a.shaft.material.clone();
+            own.transparent = true;
+            a.shaft.material = own;
+            if (a.marker) {
+              a.marker.traverse
+                ? a.marker.traverse((o) => { if (o.material) o.material = own; })
+                : (a.marker.material = own);
+            }
+            sideGroups[a.side].mats.push(own);
+            materials.push(own);
+            loneActs.push(a);
+          }
+        }
+
         const setMix = (t) => {
           if (sideGroups.length < 2) return;
-          sideGroups.forEach((s, i) => {
-            s.opacity = fade(i === 0 ? t : 1 - t);
-            // A group at zero is not drawn at all: a fully transparent mesh
-            // still writes depth in some materials, and would punch holes in
-            // the side that is meant to be solid.
-            paintSide(s);
-          });
+          if (t !== mixNow) heatTrail(mixNow, t);
+          mixNow = t;
+          if (!shift.size) {
+            // Nothing matched, so there is nothing to glide: fall back to the
+            // dissolve, which is still the right answer for two unrelated
+            // scenes.
+            sideGroups.forEach((s, i) => {
+              s.opacity = fade(i === 0 ? t : 1 - t);
+              paintSide(s);
+            });
+            return;
+          }
+          glide(t);
+          // The left run carries every matched object and is always drawn;
+          // the right run contributes only what the left does not have.
+          sideGroups[0].opacity = 1;
+          sideGroups[1].opacity = 1;
+          sideGroups.forEach(paintSide);
+          for (const p of parts) {
+            if (matched(p.key)) p.obj.visible = p.side === 0;
+          }
+          // The left run's lines are redrawn to wherever their ends now are,
+          // so the right run's copies of the same lines are duplicates. At
+          // the far right they land on top of the originals, which read as
+          // twice as many edges as the scene has.
+          for (const e of edges) {
+            // An edge both runs have is drawn once, from the left; the right
+            // run's copy of it would land on top of the original.
+            if (e.shared) { e.line.visible = e.side === 0; continue; }
+          }
+          // Peaks at the halfway mark and falls away towards either end.
+          //
+          // Halfway is where a node only one run has is worth looking at: it
+          // is the moment the edit is happening rather than the moment before
+          // or after. At its own end it is an ordinary object of an ordinary
+          // colour, and at the far end it is gone.
+          //
+          // Held opaque through the peak, so the brightest moment is not also
+          // the most transparent one.
+          const peak = Math.max(0, 1 - Math.abs(t - 0.5) * 2);
+          for (const a of acts) {
+            if (a.shared) {
+              a.shaft.visible = a.side === 0;
+              if (a.marker) a.marker.visible = a.side === 0;
+            }
+          }
+          for (const a of loneActs) {
+            const near = a.side === 0 ? 1 - t : t;
+            const lit = Math.max(near, peak);
+            a.shaft.material.opacity = lit;
+            a.shaft.visible = lit > 0.02;
+            if (a.marker) a.marker.visible = lit > 0.02;
+          }
+          for (const e of loneEdges) {
+            const near = e.side === 0 ? 1 - t : t;
+            const m = e.line.material;
+            m.opacity = Math.max(near, peak);
+            e.line.visible = m.opacity > 0.02;
+          }
+          // An object about to be lost fades as the fader leaves it, and an
+          // object about to arrive fades in as the fader reaches it.
+          for (const p of lone) {
+            const near = p.side === 0 ? 1 - t : t;
+            const m = p.obj.material;
+            m.opacity = Math.max(near, peak);
+            m.visible = true;
+            p.obj.visible = m.opacity > 0.02;
+            if (m.emissive) {
+              // The same magenta a changed node's indicator uses. One
+              // colour for "the two runs do not agree about this", whether
+              // the disagreement is that a node changed or that it is only
+              // in one of them -- three shades for three flavours of the
+              // same fact was harder to read than one.
+              //
+              // Strongest as the object is lost or gained, which is the
+              // moment worth looking at.
+              m.emissive.setHex(PAIR_DISAGREE);
+              m.emissiveIntensity = peak * 2.2;
+            }
+          }
         };
 
         /// Light the side the fader is moving towards, and push the decay
         /// back. Called per input, so holding the fader in motion holds the
         /// glow, and releasing it lets the glow go.
-        const glowTowards = (i) => {
+        /// Note that the fader moved, so the trails have a baseline to show
+        /// against for a moment. Which way it moved no longer matters here --
+        /// the trail itself carries the direction.
+        const MOVING_MS = 2000;
+        const noteMoved = () => {
           if (sideGroups.length < 2) return;
-          sideGroups.forEach((s, j) => { s.glow = j === i ? 1 : 0; });
-          glowUntil = performance.now() + GLOW_MS;
+          movingUntil = performance.now() + MOVING_MS;
+          showPaths(1);
         };
 
-        let glowUntil = 0;
-        sideGroups.forEach((s) => { s.glow = 0; s.opacity = 1; });
+        let movingUntil = 0;
+        let lastCool = performance.now();
+        let lastSpin = performance.now();
+        sideGroups.forEach((s) => { s.opacity = 1; });
         setMix(0.5);
+
+        /// Sweeping the fader by itself, so a pair can be watched with both
+        /// hands free -- which is what it is for when it is being shown to
+        /// someone rather than driven.
+        ///
+        ///    Eased rather than linear, and with a pause at each end. A
+        /// linear sweep arrives at an end and leaves immediately, so the
+        /// arrangement you were trying to see is gone before you have seen
+        /// it; the dwell is what makes the two runs legible as two runs. The
+        /// motion between is a cosine, which is the sine-wave feel of easing
+        /// out of one end and into the other.
+        const PING_DWELL = 0.18;
+        let pinging = false;
+        let pingButton = null;
+        // Declared here rather than where the control is built: the frame
+        // loop reads it, and the loop starts first.
+        let faderInput = null;
+        let pingPhase = 0;
+        let pingPeriodMs = 6000;
+
+        const pingAt = (phase) => {
+          const move = (1 - 2 * PING_DWELL) / 2;
+          if (phase < PING_DWELL) return 0;
+          if (phase < PING_DWELL + move) {
+            const u = (phase - PING_DWELL) / move;
+            return 0.5 - 0.5 * Math.cos(u * Math.PI);
+          }
+          if (phase < 2 * PING_DWELL + move) return 1;
+          const u = (phase - 2 * PING_DWELL - move) / move;
+          return 0.5 + 0.5 * Math.cos(u * Math.PI);
+        };
+
+        const HEIGHTS = { above: 52, beside: 6, below: -38 };
+        let orbiting = null;
+        let orbitAz = (Math.atan2(away.x, away.z) * 180) / Math.PI;
+        let orbitRate = 12;
+        let orbitReach = 1;
+
+        const placeCamera = () => {
+          if (orbiting === null) return;
+          const d = fittedDistance * orbitReach;
+          const el = (HEIGHTS[orbiting] * Math.PI) / 180;
+          const az = (orbitAz * Math.PI) / 180;
+          const flat = Math.cos(el) * d;
+          camera.position.set(
+            controls.target.x + Math.sin(az) * flat,
+            controls.target.y + Math.sin(el) * d,
+            controls.target.z + Math.cos(az) * flat
+          );
+          camera.lookAt(controls.target);
+        };
 
         const anim = { id: 0 };
         const tick = () => {
@@ -2028,17 +2566,40 @@
           // The glow decays on the clock rather than per frame, so it lasts
           // the same time whatever the frame rate, and stops touching
           // materials once it is spent.
-          if (glowUntil) {
-            const left = (glowUntil - performance.now()) / GLOW_MS;
-            const g = left > 0 ? left : 0;
-            sideGroups.forEach((s) => {
-              if (s.glow > 0) { s.glow = g; paintSide(s); }
-            });
-            if (g === 0) {
-              glowUntil = 0;
-              sideGroups.forEach((s) => { s.glow = 0; });
+          // The trail cools whether or not the fader is still moving, so it
+          // is shed on elapsed time rather than per frame.
+          const now = performance.now();
+          const shed = (now - lastCool) / TRAIL_MS;
+          lastCool = now;
+          let anyHeat = false;
+          for (const p of paths) {
+            if (p.heat > 0) {
+              p.heat = Math.max(0, p.heat - shed);
+              anyHeat = true;
             }
           }
+          if (movingUntil || anyHeat) {
+            const left = movingUntil
+              ? (movingUntil - performance.now()) / MOVING_MS : 0;
+            const g = left > 0 ? left : 0;
+            showPaths(g);
+            if (g === 0 && !anyHeat) movingUntil = 0;
+          }
+          if (orbiting !== null) {
+            orbitAz = (orbitAz + (orbitRate * (now - lastSpin)) / 1000) % 360;
+            placeCamera();
+          }
+          if (pinging && sideGroups.length > 1) {
+            pingPhase = (pingPhase + (now - lastSpin) / pingPeriodMs) % 1;
+            const t = pingAt(pingPhase);
+            // The control is moved to match, without dispatching: an `input`
+            // event is how the user's own hand is told apart from this, and
+            // that is what stops the sweep.
+            if (faderInput) faderInput.value = String(t);
+            noteMoved();
+            setMix(t);
+          }
+          lastSpin = now;
           controls.update();
           renderer.render(scene, camera);
         };
@@ -2068,6 +2629,41 @@
           " · drag to orbit, scroll to zoom";
         host.appendChild(hint);
 
+        // Named on the picture, because a screenshot arrives without the URL
+        // that produced it and "which example is this" is the first question
+        // anyone asks of one.
+        let caption = null;
+        if (preset && preset.key) {
+          caption = document.createElement("div");
+          caption.className = "caption";
+          const kind = document.createElement("span");
+          kind.className = "kind";
+          kind.textContent =
+            (preset.kind === "body" ? "body of " : preset.kind + "  ");
+          const name = document.createElement("span");
+          name.textContent = preset.key;
+          caption.append(kind, name);
+          host.appendChild(caption);
+        }
+
+        // Where the camera is, in terms anyone can repeat: how far round, how
+        // far up, how far back. Written on a change rather than every frame,
+        // since it only moves when someone moves it.
+        const readout = document.createElement("div");
+        readout.className = "camera";
+        host.appendChild(readout);
+        const showCamera = () => {
+          const off = camera.position.clone().sub(controls.target);
+          const dist = off.length();
+          const az = (Math.atan2(off.x, off.z) * 180) / Math.PI;
+          const el = (Math.asin(dist ? off.y / dist : 0) * 180) / Math.PI;
+          const one = (n) => (Math.round(n * 10) / 10).toFixed(1);
+          readout.textContent =
+            `camera  around ${Math.round(az)}°  up ${Math.round(el)}°  ` +
+            `back ${one(dist)}  ·  looking at ` +
+            `(${one(controls.target.x)}, ${one(controls.target.y)}, ${one(controls.target.z)})`;
+        };
+
         // The crossfader, when two runs share the canvas.
         let fader = null;
         if (sideGroups.length > 1) {
@@ -2086,18 +2682,224 @@
           range.setAttribute("aria-label", "Fade between the two runs");
           let was = Number(range.value);
           range.addEventListener("input", () => {
+            // Only the user's own hand reaches here; the sweep sets `value`
+            // without dispatching, precisely so that this can tell them apart.
+            pinging = false;
+            if (pingButton) pingButton.setAttribute("aria-pressed", "false");
             const now = Number(range.value);
-            if (now !== was) glowTowards(now > was ? 1 : 0);
+            if (now !== was) noteMoved();
             was = now;
             setMix(now);
           });
           fader.append(left, range, right);
           host.appendChild(fader);
+          faderInput = range;
         }
+
+        // Only when there is something for it to govern.
+        let trail = null;
+        if (paths.length) {
+          trail = document.createElement("div");
+          trail.className = "trail";
+          const cap = document.createElement("span");
+          cap.textContent = "trail";
+          const dial = document.createElement("input");
+          dial.type = "range";
+          dial.min = "0";
+          dial.max = "6";
+          dial.step = "0.1";
+          dial.value = String(trailGain);
+          dial.setAttribute("aria-label", "How strongly glide indicators show");
+          dial.addEventListener("input", () => {
+            trailGain = Number(dial.value);
+            // Light the whole trail while it is being set, so the effect of
+            // the control is visible without also dragging the fader.
+            heatTrail(0, 1);
+            movingUntil = performance.now() + MOVING_MS;
+            showPaths(1);
+          });
+          trail.append(cap, dial);
+          host.appendChild(trail);
+        }
+
+        /// Walk around the scene, from above, beside, or below.
+        ///
+        ///    Three heights and a circle. Aiming from a fixed elevation and
+        /// turning is how a person looks at a thing on a table, and it shows
+        /// depth in a way no single view does -- which for a pair matters,
+        /// since the two runs differ in three dimensions and a still picture
+        /// flattens one of them away.
+        ///
+        ///    Dragging stops it. A control that fights the mouse is worse
+        /// than no control, and wanting to look at something is exactly when
+        /// the automatic motion should get out of the way.
+        const orbit = document.createElement("div");
+        orbit.className = "orbit";
+        const where = document.createElement("div");
+        where.className = "where";
+        const buttons = {};
+        for (const name of ["above", "beside", "below"]) {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.textContent = name;
+          b.setAttribute("aria-pressed", "false");
+          b.addEventListener("click", () => {
+            // Pressing the one already running stops it, so the same button
+            // both starts and ends the walk.
+            orbiting = orbiting === name ? null : name;
+            for (const [n, el] of Object.entries(buttons))
+              el.setAttribute("aria-pressed", String(orbiting === n));
+            placeCamera();
+            showCamera();
+          });
+          buttons[name] = b;
+          where.appendChild(b);
+        }
+        const dials = {};
+        const dial = (text, min, max, step, value, onInput) => {
+          const label = document.createElement("label");
+          const cap = document.createElement("span");
+          cap.textContent = text;
+          const r = document.createElement("input");
+          r.type = "range";
+          r.min = String(min); r.max = String(max);
+          r.step = String(step); r.value = String(value);
+          r.setAttribute("aria-label", text);
+          r.addEventListener("input", () => onInput(Number(r.value)));
+          label.append(cap, r);
+          dials[text] = r;
+          return label;
+        };
+        orbit.append(
+          where,
+          dial("spin", 0, 60, 1, orbitRate, (v) => { orbitRate = v; }),
+          dial("out", 0.4, 3, 0.05, orbitReach, (v) => {
+            orbitReach = v;
+            placeCamera();
+            showCamera();
+          })
+        );
+        if (sideGroups.length > 1) {
+          const row = document.createElement("div");
+          row.className = "where";
+          pingButton = document.createElement("button");
+          pingButton.type = "button";
+          pingButton.textContent = "ping-pong";
+          pingButton.setAttribute("aria-pressed", "false");
+          pingButton.addEventListener("click", () => {
+            pinging = !pinging;
+            pingButton.setAttribute("aria-pressed", String(pinging));
+          });
+          row.appendChild(pingButton);
+          orbit.append(
+            row,
+            // Seconds for a there-and-back, which is the unit anyone watching
+            // it would use. Inverted, so rightwards is faster like the others.
+            dial("pace", 1.5, 14, 0.5, pingPeriodMs / 1000, (v) => {
+              pingPeriodMs = (15.5 - v) * 1000;
+            })
+          );
+        }
+        host.appendChild(orbit);
+
+        const stopOrbit = () => {
+          if (orbiting === null) return;
+          orbiting = null;
+          for (const el of Object.values(buttons))
+            el.setAttribute("aria-pressed", "false");
+        };
+
+        /// While the walk is on, the pointer means something different, and
+        /// the difference is whether it moved.
+        ///
+        ///    A drag moves what the walk is walking around. Circling a scene
+        /// is only useful if you can choose what to circle, and stopping the
+        /// walk to reposition and starting it again is three actions for one
+        /// intention. So a drag pans the centre and the walk keeps going
+        /// around wherever it now is.
+        ///
+        ///    A click -- pressed and released without moving -- stops it.
+        /// That is the gesture for "enough, let me look", and it needs to
+        /// stay available or the walk cannot be dismissed by hand at all.
+        ///
+        ///    Taken before `controls` sees any of it, since its own reading
+        /// of a left-drag is to rotate, and a rotation fights a walk.
+        const DRAG_SLOP = 3;
+        let holding = null;
+
+        const panTarget = (dx, dy) => {
+          const d = fittedDistance * orbitReach;
+          const vHalf = (camera.fov * Math.PI) / 360;
+          const perPixel =
+            (2 * Math.tan(vHalf) * d) /
+            Math.max(1, renderer.domElement.clientHeight);
+          const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+          const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+          controls.target.addScaledVector(right, -dx * perPixel);
+          controls.target.addScaledVector(up, dy * perPixel);
+        };
+
+        renderer.domElement.addEventListener("pointerdown", (e) => {
+          if (orbiting === null) return;
+          e.preventDefault();
+          e.stopPropagation();
+          holding = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
+          renderer.domElement.setPointerCapture(e.pointerId);
+        }, { capture: true });
+
+        renderer.domElement.addEventListener("pointermove", (e) => {
+          if (orbiting === null || !holding) return;
+          const dx = e.clientX - holding.x;
+          const dy = e.clientY - holding.y;
+          if (!holding.moved &&
+              Math.abs(dx) + Math.abs(dy) < DRAG_SLOP) return;
+          holding.moved = true;
+          holding.x = e.clientX;
+          holding.y = e.clientY;
+          panTarget(dx, dy);
+          placeCamera();
+          showCamera();
+        }, { capture: true });
+
+        const releaseHold = (e) => {
+          if (!holding) return;
+          const wasClick = !holding.moved;
+          try { renderer.domElement.releasePointerCapture(holding.id); } catch (_) {}
+          holding = null;
+          if (wasClick) stopOrbit();
+        };
+        renderer.domElement.addEventListener("pointerup", releaseHold, { capture: true });
+        renderer.domElement.addEventListener("pointercancel", releaseHold, { capture: true });
+
+        // Not walking: the pointer belongs to `controls`, and taking hold of
+        // the scene is just taking hold of the scene.
+
+        // So the wheel moves the distance instead, while the walk is on.
+        // Taken before `controls` sees it, or the camera would be dollied as
+        // well and the two would fight over where it goes.
+        renderer.domElement.addEventListener(
+          "wheel",
+          (e) => {
+            if (orbiting === null) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const out = dials.out;
+            const step = e.deltaY > 0 ? 1.08 : 1 / 1.08;
+            orbitReach = Math.min(3, Math.max(0.4, orbitReach * step));
+            if (out) out.value = String(orbitReach);
+            placeCamera();
+            showCamera();
+          },
+          { capture: true, passive: false }
+        );
+
+        showCamera();
+        controls.addEventListener("change", showCamera);
 
         mounted = {
           renderer, controls, geometries, materials, textures, observer, hint,
-          setMix, glowTowards, sideCount: sideGroups.length, fader,
+          caption, readout,
+          setMix, sideCount: sideGroups.length, fader, trail, orbit,
           get frame() { return anim.id; },
         };
         return true;
@@ -2153,7 +2955,7 @@
           mountObjects([
             { list: L.objects, label: "left" },
             { list: R.objects, label: "right" },
-          ]).catch((e) => {
+          ], pair.keys).catch((e) => {
             host.hidden = true;
             $("objects-body").textContent = "could not draw the scene: " + e;
           });
@@ -2164,17 +2966,35 @@
 
         const lOut = L.outline ? vArr(L.outline) : [];
         const rOut = R.outline ? vArr(R.outline) : [];
-        fillScenePanel(
-          "outline", L.outline, lOut.length + rOut.length,
-          "Neither run offered an outline. A pair offers one by evaluating to:",
-          (body) => {
-            diffLine(body, counts);
-            [["left", lOut], ["right", rOut]].forEach(([name, forest]) => {
-              runRule(body, `${name} — ${forest.length} tree${forest.length === 1 ? "" : "s"}`);
-              forest.forEach((tree) => drawOutline(body, tree, 0));
-            });
-          }
-        );
+        if (!lOut.length && !rOut.length && pairSource) {
+          // Left behind on purpose. Say so, and fetch them if this is the
+          // panel being looked at.
+          fillScenePanel(
+            "outline", L.outline, 1,
+            "",
+            (body) => {
+              diffLine(body, counts);
+              runRule(body,
+                "outlines are fetched when this panel is opened — they are " +
+                "most of what a pair costs to hand over, and the objects are " +
+                "what it is for");
+            }
+          );
+          refreshPairOutlines();
+        } else {
+          fillScenePanel(
+            "outline", L.outline, lOut.length + rOut.length,
+            "Neither run offered an outline. A pair offers one by evaluating to:",
+            (body) => {
+              diffLine(body, counts);
+              [["left", lOut], ["right", rOut]].forEach(([name, forest]) => {
+                runRule(body, `${name} — ${forest.length} tree${forest.length === 1 ? "" : "s"}`);
+                forest.forEach((tree) => drawOutline(body, tree, 0));
+              });
+            }
+          );
+        }
+        lastPairCounts = counts;
       };
 
       const showScene = (reply) => {
@@ -2227,6 +3047,44 @@
                 });
               }
             : null
+        );
+      };
+
+      /// The counts of the pair on screen, so a later outline fetch can head
+      /// its panel the same way the objects panel is headed.
+      let lastPairCounts = null;
+
+      /// Fetch and draw a pair's outlines, once, when their panel is open.
+      ///
+      /// Same shape as `refreshEvents`: nothing happens until the panel is
+      /// the one being looked at, and what it needs is asked for then.
+      let pairOutlinesShown = false;
+      const refreshPairOutlines = () => {
+        if (!ready || !pairSource) return;
+        if (libEl.dataset.view !== "outline") return;
+        if (pairOutlinesShown) return;
+        const program = pairOutlinesProgram(pairSource);
+        if (!program) return;
+        let reply;
+        try {
+          reply = JSON.parse(fumola_eval_scratch(instance, program));
+        } catch (e) { return; }
+        if (!reply.ok || !reply.value) return;
+        const f = reply.value;
+        const lOut = f.left ? vArr(f.left) : [];
+        const rOut = f.right ? vArr(f.right) : [];
+        pairOutlinesShown = true;
+        fillScenePanel(
+          "outline", f.left, lOut.length + rOut.length,
+          "Neither run offered an outline.",
+          (body) => {
+            if (lastPairCounts) diffLine(body, lastPairCounts);
+            [["left", lOut], ["right", rOut]].forEach(([name, forest]) => {
+              runRule(body,
+                `${name} — ${forest.length} tree${forest.length === 1 ? "" : "s"}`);
+              forest.forEach((tree) => drawOutline(body, tree, 0));
+            });
+          }
         );
       };
 
@@ -2394,6 +3252,40 @@
       };
 
       let timer = null;
+      /// How many steps to ask for before taking a turn back.
+      ///
+      /// Not a constant, because the right number depends on the machine. Too
+      /// few and the run is mostly round trips; too many and each chunk is a
+      /// freeze long enough to see. So it is measured: aim each chunk at
+      /// CHUNK_TARGET_MS of work and scale the request by how long the last
+      /// one actually took, within bounds that keep a bad measurement from
+      /// running away.
+      const CHUNK_TARGET_MS = 25;
+      const CHUNK_MIN = 2_000;
+      const CHUNK_MAX = 250_000;
+      const CHUNK_MAX_GROWTH = 2;
+      let chunkSteps = 20_000;
+
+      const nextChunk = (elapsed) => {
+        if (elapsed > 2) {
+          const scaled = (chunkSteps * CHUNK_TARGET_MS) / elapsed;
+          // Bounded, and only part of the way. An unbounded ratio ran away:
+          // a fast first chunk asked for one so large that the rest of the
+          // program fitted inside it, so the count was shown once and the
+          // trampoline reported nothing it had not already finished.
+          const capped = Math.min(scaled, chunkSteps * CHUNK_MAX_GROWTH);
+          chunkSteps = Math.round(chunkSteps * 0.5 + capped * 0.5);
+        }
+        chunkSteps = Math.min(CHUNK_MAX, Math.max(CHUNK_MIN, chunkSteps));
+        return chunkSteps;
+      };
+
+      /// Which run is current. A run whose generation is stale has been
+      /// superseded -- the program changed while it was still going -- and
+      /// abandons its paused computation rather than finishing work nobody
+      /// is waiting for.
+      let runGeneration = 0;
+
       /// Say that a run is under way, in the panel the answer will land in.
       ///
       /// Not an overlay. An overlay needs a visibility flag, and a flag can
@@ -2444,27 +3336,66 @@
         if (!persistEl.checked) fumola_reset(instance);
 
         // A pair says what the wait is for; anything else just says to wait.
-        // Neither can say how far along it is -- the run is one call that
-        // returns when it is finished -- so what stands in for progress is
-        // what the same program cost last time, when that is known.
+        const doing =
+          preset && preset.kind === "examplePair"
+            ? "running the left, then the right, then comparing them"
+            : "running";
         const expected = stepsSeen.get(text);
+        // The count is real now: the run comes back between chunks and says
+        // how many steps it has taken. `expected` is still worth showing
+        // beside it, because a rising number means more when there is
+        // something to compare it against.
+        const progress = (steps) =>
+          `wait… ${doing} · ${commas(steps)} Fumola steps` +
+          (expected === undefined ? "" : ` of about ${commas(expected)}`);
+
+        const generation = ++runGeneration;
+        pairOutlinesShown = false;
         await sayWaiting(
-          (preset && preset.kind === "examplePair"
-            ? "wait… running the left, then the right, then comparing them"
-            : "wait…") +
-          (expected === undefined
-            ? ""
-            : ` · about ${commas(expected)} Fumola steps`)
+          `wait… ${doing}` +
+          (expected === undefined ? "" : ` · about ${commas(expected)} Fumola steps`)
         );
+
+        // For a pair still as the library wrote it, ask for the objects and
+        // leave the outlines behind. Only when unedited: once the text is the
+        // user's own, what runs has to be what is written.
+        const asWritten =
+          preset && preset.kind === "examplePair" && text === preset.text;
+        const lightened = asWritten ? lightPairProgram(text) : null;
+        pairSource = lightened ? text : null;
+        const toRun = lightened || text;
+
         let reply;
         try {
-          reply = JSON.parse(fumola_eval_top(instance, text));
+          let began = performance.now();
+          reply = JSON.parse(
+            fumola_eval_top_limited(instance, toRun, chunkSteps));
+          while (reply.paused) {
+            // Superseded: the program changed while this was running. Drop
+            // the paused computation rather than finish it -- and drop it
+            // through `fumola_abandon`, which restores the instance, so a
+            // cancelled run costs nothing either.
+            if (generation !== runGeneration) {
+              fumola_abandon(instance);
+              return;
+            }
+            const steps = nextChunk(performance.now() - began);
+            await sayWaiting(progress(reply.steps));
+            began = performance.now();
+            reply = JSON.parse(fumola_resume(instance, steps));
+          }
         } catch (e) {
           return;
         }
+        // A later run started while this one was finishing its last chunk.
+        if (generation !== runGeneration) return;
         // What it actually cost, for the next wait and for the answer below.
-        const ranSteps =
-          reply.counts && Number.isFinite(Number(reply.counts.step))
+        // `steps` is the whole run where a chunked path reported one;
+        // `counts.step` is the last chunk, and is the fallback for the
+        // unlimited entry points that report no `steps`.
+        const ranSteps = Number.isFinite(Number(reply.steps))
+          ? Number(reply.steps)
+          : reply.counts && Number.isFinite(Number(reply.counts.step))
             ? Number(reply.counts.step) : null;
         if (ranSteps !== null) stepsSeen.set(text, ranSteps);
         // Both places: the panel is where it is meant to be read, the
@@ -2509,6 +3440,29 @@
               (ranSteps === null ? "" : `, ${commas(ranSteps)} Fumola steps`) +
               " — see the objects and outline panels";
             outEl.append(tag, body);
+            refreshEvents();
+            return;
+          }
+          // A pair, like a scene, is described rather than printed. Its
+          // value is two whole histories -- measured at 1.17 MB for the
+          // tree pair -- and rendering that through the highlighter cost
+          // more than running the program did, to produce something nobody
+          // reads. The panels carry what it means.
+          const asPair = pairOf(reply);
+          if (asPair) {
+            const c = diffCounts(asPair.sizes);
+            outEl.classList.remove("stale");
+            outEl.textContent = "";
+            const pairTag = document.createElement("span");
+            pairTag.className = "tag";
+            pairTag.textContent = "Pair  ";
+            const pairBody = document.createElement("span");
+            pairBody.textContent =
+              `${c.changed} of ${c.total} nodes differ ` +
+              `(${(c.fraction * 100).toFixed(1)}%)` +
+              (ranSteps === null ? "" : `, ${commas(ranSteps)} Fumola steps`) +
+              " — see the objects and outline panels";
+            outEl.append(pairTag, pairBody);
             refreshEvents();
             return;
           }

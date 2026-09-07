@@ -1,0 +1,5 @@
+# Built by the Pages workflow from the wasm crate. A local build drops a
+# copy here so this directory can be served, and that copy is not the
+# repository's business.
+fumola_wasm.js
+fumola_wasm_bg.wasm
