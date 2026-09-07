@@ -376,21 +376,24 @@ reaches.
 
 ## 11. Limitations
 
-1. No time cursor. `#action` scene objects are consequently not rendered.
-2. The outline panel does not cross-link to the viewport or the events table.
-3. The `()` contract for `#[example]` is unenforced.
-4. `Scene.outline` is a single outline, but a session has one force tree per top-level force and
-   `Outline.outlines()` returns an array. The two are not reconciled.
-5. No scene is built incrementally. `generateSceneFullDemand` begins with `A.reset()`, so
-   repeated runs cost the same. This is the principal obstacle to demonstrating incremental
-   computation in a tool built to demonstrate it.
-6. Evaluation is synchronous; a size-44 scene blocks the tab for about 2.5 s. A worker is needed
-   before raising the input size, and is also the only means observed of reclaiming memory:
-   `fumola_reset` and `fumola_drop` both leave heap usage unchanged.
-7. Assets cache aggressively; the wasm and three.js require a hard reload after a deploy. A
-   content hash on those URLs would remove the problem.
+Each is tracked as an issue.
 
----
+1. **No time cursor** (#63). `#action` scene objects are consequently not rendered.
+2. **The outline panel does not cross-link** to the viewport or the events table (#64).
+3. **The `()` contract for `#[example]` is unenforced** (#65). It belongs in `fumola test` or
+   CI, not in the page.
+4. **`Scene.outline` is a single outline** (#66), but a session has one force tree per
+   top-level force and `Outline.outlines()` returns an array. The two are not reconciled, so
+   an example must choose which tree to portray.
+5. **No scene is built incrementally** (#67). `generateSceneFullDemand` begins with
+   `A.reset()`, so repeated runs cost the same. This is the principal obstacle to
+   demonstrating incremental computation in a tool built to demonstrate it, and the only item
+   here with research content rather than engineering content.
+6. **Evaluation is synchronous** (#68); a size-44 scene blocks the tab for about 2.5 s. A
+   worker is needed before raising the input size, and is also the only means observed of
+   reclaiming memory: `fumola_reset` and `fumola_drop` both leave heap usage unchanged.
+7. **Published assets have stable URLs** (#69), so a deploy leaves browsers a version behind
+   until a hard reload. A content hash would remove the problem.
 
 ## 12. Relationship to `replayground-www`
 
