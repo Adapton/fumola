@@ -8,6 +8,44 @@ import W "../system/webPlay";
 import Prim "../system/prim";
 import Files "../system/files";
 
+/// A sequence represented as a balanced binary tree, keyed by level.
+///
+///    The structure and its balance argument come from Pugh and Teitelbaum,
+/// "Incremental Computation via Function Caching", POPL 1989. Each element
+/// draws a `level` from a geometric distribution, and the tree is the one
+/// those levels determine: the highest level roots, and partitions the
+/// sequence around itself. That makes the representation a function of the
+/// sequence's contents rather than of the history of edits that produced it,
+/// which is what lets a cached result be reused --- the same subsequence has
+/// the same shape however it was arrived at. Balance holds in expectation
+/// over the draws.
+///
+///    Fumola departs from the paper in one necessary way. The paper draws
+/// each level independently, by coin flips. Here the level is a deterministic
+/// function of the element's symbol --- `Prim.symbolLevel`, which packs four
+/// geometric samples taken from the symbol's hash. Determinism is the
+/// requirement rather than a shortcut: reuse depends on a symbol receiving
+/// the same level every time it appears.
+///
+///    The cost of that departure is that there is no averaging left. The
+/// expectation the paper's theorem quantifies over becomes a single fixed
+/// realisation, so a set of symbols whose levels happen to be poorly
+/// distributed stays that way permanently. Positional symbols are the case
+/// to be careful with, being both few and shared across every structure that
+/// uses them. See issue #72, and `R.generateRandomInputSymbols` for symbols
+/// that carry entropy instead.
+///
+///    Two details of the representation, both of which are easy to get wrong
+/// when reasoning about the shape. The elements are the *leaves*: the n-1
+/// internal `#binary` nodes are the gaps between consecutive elements, gap i
+/// carrying `symbolLevel` of the i-th symbol for i in 2..n. So it is a treap
+/// over the gaps, the root holds a symbol rather than an element, and the
+/// element whose symbol labels the root is the leftmost leaf of the right
+/// subtree. One consequence: the first element's level is never consulted,
+/// and only n-1 of the n levels drive the shape. The other detail is the
+/// depth convention --- `metrics` and `Scene.geom2d` count nodes, taking a
+/// leaf to be 1, so they report one more than the root-to-leaf edge count.
+
 module { 
     
   #[listing(30)]
