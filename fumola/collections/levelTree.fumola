@@ -451,6 +451,34 @@ module {
   };
   
 
+  /// A tree built from a list, and both ways of looking at it.
+  ///
+  /// Derived from `testSceneObjectsFromList`, which already computed exactly
+  /// this and then discarded it. Two layouts are concatenated: `sceneObjects`
+  /// places the tree, and `sceneObjectsFromList` places the list it was built
+  /// from, displaced by real offsets so the two do not sit on top of one
+  /// another. The outline is the force tree that built it.
+  #[example]
+  public func exampleTreeFromList() : W.ExampleOutput {
+    let array = R.generateRandomInput(10, 10);
+    let buildList = `buildList := thunk { List.fromIter(array.vals()) };
+    let list = force buildList;
+    let buildTree = `buildTree := thunk { fromList(list); };
+    let tree = force buildTree;
+    A.scratch(thunk {
+      let outline = A.Outline.outline(buildTree);
+      let offsets = {
+        binary = { x = 0.0; y = 0.0; z = 5.0};
+        leafL  = { x = -0.5; y = -0.25; z = 1.0};
+        leafR  = { x =  0.5; y = -0.25; z = 1.0};
+      };
+      W.scene(
+        sceneObjects(tree!, A.Scene.zero) # sceneObjectsFromList(outline, A.Scene.zero, offsets),
+        [ outline ]
+      )
+    })
+  };
+
   #[test]
   public func testSceneObjectsFromList() {
     let array = R.generateRandomInput(10, 10);

@@ -1430,6 +1430,11 @@
         }
         into.appendChild(div);
 
+        // Everything below this node goes inside its element, not beside it.
+        // That nesting is the indentation: `.outline-node` and
+        // `.outline-edge` each step 8px left-ward, and the steps accumulate
+        // only if the DOM actually nests. Appending to `into` instead draws
+        // the whole tree flush left, which is what it did at first.
         for (const edgeValue of vArr(fields.edges)) {
           const e = vRec(edgeValue);
           if (!e) continue;
@@ -1451,16 +1456,16 @@
             span("action-arrow action-" + name, ARROWS[name] || ` ${name} `)
           );
           row.appendChild(span("nodeId", vFlat(e.actionTarget)));
-          into.appendChild(row);
+          div.appendChild(row);
 
           if (nested) {
-            drawOutline(into, nested, depth + 1);
+            drawOutline(div, nested, depth + 1);
             // The value a nested force came back with, on a line of its own.
             const result = document.createElement("div");
             result.className = "outline-internal-result";
             result.appendChild(span("action-arrow result-arrow", "╰〜〜> "));
             result.appendChild(span("outline-value-text", vFlat(e.value)));
-            into.appendChild(result);
+            div.appendChild(result);
           } else {
             row.appendChild(span("outline-value-text", " " + vFlat(e.value)));
           }
@@ -1497,7 +1502,7 @@
 
       /// Take the scene apart into what a renderer needs.
       const readObjects = (list) => {
-        const shapes = [], links = [];
+        const shapes = [], links = [], actions = [];
         for (const item of vArr(list)) {
           const v = vVariant(item);
           if (!v) continue;
@@ -1516,11 +1521,18 @@
             });
           } else if (v.name === "pointer") {
             links.push({ from: vStr(f.from), to: vStr(f.to) });
+          } else if (v.name === "action") {
+            const kind = vVariant(f.action);
+            actions.push({
+              // `#force_` is the variant's name; "force" is what the JSON
+              // calls it and what the colours below are keyed on.
+              kind: kind ? (kind.name === "force_" ? "force" : kind.name) : "",
+              from: vStr(f.from),
+              to: vStr(f.to),
+            });
           }
-          // `#action` edges carry a time cursor's worth of meaning and are
-          // left for when there is a cursor to hang them on.
         }
-        return { shapes, links };
+        return { shapes, links, actions };
       };
 
       /// Everything a mounted scene owns, so it can be given back.
@@ -1543,8 +1555,11 @@
       };
 
       const mountObjects = async (list) => {
-        const { shapes, links } = readObjects(list);
-        if (!shapes.length && !links.length) { disposeScene(); return false; }
+        const { shapes, links, actions } = readObjects(list);
+        if (!shapes.length && !links.length && !actions.length) {
+          disposeScene();
+          return false;
+        }
         const { THREE, OrbitControls } = await loadThree();
         disposeScene();
 
@@ -1671,6 +1686,73 @@
           scene.add(new THREE.Line(geo, lineMat));
         }
 
+        // Action edges: what the computation did, rather than what it points
+        // at. A shaft from source to target with a head that says which
+        // action it was -- a cone for a get or a force, two cones back to
+        // back for a put, since a put is a get's opposite. Colours, radii and
+        // the hover offset follow `createActionMesh` in the replayground.
+        const ACTION_COLOUR = { put: 0x008877, putForce: 0xaaaaaa };
+        const actionMat = new Map();
+        const materialFor = (kind) => {
+          if (!actionMat.has(kind)) {
+            const heavy = kind === "force" || kind === "putForce";
+            const mat = new THREE.MeshLambertMaterial({
+              color: ACTION_COLOUR[kind] || 0x0088aa,
+              transparent: true,
+              opacity: heavy ? 0.6 : 0.8,
+            });
+            materials.push(mat);
+            actionMat.set(kind, mat);
+          }
+          return actionMat.get(kind);
+        };
+        const UP = new THREE.Vector3(0, 1, 0);
+        const hoverOffset = -BoxDim;
+
+        for (const act of actions) {
+          const a = dots.get(act.from) || at.get(act.from);
+          const b = at.get(act.to);
+          if (!a || !b) continue;
+          const dir = new THREE.Vector3().subVectors(b, a);
+          const length = dir.length();
+          if (length < 1e-6) continue;
+          dir.normalize();
+          const mat = materialFor(act.kind);
+          const heavy = act.kind === "force" || act.kind === "putForce";
+
+          const shaftLength = Math.max(0.001, length + hoverOffset * 1.6);
+          const shaftGeo = new THREE.CylinderGeometry(
+            heavy ? 0.1 : 0.03, heavy ? 0.1 : 0.03, shaftLength, 10
+          );
+          geometries.push(shaftGeo);
+          const head = b.clone().addScaledVector(dir, hoverOffset);
+          const shaft = new THREE.Mesh(shaftGeo, mat);
+          shaft.position.copy(a.clone().add(head).multiplyScalar(0.5));
+          shaft.quaternion.setFromUnitVectors(UP, dir);
+          scene.add(shaft);
+
+          const coneGeo = new THREE.ConeGeometry(0.12, 0.12, 10);
+          geometries.push(coneGeo);
+          if (act.kind === "put" || act.kind === "putForce") {
+            // Two cones back to back: a put goes the other way from a get.
+            const group = new THREE.Group();
+            const up = new THREE.Mesh(coneGeo, mat);
+            const down = new THREE.Mesh(coneGeo, mat);
+            down.rotateX(Math.PI);
+            up.position.y = 0.06;
+            down.position.y = -0.06;
+            group.add(up, down);
+            group.position.copy(head);
+            group.quaternion.setFromUnitVectors(UP, dir);
+            scene.add(group);
+          } else {
+            const cone = new THREE.Mesh(coneGeo, mat);
+            cone.position.copy(head);
+            cone.quaternion.setFromUnitVectors(UP, dir);
+            scene.add(cone);
+          }
+        }
+
         // Frame whatever was built, rather than assuming where it is.
         const centre = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
@@ -1702,6 +1784,7 @@
         hint.className = "hint";
         hint.textContent =
           `${shapes.length} objects, ${links.length} pointers` +
+          (actions.length ? `, ${actions.length} actions` : "") +
           " · drag to orbit, scroll to zoom";
         host.appendChild(hint);
 
