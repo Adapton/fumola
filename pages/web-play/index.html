@@ -213,6 +213,18 @@
         font: 400 0.7rem/1.4 var(--mono); color: var(--dim);
         pointer-events: none;
       }
+      /* The crossfader, opposite the hint: two runs in one canvas, and a
+         slider to dissolve between them. */
+      .viewport .fader {
+        position: absolute; right: 0.7rem; bottom: 0.5rem;
+        display: flex; align-items: center; gap: 0.5rem;
+        font: 400 0.7rem/1.4 var(--mono); color: var(--dim);
+        background: rgba(8, 8, 11, 0.72); padding: 0.25rem 0.5rem;
+        border: 1px solid var(--rule); border-radius: 3px;
+      }
+      .viewport .fader input[type="range"] {
+        width: 8rem; accent-color: var(--green); margin: 0;
+      }
 
       /* The two scene panels: what a program said about how to look at it. */
       .scene { flex: 1; min-height: 0; overflow: auto; }
@@ -1620,12 +1632,22 @@
         // left behind would sit under the next scene describing the last one.
         mounted.renderer.domElement.remove();
         mounted.hint.remove();
+        if (mounted.fader) mounted.fader.remove();
         mounted = null;
       };
 
-      const mountObjects = async (list) => {
-        const { shapes, links, actions } = readObjects(list);
-        if (!shapes.length && !links.length && !actions.length) {
+      /// Draw one scene, or several into the same canvas.
+      ///
+      /// A pair's two runs belong in one canvas rather than two: a second
+      /// WebGL context to look at the same structure twice is a lot of
+      /// machinery for a comparison that reads better as a dissolve. Each
+      /// side goes under its own group, and `setMix` fades between them.
+      const mountObjects = async (input) => {
+        const sides = Array.isArray(input) ? input : [{ list: input }];
+        const parsed = sides.map((s) => readObjects(s.list));
+        const anything = parsed.some(
+          (d) => d.shapes.length || d.links.length || d.actions.length);
+        if (!anything) {
           disposeScene();
           return false;
         }
@@ -1657,6 +1679,13 @@
         const orbGeo = new THREE.SphereGeometry(BoxDim / 2, 20, 14);
         const dotGeo = new THREE.SphereGeometry(0.03, 10, 8);
         geometries.push(boxGeo, orbGeo, dotGeo);
+
+        // What each side owns: a group to add to, and the materials whose
+        // opacity the crossfader moves. Reassigned once per side; the build
+        // below is synchronous, so the closures see the right one.
+        const sideGroups = [];
+        let root = scene;
+        let sideMats = materials;
 
         /// Text as a texture, the way the replayground does it: draw the
         /// lines onto a canvas and hand the canvas to a plane. There is no
@@ -1691,12 +1720,23 @@
             map: texture, transparent: true, alphaTest: 0.05, depthWrite: false,
           });
           geometries.push(geo);
-          materials.push(mat);
+          sideMats.push(mat);
           const mesh = new THREE.Mesh(geo, mat);
           mesh.position.copy(anchor);
-          scene.add(mesh);
+          root.add(mesh);
           return mesh;
         };
+        // Bounds accumulate across sides, so a pair is framed as a whole
+        // and the two runs stay registered against each other.
+        const box = new THREE.Box3();
+
+        for (let sideIx = 0; sideIx < parsed.length; sideIx += 1) {
+        const { shapes, links, actions } = parsed[sideIx];
+        root = new THREE.Group();
+        sideMats = [];
+        scene.add(root);
+        sideGroups.push({ group: root, mats: sideMats, label: sides[sideIx].label });
+
         // The replayground's own colours, so a scene laid out for it looks
         // like itself here: a box and a pointer share one green
         // (`color.box`, `color.pointer`), and an orb is the blue that
@@ -1706,13 +1746,12 @@
         const boxMat = new THREE.MeshLambertMaterial({ color: 0x55aa44 });
         const orbMat = new THREE.MeshLambertMaterial({ color: 0x4488aa });
         const lineMat = new THREE.LineBasicMaterial({ color: 0x55aa44 });
-        materials.push(boxMat, orbMat, lineMat);
+        sideMats.push(boxMat, orbMat, lineMat);
 
         const at = new Map();       // label -> the object's position
         const dots = new Map();     // "label:field" -> where a pointer leaves
-        const box = new THREE.Box3();
         const dotMat = new THREE.MeshLambertMaterial({ color: 0xbdbdc6 });
-        materials.push(dotMat);
+        sideMats.push(dotMat);
 
         for (const sh of shapes) {
           const mesh = new THREE.Mesh(
@@ -1721,7 +1760,7 @@
           );
           mesh.position.set(sh.at[0], sh.at[1], sh.at[2]);
           mesh.userData.label = sh.label;
-          scene.add(mesh);
+          root.add(mesh);
           at.set(sh.label, mesh.position);
           box.expandByPoint(mesh.position);
 
@@ -1743,7 +1782,7 @@
           sh.fields.forEach((name, i) => {
             const dot = new THREE.Mesh(dotGeo, dotMat);
             dot.position.set(startX + i * spacing, mesh.position.y - 0.17, mesh.position.z);
-            scene.add(dot);
+            root.add(dot);
             dots.set(sh.label + ":" + name, dot.position);
           });
         }
@@ -1756,7 +1795,7 @@
           const to = b.clone().add(new THREE.Vector3(0, BoxDim / 2, 0));
           const geo = new THREE.BufferGeometry().setFromPoints([a.clone(), to]);
           geometries.push(geo);
-          scene.add(new THREE.Line(geo, lineMat));
+          root.add(new THREE.Line(geo, lineMat));
         }
 
         // Action edges: what the computation did, rather than what it points
@@ -1774,7 +1813,7 @@
               transparent: true,
               opacity: heavy ? 0.6 : 0.8,
             });
-            materials.push(mat);
+            sideMats.push(mat);
             actionMat.set(kind, mat);
           }
           return actionMat.get(kind);
@@ -1802,7 +1841,7 @@
           const shaft = new THREE.Mesh(shaftGeo, mat);
           shaft.position.copy(a.clone().add(head).multiplyScalar(0.5));
           shaft.quaternion.setFromUnitVectors(UP, dir);
-          scene.add(shaft);
+          root.add(shaft);
 
           const coneGeo = new THREE.ConeGeometry(0.12, 0.12, 10);
           geometries.push(coneGeo);
@@ -1817,13 +1856,16 @@
             group.add(up, down);
             group.position.copy(head);
             group.quaternion.setFromUnitVectors(UP, dir);
-            scene.add(group);
+            root.add(group);
           } else {
             const cone = new THREE.Mesh(coneGeo, mat);
             cone.position.copy(head);
             cone.quaternion.setFromUnitVectors(UP, dir);
-            scene.add(cone);
+            root.add(cone);
           }
+        }
+
+        materials.push(...sideMats);
         }
 
         // Frame whatever was built, rather than assuming where it is.
@@ -1851,6 +1893,35 @@
         controls.enableDamping = true;
         controls.update();
 
+        /// The crossfader. `t` runs 0 (all left) to 1 (all right).
+        ///
+        /// At either end one side is solid and the other is gone. In the
+        /// middle both sit at 0.7, which is what makes the comparison
+        /// legible: two structures at full strength read as one confused
+        /// structure, and two at half strength read as neither. So the curve
+        /// is 1 to 0.7 over the first half and 0.7 to 0 over the second --
+        /// a slow give and then a quick one, the way a DJ's fader is not
+        /// linear either.
+        const fade = (u) =>
+          u <= 0.5 ? 1 - 0.6 * u : Math.max(0, 0.7 - 1.4 * (u - 0.5));
+
+        const setMix = (t) => {
+          if (sideGroups.length < 2) return;
+          sideGroups.forEach(({ group, mats }, i) => {
+            const o = fade(i === 0 ? t : 1 - t);
+            // A group at zero is not drawn at all: a fully transparent mesh
+            // still writes depth in some materials, and would punch holes in
+            // the side that is meant to be solid.
+            group.visible = o > 0.01;
+            for (const m of mats) {
+              m.transparent = true;
+              m.opacity = o;
+              m.needsUpdate = true;
+            }
+          });
+        };
+        setMix(0.5);
+
         const anim = { id: 0 };
         const tick = () => {
           anim.id = requestAnimationFrame(tick);
@@ -1870,17 +1941,43 @@
 
         const hint = document.createElement("div");
         hint.className = "hint";
+        // Totals across every side, since `shapes` and friends belong to one
+        // side's turn through the loop above.
+        const tot = (k) => parsed.reduce((n, d) => n + d[k].length, 0);
         hint.textContent =
           // "shapes" rather than "objects": the objects array holds all
           // three kinds, and the output panel reports its total, so calling
           // the boxes and orbs "objects" here reads as a contradiction.
-          `${shapes.length} shapes, ${links.length} pointers` +
-          (actions.length ? `, ${actions.length} actions` : "") +
+          `${tot("shapes")} shapes, ${tot("links")} pointers` +
+          (tot("actions") ? `, ${tot("actions")} actions` : "") +
+          (sideGroups.length > 1 ? " · across both runs" : "") +
           " · drag to orbit, scroll to zoom";
         host.appendChild(hint);
 
+        // The crossfader, when two runs share the canvas.
+        let fader = null;
+        if (sideGroups.length > 1) {
+          fader = document.createElement("div");
+          fader.className = "fader";
+          const left = document.createElement("span");
+          left.textContent = sideGroups[0].label || "left";
+          const right = document.createElement("span");
+          right.textContent = sideGroups[1].label || "right";
+          const range = document.createElement("input");
+          range.type = "range";
+          range.min = "0";
+          range.max = "1";
+          range.step = "0.01";
+          range.value = "0.5";
+          range.setAttribute("aria-label", "Fade between the two runs");
+          range.addEventListener("input", () => setMix(Number(range.value)));
+          fader.append(left, range, right);
+          host.appendChild(fader);
+        }
+
         mounted = {
           renderer, controls, geometries, materials, textures, observer, hint,
+          setMix, sideCount: sideGroups.length, fader,
           get frame() { return anim.id; },
         };
         return true;
@@ -1908,10 +2005,11 @@
 
       /// An `#[examplePair]`: the left run, the right run, and the diff.
       ///
-      /// The objects panel draws the left run, because two WebGL contexts is
-      /// a change to the single viewport this page keeps, and says what the
-      /// right run holds beside it. The outline panel has room for both, so
-      /// it shows both.
+      /// Both runs share the one canvas, under a group each, with a
+      /// crossfader to dissolve between them: a second WebGL context to look
+      /// at the same structure twice is a lot of machinery for a comparison
+      /// that reads better as a dissolve. The outline panel has room for
+      /// both side by side, so it shows both.
       const showPair = (pair) => {
         const counts = diffCounts(pair.sizes);
         const side = (s) => (s && s.value) || {};
@@ -1924,14 +2022,18 @@
           "Neither run placed anything in space. A pair offers objects by evaluating to:",
           (body) => {
             diffLine(body, counts);
-            runRule(body, `left: ${lObj.length} objects — drawn below`);
-            runRule(body, `right: ${rObj.length} objects`);
+            runRule(body,
+              `both runs drawn above — left ${lObj.length} objects, ` +
+              `right ${rObj.length} — fade between them with the slider`);
           }
         );
         const host = $("viewport");
-        if (lObj.length) {
+        if (lObj.length || rObj.length) {
           host.hidden = false;
-          mountObjects(L.objects).catch((e) => {
+          mountObjects([
+            { list: L.objects, label: "left" },
+            { list: R.objects, label: "right" },
+          ]).catch((e) => {
             host.hidden = true;
             $("objects-body").textContent = "could not draw the scene: " + e;
           });
