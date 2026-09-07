@@ -8,6 +8,44 @@ import W "../system/webPlay";
 import Prim "../system/prim";
 import Files "../system/files";
 
+/// A sequence represented as a balanced binary tree, keyed by level.
+///
+///    The structure and its balance argument come from Pugh and Teitelbaum,
+/// "Incremental Computation via Function Caching", POPL 1989. Each element
+/// draws a `level` from a geometric distribution, and the tree is the one
+/// those levels determine: the highest level roots, and partitions the
+/// sequence around itself. That makes the representation a function of the
+/// sequence's contents rather than of the history of edits that produced it,
+/// which is what lets a cached result be reused --- the same subsequence has
+/// the same shape however it was arrived at. Balance holds in expectation
+/// over the draws.
+///
+///    Fumola departs from the paper in one necessary way. The paper draws
+/// each level independently, by coin flips. Here the level is a deterministic
+/// function of the element's symbol --- `Prim.symbolLevel`, which packs four
+/// geometric samples taken from the symbol's hash. Determinism is the
+/// requirement rather than a shortcut: reuse depends on a symbol receiving
+/// the same level every time it appears.
+///
+///    The cost of that departure is that there is no averaging left. The
+/// expectation the paper's theorem quantifies over becomes a single fixed
+/// realisation, so a set of symbols whose levels happen to be poorly
+/// distributed stays that way permanently. Positional symbols are the case
+/// to be careful with, being both few and shared across every structure that
+/// uses them. See issue #72, and `R.generateRandomInputSymbols` for symbols
+/// that carry entropy instead.
+///
+///    Two details of the representation, both of which are easy to get wrong
+/// when reasoning about the shape. The elements are the *leaves*: the n-1
+/// internal `#binary` nodes are the gaps between consecutive elements, gap i
+/// carrying `symbolLevel` of the i-th symbol for i in 2..n. So it is a treap
+/// over the gaps, the root holds a symbol rather than an element, and the
+/// element whose symbol labels the root is the leftmost leaf of the right
+/// subtree. One consequence: the first element's level is never consulted,
+/// and only n-1 of the n levels drive the shape. The other detail is the
+/// depth convention --- `metrics` and `Scene.geom2d` count nodes, taking a
+/// leaf to be 1, so they report one more than the root-to-leaf edge count.
+
 module { 
     
   #[listing(30)]
@@ -460,6 +498,31 @@ module {
   /// places the tree, and `sceneObjectsFromList` places the list it was built
   /// from, displaced by real offsets so the two do not sit on top of one
   /// another. The outline is the force tree that built it.
+  /// The same as `exampleTreeFromList`, over symbols that carry entropy.
+  ///
+  /// One call different, for the reason given on
+  /// `exampleLevelTreeRandomSymbols`.
+  #[example]
+  public func exampleTreeFromListRandomSymbols() : W.ExampleOutput {
+    let array = R.generateRandomInputSymbols(10, 10);
+    let buildList = `buildList := thunk { List.fromIter(array.vals()) };
+    let list = force buildList;
+    let buildTree = `buildTree := thunk { fromList(list); };
+    let tree = force buildTree;
+    A.scratch(thunk {
+      let outline = A.Outline.outline(buildTree);
+      let offsets = {
+        binary = { x = 0.0; y = 0.0; z = 5.0};
+        leafL  = { x = -0.5; y = -0.25; z = 1.0};
+        leafR  = { x =  0.5; y = -0.25; z = 1.0};
+      };
+      W.scene(
+        sceneObjects(tree!, A.Scene.zero) # sceneObjectsFromList(outline, A.Scene.zero, offsets),
+        [ outline ]
+      )
+    })
+  };
+
   #[example]
   public func exampleTreeFromList() : W.ExampleOutput {
     let array = R.generateRandomInput(10, 10);
@@ -631,6 +694,30 @@ module {
         }
       };
     }})
+  };
+
+  /// The same tree, over symbols that carry entropy.
+  ///
+  ///    A duplicate of `exampleLevelTree` differing in one call:
+  /// `generateRandomInputSymbols` rather than `generateRandomInput`. Its
+  /// symbols are `sym-1-482710`, `sym-2-1826057930`, ... rather than 1, 2,
+  /// ..., so the levels -- and therefore the shape -- depend on the seed.
+  /// Change the first argument and the tree changes; with the other
+  /// generator it does not, whatever the seed (#72).
+  ///
+  ///    Kept beside the original rather than replacing it: the existing
+  /// examples and tests assert on values built from positional symbols.
+  #[example]
+  public func exampleLevelTreeRandomSymbols() : W.ExampleOutput {
+    let array = R.generateRandomInputSymbols(10, 10);
+    let buildTree = `buildTree := thunk { fromArray(array) };
+    let tree = force buildTree;
+    A.scratch(thunk {
+      W.scene(
+        Scene.sceneObjects(tree!, A.Scene.zero),
+        [ A.Outline.outline(buildTree) ]
+      )
+    })
   };
 
   /// A level tree, and the program's own account of how to look at it.
