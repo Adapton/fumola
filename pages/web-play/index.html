@@ -925,13 +925,34 @@
       /// importing file's directory -- which is what the symlinks under
       /// `fumola/` are working around -- so re-addressing one from the top
       /// level is just putting that directory in front of it.
+      /// Re-address one of a module's imports for use at the top level.
+      ///
+      /// A module's imports resolve against its own directory, and since #74
+      /// they say so out loud: `../system/adapton` rather than a symlinked
+      /// `adapton`. Hoisting such a line into a top-level program moves the
+      /// base it is relative to, so the path must be rebuilt against the
+      /// module's directory with its `..` segments folded away. Testing
+      /// merely for a `/` is what used to distinguish an absolute path from a
+      /// bare neighbour, and no longer does -- every relative path has one
+      /// now. A path already starting at the library root is left alone.
+      const resolveImport = (dir, spec) => {
+        if (/^fumola\//.test(spec)) return spec;
+        const out = [];
+        for (const part of `${dir}/${spec}`.split("/")) {
+          if (part === "" || part === ".") continue;
+          if (part === "..") out.pop();
+          else out.push(part);
+        }
+        return out.join("/");
+      };
+
       const importsOf = (source, path) => {
         const dir = path.replace(/\/[^/]*$/, "");
         const out = [];
         const re = /\bimport\s+([A-Za-z_][A-Za-z0-9_]*)\s+"([^"]*)"/g;
         let m;
         while ((m = re.exec(source)) !== null)
-          out.push({ alias: m[1], path: m[2].includes("/") ? m[2] : `${dir}/${m[2]}` });
+          out.push({ alias: m[1], path: resolveImport(dir, m[2]) });
         return out;
       };
 
