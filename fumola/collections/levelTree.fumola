@@ -848,6 +848,75 @@ module {
     out
   };
 
+  /// One run of tree-into-list: the merge network, and what it produces.
+  ///
+  ///    The middle of three. `treeFromListRun` builds a tree and stops, and
+  /// mergeSort's own pair does the whole algorithm at once; this does the
+  /// half that turns a tree into a sorted list, and portrays that half
+  /// alone. Small enough to read, and it is the half that is not stable.
+  ///
+  /// The list and the tree are still built -- the merge has to have
+  /// something to merge -- but only the merge network is drawn.
+  public func mergeFromTreeRun(seed : Nat, size : Nat, remove : ?Symbol) : A.Scene.Scene {
+    A.reset();
+    let array = R.generateRandomInput(seed, size);
+    let list_ = `ListFromArray := thunk {
+      do within space `inputList { List.fromIter(array.vals()) }
+    };
+    let list = force list_;
+    do ? {
+      let editor = List.Edit.cursor(list!.next);
+      let editor = List.Edit.gotoSymbol(editor, remove!)!;
+      List.Edit.remove(editor);
+    };
+    let tree_ = `LevelTreeFromList := thunk {
+      do within space `inputTree { fromList(list) }
+    };
+    let tree = force tree_;
+    let sorted_ = do within space `mergeSort { lazyMergeSort_(tree) };
+    // Demanded, or the network is a promise rather than a graph.
+    let _ = LazyList.takeN_(sorted_, size);
+    W.withHistory(A.scratch(thunk {
+      // The tree is laid out first, and not only because it belongs in the
+      // picture: the merge network is placed relative to the tree nodes its
+      // streams come from, and reads the `position` cells that laying the
+      // tree out writes. Without it the network has nowhere to stand and
+      // asks for a pointer that was never made.
+      let treeObjects = Scene.sceneObjects(tree!, A.Scene.zero);
+      let geom = Scene.geom2d(tree!);
+      let levelGap = 2.0;
+      let mergeObjects = Scene.sceneObjectsLazyMergeSort_(
+        A.Outline.outline(sorted_),
+        { x = 0.0; y = 1.618 * geom.height; z = -levelGap / 2.0 },
+        { reduce = { x = 0.0; y = 1.0; z = -levelGap / 2.0 };
+          merge = { x = 0.0; y = 0.0; z = -1.0 } });
+      W.scene(treeObjects # mergeObjects, [ A.Outline.outline(sorted_) ])
+    }))
+  };
+
+  /// The merge network, before and after one cell is removed.
+  ///
+  ///    The middle rung of the three, and the one that carries the argument.
+  /// A tree glides almost intact under an edit; the whole of mergeSort is
+  /// too much to take in at once; this is the part that misbehaves, on its
+  /// own and at a size that can be looked at.
+  ///
+  ///    A merge thunk is named for the input-tree node whose stream it is
+  /// built from, so a symbol's reach is however many streams descend from
+  /// its node -- unbounded, and largest at the root. Remove the cell whose
+  /// symbol happens to root the tree and the network is rebuilt around it.
+  /// Naming each merge by the pair of cells it compared should bound that to
+  /// O(log n), which is the change this example exists to be measured
+  /// against.
+  #[examplePair]
+  public func examplePairMergeFromTree() : W.ExamplePairOutput {
+    let seed = 10;
+    let size = 16;
+    let removed = 3;
+    W.pair(mergeFromTreeRun(seed, size, null),
+           mergeFromTreeRun(seed, size, ?removed))
+  };
+
   /// The same list built into a tree twice, differing by one removed cell.
   ///
   ///    What a repair would cost, if repair were implemented. Neither run
