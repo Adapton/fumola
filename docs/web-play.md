@@ -5,9 +5,10 @@
 green in the browser.
 
 This document records what was built, why each part exists, and what was measured. It is
-organised by requirement rather than chronologically; §10 gives a dated summary. §6 lists two
-defects in the Fumola implementation that were found by building the tool, and is the section
-most likely to matter outside this page.
+organised by requirement rather than chronologically. §10 places the playground in the
+project's history, which begins in 2022 and reaches Adapton in 2025. §6 lists two defects in
+the Fumola implementation that were found by building the tool, and is the section most likely
+to matter outside this page.
 
 ---
 
@@ -321,27 +322,57 @@ Same nesting, arrows (`───»`, `───>`, `══▷»`, `═══▷`
 
 ---
 
-## 10. Timeline
+## 10. History
 
-Dates are of the commit that completed each step.
+### 10.1 Before the implementation
 
-| Date | Step |
+The ideas the language rests on predate it. Adapton was introduced at PLDI 2014; explicit
+symbols, then called names, at OOPSLA 2015. Fungi, a type-and-effect system for incremental
+programs, exists as a draft. Fumola is an attempt to put those into a language with a
+conventional surface rather than a library interface.
+
+### 10.2 Implementation phases
+
+Dates are of the commit or merge that completed each step. Commit counts are for the period and
+indicate only where the effort went.
+
+| Period | Work |
 | --- | --- |
-| 2026-09-05 | Prelude moved into the library; bound by the CLI when the library is imported (#49, #54) |
-| 2026-09-05 | Homepage published at fumola.org |
-| 2026-09-06 | Web REPL at `/web-repl`, highlighted by the language's own lexer (#56) — R1, R2, R3 |
-| 2026-09-06 | Events panel; ready-made tests in the outline; clean core per run — R4, R8, R9 |
-| 2026-09-06 | Graphical semantics throughout; clickable `#[test]`; test opens its module at the marker — R5 |
-| 2026-09-06 | `body` button and the print panel — R6, R7 |
-| 2026-09-06 | Module bodies no longer capture the host environment (#58) — §6.1 |
-| 2026-09-06 | Symbol hashing made target-independent (#59, #60) — §6.2 |
-| 2026-09-06 | Renamed to `/web-play`; `/web-repl` retained as a redirect |
-| 2026-09-06 | `A.scratch` — §5 |
-| 2026-09-06 | `#[example]` and `#scene`; examples section in the library — §4 |
-| 2026-09-06 | Error line reporting; gutter; share links; `// assert` — R10, R11, R12, R13 |
-| 2026-09-06 | 3D viewport and outline panel — R16 |
+| 2022-07 – 2022-10 | Started as `matthewhammer/motoko.rs`: a Motoko interpreter in Rust — AST, parser, and a stepping VM with an explicit continuation and stack. ~240 commits. No Adapton. |
+| 2022-11 – 2023 | Sporadic. Module system, with `set_module` enforcing DAG structure (#152), then largely dormant: ~30 commits over 14 months. |
+| 2024-01 | Renamed; crates renamed under the `Adapton` organisation (#2). |
+| 2024-02 | Attribute syntax added — the `#[…]` form that `#[test]`, and later `#[example]`, use. |
+| 2025-05 – 2025-07 | **Adapton enters the language.** Quote/unquote (#3) and the first Adapton recipe (#4): `adapton_state` integrated with the VM, navigation blocks parsed and stepped, `put`, `force`, `here()`, `now()`, and the simple (non-graph) semantics. ~95 commits. |
+| 2026-01 – 2026-02 | Symbolic peek/poke effects. The mergeSort example (#5). Reorganisation into multiple crates (#8). |
+| 2026-03 | **The graph itself.** `prim "adaptonReset"` takes a strategy (#24); graphical Adapton builds the DCG (#25); the DCG becomes Fumola values and several output formats, including the Unicode text form still in use (#26); a Fumola test runner (#28). ~58 commits, the largest month since 2022. |
+| 2026-04 | `levelTree` and its `Edit` sub-module (#29). Scene files and a scene player: the first visualisation of a DCG (#31). |
+| 2026-08 | **`replayground-www`.** DCG event logs as 3D animations (#34, #35), a static HTML build (#38), scene generation refactored (#39, #40), and DCG comparison by diffing node values (#43, #44). |
+| 2026-09-04 – 09-05 | **The browser.** `fumola_wasm`: the runtime compiled to WebAssembly, with symbol translation and a value boundary for tuples, records, variants and pointers (#45, #46, #47). The homepage at fumola.org. In parallel, a Fumola livelit in Hazel backed by external incremental runtime state, on the `fumola-livelit-mvp` branch. |
+| 2026-09-06 | **The playground**, in one day. §10.3. |
 
----
+### 10.3 The playground
+
+All on 2026-09-06, in approximately this order. Requirement numbers refer to §2.
+
+| Step | |
+| --- | --- |
+| Web REPL at `/web-repl`, highlighted by the language's own lexer (#56) | R1, R2, R3 |
+| Events panel; ready-made tests in the outline; a clean core per run | R4, R8, R9 |
+| Graphical semantics throughout; clickable `#[test]`; a test opens its module at the marker | R5 |
+| `body` button; print panel | R6, R7 |
+| Module bodies no longer capture the host environment (#58) | §6.1 |
+| Symbol hashing made target-independent (#59, #60) | §6.2 |
+| Renamed to `/web-play`, with `/web-repl` retained as a redirect | |
+| `A.scratch` | §5 |
+| `#[example]` and `#scene`; examples section in the library | §4 |
+| Error line reporting; line number gutter; share links; `// assert` | R10–R13 |
+| 3D viewport; outline panel | R16 |
+
+Two of those steps are corrections to the language rather than additions to the page, and both
+were prompted by the page failing to run library code that the CLI ran. That is the pattern
+worth recording: a tool that executes the library from a second host, in a second compilation
+target, through a different entry point, exercises paths that neither the CLI nor `fumola test`
+reaches.
 
 ## 11. Limitations
 
