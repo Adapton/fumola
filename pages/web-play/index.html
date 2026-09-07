@@ -1892,6 +1892,7 @@
         // moving every part by the same delta.
         const parts = [];
         const edges = [];
+        const acts = [];
         const sideAt = [];
         // Box or orb, so a glide indicator can take the colour of the thing
         // it belongs to rather than a colour of its own.
@@ -2075,6 +2076,7 @@
 
           const coneGeo = new THREE.ConeGeometry(0.12, 0.12, 10);
           geometries.push(coneGeo);
+          let marker = null;
           if (act.kind === "put" || act.kind === "putForce") {
             // Two cones back to back: a put goes the other way from a get.
             const group = new THREE.Group();
@@ -2087,12 +2089,25 @@
             group.position.copy(head);
             group.quaternion.setFromUnitVectors(UP, dir);
             root.add(group);
+            marker = group;
           } else {
             const cone = new THREE.Mesh(coneGeo, mat);
             cone.position.copy(head);
             cone.quaternion.setFromUnitVectors(UP, dir);
             root.add(cone);
+            marker = cone;
           }
+          // An action spans two objects like a pointer does, so it has to
+          // follow both ends. Its length changes as well as its place, and a
+          // cylinder's length is baked into its geometry -- so it is scaled
+          // rather than rebuilt.
+          acts.push({
+            side: sideIx,
+            id: act.kind + " " + String(act.from) + " -> " + String(act.to),
+            fromKey: String(act.from).split(":")[0], toKey: act.to,
+            fromBase: a.clone(), toBase: b.clone(),
+            shaft, marker, baseLen: shaftLength, hover: hoverOffset,
+          });
         }
 
         sideAt[sideIx] = at;
@@ -2185,6 +2200,7 @@
         }
         const matched = (key) => shift.has(key);
 
+        const ALONG_Y = new THREE.Vector3(0, 1, 0);
         let mixNow = 0.5;
         ///    An indicator for a node both runs agree about takes the colour
         /// of the object it belongs to -- green for a box, blue for an orb --
@@ -2305,6 +2321,30 @@
             pos.setXYZ(1, b.x, b.y, b.z);
             pos.needsUpdate = true;
           }
+          for (const a of acts) {
+            const df = shift.get(a.fromKey);
+            const dt = shift.get(a.toKey);
+            if (!df && !dt) continue;
+            const k = a.side === 0 ? t : -(1 - t);
+            const from = a.fromBase.clone();
+            const to = a.toBase.clone();
+            if (df) from.addScaledVector(df, k);
+            if (dt) to.addScaledVector(dt, k);
+            const dir = new THREE.Vector3().subVectors(to, from);
+            const span = dir.length();
+            if (span < 1e-6) continue;
+            dir.normalize();
+            const head = to.clone().addScaledVector(dir, a.hover);
+            const want = Math.max(0.001, span + a.hover * 1.6);
+            a.shaft.position.copy(from).add(head).multiplyScalar(0.5);
+            a.shaft.quaternion.setFromUnitVectors(ALONG_Y, dir);
+            // Scaled, not rebuilt: the cylinder's length is in its geometry.
+            a.shaft.scale.y = want / a.baseLen;
+            if (a.marker) {
+              a.marker.position.copy(head);
+              a.marker.quaternion.setFromUnitVectors(ALONG_Y, dir);
+            }
+          }
         };
 
         /// An object only one run has gets its own material, because the
@@ -2312,6 +2352,7 @@
         /// side shares one material per shape kind.
         const lone = [];
         const loneEdges = [];
+        const loneActs = [];
         if (shift.size) {
           for (const p of parts) {
             const isLone = !matched(p.key);
@@ -2328,10 +2369,10 @@
           // right -- and some of those have ends present in both. Testing the
           // ends drew the left run's wiring at the right run's positions,
           // which produced a tree that was not a binary tree.
-          const idsOf = (side) =>
-            new Set(edges.filter((e) => e.side === side).map((e) => e.id));
-          const leftIds = idsOf(0);
-          const rightIds = idsOf(1);
+          const idsOf = (list, side) =>
+            new Set(list.filter((e) => e.side === side).map((e) => e.id));
+          const leftIds = idsOf(edges, 0);
+          const rightIds = idsOf(edges, 1);
           for (const e of edges) {
             const inBoth = leftIds.has(e.id) && rightIds.has(e.id);
             e.shared = inBoth;
@@ -2342,6 +2383,26 @@
             sideGroups[e.side].mats.push(e.line.material);
             materials.push(e.line.material);
             loneEdges.push(e);
+          }
+          // The same for actions, which had been drawn from both runs at
+          // once: every shared action appeared twice, one copy over the
+          // other, and neither moved.
+          const leftActs = idsOf(acts, 0);
+          const rightActs = idsOf(acts, 1);
+          for (const a of acts) {
+            a.shared = leftActs.has(a.id) && rightActs.has(a.id);
+            if (a.shared) continue;
+            const own = a.shaft.material.clone();
+            own.transparent = true;
+            a.shaft.material = own;
+            if (a.marker) {
+              a.marker.traverse
+                ? a.marker.traverse((o) => { if (o.material) o.material = own; })
+                : (a.marker.material = own);
+            }
+            sideGroups[a.side].mats.push(own);
+            materials.push(own);
+            loneActs.push(a);
           }
         }
 
@@ -2387,6 +2448,19 @@
           // Held opaque through the peak, so the brightest moment is not also
           // the most transparent one.
           const peak = Math.max(0, 1 - Math.abs(t - 0.5) * 2);
+          for (const a of acts) {
+            if (a.shared) {
+              a.shaft.visible = a.side === 0;
+              if (a.marker) a.marker.visible = a.side === 0;
+            }
+          }
+          for (const a of loneActs) {
+            const near = a.side === 0 ? 1 - t : t;
+            const lit = Math.max(near, peak);
+            a.shaft.material.opacity = lit;
+            a.shaft.visible = lit > 0.02;
+            if (a.marker) a.marker.visible = lit > 0.02;
+          }
           for (const e of loneEdges) {
             const near = e.side === 0 ? 1 - t : t;
             const m = e.line.material;
@@ -2681,6 +2755,7 @@
           buttons[name] = b;
           where.appendChild(b);
         }
+        const dials = {};
         const dial = (text, min, max, step, value, onInput) => {
           const label = document.createElement("label");
           const cap = document.createElement("span");
@@ -2692,6 +2767,7 @@
           r.setAttribute("aria-label", text);
           r.addEventListener("input", () => onInput(Number(r.value)));
           label.append(cap, r);
+          dials[text] = r;
           return label;
         };
         orbit.append(
@@ -2726,13 +2802,37 @@
         }
         host.appendChild(orbit);
 
-        // Taking hold of the scene ends the walk.
-        controls.addEventListener("start", () => {
+        const stopOrbit = () => {
           if (orbiting === null) return;
           orbiting = null;
           for (const el of Object.values(buttons))
             el.setAttribute("aria-pressed", "false");
-        });
+        };
+
+        // Taking hold of the scene ends the walk -- but only taking hold of
+        // it. `controls` raises the same event for a wheel as for a drag, so
+        // listening to that made a scroll stop the walk, when a scroll is
+        // the one gesture that clearly means "keep going, but closer".
+        renderer.domElement.addEventListener("pointerdown", stopOrbit);
+
+        // So the wheel moves the distance instead, while the walk is on.
+        // Taken before `controls` sees it, or the camera would be dollied as
+        // well and the two would fight over where it goes.
+        renderer.domElement.addEventListener(
+          "wheel",
+          (e) => {
+            if (orbiting === null) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const out = dials.out;
+            const step = e.deltaY > 0 ? 1.08 : 1 / 1.08;
+            orbitReach = Math.min(3, Math.max(0.4, orbitReach * step));
+            if (out) out.value = String(orbitReach);
+            placeCamera();
+            showCamera();
+          },
+          { capture: true, passive: false }
+        );
 
         showCamera();
         controls.addEventListener("change", showCamera);
