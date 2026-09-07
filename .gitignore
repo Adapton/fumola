@@ -18,3 +18,15 @@ Cargo.lock
 *-txt
 *-json
 *.output
+# The runtime the Pages workflow builds. A local build drops a copy beside
+# the page so the directory can be served; it is not the repository's.
+#
+# These live here, at the repository root, and NOT in pages/. The deploy
+# copies `pages/.` into the published directory, so a .gitignore under
+# pages/ is published too -- and the publish action honours it. Patterns
+# without a leading slash match at any depth, so `fumola_wasm.js` under
+# pages/ removed both /fumola_wasm.js and /v/<hash>/fumola_wasm.js from the
+# live site, and the page could not start.
+/pages/fumola_wasm.js
+/pages/fumola_wasm_bg.wasm
+/pages/web-play/rt/
