@@ -829,11 +829,15 @@
             pending = text(i + 2);
             continue;
           }
-          // `#[test] public func NAME`, and `#[example]` the same way. Both
-          // are a public function the library offers to be run; what differs
-          // is what running one is for, and which section it is listed under.
+          // `#[test] public func NAME`, and `#[example]` and
+          // `#[examplePair]` the same way. All three are a public function
+          // the library offers to be run; what differs is what running one is
+          // for, and which section it is listed under. A pair answers with
+          // two runs and the difference between them, so one panel becomes
+          // three.
           if (w === "#" && text(i + 1) === "[" &&
-              (text(i + 2) === "test" || text(i + 2) === "example") &&
+              (text(i + 2) === "test" || text(i + 2) === "example" ||
+               text(i + 2) === "examplePair") &&
               text(i + 3) === "]" && text(i + 4) === "public" &&
               text(i + 5) === "func" && t[i + 6] && t[i + 6].kind === "ident") {
             found.push({
@@ -1022,8 +1026,9 @@
         // modules above, so where each one comes from is visible rather than
         // something to look up. A module becomes a directory of its own.
         const examples = emptyTree();
+        const pairs = emptyTree();
         const tests = emptyTree();
-        let count = 0, exampleCount = 0;
+        let count = 0, exampleCount = 0, pairCount = 0;
         for (const path of real) {
           const src = JSON.parse(fumola_module_source(path));
           if (!src.ok) continue;
@@ -1031,8 +1036,11 @@
             const dirs = path.replace(/^fumola\//, "").split("/");
             const call = invocationFor(path, t);
             presets.set(presetKey(path, t), { path, test: t });
-            const into = t.kind === "example" ? examples : tests;
-            if (t.kind === "example") exampleCount += 1; else count += 1;
+            const into = t.kind === "example" ? examples
+                       : t.kind === "examplePair" ? pairs : tests;
+            if (t.kind === "example") exampleCount += 1;
+            else if (t.kind === "examplePair") pairCount += 1;
+            else count += 1;
             place(into, dirs, {
               name: (t.scope ? t.scope + "." : "") + t.name,
               title: call.split("\n")[1],
@@ -1065,6 +1073,7 @@
         // Examples first: they are what someone opening the page is most
         // likely to want, and each one answers with a picture of itself.
         if (exampleCount) section("examples-root", "examples/", examples);
+        if (pairCount) section("examples-root", "examplePairs/", pairs);
         if (count) section("tests-root", "tests/", tests);
       };
 
@@ -1371,6 +1380,37 @@
         return fields.objects !== undefined && fields.outline !== undefined
           ? reply
           : null;
+      };
+
+      /// An `#[examplePair]` answers with two scenes and their node diff.
+      /// Recognised by having those three fields, the way a scene is
+      /// recognised by having `objects` and `outline` -- no tag to carry.
+      const pairOf = (reply) => {
+        if (!reply.ok || reply.tag !== "Record") return null;
+        const f = reply.value || {};
+        return f.left !== undefined && f.right !== undefined &&
+               f.nodes !== undefined ? f : null;
+      };
+
+      /// The four numbers, from the `nodes` diff, plus what they imply.
+      ///
+      /// `left`/`right` are the two runs' node counts; the difference is
+      /// what a repair would have to touch, were repair implemented.
+      const diffCounts = (nodes) => {
+        const f = (nodes && nodes.value) || {};
+        const n = (k) => {
+          const v = f[k];
+          return v && Array.isArray(v.value) ? v.value.length : 0;
+        };
+        const c = {
+          left: n("left"), right: n("right"),
+          onlyLeft: n("onlyLeft"), onlyRight: n("onlyRight"),
+          equal: n("equal"), notEqual: n("notEqual"),
+        };
+        c.changed = c.onlyLeft + c.onlyRight + c.notEqual;
+        c.total = Math.max(c.left, c.right);
+        c.fraction = c.total ? c.changed / c.total : 0;
+        return c;
       };
 
       const fillScenePanel = (name, component, count, lead, draw) => {
@@ -1842,7 +1882,78 @@
         return true;
       };
 
+      /// A heading inside a panel, saying which run is below it.
+      const runRule = (into, text) => {
+        const rule = document.createElement("div");
+        rule.className = "forest-rule";
+        rule.textContent = text;
+        into.appendChild(rule);
+      };
+
+      /// What differs, as a line of counts, above both runs.
+      const diffLine = (into, c) => {
+        const d = document.createElement("div");
+        d.className = "forest-rule";
+        d.textContent =
+          `${c.changed} of ${c.total} nodes differ ` +
+          `(${(c.fraction * 100).toFixed(1)}%) — ` +
+          `${c.equal} equal, ${c.notEqual} not equal, ` +
+          `${c.onlyLeft} only left, ${c.onlyRight} only right`;
+        into.appendChild(d);
+      };
+
+      /// An `#[examplePair]`: the left run, the right run, and the diff.
+      ///
+      /// The objects panel draws the left run, because two WebGL contexts is
+      /// a change to the single viewport this page keeps, and says what the
+      /// right run holds beside it. The outline panel has room for both, so
+      /// it shows both.
+      const showPair = (pair) => {
+        const counts = diffCounts(pair.nodes);
+        const side = (s) => (s && s.value) || {};
+        const L = side(pair.left), R = side(pair.right);
+        const arr = (v) => (v && Array.isArray(v.value) ? v.value : []);
+        const lObj = arr(L.objects), rObj = arr(R.objects);
+
+        fillScenePanel(
+          "objects", L.objects, lObj.length + rObj.length,
+          "Neither run placed anything in space. A pair offers objects by evaluating to:",
+          (body) => {
+            diffLine(body, counts);
+            runRule(body, `left: ${lObj.length} objects — drawn below`);
+            runRule(body, `right: ${rObj.length} objects`);
+          }
+        );
+        const host = $("viewport");
+        if (lObj.length) {
+          host.hidden = false;
+          mountObjects(L.objects).catch((e) => {
+            host.hidden = true;
+            $("objects-body").textContent = "could not draw the scene: " + e;
+          });
+        } else {
+          host.hidden = true;
+          disposeScene();
+        }
+
+        const lOut = L.outline ? vArr(L.outline) : [];
+        const rOut = R.outline ? vArr(R.outline) : [];
+        fillScenePanel(
+          "outline", L.outline, lOut.length + rOut.length,
+          "Neither run offered an outline. A pair offers one by evaluating to:",
+          (body) => {
+            diffLine(body, counts);
+            [["left", lOut], ["right", rOut]].forEach(([name, forest]) => {
+              runRule(body, `${name} — ${forest.length} tree${forest.length === 1 ? "" : "s"}`);
+              forest.forEach((tree) => drawOutline(body, tree, 0));
+            });
+          }
+        );
+      };
+
       const showScene = (reply) => {
+        const asPair = pairOf(reply);
+        if (asPair) return showPair(asPair);
         const scene = sceneOf(reply);
         const fields = scene && scene.value ? scene.value : {};
         const objects = fields.objects;
@@ -1903,7 +2014,7 @@
       const loadTest = (path, test) => {
         srcEl.value = invocationFor(path, test);
         // A link says which kind of thing it names, so it reads as what it is.
-        setPreset(test.kind === "example" ? "example" : "test", path, test);
+        setPreset(test.kind === "test" ? "test" : test.kind, path, test);
         paint();
         evaluate();
       };
@@ -2193,7 +2304,8 @@
       };
 
       const openFromHash = () => {
-        const m = /^#(test|example|body)=(.+)$/.exec(decodeURIComponent(location.hash));
+        const m = /^#(test|examplePair|example|body)=(.+)$/.exec(
+          decodeURIComponent(location.hash));
         if (!m) return false;
         const found = presets.get(m[2]);
         if (!found) {
