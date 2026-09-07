@@ -16,6 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Before the Rust build, because it needs none of it and takes seconds.
+      # This is the logic that decides what every browser gets from the
+      # published site; the publish workflow itself can only be tested by
+      # publishing, so the script it calls is tested here instead. See #69.
+      - name: Test the site assembly
+        run: ./scripts/assemble-site.test.sh
+
       - name: Install latest nightly
         uses: actions-rs/toolchain@v1
         with:

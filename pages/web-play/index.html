@@ -565,14 +565,44 @@
     </div>
 
     <script type="module">
-      import init, {
-        fumola_ensure_mode,
-        fumola_eval_top,
-        fumola_reset,
-        fumola_tokens,
-        fumola_modules,
-        fumola_module_source,
-      } from "../fumola_wasm.js";
+      // The glue and the binary are a matched pair -- wasm-bindgen emits them
+      // together and they do not load if their versions disagree -- so both
+      // come from whichever version `runtime.json` names. That is the fix for
+      // #69, which bit this page twice: an outline once drew as raw text
+      // because the cached index.html predated the renderer, and the examples
+      // section once did not appear though the deployed wasm had it. Pages
+      // stamps `max-age=600` on everything and gives us no say in it, so a
+      // deploy cannot invalidate a cached binary. A new build gets a new URL
+      // instead, and the stale copy is never asked for again.
+      //
+      // Bound late rather than imported statically because the import URL is
+      // not known until the manifest is read. Every use below is already
+      // either behind `ready` or inside a try/catch that falls back to plain
+      // text, so the window before they are assigned needs no new guard.
+      let fumola_ensure_mode, fumola_eval_top, fumola_reset,
+          fumola_tokens, fumola_modules, fumola_module_source;
+      const loadRuntime = async () => {
+        let glue = "../fumola_wasm.js",
+            wasm = "../fumola_wasm_bg.wasm",
+            version = "stable";
+        try {
+          const reply = await fetch("../runtime.json", { cache: "no-cache" });
+          if (reply.ok) {
+            const manifest = await reply.json();
+            glue = manifest.js;
+            wasm = manifest.wasm;
+            version = manifest.hash;
+          }
+        } catch (e) {
+          // The copies beside the site root, which are the current build at
+          // publish time. Reached only if the manifest is unavailable.
+        }
+        const mod = await import(glue);
+        ({ fumola_ensure_mode, fumola_eval_top, fumola_reset,
+           fumola_tokens, fumola_modules, fumola_module_source } = mod);
+        await mod.default({ module_or_path: wasm });
+        console.info("Fumola runtime " + version);
+      };
 
       const $ = (id) => document.getElementById(id);
       const rowEl = document.createElement("div");
@@ -756,7 +786,7 @@
       const ensureRuntime = () => {
         if (starting) return starting;
         statusEl.textContent = "starting the runtime…";
-        starting = init()
+        starting = loadRuntime()
           .then(() => {
             // Graphical throughout, and built that way rather than created
             // simple and switched. Simple is the wasm default because Hazel
