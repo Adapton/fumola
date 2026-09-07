@@ -222,6 +222,127 @@ enough to contain the rest of the program.
 
 ---
 
+---
+
+# How the encoding got decided
+
+The defects above are one half of the log. The other half is the visual design,
+which was not designed and then built: every step of it came from looking at
+the thing and finding the previous step wrong. Recorded because the reasoning
+is not recoverable from the final state.
+
+## Crossfade, then glide
+
+The first version dissolved between two pictures: both runs in one canvas, one
+fading out as the other faded in. It worked and it was hard to read.
+
+What it missed is measurable. For the tree pair, **54 of 61 objects differ only
+in position** — the two runs are not two pictures, they are one picture whose
+parts move. So a matched object is now drawn once and slid from where the left
+run puts it to where the right run does, and the fader reads as a journey from
+the old layout to the new one. The verdict on that change was immediate and not
+mine: *"way, way easier to understand."*
+
+The crossfade survives as the fallback for when nothing matches, which is the
+case it was always right for.
+
+## The fader's curve
+
+Not linear, and the reason is legibility rather than taste. At either end one
+run is solid and the other gone; in the middle both sit at 0.7. Two structures
+at full strength read as one confused structure, and two at half strength read
+as neither.
+
+## Three attempts at "which way am I going"
+
+**A white glow** on the side being entered, decaying after the fader stopped.
+Dropped. Once the trails and the gliding existed it was a third signal for
+something already said twice — and it was half broken in a way that revealed
+the preference: matched objects are drawn from the left run only, so lighting
+the right run lit things that are hidden. Moving left glowed; moving right did
+nothing. The bug was preferred to the feature.
+
+**Brightness scaled by fader position.** Dropped on the grounds that the same
+gesture should not mean different things in different places: the cue is about
+direction, and direction is the same claim wherever it is made.
+
+**A trail**, which is what stayed. Each glide indicator is cut into ten
+segments; a segment lights when the fader passes through it and cools over the
+next second. The decay is in *time*, not in distance from the fader — a window
+around the fader's position is a highlight, symmetric and blind to which way
+you are going, where heat applied on passage and shed on a clock follows the
+drag and lingers behind it.
+
+## What a colour is allowed to mean
+
+Three revisions, each narrowing it.
+
+At first red marked `notEqual`. That put the loudest colour in the picture on
+the mildest event: of 16 `notEqual` nodes only three have scene objects, so red
+landed on a node whose offence was a changed child pointer, while the node the
+edit actually *removed* faded away quietly.
+
+So red became "leaving" and changed-paths became pink. Better, and still one
+code too many: a node only one run has and a node the runs disagree about are
+both the edit showing itself. They now share one magenta, and the eye has one
+fact to learn instead of three.
+
+Meanwhile the indicators for nodes both runs *agree* about stopped being white
+and took the colour of their object — green for a box, blue for an orb. White
+is what a moving object glows, so white indicators competed with the things
+they were about; in the object's own colour they read as its wake.
+
+The remaining emphasis peaks at the **halfway** mark, which is where a node
+only one run has is worth looking at: the moment the edit is happening rather
+than before or after. It is held opaque through that peak, so the brightest
+moment is not also the most transparent one.
+
+## Thickness, and a dial
+
+Indicators began as `THREE.Line`, which cannot be thick: `linewidth` is ignored
+in WebGL whatever the material asks for. They are cylinders now, the shape an
+action arrow already uses.
+
+They were then tuned faint enough not to hide the structure they are about —
+which turned out to be faint enough not to notice. Rather than guess again, the
+strength is a dial: how much is too much depends on the scene and the screen,
+and neither of us could pick a number that was right for both the 61-object
+tree pair and the 493-object mergeSort pair. Moving the dial lights the whole
+trail for a second, because a dial whose effect you cannot see while setting it
+is not a dial.
+
+## What the picture says about itself
+
+A screenshot arrives without the URL that produced it, and "which example is
+this" is the first question anyone asks of one. So the example's path is drawn
+on the picture — and only when the code is a loaded example, since a
+hand-written program has no path to name.
+
+The camera's position is written there too: how far round, how far up, how far
+back. That was asked for so that a view could be described and returned to
+across a conversation, which is what a screenshot cannot do on its own.
+
+## Where the cost actually was
+
+Worth recording because the intuition was wrong twice.
+
+The step-limited eval was built to report progress on a run that felt slow.
+Measured, the stepping is **56 ms** of a wait dominated by a **196 ms**
+one-shot handoff and ~950 ms of rendering. The trampoline is honest about the
+56 ms and structurally blind to the rest.
+
+Then the fader itself: about **a second per move** on the mergeSort pair,
+against 1.26 ms now. Both causes were mine, and neither was the geometry.
+`material.needsUpdate = true` asks three.js to recompile a shader, and opacity
+is a uniform that needs no such thing — with some nine hundred materials that
+was nine hundred recompiles a move. `setFromPoints` allocates an attribute per
+call, once per edge per move.
+
+The 61-object tree pair hid both completely. It took a 493-object scene to make
+them visible, which is the same lesson as the rest of this log.
+
+---
+
 ## What the pattern is
 
 Nine of the eleven were found by using the thing, not by reading it. Three

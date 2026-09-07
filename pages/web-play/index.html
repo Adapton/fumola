@@ -2093,54 +2093,26 @@
         const fade = (u) =>
           u <= 0.5 ? 1 - 0.6 * u : Math.max(0, 0.7 - 1.4 * (u - 0.5));
 
-        /// White emissive, at the strength the replayground uses to mark a
-        /// node under the cursor. Here it marks the side being faded *into*:
-        /// the fader says how much of each run is visible, and the glow says
-        /// which way you are going, which the opacities alone do not.
+        /// A side, painted. Opacity only.
         ///
-        /// One thing scales it: movement. Every nudge of the fader relights
-        /// the side being entered and pushes the decay back, so the glow
-        /// holds while the fader is moving and falls away once it stops. It
-        /// is a cue about motion, so a fader at rest does not carry it.
+        ///    There used to be a white glow here, lighting whichever run the
+        /// fader was moving towards. It is gone: the trails say which way you
+        /// are going and the gliding says what is moving, so a third signal
+        /// for the same thing was noise.
         ///
-        /// The strength does not depend on where the fader is. Tying it to
-        /// how near an end you were made the same gesture mean different
-        /// things in different places, and the cue is about direction, which
-        /// is the same claim wherever it is made. So the brightness is
-        /// constant and only its lifetime varies.
+        ///    It was also half broken, which is what prompted looking at it.
+        /// Matched objects are drawn from the left run only, so lighting the
+        /// right run lit things that are hidden -- moving left glowed and
+        /// moving right did nothing.
         ///
-        /// The decay is long on purpose. A glow that goes out as soon as the
-        /// fader stops reads as a flicker rather than as a direction, and the
-        /// gesture it marks is a slow one -- you push the fader, look at what
-        /// arrived, and push again.
-        ///
-        /// Only the lit materials take it. Boxes, orbs, pointer dots and
-        /// action arrows are Lambert and have an emissive channel; the
-        /// pointer lines and the text planes are Basic and do not, so they
-        /// fade without glowing.
-        const GLOW_PEAK = 1.0;
-        const GLOW_MS = 2000;
-
-        /// Repaint a side.
-        ///
-        ///    No `needsUpdate` here, and that is a performance fix rather
-        ///    than an omission. Setting it asks three.js to recompile the
-        /// material's shader, and opacity and emissive intensity are uniforms
-        /// that need no such thing. Setting it per material per fader move
+        ///    No `needsUpdate`: that asks three.js to recompile the shader,
+        /// and opacity is a uniform. Setting it per material per fader move
         /// cost about a second a move on the mergeSort pair, which has some
-        /// nine hundred materials across its two runs.
-        ///
-        ///    `transparent` does affect compilation, so it is set once when
-        /// the material is made and never touched here.
+        /// nine hundred materials. `transparent` does affect compilation, so
+        /// it is set once when the material is made.
         const paintSide = (s) => {
           s.group.visible = s.opacity > 0.01;
-          for (const m of s.mats) {
-            m.opacity = s.opacity;
-            if (m.emissive) {
-              m.emissive.setHex(0xffffff);
-              m.emissiveIntensity = s.glow * GLOW_PEAK;
-            }
-          }
+          for (const m of s.mats) m.opacity = s.opacity;
         };
 
         /// Where every matched object has to travel, and which objects are
@@ -2149,14 +2121,14 @@
         ///    Most of a pair is the same objects in different places: for the
         /// tree pair, 54 of 61 differ only in position. So the two runs are
         /// not two pictures to dissolve between, they are one picture whose
-        /// parts move -- and the fader is better read as a journey from the
-        /// old layout to the new one than as a crossfade.
+        /// parts move, and the fader reads as a journey from the old layout
+        /// to the new one rather than as a crossfade.
         ///
         ///    An object matched in both runs is drawn once, from the left
         /// run, and slid to where the right run puts it. Its counterpart in
         /// the right run is never shown, or the same object would appear
         /// twice. Only the objects one run has and the other does not are
-        /// left to fade, and there are few of them: 4 and 0 here.
+        /// left to fade, and there are few of them.
         const shift = new Map();
         if (sideAt.length === 2 && sideAt[0] && sideAt[1]) {
           for (const [key, here] of sideAt[0]) {
@@ -2166,47 +2138,6 @@
         }
         const matched = (key) => shift.has(key);
 
-        /// The path each matched object travels, drawn as a line from where
-        /// the left run put it to where the right run does.
-        ///
-        ///    White where the two runs agree about the node, pink where they
-        /// named it and disagreed. So the picture separates "this moved" from
-        /// "this moved *and* changed", which the positions alone cannot say:
-        /// an object can travel a long way with identical content, and a
-        /// short way with different content.
-        ///
-        ///    Pink and not red, because red is what a node about to be lost
-        /// turns, and one colour cannot mean both. A changed node is still
-        /// there in both runs; a red one is leaving. Read together, red was
-        /// the louder signal attached to the milder event -- the deleted cell
-        /// faded away quietly while a node that merely changed a child
-        /// pointer got the alarm.
-        ///
-        ///    Only for objects that actually go somewhere. A path of zero
-        /// length is a dot, and there is nothing to learn from it.
-        ///    Drawn with thickness, like an action arrow, and not as a line.
-        /// `linewidth` is ignored in WebGL -- a `Line` is one pixel wide
-        /// whatever it asks for -- so a path with any presence has to be a
-        /// solid, and a cylinder from one position to the other is the same
-        /// shape an action shaft already uses.
-        ///
-        ///    Faint, because there are as many paths as there are moving
-        /// objects and they cross the whole scene. They are there to be read
-        /// as a field of motion rather than followed one at a time, and at
-        /// full strength they hid the structure they are about. `depthWrite`
-        /// stays off so they never occlude a box.
-        ///    Each indicator is cut into segments rather than drawn whole, and
-        /// a segment lights when the fader passes through it and dims again
-        /// over the next second. So dragging leaves a trail behind the
-        /// object, in whichever direction you drag, and an indicator says how
-        /// far along the move is rather than only where it goes.
-        ///
-        ///    The decay is in time and not in distance from the fader. A
-        /// window around the fader's position would be a highlight: it would
-        /// sit symmetrically ahead and behind, and would not know which way
-        /// you were going. Heat applied on passage and shed on a clock knows,
-        /// and it keeps glowing for a moment after you stop, which is what
-        /// makes it read as something left behind.
         let mixNow = 0.5;
         ///    An indicator for a node both runs agree about takes the colour
         /// of the object it belongs to -- green for a box, blue for an orb --
@@ -2399,20 +2330,30 @@
             // run's copy of it would land on top of the original.
             if (e.shared) { e.line.visible = e.side === 0; continue; }
           }
+          // Peaks at the halfway mark and falls away towards either end.
+          //
+          // Halfway is where a node only one run has is worth looking at: it
+          // is the moment the edit is happening rather than the moment before
+          // or after. At its own end it is an ordinary object of an ordinary
+          // colour, and at the far end it is gone.
+          //
+          // Held opaque through the peak, so the brightest moment is not also
+          // the most transparent one.
+          const peak = Math.max(0, 1 - Math.abs(t - 0.5) * 2);
           for (const e of loneEdges) {
             const near = e.side === 0 ? 1 - t : t;
             const m = e.line.material;
-            m.opacity = near;
-            e.line.visible = near > 0.02;
+            m.opacity = Math.max(near, peak);
+            e.line.visible = m.opacity > 0.02;
           }
           // An object about to be lost fades as the fader leaves it, and an
           // object about to arrive fades in as the fader reaches it.
           for (const p of lone) {
             const near = p.side === 0 ? 1 - t : t;
             const m = p.obj.material;
-            m.opacity = near;
+            m.opacity = Math.max(near, peak);
             m.visible = true;
-            p.obj.visible = near > 0.02;
+            p.obj.visible = m.opacity > 0.02;
             if (m.emissive) {
               // The same magenta a changed node's indicator uses. One
               // colour for "the two runs do not agree about this", whether
@@ -2422,10 +2363,8 @@
               //
               // Strongest as the object is lost or gained, which is the
               // moment worth looking at.
-              const leaving = p.side === 0;
-              const heat = Math.max(0, 1 - near);
               m.emissive.setHex(PAIR_DISAGREE);
-              m.emissiveIntensity = leaving ? heat * 1.2 : Math.max(0, near - 0.5) * 2 * 1.2;
+              m.emissiveIntensity = peak * 2.2;
             }
           }
         };
@@ -2433,16 +2372,19 @@
         /// Light the side the fader is moving towards, and push the decay
         /// back. Called per input, so holding the fader in motion holds the
         /// glow, and releasing it lets the glow go.
-        const glowTowards = (i) => {
+        /// Note that the fader moved, so the trails have a baseline to show
+        /// against for a moment. Which way it moved no longer matters here --
+        /// the trail itself carries the direction.
+        const MOVING_MS = 2000;
+        const noteMoved = () => {
           if (sideGroups.length < 2) return;
-          sideGroups.forEach((s, j) => { s.glow = j === i ? 1 : 0; });
-          glowUntil = performance.now() + GLOW_MS;
+          movingUntil = performance.now() + MOVING_MS;
           showPaths(1);
         };
 
-        let glowUntil = 0;
+        let movingUntil = 0;
         let lastCool = performance.now();
-        sideGroups.forEach((s) => { s.glow = 0; s.opacity = 1; });
+        sideGroups.forEach((s) => { s.opacity = 1; });
         setMix(0.5);
 
         const anim = { id: 0 };
@@ -2463,17 +2405,12 @@
               anyHeat = true;
             }
           }
-          if (glowUntil || anyHeat) {
-            const left = glowUntil ? (glowUntil - performance.now()) / GLOW_MS : 0;
+          if (movingUntil || anyHeat) {
+            const left = movingUntil
+              ? (movingUntil - performance.now()) / MOVING_MS : 0;
             const g = left > 0 ? left : 0;
-            sideGroups.forEach((s) => {
-              if (s.glow > 0) { s.glow = g; paintSide(s); }
-            });
             showPaths(g);
-            if (g === 0) {
-              glowUntil = 0;
-              sideGroups.forEach((s) => { s.glow = 0; });
-            }
+            if (g === 0 && !anyHeat) movingUntil = 0;
           }
           controls.update();
           renderer.render(scene, camera);
@@ -2558,7 +2495,7 @@
           let was = Number(range.value);
           range.addEventListener("input", () => {
             const now = Number(range.value);
-            if (now !== was) glowTowards(now > was ? 1 : 0);
+            if (now !== was) noteMoved();
             was = now;
             setMix(now);
           });
@@ -2585,7 +2522,7 @@
             // Light the whole trail while it is being set, so the effect of
             // the control is visible without also dragging the fader.
             heatTrail(0, 1);
-            glowUntil = performance.now() + GLOW_MS;
+            movingUntil = performance.now() + MOVING_MS;
             showPaths(1);
           });
           trail.append(cap, dial);
@@ -2598,7 +2535,7 @@
         mounted = {
           renderer, controls, geometries, materials, textures, observer, hint,
           caption, readout,
-          setMix, glowTowards, sideCount: sideGroups.length, fader, trail,
+          setMix, sideCount: sideGroups.length, fader, trail,
           get frame() { return anim.id; },
         };
         return true;
