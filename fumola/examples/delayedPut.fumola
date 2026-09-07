@@ -1,4 +1,4 @@
-import A "adapton";
+import A "../system/adapton";
 
 //
 // Delayed puts: a put inside `do within time` takes effect when the block

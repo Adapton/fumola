@@ -6,15 +6,16 @@
 //! so their text is compiled in.
 //!
 //! Generated rather than hand-listed: adding a .fumola file needs no Rust
-//! change. Symlinks are followed for content but each path is kept as its own
-//! entry, because a module's imports resolve relative to its own directory --
-//! that is why `examples/mergeSort/` contains symlinks to `collections/` and
-//! `system/`, giving mergeSort its own view of `adapton`.
+//! change. One entry per file, and every file is a real one -- `examples/`
+//! and `collections/` used to hold symlinks to their dependencies, because a
+//! module could only import what was registered beside it. An import can
+//! name a sibling directory now (`../../system/adapton`), so the links and
+//! the entries that duplicated them are gone.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-fn collect(dir: &Path, out: &mut Vec<(String, PathBuf, bool)>, root: &Path) {
+fn collect(dir: &Path, out: &mut Vec<(String, PathBuf)>, root: &Path) {
     let entries = match fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(e) => panic!("cannot read {}: {}", dir.display(), e),
@@ -22,11 +23,8 @@ fn collect(dir: &Path, out: &mut Vec<(String, PathBuf, bool)>, root: &Path) {
     for entry in entries {
         let entry = entry.expect("readable directory entry");
         let path = entry.path();
-        // metadata() follows symlinks, so a symlinked file is a file here and
-        // a symlinked directory is walked like any other.
         let meta = match fs::metadata(&path) {
             Ok(meta) => meta,
-            // A broken symlink is skipped rather than failing the build.
             Err(_) => continue,
         };
         if meta.is_dir() {
@@ -39,15 +37,7 @@ fn collect(dir: &Path, out: &mut Vec<(String, PathBuf, bool)>, root: &Path) {
                 .expect("path is under the root")
                 .with_extension("");
             let module_path = relative.to_string_lossy().replace('\\', "/");
-            // symlink_metadata does not follow the link, so this distinguishes
-            // a module's real home from the copies of it that exist only to
-            // work around import paths that cannot say "../..". Every path
-            // stays registered -- the links are what let mergeSort's imports
-            // resolve -- but a host can tell which are duplicates.
-            let is_link = fs::symlink_metadata(&path)
-                .map(|m| m.file_type().is_symlink())
-                .unwrap_or(false);
-            out.push((module_path, path, is_link));
+            out.push((module_path, path));
         }
     }
 }
@@ -63,7 +53,7 @@ fn main() {
 
     println!("cargo:rerun-if-changed={}", library.display());
 
-    let mut modules: Vec<(String, PathBuf, bool)> = Vec::new();
+    let mut modules: Vec<(String, PathBuf)> = Vec::new();
     collect(&library, &mut modules, &root);
     // Sorted so the generated table does not depend on directory order.
     modules.sort();
@@ -74,27 +64,13 @@ fn main() {
          /// Every module in the Fumola library, as (registered path, source).\n\
          pub static MODULES: &[(&str, &str)] = &[\n",
     );
-    for (module_path, file, _) in &modules {
+    for (module_path, file) in &modules {
         println!("cargo:rerun-if-changed={}", file.display());
         generated.push_str(&format!(
             "    ({:?}, include_str!({:?})),\n",
             module_path,
             file.display().to_string()
         ));
-    }
-    generated.push_str("];\n");
-
-    generated.push_str(
-        "\n/// The module paths that are symlinks to a module's real home.\n\
-         /// They are registered like any other, because a module's imports\n\
-         /// resolve relative to its own directory; they are duplicates only\n\
-         /// when listing the library for a person to read.\n\
-         pub static SYMLINKED: &[&str] = &[\n",
-    );
-    for (module_path, _, is_link) in &modules {
-        if *is_link {
-            generated.push_str(&format!("    {:?},\n", module_path));
-        }
     }
     generated.push_str("];\n");
 

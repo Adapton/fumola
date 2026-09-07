@@ -999,13 +999,14 @@
         list.textContent = "";
 
         // Shared prefixes become shared parents. The `fumola/` prefix is on
-        // every module, so it is only noise. Symlinked copies are skipped:
-        // they exist so a module's neighbours are importable without "../..",
-        // not because the file lives there. See Adapton/fumola#55.
+        // every module, so it is only noise. Every module listed is a file
+        // that exists: the library used to carry symlinked copies, skipped
+        // here by a `link` flag, so that a module's neighbours were
+        // importable without "../..". An import can climb out of its own
+        // directory now, so there is nothing left to filter.
         const modules = emptyTree();
         const real = [];
         for (const m of reply.modules) {
-          if (m.link) continue;
           real.push(m.path);
           const parts = m.path.replace(/^fumola\//, "").split("/");
           const name = parts.pop();

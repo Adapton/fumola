@@ -1,4 +1,4 @@
-import Map "hashMap";
+import Map "../collections/hashMap";
 import Prim "prim";
 
 /// Adapton's structures represented within Fumola.

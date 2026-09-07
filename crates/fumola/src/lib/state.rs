@@ -176,9 +176,14 @@ impl State {
         } else if local_path_ends_with_mo {
             local_path = format!("{}", &local_path[0..local_path.len() - 3]);
         }
+        // Registered under the same normal form an `import` resolves to, so
+        // that `--import ./fumola/collections/List.fumola` and
+        // `--import fumola/collections/List.fumola` register one module and
+        // not two, and so a path reached by climbing out of a directory with
+        // ".." matches what is in the map.
         let path = ModulePath {
             package_name,
-            local_path,
+            local_path: fumola_semantics::module_path::normalize(&local_path),
         };
         let init = crate::check::assert_module_def(path.clone(), file_content)?;
         let old = self

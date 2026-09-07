@@ -1,6 +1,6 @@
-import A "adapton";
-import W "webPlay";
-import Prim "prim";
+import A "../system/adapton";
+import W "../system/webPlay";
+import Prim "../system/prim";
 import Array "array";
 
 module {

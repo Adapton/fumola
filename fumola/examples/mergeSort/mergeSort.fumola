@@ -1,11 +1,11 @@
-import Seq "levelTree";
-import LazyList "LazyList";
-import List "List";
-import A "adapton";
-import R "randomInput";
-import W "webPlay";
-import Prim "prim";
-import Files "files";
+import Seq "../../collections/levelTree";
+import LazyList "../../collections/LazyList";
+import List "../../collections/List";
+import A "../../system/adapton";
+import R "../../collections/randomInput";
+import W "../../system/webPlay";
+import Prim "../../system/prim";
+import Files "../../system/files";
 
 module {
     public func report( outputs ) {
