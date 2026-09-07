@@ -2,11 +2,11 @@ import pureList "pureList";
 import List "List";
 import LazyList "LazyList";
 import R "randomInput";
-import A "adapton";
+import A "../system/adapton";
 import Map "hashMap";
-import W "webPlay";
-import Prim "prim";
-import Files "files";
+import W "../system/webPlay";
+import Prim "../system/prim";
+import Files "../system/files";
 
 module { 
     

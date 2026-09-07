@@ -1,13 +1,19 @@
-//! A module body must not see the host's top-level bindings.
+//! The real library, loaded by the wasm host, still runs.
 //!
-//! The host binds the prelude -- `pointer`, `get`, `peek`, `print` -- at the
-//! top level of every instance, before the library is imported. Module bodies
-//! used to capture that environment as they were elaborated, and `var_step`
-//! consults the captured environment before the lexical definitions, so those
-//! four names silently outranked a module's own functions of the same name.
+//! A module body must not see the host's top-level bindings: the host binds
+//! the prelude -- `pointer`, `get`, `peek`, `print` -- at the top level of
+//! every instance, before the library is imported, and module bodies used to
+//! capture that environment as they were elaborated, so those four names
+//! silently outranked a module's own functions of the same name.
 //!
-//! These run against the wasm host because it is the one that binds a prelude
-//! and imports the library at construction, which is the shape the bug needs.
+//! The sharp statement of that property now lives in
+//! `crates/fumola/tests/test_module_hygiene.rs`, which builds a host and a
+//! module rather than borrowing them from the library. These stay because
+//! they exercise the whole thing as a browser does -- the compiled-in
+//! library, the prelude bound at construction, a program at the top level --
+//! and that is worth a test of its own even when the property it started life
+//! guarding is pinned elsewhere.
+//!
 //! They are deliberately NOT `#[test]` functions in `.fumola`: the Fumola test
 //! runner calls a function with an empty environment
 //! (`Core::call_function_def`), so it cannot observe this class of bug at all
@@ -32,32 +38,51 @@ fn eval_top_ok(id: FumolaInstanceId, src: &str) -> serde_json::Value {
 /// two-argument `get`. With the prelude's one-argument `get(s)` captured, the
 /// whole `(m, 1)` went to `adaptonPointer` as a tuple and the call died with a
 /// TypeMismatch.
+///
+/// hashMap is elaborated on the way to the prelude now -- the prelude reaches
+/// adapton, and adapton reaches hashMap -- so this no longer catches the
+/// capture on its own. It is the library's own test suite for that module,
+/// run through the host, which is why it stays.
 #[test]
 fn a_module_calls_its_own_get_not_the_prelude_s() {
     let id = fumola_create();
     eval_top_ok(id, r#"import H "fumola/collections/hashMap"; H.Test.testAll()"#);
 }
 
-/// The cleanest statement of the bug, because it holds the source constant.
+/// Every module of the library loads and its tests pass, whatever order the
+/// host walks into them in.
 ///
-/// `fumola/system/hashMap.fumola` is a symlink to
-/// `../collections/hashMap.fumola`, so one file is registered under two paths
-/// -- and those two paths fall on opposite sides of the prelude binding. The
-/// `system/` copy is elaborated inside the prelude's own import, before the
-/// names exist; the `collections/` copy is elaborated afterwards. Identical
-/// bytes, and they used to disagree: `system/` returned unit and
-/// `collections/` crashed. Load position was the only variable.
+/// This replaces a test that compared `fumola/system/hashMap` with
+/// `fumola/collections/hashMap` -- one file registered under two paths, one
+/// on each side of the prelude binding, which used to disagree. Imports can
+/// name a sibling directory now, so the symlink that made the second path is
+/// gone and there is only one hashMap. What is left worth checking is that
+/// nothing in the library depends on the order a host reaches it: mergeSort
+/// pulls in most of the library through `../..`, and a fresh instance that
+/// starts there must get the same answers as one that does not.
 #[test]
-fn the_same_source_behaves_the_same_under_both_of_its_paths() {
-    let id = fumola_create();
-    let system = eval_top(id, r#"import H "fumola/system/hashMap"; H.Test.testAll()"#);
-    let collections = eval_top(id, r#"import H "fumola/collections/hashMap"; H.Test.testAll()"#);
-    assert_eq!(
-        system["ok"], collections["ok"],
-        "one file, two registered paths, two different answers:\n  system/      {}\n  collections/ {}",
-        system, collections
+fn the_library_loads_however_a_host_walks_into_it() {
+    let direct = fumola_create();
+    let hash_map = eval_top(direct, r#"import H "fumola/collections/hashMap"; H.Test.testAll()"#);
+
+    // Importing it is what matters: that elaborates mergeSort and everything
+    // it reaches, which is most of the library, before hashMap is asked for.
+    let via_mergesort = fumola_create();
+    eval_top_ok(
+        via_mergesort,
+        r#"import M "fumola/examples/mergeSort/mergeSort"; 0"#,
     );
-    assert_eq!(system["ok"], serde_json::json!(true), "both failed: {}", system);
+    let after = eval_top(
+        via_mergesort,
+        r#"import H "fumola/collections/hashMap"; H.Test.testAll()"#,
+    );
+
+    assert_eq!(
+        hash_map["ok"], after["ok"],
+        "one module, two ways of arriving at it, two different answers:\n  direct          {}\n  after mergeSort {}",
+        hash_map, after
+    );
+    assert_eq!(hash_map["ok"], serde_json::json!(true), "both failed: {}", hash_map);
 }
 
 /// Shadowing a prelude name at the top level does not reach into a module

@@ -14,6 +14,7 @@ use fumola_syntax::shared::{FastClone, Share};
 use im_rc::{HashMap, Vector};
 use std::vec::Vec;
 
+use crate::module_path;
 use crate::nyi;
 
 impl Def {
@@ -194,26 +195,6 @@ pub fn module_project(
     }
 }
 
-fn path_base(path: &String) -> String {
-    let mut output = String::from("");
-    let split = path.split("/");
-    let parts = split.clone().count(); // probably a better way someday.
-    let mut count = 0;
-    for part in split {
-        if count > 0 && count < parts - 1 {
-            output = format!("{}/{}", output, part);
-            count += 1;
-        } else if count == 0 && count < parts - 1 {
-            output = format!("{}", part);
-            count += 1;
-        } else {
-            assert_eq!(count, parts - 1)
-            // skip end of path, after all '/'
-        }
-    }
-    output
-}
-
 pub mod def {
 
     use fumola_syntax::ast;
@@ -238,8 +219,16 @@ pub mod def {
             let mut sep_parts = path.split("/");
             if let Some(package_name) = sep_parts.next() {
                 if let Some(_) = sep_parts.next() {
-                    let local_path = format!("{}", &path[package_name.len() + 1..path.len()]);
-                    (Some(package_name.to_string()), local_path)
+                    let local_path = &path[package_name.len() + 1..path.len()];
+                    // The package name is the root; what follows it is a path
+                    // within the package, and may say "." or ".." like any
+                    // other. A ".." that climbs past the package root is left
+                    // in place, so the import fails naming the path as the
+                    // program wrote it rather than resolving to a neighbour.
+                    (
+                        Some(package_name.to_string()),
+                        module_path::normalize(local_path),
+                    )
                 } else {
                     (Some(package_name.to_string()), "lib".to_string())
                 }
@@ -248,21 +237,16 @@ pub mod def {
             }
         } else {
             debug!("Pre  {:?} {:?}", active.defs().active_path.as_ref(), path);
+            // We are "active" at some other path that this one is relative to,
+            // and we need to account for that: if active_path is
+            // "foo/bar/baz" and path is "qux", the local_path is
+            // "foo/bar/baz/qux". `join` also resolves the "." and ".." that a
+            // path may use to reach out of its own directory -- "../../lib"
+            // from "foo/bar/baz" is "foo/lib" -- so that one module is one
+            // registered path however an importer spells its way there.
             let path = match active.defs().active_path.as_ref() {
-                // we are "active" at some other path that's relative to this one.
-                // we need to account for that.
-                // e.g., if active_local_path = "foo/bar/baz/"
-                // and if path = "foo.fumola"
-                // then the local_path is "foo/bar/baz/foo.fumola"
-                None => path,
-                Some(prefix) => {
-                    let mut prefix = prefix.clone();
-                    if prefix.len() > 0 {
-                        prefix.push_str("/");
-                    };
-                    prefix.push_str(path.as_str());
-                    prefix
-                }
+                None => module_path::normalize(&path),
+                Some(prefix) => module_path::join(prefix, &path),
             };
             debug!("Post {:?} {:?}", active.defs().active_path.as_ref(), path);
             (active.package().clone(), path)
@@ -290,7 +274,7 @@ pub mod def {
                     return Err(Interruption::ImportCycle(stack));
                 } else {
                     debug!("Pre  {:?}", active.defs().active_path);
-                    active.defs().active_path = Some(path_base(&local_path));
+                    active.defs().active_path = Some(module_path::parent(&local_path));
                     debug!("Post {:?}", active.defs().active_path);
 
                     debug!("Pushing {:?}", path);
@@ -372,15 +356,27 @@ pub mod def {
                 *active.package() = importing_package;
                 if let Some(top_path) = active.module_files().import_stack.pop_back() {
                     debug!("Popping {:?}", top_path);
-                    match active.module_files().import_stack.head() {
+                    // The importer we are returning to is the top of the
+                    // stack, `last()`. This read `head()`, the bottom -- the
+                    // outermost module of the whole chain -- so after any
+                    // nested import finished, the rest of a module's own
+                    // imports resolved against some other module's directory.
+                    // Nothing noticed while every module could only import
+                    // what sat beside it: the library's symlinks put a copy
+                    // of each dependency in every directory that used one, so
+                    // the wrong directory held the right file. It surfaced
+                    // the moment they were deleted -- levelTree's `import
+                    // List "List"`, reached from mergeSort, looked for
+                    // `fumola/examples/mergeSort/List`.
+                    match active.module_files().import_stack.last() {
                         Some(active_module_path) => {
                             debug!("Top module {:?}", active_module_path);
                             debug!(
                                 "Path of top {:?}",
-                                path_base(&active_module_path.local_path)
+                                module_path::parent(&active_module_path.local_path)
                             );
                             active.defs().active_path =
-                                Some(path_base(&active_module_path.local_path))
+                                Some(module_path::parent(&active_module_path.local_path))
                         }
                         None => active.defs().active_path = None,
                     };

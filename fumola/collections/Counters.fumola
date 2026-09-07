@@ -1,4 +1,4 @@
-import A "adapton";
+import A "../system/adapton";
 
 /// Counting things, without the counting showing up in the graph.
 ///

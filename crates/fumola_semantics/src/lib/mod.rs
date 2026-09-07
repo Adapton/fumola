@@ -5,6 +5,7 @@ pub mod quoted;
 pub mod candid_utils;
 pub mod convert;
 pub mod dynamic;
+pub mod module_path;
 pub mod package;
 #[doc(hidden)]
 pub mod proc_macro;

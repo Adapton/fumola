@@ -73,10 +73,9 @@ include!(concat!(env!("OUT_DIR"), "/modules.rs"));
 /// The Fumola library modules bound at the top level of every instance.
 ///
 /// Chosen from what `fumola/` actually defines and what its own scripts use.
-/// The paths are the canonical homes: `adapton` lives in `system/` and is
-/// symlinked into `collections/`, `hashMap` the other way around, and the
-/// whole of `examples/mergeSort/` is symlinks -- so a name is bound once,
-/// from the file that really holds it.
+/// There is one path per module now that imports can name a sibling directory
+/// -- `adapton` lives in `system/` and nowhere else -- so these are simply
+/// where the files are.
 static PRELUDE_MODULES: &[(&str, &str)] = &[
     ("Adapton", "fumola/system/adapton"),
     ("List", "fumola/collections/List"),
@@ -97,9 +96,8 @@ static PRELUDE_MODULES: &[(&str, &str)] = &[
 /// prelude: top-level bindings persist across evaluations in one State, so
 /// paying for this on every keystroke would be waste.
 ///
-/// Every module is registered, including the symlinked duplicates, because a
-/// module's imports resolve relative to its own directory. Only the names in
-/// PRELUDE_MODULES are bound; the rest are reachable by importing them.
+/// Every module is registered. Only the names in PRELUDE_MODULES are bound;
+/// the rest are reachable by importing them.
 fn new_state() -> State {
     new_state_with(DEFAULT_MODE)
 }
@@ -1072,17 +1070,13 @@ pub fn fumola_tokens(source: &str) -> String {
 pub fn fumola_modules() -> String {
     let mut paths: Vec<&str> = MODULES.iter().map(|(path, _)| *path).collect();
     paths.sort();
+    // One entry per module. There used to be a `link` flag here for the
+    // symlinked copies a host had to skip to avoid showing the same file
+    // three times; imports can climb out of their own directory now, so the
+    // copies are gone and every path listed is a file that exists.
     let modules: Vec<serde_json::Value> = paths
         .iter()
-        .map(|path| {
-            serde_json::json!({
-                "path": path,
-                // True for the copies that exist only so that a module's
-                // neighbours are importable without "../..". Listing them
-                // shows the same file several times over.
-                "link": SYMLINKED.contains(path),
-            })
-        })
+        .map(|path| serde_json::json!({ "path": path }))
         .collect();
     serde_json::json!({ "ok": true, "modules": modules }).to_string()
 }
