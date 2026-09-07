@@ -1420,8 +1420,27 @@
         `${test.scope ? test.scope + "." : ""}${test.name}`;
 
       const setPreset = (kind, path, test) => {
+        // A different entry, not a recomputation of this one.
+        inheritView = false;
+        carriedView = null;
+        // Whether this is a pair is not the anchor's business, and must not
+        // go when the anchor does: `clearPreset` fires on the first
+        // keystroke, and editing a pair is precisely when knowing it is one
+        // is worth something. So it is remembered as the tail the program
+        // ends in -- a pair's body opened from the library is a few `let`s
+        // and then the call they are for, and an edit to a `let` leaves that
+        // call, and so the shape of the answer, exactly as it was.
+        pairTail = test.kind === "examplePair" ? tailOf(srcEl.value) : null;
         preset = { kind, key: presetKey(path, test), text: srcEl.value };
-        const hash = `#${kind}=${preset.key}`;
+        // Carrying out a link replaces the anchor with the canonical one for
+        // what was opened. A link's settings have to survive that, or the
+        // address bar would hold a link poorer than the one that was
+        // followed -- and a reload, or a copy out of the bar, would lose the
+        // view the sender chose.
+        const view = pendingView
+          ? Object.entries(pendingView).map(([k, v]) => `${k}=${v}`).join("&")
+          : "";
+        const hash = `#${kind}=${preset.key}` + (view ? "&" + view : "");
         history.replaceState(null, "", location.pathname + location.search + hash);
         showShare();
       };
@@ -1560,10 +1579,30 @@
       /// the objects are what a pair is for. So they are left behind until
       /// the panel that shows them is opened, the way the events panel has
       /// always fetched its own contents.
+      /// The expression a program ends in, with its bindings set aside.
+      ///
+      /// A body opened from the library is a few `let`s and then the call
+      /// they are for. Editing a `let` -- moving a removal by one, say -- is
+      /// the whole point of opening the body, and it does not change what
+      /// the program yields: the tail is still the same call, so the value
+      /// is still a pair and can still be asked for without its outlines.
+      /// Editing the tail is another matter, and there the caution below
+      /// applies again.
+      const tailOf = (text) => {
+        const lines = splitProgram(text).expr.split("\n")
+          .filter((l) => l.trim() && !/^\s*\/\//.test(l));
+        return lines.length ? lines[lines.length - 1].trim() : "";
+      };
+
+      /// `expr` is wrapped as a block, not in parentheses: a body opened
+      /// from the library is a run of `let`s ending in the call they are
+      /// there for, and parentheses cannot hold that. A bare invocation is
+      /// as happy inside a block as inside parentheses, so one form serves
+      /// both.
       const lightPairProgram = (text) => {
         const { head, expr } = splitProgram(text);
         if (!expr) return null;
-        return `${head}\ndo { let __p = (${expr});\n` +
+        return `${head}\ndo { let __p = do { ${expr} };\n` +
           `  { left = { objects = __p.left.objects ; outline = [] } ;\n` +
           `    right = { objects = __p.right.objects ; outline = [] } ;\n` +
           `    sizes = __p.sizes ; keys = __p.keys } }`;
@@ -1572,7 +1611,7 @@
       const pairOutlinesProgram = (text) => {
         const { head, expr } = splitProgram(text);
         if (!expr) return null;
-        return `${head}\ndo { let __p = (${expr});\n` +
+        return `${head}\ndo { let __p = do { ${expr} };\n` +
           `  { left = __p.left.outline ; right = __p.right.outline } }`;
       };
 
@@ -1584,9 +1623,34 @@
       /// someone else's camera.
       let pendingView = null;
 
+      /// The view the scene on screen had, for the run that replaces it.
+      ///
+      /// Editing a binding and watching what changes is the point of the
+      /// page, and the run is live -- 300ms after a keystroke. Changing a
+      /// removal position by one leaves a structure that is the same at a
+      /// macro scale, which is exactly what makes the comparison worth
+      /// looking at; a camera that snapped back to its default framing on
+      /// every keystroke would throw that away, and throw away the walk and
+      /// the fader with it. So a run inherits the view of the run before it.
+      let carriedView = null;
+
+      /// Whether the next teardown should offer its view to what follows.
+      ///
+      /// Asking for a different library entry is asking to look at something
+      /// else, and that deserves the framing chosen for it rather than the
+      /// last one. `setPreset` lowers this for the one teardown that the
+      /// load is about to cause; it is raised again there, so a suppression
+      /// never outlives the load that asked for it.
+      let inheritView = true;
+
       /// The invocation a light pair came from, so its outlines can be asked
       /// for later. Null when what is showing is not a pair fetched that way.
       let pairSource = null;
+
+      /// The tail of the pair being explored, or null if it is not a pair.
+      /// Set when one is loaded and left alone by editing, which is the
+      /// point of it -- see `setPreset`.
+      let pairTail = null;
 
       /// An `#[examplePair]` answers with two scenes and their node diff.
       /// Recognised by having those three fields, the way a scene is
@@ -1814,7 +1878,13 @@
       let mounted = null;
 
       const disposeScene = () => {
+        // One teardown's worth of suppression, spent whether or not there is
+        // a scene here to suppress -- a link that arrives before any scene
+        // must not leave the flag down for the first edit after it.
+        const keep = inheritView;
+        inheritView = true;
         if (!mounted) return;
+        carriedView = keep && mounted.getView ? mounted.getView() : null;
         cancelAnimationFrame(mounted.frame);
         mounted.observer.disconnect();
         mounted.controls.dispose();
@@ -2993,7 +3063,12 @@
         showCamera();
         controls.addEventListener("change", showCamera);
 
-        if (pendingView) { applyView(pendingView); pendingView = null; }
+        // A link says where to stand; failing that, stand where the last
+        // run left us. Both are spent here, so a scene asked for afresh
+        // later does not snap back to either.
+        applyView(pendingView || carriedView);
+        pendingView = null;
+        carriedView = null;
 
         mounted = {
           renderer, controls, geometries, materials, textures, observer, hint,
@@ -3436,8 +3511,12 @@
         if (!persistEl.checked) fumola_reset(instance);
 
         // A pair says what the wait is for; anything else just says to wait.
+        // Still a pair if the call it ends in is the one a pair was loaded
+        // with. The bindings above may say anything by now; they feed the
+        // same call, which answers with the same shape.
+        const stillAPair = pairTail !== null && tailOf(text) === pairTail;
         const doing =
-          preset && preset.kind === "examplePair"
+          stillAPair
             ? "running the left, then the right, then comparing them"
             : "running";
         const expected = stepsSeen.get(text);
@@ -3456,12 +3535,18 @@
           (expected === undefined ? "" : ` · about ${commas(expected)} Fumola steps`)
         );
 
-        // For a pair still as the library wrote it, ask for the objects and
-        // leave the outlines behind. Only when unedited: once the text is the
-        // user's own, what runs has to be what is written.
-        const asWritten =
-          preset && preset.kind === "examplePair" && text === preset.text;
-        const lightened = asWritten ? lightPairProgram(text) : null;
+        // Ask a pair for its objects and leave its outlines behind.
+        //
+        // Opened as a call or opened as its body, either way -- and a body
+        // is where this matters most, since a body is what you open in order
+        // to edit, and paying for two outlines on every keystroke is what
+        // would make editing feel like a poor idea.
+        //
+        // The text may be the user's own by now. What has to hold is not
+        // that it is untouched but that it still yields a pair, since the
+        // projection below reads `left`, `right`, `sizes` and `keys` off it.
+        // `stillAPair`, decided above, is that question.
+        const lightened = stillAPair ? lightPairProgram(text) : null;
         pairSource = lightened ? text : null;
         const toRun = lightened || text;
 
