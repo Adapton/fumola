@@ -460,6 +460,31 @@ module {
   /// places the tree, and `sceneObjectsFromList` places the list it was built
   /// from, displaced by real offsets so the two do not sit on top of one
   /// another. The outline is the force tree that built it.
+  /// The same as `exampleTreeFromList`, over symbols that carry entropy.
+  ///
+  /// One call different, for the reason given on
+  /// `exampleLevelTreeRandomSymbols`.
+  #[example]
+  public func exampleTreeFromListRandomSymbols() : W.ExampleOutput {
+    let array = R.generateRandomInputSymbols(10, 10);
+    let buildList = `buildList := thunk { List.fromIter(array.vals()) };
+    let list = force buildList;
+    let buildTree = `buildTree := thunk { fromList(list); };
+    let tree = force buildTree;
+    A.scratch(thunk {
+      let outline = A.Outline.outline(buildTree);
+      let offsets = {
+        binary = { x = 0.0; y = 0.0; z = 5.0};
+        leafL  = { x = -0.5; y = -0.25; z = 1.0};
+        leafR  = { x =  0.5; y = -0.25; z = 1.0};
+      };
+      W.scene(
+        sceneObjects(tree!, A.Scene.zero) # sceneObjectsFromList(outline, A.Scene.zero, offsets),
+        [ outline ]
+      )
+    })
+  };
+
   #[example]
   public func exampleTreeFromList() : W.ExampleOutput {
     let array = R.generateRandomInput(10, 10);
@@ -640,6 +665,30 @@ module {
   /// Laying it out is the portrayal: it runs in a scratch, so the graph
   /// records none of it, and the history the runtime hands over afterwards is
   /// of the tree rather than of the drawing of the tree.
+  /// The same tree, over symbols that carry entropy.
+  ///
+  ///    A duplicate of `exampleLevelTree` differing in one call:
+  /// `generateRandomInputSymbols` rather than `generateRandomInput`. Its
+  /// symbols are `sym-1-470`, `sym-2-274`, ... rather than 1, 2, ..., so the
+  /// levels -- and therefore the shape -- depend on the seed. Change the
+  /// first argument and the tree changes; with the other generator it does
+  /// not, whatever the seed (#72).
+  ///
+  ///    Kept beside the original rather than replacing it: the existing
+  /// examples and tests assert on values built from positional symbols.
+  #[example]
+  public func exampleLevelTreeRandomSymbols() : W.ExampleOutput {
+    let array = R.generateRandomInputSymbols(10, 10);
+    let buildTree = `buildTree := thunk { fromArray(array) };
+    let tree = force buildTree;
+    A.scratch(thunk {
+      W.scene(
+        Scene.sceneObjects(tree!, A.Scene.zero),
+        [ A.Outline.outline(buildTree) ]
+      )
+    })
+  };
+
   #[example]
   public func exampleLevelTree() : W.ExampleOutput {
     let array = R.generateRandomInput(10, 10);

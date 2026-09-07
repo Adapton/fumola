@@ -2,6 +2,7 @@ import A "../system/adapton";
 import W "../system/webPlay";
 import Prim "../system/prim";
 import Array "array";
+import R "randomInput";
 
 module {
 
@@ -92,6 +93,22 @@ module {
   /// inside a thunk so that forcing it leaves a force tree worth outlining.
   /// Both components are offered. The layout runs in a scratch, so the
   /// history stays the list's rather than the drawing's.
+  /// The same as `exampleList`, over symbols that carry entropy.
+  ///
+  /// A list's shape does not depend on its symbols, so this changes nothing
+  /// about the picture -- it is here so that the labels show what a symbol
+  /// with a random part looks like, beside the tree examples where the shape
+  /// does depend on them (#72).
+  #[example]
+  public func exampleListRandomSymbols() : W.ExampleOutput {
+    let array = R.generateRandomInputSymbols(10, 4);
+    let build = `buildList := thunk { fromIter(array.vals()) };
+    let _ = force build;
+    A.scratch(thunk {
+      W.scene(sceneObjectsFromThunk(build, A.Scene.zero), [ A.Outline.outline(build) ])
+    })
+  };
+
   #[example]
   public func exampleList() : W.ExampleOutput {
     let build = `buildList := thunk { fromIter([(1,1), (2,2), (3,3)].vals()) };
