@@ -611,6 +611,9 @@
       import init, {
         fumola_ensure_mode,
         fumola_eval_top,
+        fumola_eval_top_limited,
+        fumola_resume,
+        fumola_abandon,
         fumola_reset,
         fumola_tokens,
         fumola_modules,
@@ -2394,6 +2397,40 @@
       };
 
       let timer = null;
+      /// How many steps to ask for before taking a turn back.
+      ///
+      /// Not a constant, because the right number depends on the machine. Too
+      /// few and the run is mostly round trips; too many and each chunk is a
+      /// freeze long enough to see. So it is measured: aim each chunk at
+      /// CHUNK_TARGET_MS of work and scale the request by how long the last
+      /// one actually took, within bounds that keep a bad measurement from
+      /// running away.
+      const CHUNK_TARGET_MS = 25;
+      const CHUNK_MIN = 2_000;
+      const CHUNK_MAX = 250_000;
+      const CHUNK_MAX_GROWTH = 2;
+      let chunkSteps = 20_000;
+
+      const nextChunk = (elapsed) => {
+        if (elapsed > 2) {
+          const scaled = (chunkSteps * CHUNK_TARGET_MS) / elapsed;
+          // Bounded, and only part of the way. An unbounded ratio ran away:
+          // a fast first chunk asked for one so large that the rest of the
+          // program fitted inside it, so the count was shown once and the
+          // trampoline reported nothing it had not already finished.
+          const capped = Math.min(scaled, chunkSteps * CHUNK_MAX_GROWTH);
+          chunkSteps = Math.round(chunkSteps * 0.5 + capped * 0.5);
+        }
+        chunkSteps = Math.min(CHUNK_MAX, Math.max(CHUNK_MIN, chunkSteps));
+        return chunkSteps;
+      };
+
+      /// Which run is current. A run whose generation is stale has been
+      /// superseded -- the program changed while it was still going -- and
+      /// abandons its paused computation rather than finishing work nobody
+      /// is waiting for.
+      let runGeneration = 0;
+
       /// Say that a run is under way, in the panel the answer will land in.
       ///
       /// Not an overlay. An overlay needs a visibility flag, and a flag can
@@ -2444,24 +2481,49 @@
         if (!persistEl.checked) fumola_reset(instance);
 
         // A pair says what the wait is for; anything else just says to wait.
-        // Neither can say how far along it is -- the run is one call that
-        // returns when it is finished -- so what stands in for progress is
-        // what the same program cost last time, when that is known.
+        const doing =
+          preset && preset.kind === "examplePair"
+            ? "running the left, then the right, then comparing them"
+            : "running";
         const expected = stepsSeen.get(text);
+        // The count is real now: the run comes back between chunks and says
+        // how many steps it has taken. `expected` is still worth showing
+        // beside it, because a rising number means more when there is
+        // something to compare it against.
+        const progress = (steps) =>
+          `wait… ${doing} · ${commas(steps)} Fumola steps` +
+          (expected === undefined ? "" : ` of about ${commas(expected)}`);
+
+        const generation = ++runGeneration;
         await sayWaiting(
-          (preset && preset.kind === "examplePair"
-            ? "wait… running the left, then the right, then comparing them"
-            : "wait…") +
-          (expected === undefined
-            ? ""
-            : ` · about ${commas(expected)} Fumola steps`)
+          `wait… ${doing}` +
+          (expected === undefined ? "" : ` · about ${commas(expected)} Fumola steps`)
         );
+
         let reply;
         try {
-          reply = JSON.parse(fumola_eval_top(instance, text));
+          let began = performance.now();
+          reply = JSON.parse(
+            fumola_eval_top_limited(instance, text, chunkSteps));
+          while (reply.paused) {
+            // Superseded: the program changed while this was running. Drop
+            // the paused computation rather than finish it -- and drop it
+            // through `fumola_abandon`, which restores the instance, so a
+            // cancelled run costs nothing either.
+            if (generation !== runGeneration) {
+              fumola_abandon(instance);
+              return;
+            }
+            const steps = nextChunk(performance.now() - began);
+            await sayWaiting(progress(reply.steps));
+            began = performance.now();
+            reply = JSON.parse(fumola_resume(instance, steps));
+          }
         } catch (e) {
           return;
         }
+        // A later run started while this one was finishing its last chunk.
+        if (generation !== runGeneration) return;
         // What it actually cost, for the next wait and for the answer below.
         const ranSteps =
           reply.counts && Number.isFinite(Number(reply.counts.step))
@@ -2509,6 +2571,29 @@
               (ranSteps === null ? "" : `, ${commas(ranSteps)} Fumola steps`) +
               " — see the objects and outline panels";
             outEl.append(tag, body);
+            refreshEvents();
+            return;
+          }
+          // A pair, like a scene, is described rather than printed. Its
+          // value is two whole histories -- measured at 1.17 MB for the
+          // tree pair -- and rendering that through the highlighter cost
+          // more than running the program did, to produce something nobody
+          // reads. The panels carry what it means.
+          const asPair = pairOf(reply);
+          if (asPair) {
+            const c = diffCounts(asPair.sizes);
+            outEl.classList.remove("stale");
+            outEl.textContent = "";
+            const pairTag = document.createElement("span");
+            pairTag.className = "tag";
+            pairTag.textContent = "Pair  ";
+            const pairBody = document.createElement("span");
+            pairBody.textContent =
+              `${c.changed} of ${c.total} nodes differ ` +
+              `(${(c.fraction * 100).toFixed(1)}%)` +
+              (ranSteps === null ? "" : `, ${commas(ranSteps)} Fumola steps`) +
+              " — see the objects and outline panels";
+            outEl.append(pairTag, pairBody);
             refreshEvents();
             return;
           }
