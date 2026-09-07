@@ -1389,18 +1389,22 @@
         if (!reply.ok || reply.tag !== "Record") return null;
         const f = reply.value || {};
         return f.left !== undefined && f.right !== undefined &&
-               f.nodes !== undefined ? f : null;
+               f.nodes !== undefined && f.sizes !== undefined ? f : null;
       };
 
-      /// The four numbers, from the `nodes` diff, plus what they imply.
+      /// The four numbers, from the pair's `sizes`, plus what they imply.
       ///
-      /// `left`/`right` are the two runs' node counts; the difference is
-      /// what a repair would have to touch, were repair implemented.
-      const diffCounts = (nodes) => {
-        const f = (nodes && nodes.value) || {};
+      /// From `sizes` and not from `nodes`: the diff's maps are `Map`s, whose
+      /// representation is hidden, so they arrive here as an opaque rendering
+      /// rather than something countable. The pair states the counts for that
+      /// reason.
+      const diffCounts = (sizes) => {
+        const f = (sizes && sizes.value) || {};
         const n = (k) => {
           const v = f[k];
-          return v && Array.isArray(v.value) ? v.value.length : 0;
+          const raw = v && v.value !== undefined ? v.value : v;
+          const num = Number(raw);
+          return Number.isFinite(num) ? num : 0;
         };
         const c = {
           left: n("left"), right: n("right"),
@@ -1909,7 +1913,7 @@
       /// right run holds beside it. The outline panel has room for both, so
       /// it shows both.
       const showPair = (pair) => {
-        const counts = diffCounts(pair.nodes);
+        const counts = diffCounts(pair.sizes);
         const side = (s) => (s && s.value) || {};
         const L = side(pair.left), R = side(pair.right);
         const arr = (v) => (v && Array.isArray(v.value) ? v.value : []);
