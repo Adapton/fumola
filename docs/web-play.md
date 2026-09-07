@@ -103,18 +103,24 @@ extracted from it.
 ```fumola
 public type SceneComponents = {
     objects : [ A.Scene.SceneObject ];
-    outline : ? A.Outline.Outline;
+    outline : [ A.Outline.Outline ];
 };
 public type ExampleOutput = { #scene : SceneComponents };
 ```
 
-Both components conform to `A.Scene.Scene` as it stands, minus its history. The outline is
-optional; `? Outline` is the form already used by `A.Outline.OutlineEdge.outline`. An empty
-array and a null outline each denote a component the author chose not to supply.
+`objects` is `A.Scene.Scene`'s own array of `SceneObject`. `outline` is a forest: zero or more
+trees, in the order the provider chose. A session has one force tree per force begun from
+outside any other, so a single tree is the special case rather than the rule, and an example
+wishing to show two need not choose between them. Both components use one convention for
+absence: an empty array denotes a component the author did not supply.
 
-Constructors `scene`, `sceneOfObjects` and `sceneOfOutline` are provided.
-`withHistory : ExampleOutput -> ?A.Scene.Scene` adds the runtime's history; its result is
-optional because a `Scene` requires an outline.
+Constructors `scene`, `sceneOfObjects`, `sceneOfOutline`, `sceneOfOneOutline` and
+`sceneOfForces` are provided; the last offers every top-level force in the order forced, and
+requires no decisions from the author.
+
+`withHistory : ExampleOutput -> ?A.Scene.Scene` adds the runtime's history. Its result is
+optional, and non-empty only for a forest of exactly one tree, because `A.Scene.Scene` carries
+a single outline (§11.4).
 
 ### 4.3 Contract
 
@@ -129,12 +135,12 @@ optional because a `Scene` requires an outline.
 
 ### 4.4 Examples supplied
 
-| Example | objects | outline | derived from |
+| Example | objects | outline trees | derived from |
 | --- | --- | --- | --- |
-| `List.exampleList` | 7 | yes | `testFromIter`, `testSceneObjects` |
-| `LazyList.exampleLazyList` | 4 | yes | `testTakeN_`, `sceneObjectsMergeSortStream` |
-| `levelTree.Scene.exampleLevelTree` | 37 | yes | `testGeom2d` |
-| `mergeSort.exampleMergeSort` | 279 | no | `generateSceneFullDemand` |
+| `List.exampleList` | 7 | 1 | `testFromIter`, `testSceneObjects` |
+| `LazyList.exampleLazyList` | 4 | 1 | `testTakeN_`, `sceneObjectsMergeSortStream` |
+| `levelTree.Scene.exampleLevelTree` | 37 | 1 | `testGeom2d` |
+| `mergeSort.exampleMergeSort` | 279 | 0 | `generateSceneFullDemand` |
 
 `exampleMergeSort` supplies no outline, and is retained as a test of the optional case.
 
@@ -382,9 +388,11 @@ Each is tracked as an issue.
 2. **The outline panel does not cross-link** to the viewport or the events table (#64).
 3. **The `()` contract for `#[example]` is unenforced** (#65). It belongs in `fumola test` or
    CI, not in the page.
-4. **`Scene.outline` is a single outline** (#66), but a session has one force tree per
-   top-level force and `Outline.outlines()` returns an array. The two are not reconciled, so
-   an example must choose which tree to portray.
+4. **`A.Scene.Scene.outline` is a single outline** (#66). The `#scene` component is now a
+   forest, so an example no longer has to choose which tree to portray, but the two shapes
+   still differ: `withHistory` produces a `Scene` only for a forest of exactly one tree.
+   Changing `A.Scene.Scene` reaches `IntoJSON.fromScene` and the JSON `replayground-www`
+   consumes, so it was not done at the same time.
 5. **No scene is built incrementally** (#67). `generateSceneFullDemand` begins with
    `A.reset()`, so repeated runs cost the same. This is the principal obstacle to
    demonstrating incremental computation in a tool built to demonstrate it, and the only item
