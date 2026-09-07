@@ -649,6 +649,7 @@
       import init, {
         fumola_ensure_mode,
         fumola_eval_top,
+        fumola_eval_scratch,
         fumola_eval_top_limited,
         fumola_resume,
         fumola_abandon,
@@ -1310,6 +1311,7 @@
         for (const t of document.querySelectorAll(".view-tab"))
           t.setAttribute("aria-current", String(t.dataset.view === view));
         if (view === "events") refreshEvents();
+        if (view === "outline") refreshPairOutlines();
       };
 
       /// Fumola's lexer recognises `\n` and `\t` well enough to know they do
@@ -1486,6 +1488,55 @@
           ? reply
           : null;
       };
+
+      /// What the two runs do not agree about, in one colour: a node that
+      /// changed, and a node only one of them has. Both are the edit showing
+      /// itself, and giving them separate hues asked the eye to learn a
+      /// three-way code for what is really one fact.
+      const PAIR_DISAGREE = 0xff66bb;
+
+      /// A program's imports, and the expression they are there for.
+      ///
+      /// A pair's outlines are fetched separately from its objects, which
+      /// means asking the same question again with a different projection --
+      /// so the invocation has to be separable from the imports it needs.
+      const splitProgram = (text) => {
+        const lines = String(text).split("\n");
+        let i = 0;
+        while (i < lines.length && /^\s*(import\b|\/\/|$)/.test(lines[i])) i += 1;
+        return {
+          head: lines.slice(0, i).join("\n"),
+          expr: lines.slice(i).join("\n").trim(),
+        };
+      };
+
+      /// The pair without its outlines, which is most of what it costs.
+      ///
+      /// Measured on the tree pair: the whole value is 0.355 MB and 178 ms,
+      /// and 90% of that is the two outlines. They are also the part nobody
+      /// reads first -- two outlines side by side are hard to compare, and
+      /// the objects are what a pair is for. So they are left behind until
+      /// the panel that shows them is opened, the way the events panel has
+      /// always fetched its own contents.
+      const lightPairProgram = (text) => {
+        const { head, expr } = splitProgram(text);
+        if (!expr) return null;
+        return `${head}\ndo { let __p = (${expr});\n` +
+          `  { left = { objects = __p.left.objects ; outline = [] } ;\n` +
+          `    right = { objects = __p.right.objects ; outline = [] } ;\n` +
+          `    sizes = __p.sizes ; keys = __p.keys } }`;
+      };
+
+      const pairOutlinesProgram = (text) => {
+        const { head, expr } = splitProgram(text);
+        if (!expr) return null;
+        return `${head}\ndo { let __p = (${expr});\n` +
+          `  { left = __p.left.outline ; right = __p.right.outline } }`;
+      };
+
+      /// The invocation a light pair came from, so its outlines can be asked
+      /// for later. Null when what is showing is not a pair fetched that way.
+      let pairSource = null;
 
       /// An `#[examplePair]` answers with two scenes and their node diff.
       /// Recognised by having those three fields, the way a scene is
@@ -1799,6 +1850,9 @@
         const parts = [];
         const edges = [];
         const sideAt = [];
+        // Box or orb, so a glide indicator can take the colour of the thing
+        // it belongs to rather than a colour of its own.
+        const kindOf = new Map();
 
         /// Text as a texture, the way the replayground does it: draw the
         /// lines onto a canvas and hand the canvas to a plane. There is no
@@ -1876,6 +1930,7 @@
           root.add(mesh);
           at.set(sh.label, mesh.position.clone());
           box.expandByPoint(mesh.position);
+          if (sideIx === 0) kindOf.set(sh.label, sh.kind);
           const own = (obj) => {
             if (obj) parts.push({
               side: sideIx, key: sh.label, obj, base: obj.position.clone(),
@@ -2144,8 +2199,15 @@
         /// and it keeps glowing for a moment after you stop, which is what
         /// makes it read as something left behind.
         let mixNow = 0.5;
-        const PATH_AGREE = 0xffffff;
-        const PATH_DISAGREE = 0xff66bb;
+        ///    An indicator for a node both runs agree about takes the colour
+        /// of the object it belongs to -- green for a box, blue for an orb --
+        /// and not white. White is what a moving object glows, so white
+        /// indicators competed with the things they were about; in the
+        /// object's own colour they read as its wake. Emissive either way, so
+        /// they still light rather than merely tint.
+        const BOX_COLOUR = 0x55aa44;
+        const ORB_COLOUR = 0x4488aa;
+        const PATH_DISAGREE = PAIR_DISAGREE;
         const PATH_RADIUS = 0.055;
         const PATH_OPACITY_AGREE = 0.22;
         const PATH_OPACITY_DISAGREE = 0.45;
@@ -2168,6 +2230,9 @@
             const from = sideAt[0].get(key);
             if (!from) continue;
             const differs = disagreed.has(key);
+            const hue = differs
+              ? PATH_DISAGREE
+              : kindOf.get(key) === "orb" ? ORB_COLOUR : BOX_COLOUR;
             const dir = delta.clone().normalize();
             const turn = new THREE.Quaternion().setFromUnitVectors(along, dir);
             // One geometry for the whole indicator; the segments differ only
@@ -2179,7 +2244,7 @@
             for (let i = 0; i < PATH_SEGMENTS; i += 1) {
               const at = (i + 0.5) / PATH_SEGMENTS;
               const mat = new THREE.MeshLambertMaterial({
-                color: differs ? PATH_DISAGREE : PATH_AGREE,
+                color: hue,
                 transparent: true,
                 opacity: 0,
                 depthWrite: false,
@@ -2189,7 +2254,7 @@
               seg.position.copy(from).addScaledVector(delta, at);
               seg.quaternion.copy(turn);
               sideGroups[0].group.add(seg);
-              paths.push({ mat, differs, at, heat: 0 });
+              paths.push({ mat, differs, hue, at, heat: 0 });
             }
           }
         }
@@ -2206,7 +2271,7 @@
             p.mat.opacity = Math.min(1, base * lit * trailGain);
             p.mat.visible = p.mat.opacity > 0.005;
             if (p.mat.emissive) {
-              p.mat.emissive.setHex(p.differs ? PATH_DISAGREE : PATH_AGREE);
+              p.mat.emissive.setHex(p.hue);
               p.mat.emissiveIntensity = Math.min(2, p.heat * 0.9 * trailGain);
             }
             p.mat.needsUpdate = true;
@@ -2337,19 +2402,18 @@
             m.visible = true;
             p.obj.visible = near > 0.02;
             if (m.emissive) {
-              // Red as it goes, and only for the side that is losing it.
-              // Leaving is the event worth marking here: an object the right
-              // run does not have is the edit itself, and it should be the
-              // loudest thing on screen at the moment it disappears rather
-              // than the quietest.
+              // The same magenta a changed node's indicator uses. One
+              // colour for "the two runs do not agree about this", whether
+              // the disagreement is that a node changed or that it is only
+              // in one of them -- three shades for three flavours of the
+              // same fact was harder to read than one.
               //
-              // An arriving object brightens in its own colour instead --
-              // green for a box, blue for an orb -- because it is not a loss
-              // and should not read as one.
+              // Strongest as the object is lost or gained, which is the
+              // moment worth looking at.
               const leaving = p.side === 0;
               const heat = Math.max(0, 1 - near);
-              m.emissive.setHex(leaving ? 0xff2200 : 0xffffff);
-              m.emissiveIntensity = leaving ? heat * 1.2 : Math.max(0, near - 0.5) * 2 * 0.9;
+              m.emissive.setHex(PAIR_DISAGREE);
+              m.emissiveIntensity = leaving ? heat * 1.2 : Math.max(0, near - 0.5) * 2 * 1.2;
             }
             m.needsUpdate = true;
           }
@@ -2590,17 +2654,35 @@
 
         const lOut = L.outline ? vArr(L.outline) : [];
         const rOut = R.outline ? vArr(R.outline) : [];
-        fillScenePanel(
-          "outline", L.outline, lOut.length + rOut.length,
-          "Neither run offered an outline. A pair offers one by evaluating to:",
-          (body) => {
-            diffLine(body, counts);
-            [["left", lOut], ["right", rOut]].forEach(([name, forest]) => {
-              runRule(body, `${name} — ${forest.length} tree${forest.length === 1 ? "" : "s"}`);
-              forest.forEach((tree) => drawOutline(body, tree, 0));
-            });
-          }
-        );
+        if (!lOut.length && !rOut.length && pairSource) {
+          // Left behind on purpose. Say so, and fetch them if this is the
+          // panel being looked at.
+          fillScenePanel(
+            "outline", L.outline, 1,
+            "",
+            (body) => {
+              diffLine(body, counts);
+              runRule(body,
+                "outlines are fetched when this panel is opened — they are " +
+                "most of what a pair costs to hand over, and the objects are " +
+                "what it is for");
+            }
+          );
+          refreshPairOutlines();
+        } else {
+          fillScenePanel(
+            "outline", L.outline, lOut.length + rOut.length,
+            "Neither run offered an outline. A pair offers one by evaluating to:",
+            (body) => {
+              diffLine(body, counts);
+              [["left", lOut], ["right", rOut]].forEach(([name, forest]) => {
+                runRule(body, `${name} — ${forest.length} tree${forest.length === 1 ? "" : "s"}`);
+                forest.forEach((tree) => drawOutline(body, tree, 0));
+              });
+            }
+          );
+        }
+        lastPairCounts = counts;
       };
 
       const showScene = (reply) => {
@@ -2653,6 +2735,44 @@
                 });
               }
             : null
+        );
+      };
+
+      /// The counts of the pair on screen, so a later outline fetch can head
+      /// its panel the same way the objects panel is headed.
+      let lastPairCounts = null;
+
+      /// Fetch and draw a pair's outlines, once, when their panel is open.
+      ///
+      /// Same shape as `refreshEvents`: nothing happens until the panel is
+      /// the one being looked at, and what it needs is asked for then.
+      let pairOutlinesShown = false;
+      const refreshPairOutlines = () => {
+        if (!ready || !pairSource) return;
+        if (libEl.dataset.view !== "outline") return;
+        if (pairOutlinesShown) return;
+        const program = pairOutlinesProgram(pairSource);
+        if (!program) return;
+        let reply;
+        try {
+          reply = JSON.parse(fumola_eval_scratch(instance, program));
+        } catch (e) { return; }
+        if (!reply.ok || !reply.value) return;
+        const f = reply.value;
+        const lOut = f.left ? vArr(f.left) : [];
+        const rOut = f.right ? vArr(f.right) : [];
+        pairOutlinesShown = true;
+        fillScenePanel(
+          "outline", f.left, lOut.length + rOut.length,
+          "Neither run offered an outline.",
+          (body) => {
+            if (lastPairCounts) diffLine(body, lastPairCounts);
+            [["left", lOut], ["right", rOut]].forEach(([name, forest]) => {
+              runRule(body,
+                `${name} — ${forest.length} tree${forest.length === 1 ? "" : "s"}`);
+              forest.forEach((tree) => drawOutline(body, tree, 0));
+            });
+          }
         );
       };
 
@@ -2918,16 +3038,26 @@
           (expected === undefined ? "" : ` of about ${commas(expected)}`);
 
         const generation = ++runGeneration;
+        pairOutlinesShown = false;
         await sayWaiting(
           `wait… ${doing}` +
           (expected === undefined ? "" : ` · about ${commas(expected)} Fumola steps`)
         );
 
+        // For a pair still as the library wrote it, ask for the objects and
+        // leave the outlines behind. Only when unedited: once the text is the
+        // user's own, what runs has to be what is written.
+        const asWritten =
+          preset && preset.kind === "examplePair" && text === preset.text;
+        const lightened = asWritten ? lightPairProgram(text) : null;
+        pairSource = lightened ? text : null;
+        const toRun = lightened || text;
+
         let reply;
         try {
           let began = performance.now();
           reply = JSON.parse(
-            fumola_eval_top_limited(instance, text, chunkSteps));
+            fumola_eval_top_limited(instance, toRun, chunkSteps));
           while (reply.paused) {
             // Superseded: the program changed while this was running. Drop
             // the paused computation rather than finish it -- and drop it
