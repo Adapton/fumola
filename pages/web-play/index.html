@@ -1899,6 +1899,9 @@
           // pointers stay where they were.
           edges.push({
             side: sideIx, geo, line: pointerLine,
+            // Identity, not endpoints: an edge is the same edge in both runs
+            // only if it runs from the same slot to the same object.
+            id: String(link.from) + " -> " + String(link.to),
             fromKey: String(link.from).split(":")[0], toKey: link.to,
             fromBase: a.clone(), toBase: to.clone(),
           });
@@ -2139,14 +2142,17 @@
             if (d) p.obj.position.copy(p.base).addScaledVector(d, t);
           }
           for (const e of edges) {
-            if (e.side !== 0) continue;
             const df = shift.get(e.fromKey);
             const dt = shift.get(e.toKey);
             if (!df && !dt) continue;
+            // The left run's bases are where things start, the right run's
+            // are where they end, so each side reaches the same place from
+            // its own end: L + d*t is R - d*(1 - t).
+            const k = e.side === 0 ? t : -(1 - t);
             const a = e.fromBase.clone();
             const b = e.toBase.clone();
-            if (df) a.addScaledVector(df, t);
-            if (dt) b.addScaledVector(dt, t);
+            if (df) a.addScaledVector(df, k);
+            if (dt) b.addScaledVector(dt, k);
             e.geo.setFromPoints([a, b]);
           }
         };
@@ -2165,14 +2171,21 @@
             materials.push(p.obj.material);
             lone.push(p);
           }
-          // A pointer line belongs to two objects, so it survives only while
-          // both its ends do. One touching an object the other run does not
-          // have gets its own material and fades with that object -- without
-          // this the removed cell's box faded out while the pointer into it
-          // stayed at full strength, pointing at nothing.
+          // Whether an edge survives is a question about the edge, not about
+          // its ends. Removing a cell rewires the tree: for the tree pair, 25
+          // edges are in both runs, 5 only in the left and 3 only in the
+          // right -- and some of those have ends present in both. Testing the
+          // ends drew the left run's wiring at the right run's positions,
+          // which produced a tree that was not a binary tree.
+          const idsOf = (side) =>
+            new Set(edges.filter((e) => e.side === side).map((e) => e.id));
+          const leftIds = idsOf(0);
+          const rightIds = idsOf(1);
           for (const e of edges) {
-            e.lonely = !matched(e.fromKey) || !matched(e.toKey);
-            if (!e.lonely) continue;
+            const inBoth = leftIds.has(e.id) && rightIds.has(e.id);
+            e.shared = inBoth;
+            if (inBoth) continue;
+            // Only in one run, so it has to arrive or leave.
             e.line.material = e.line.material.clone();
             sideGroups[e.side].mats.push(e.line.material);
             materials.push(e.line.material);
@@ -2206,8 +2219,9 @@
           // the far right they land on top of the originals, which read as
           // twice as many edges as the scene has.
           for (const e of edges) {
-            if (e.side === 0) { e.line.visible = true; continue; }
-            e.line.visible = e.lonely === true;
+            // An edge both runs have is drawn once, from the left; the right
+            // run's copy of it would land on top of the original.
+            if (e.shared) { e.line.visible = e.side === 0; continue; }
           }
           for (const e of loneEdges) {
             const near = e.side === 0 ? 1 - t : t;
