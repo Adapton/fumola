@@ -1,5 +1,6 @@
 import Counters "Counters";
 import A "adapton";
+import W "webPlay";
 
 module {
 
@@ -141,6 +142,26 @@ module {
     let p2 = `p2 := thunk { ?{symbol=2; element=2; next=p3}};
     let p1 = `p1 := thunk { ?{symbol=1; element=1; next=p2}};
     p1
+  };
+
+  /// A lazy list of three, taken from, and how to look at it.
+  ///
+  /// Derived from `testTakeN_`: the same three thunks, and the same walk over
+  /// them. Taking from a lazy list forces it one cell at a time, so the
+  /// outline is the shape of that demand -- which is the thing about a lazy
+  /// list worth seeing. `sceneObjectsMergeSortStream` places the cells.
+  #[example]
+  public func exampleLazyList() : W.ExampleOutput {
+    let p3 = `p3 := thunk { null };
+    let p2 = `p2 := thunk { ?{symbol=2; element=2; next=p3}};
+    let p1 = `p1 := thunk { ?{symbol=1; element=1; next=p2}};
+    let _ = takeN_(p1, 7);
+    A.scratch(thunk {
+      W.scene(
+        sceneObjectsMergeSortStream(p1, A.Scene.zero, A.Scene.zero),
+        A.Outline.outline(p1)
+      )
+    })
   };
 
   #[test]

@@ -1,4 +1,5 @@
 import A "adapton";
+import W "webPlay";
 
 module {
 
@@ -82,6 +83,24 @@ module {
     [#orb({label_; position; textFields; pointerFields })] # objs
   };
 
+
+  /// A three-element list, and how to look at it.
+  ///
+  /// Derived from `testFromIter` and `testSceneObjects`: the same list, built
+  /// inside a thunk so that forcing it leaves a force tree worth outlining.
+  /// Both components are offered. The layout runs in a scratch, so the
+  /// history stays the list's rather than the drawing's.
+  #[example]
+  public func exampleList() : W.ExampleOutput {
+    let build = `buildList := thunk { fromIter([(1,1), (2,2), (3,3)].vals()) };
+    let _ = force build;
+    A.scratch(thunk {
+      // `sceneObjectsFromThunk` rather than `sceneObjects`: the subject here
+      // is the thunk that built the list, which is also what the outline
+      // grows from, so both components describe the same root.
+      W.scene(sceneObjectsFromThunk(build, A.Scene.zero), A.Outline.outline(build))
+    })
+  };
 
   #[test]
   public func testSceneObjects() {
