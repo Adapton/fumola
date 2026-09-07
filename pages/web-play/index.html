@@ -1576,6 +1576,14 @@
           `  { left = __p.left.outline ; right = __p.right.outline } }`;
       };
 
+      /// A view a link asked for, held until there is a scene to apply it to.
+      ///
+      /// A link names an example and the run happens asynchronously, so the
+      /// settings arrive before the viewport they configure. Cleared once
+      /// used, so a later run of the same example does not snap back to
+      /// someone else's camera.
+      let pendingView = null;
+
       /// The invocation a light pair came from, so its outlines can be asked
       /// for later. Null when what is showing is not a pair fetched that way.
       let pairSource = null;
@@ -2893,13 +2901,105 @@
           { capture: true, passive: false }
         );
 
+        /// Everything about how this is being looked at that the program did
+        /// not decide.
+        ///
+        ///    A link already carries which example to run. What it has not
+        /// carried is where the camera stands, whether it is walking, how
+        /// strongly the indicators show, and where the fader sits -- and
+        /// those are most of what makes a particular view worth sending to
+        /// someone. Without them a link means "look at this example" when
+        /// what was meant was "look at this".
+        ///
+        ///    Angles are rounded and the distance kept to one decimal: this
+        /// goes in a URL a person may read, and nobody needs the camera
+        /// restored to a millionth of a degree.
+        const round1 = (n) => Math.round(n * 10) / 10;
+        const getView = () => {
+          const off = camera.position.clone().sub(controls.target);
+          const dist = off.length();
+          const az = Math.round((Math.atan2(off.x, off.z) * 180) / Math.PI);
+          const el = Math.round((Math.asin(dist ? off.y / dist : 0) * 180) / Math.PI);
+          const v = {
+            cam: [az, el, round1(dist),
+                  round1(controls.target.x), round1(controls.target.y),
+                  round1(controls.target.z)].join(","),
+            out: round1(orbitReach),
+            trail: round1(trailGain),
+          };
+          if (orbiting !== null) { v.walk = orbiting; v.spin = Math.round(orbitRate); }
+          if (sideGroups.length > 1) {
+            v.mix = Math.round(mixNow * 100) / 100;
+            if (pinging) v.pong = round1(15.5 - pingPeriodMs / 1000);
+          }
+          return v;
+        };
+
+        const applyView = (v) => {
+          if (!v) return;
+          if (v.trail !== undefined) {
+            trailGain = Number(v.trail);
+            if (dials.trail) dials.trail.value = String(trailGain);
+            const t = document.querySelector(".viewport .trail input");
+            if (t) t.value = String(trailGain);
+          }
+          if (v.out !== undefined) {
+            orbitReach = Number(v.out);
+            if (dials.out) dials.out.value = String(orbitReach);
+          }
+          if (v.spin !== undefined) {
+            orbitRate = Number(v.spin);
+            if (dials.spin) dials.spin.value = String(orbitRate);
+          }
+          if (v.mix !== undefined && faderInput) {
+            faderInput.value = String(v.mix);
+            setMix(Number(v.mix));
+          }
+          // The camera before the walk: starting a walk recomputes the
+          // position from its own height, so a camera set afterwards would
+          // be overwritten on the next frame.
+          if (v.cam) {
+            const n = String(v.cam).split(",").map(Number);
+            if (n.length === 6 && n.every((x) => Number.isFinite(x))) {
+              const [az, el, dist, tx, ty, tz] = n;
+              controls.target.set(tx, ty, tz);
+              const a = (az * Math.PI) / 180;
+              const e = (el * Math.PI) / 180;
+              const flat = Math.cos(e) * dist;
+              camera.position.set(
+                tx + Math.sin(a) * flat, ty + Math.sin(e) * dist,
+                tz + Math.cos(a) * flat
+              );
+              camera.lookAt(controls.target);
+              controls.update();
+              orbitAz = az;
+            }
+          }
+          if (v.walk && buttons[v.walk]) {
+            orbiting = v.walk;
+            for (const [n, el] of Object.entries(buttons))
+              el.setAttribute("aria-pressed", String(orbiting === n));
+            placeCamera();
+          }
+          if (v.pong !== undefined && pingButton) {
+            pingPeriodMs = (15.5 - Number(v.pong)) * 1000;
+            if (dials.pace) dials.pace.value = String(v.pong);
+            pinging = true;
+            pingButton.setAttribute("aria-pressed", "true");
+          }
+          showCamera();
+        };
+
         showCamera();
         controls.addEventListener("change", showCamera);
+
+        if (pendingView) { applyView(pendingView); pendingView = null; }
 
         mounted = {
           renderer, controls, geometries, materials, textures, observer, hint,
           caption, readout,
           setMix, sideCount: sideGroups.length, fader, trail, orbit,
+          getView, applyView,
           get frame() { return anim.id; },
         };
         return true;
@@ -3524,10 +3624,31 @@
 
       $("hush").addEventListener("click", commentAsserts);
 
+      /// The address, with everything about the current view that the
+      /// example itself does not say.
+      ///
+      /// The program decides what a scene contains; a link should be able to
+      /// decide how it is being looked at. Without that, sharing a view means
+      /// sending a link and then describing the camera in words.
+      const shareUrl = () => {
+        if (!preset || !preset.key) return location.href;
+        const parts = [`${preset.kind}=${preset.key}`];
+        if (mounted && mounted.getView) {
+          const v = mounted.getView();
+          for (const k of ["cam", "walk", "spin", "out", "trail", "mix", "pong"])
+            if (v[k] !== undefined) parts.push(`${k}=${v[k]}`);
+        }
+        return location.origin + location.pathname + location.search +
+               "#" + parts.join("&");
+      };
+
       $("share").addEventListener("click", async () => {
         const b = $("share");
+        const url = shareUrl();
+        // Put it in the address bar too, so what was copied is visible.
+        history.replaceState(null, "", url);
         try {
-          await navigator.clipboard.writeText(location.href);
+          await navigator.clipboard.writeText(url);
           b.textContent = "copied";
           b.classList.add("done");
           setTimeout(showShare, 1400);
@@ -3553,9 +3674,21 @@
       };
 
       const openFromHash = () => {
-        const m = /^#(test|examplePair|example|body)=(.+)$/.exec(
-          decodeURIComponent(location.hash));
-        if (!m) return false;
+        const raw = decodeURIComponent(location.hash).replace(/^#/, "");
+        if (!raw) return false;
+        // `kind=path` first, then any number of `name=value` settings. The
+        // path may itself contain `=`-free colons and slashes, so only the
+        // first `=` of each part is a separator.
+        const parts = raw.split("&");
+        const first = /^(test|examplePair|example|body)=(.+)$/.exec(parts[0]);
+        if (!first) return false;
+        const m = first;
+        const view = {};
+        for (const part of parts.slice(1)) {
+          const at = part.indexOf("=");
+          if (at > 0) view[part.slice(0, at)] = part.slice(at + 1);
+        }
+        pendingView = Object.keys(view).length ? view : null;
         const found = presets.get(m[2]);
         if (!found) {
           // Say so rather than silently showing the starter program: a link
