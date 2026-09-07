@@ -18,6 +18,42 @@ module {
     };
 
     //
+    // The same inputs, with symbols that carry entropy.
+    //
+    //    `generateRandomInput` numbers its symbols by position -- 1, 2, 3 --
+    // so a structure keyed on them has one shape whatever the seed is. A
+    // level tree over 1..n is the case in point: its levels are a function of
+    // its keys, its keys are positions, and so every such tree in this
+    // library came out the same, and degenerate (issue #72).
+    //
+    //    These symbols carry a random part beside the position --
+    // `sym-1-470`, `sym-2-0` -- drawn from the same seeded generator as the
+    // elements. The position keeps them ordered and tells you where each came
+    // from; the random part gives the seed something to affect.
+    //
+    //    Added rather than substituted: `generateRandomInput` is what the
+    // existing tests and their asserted values are built on.
+    //
+
+    public func generateRandomInputSymbols_(seed : Nat, startIndex : Nat, size : Nat) : [(Symbol, Nat)] {
+        let iter = prim "fastRandIterNew" (?size, seed + startIndex);
+        var count = 0;
+        var result = [];
+        let maxValue = (size + startIndex) * 137;
+        for (x in iter) {
+            count += 1;
+            let index = count + startIndex;
+            let element = x % maxValue;
+            result #= [(`sym-index-element, element)]
+        };
+        result
+    };
+
+    public func generateRandomInputSymbols(seed : Nat, size : Nat) : [(Symbol, Nat)] {
+        generateRandomInputSymbols_(seed, 0, size)
+    };
+
+    //
     // Simple case where there's just one input to consider.
     //
     public func generateRandomInput(seed : Nat, size : Nat) : [(Nat, Nat)] {
