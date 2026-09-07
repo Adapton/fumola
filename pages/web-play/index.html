@@ -260,6 +260,28 @@
         pointer-events: none;
       }
 
+      /* How strongly the glide indicators show. Vertical and on the left,
+         away from the crossfader: it sets how the picture is drawn rather
+         than what it shows, so it should not sit beside the control that
+         does. */
+      .viewport .trail {
+        position: absolute; left: 0.6rem; top: 50%;
+        transform: translateY(-50%);
+        display: flex; flex-direction: column; align-items: center;
+        gap: 0.35rem;
+        font: 400 0.62rem/1.3 var(--mono); color: var(--dim);
+        background: rgba(8, 8, 11, 0.6); padding: 0.4rem 0.3rem;
+        border: 1px solid var(--rule); border-radius: 3px;
+      }
+      .viewport .trail input[type="range"] {
+        writing-mode: vertical-lr;
+        direction: rtl;
+        appearance: slider-vertical;
+        -webkit-appearance: slider-vertical;
+        width: 0.85rem; height: 6.5rem; margin: 0;
+        accent-color: var(--green);
+      }
+
       /* The crossfader, opposite the hint: two runs in one canvas, and a
          slider to dissolve between them. */
       .viewport .fader {
@@ -1704,6 +1726,7 @@
         mounted.renderer.domElement.remove();
         mounted.hint.remove();
         if (mounted.fader) mounted.fader.remove();
+        if (mounted.trail) mounted.trail.remove();
         if (mounted.caption) mounted.caption.remove();
         if (mounted.readout) mounted.readout.remove();
         mounted = null;
@@ -2132,6 +2155,10 @@
         const TRAIL_MS = 900;
         // What an unlit segment still shows, so a path reads as a path.
         const TRAIL_FLOOR = 0.12;
+        // How much of it to show, under the viewer's hand. The default is
+        // above 1 because the faint version proved too faint to notice, and
+        // how much is too much depends on the scene and the screen.
+        let trailGain = 2.5;
         const paths = [];
         if (shift.size) {
           const along = new THREE.Vector3(0, 1, 0);
@@ -2176,11 +2203,11 @@
           for (const p of paths) {
             const base = p.differs ? PATH_OPACITY_DISAGREE : PATH_OPACITY_AGREE;
             const lit = Math.max(p.heat, TRAIL_FLOOR * strength);
-            p.mat.opacity = base * lit;
+            p.mat.opacity = Math.min(1, base * lit * trailGain);
             p.mat.visible = p.mat.opacity > 0.005;
             if (p.mat.emissive) {
               p.mat.emissive.setHex(p.differs ? PATH_DISAGREE : PATH_AGREE);
-              p.mat.emissiveIntensity = p.heat * 0.9;
+              p.mat.emissiveIntensity = Math.min(2, p.heat * 0.9 * trailGain);
             }
             p.mat.needsUpdate = true;
           }
@@ -2464,13 +2491,39 @@
           host.appendChild(fader);
         }
 
+        // Only when there is something for it to govern.
+        let trail = null;
+        if (paths.length) {
+          trail = document.createElement("div");
+          trail.className = "trail";
+          const cap = document.createElement("span");
+          cap.textContent = "trail";
+          const dial = document.createElement("input");
+          dial.type = "range";
+          dial.min = "0";
+          dial.max = "6";
+          dial.step = "0.1";
+          dial.value = String(trailGain);
+          dial.setAttribute("aria-label", "How strongly glide indicators show");
+          dial.addEventListener("input", () => {
+            trailGain = Number(dial.value);
+            // Light the whole trail while it is being set, so the effect of
+            // the control is visible without also dragging the fader.
+            heatTrail(0, 1);
+            glowUntil = performance.now() + GLOW_MS;
+            showPaths(1);
+          });
+          trail.append(cap, dial);
+          host.appendChild(trail);
+        }
+
         showCamera();
         controls.addEventListener("change", showCamera);
 
         mounted = {
           renderer, controls, geometries, materials, textures, observer, hint,
           caption, readout,
-          setMix, glowTowards, sideCount: sideGroups.length, fader,
+          setMix, glowTowards, sideCount: sideGroups.length, fader, trail,
           get frame() { return anim.id; },
         };
         return true;
