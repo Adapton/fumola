@@ -211,3 +211,30 @@ fn progress_counts_this_run_not_the_instance() {
         "lifetime total {} not greater than this run's {}", total, ran
     );
 }
+
+/// A finished run reports the whole run, not its last chunk.
+#[test]
+fn a_finished_run_reports_all_of_its_steps() {
+    let id = fumola_create();
+    let program = "var i = 0; while (i < 400) { i += 1 }; i";
+    let mut reply = parse(&fumola_eval_top_limited(id, program, 50));
+    let mut rounds = 0;
+    let mut last_paused = 0u64;
+    while reply["paused"] == true {
+        last_paused = reply["steps"].as_u64().unwrap();
+        rounds += 1;
+        assert!(rounds < 10_000);
+        reply = parse(&fumola_resume(id, 50));
+    }
+    assert!(rounds > 2, "too few chunks to test this");
+    let whole = reply["steps"].as_u64().expect("a finished run carries steps");
+    let last_chunk = reply["counts"]["step"].as_u64().expect("counts");
+    assert!(
+        whole >= last_paused,
+        "final total {} below the last pause {}", whole, last_paused
+    );
+    assert!(
+        whole > last_chunk,
+        "final reply reported its last chunk ({}) as the run ({})", last_chunk, whole
+    );
+}

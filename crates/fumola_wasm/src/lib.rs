@@ -687,6 +687,11 @@ fn finish_chunk(
         Ok(value) => {
             BEFORE_CHUNKS.with(|b| b.borrow_mut().remove(&id));
             let json = with_print(value_to_json(&value), printed);
+            // `counts` is this chunk's; `steps` is the whole run's. A host
+            // showing progress wants the run, and a chunked run's last chunk
+            // is a small and misleading fraction of it -- 5,673 of 138,271
+            // for the tree pair, which read as though the run were tiny.
+            let json = insert_key(json, "steps", serde_json::json!(ran));
             insert_key(json, "counts", counts)
         }
         Err(fumola::Error::Interruption(i)) if matches!(i, Interruption::Limit(_)) => {
@@ -706,6 +711,7 @@ fn finish_chunk(
             if let Some(snapshot) = BEFORE_CHUNKS.with(|b| b.borrow_mut().remove(&id)) {
                 *state = snapshot;
             }
+            let json = insert_key(json, "steps", serde_json::json!(ran));
             insert_key(json, "counts", counts)
         }
     }

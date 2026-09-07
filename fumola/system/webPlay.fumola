@@ -102,17 +102,24 @@ module {
     /// result can be used. Its four output fields are the measurement: what
     /// only the left run named, what only the right named, what both named
     /// and agreed on, and what both named and disagreed on.
-    ///    `sizes` repeats what `nodes` already holds, as plain numbers, and
-    /// is not redundant. `A.Diff.NodeVals` is a `Map`, whose representation
-    /// is hidden, so a host reading this across a boundary receives it as an
-    /// opaque value --- a rendering, not a structure it can count. The counts
-    /// are the first thing any viewer of a pair wants, so the pair states
-    /// them rather than leaving each host to parse them back out.
+    ///    What crosses is what a viewer reads, and no more. The two runs'
+    /// histories are what the diff is computed *from*, not what anyone looks
+    /// at, and they dominate the cost of handing a pair over: measured on the
+    /// tree pair, 0.81 MB of 1.17 MB, and the whole reply took 232 ms to
+    /// serialise against 56 ms to compute. So the diff is reduced here, in
+    /// Fumola, to the numbers and the names a viewer needs, and the
+    /// histories stay behind. See issue #83.
+    ///
+    ///    `sizes` gives the four counts; `keys` gives the names of the nodes
+    /// that are not simply equal. Neither could be recovered from a `Map`
+    /// across a boundary anyway: `A.Diff.NodeVals` has a hidden
+    /// representation and arrives as an opaque rendering rather than
+    /// something a host can read.
     public type ExamplePairOutput = {
-        left : A.Scene.Scene;
-        right : A.Scene.Scene;
-        nodes : A.Diff.NodeValsDiff;
+        left : SceneComponents;
+        right : SceneComponents;
         sizes : DiffSizes;
+        keys : DiffKeys;
     };
 
     /// The four numbers, and the two totals they came from.
@@ -137,6 +144,47 @@ module {
           notEqual = d.notEqual.size() }
     };
 
+    /// Which nodes differ, by name, and nothing about the ones that agree.
+    ///
+    ///    Three lists and an assumption: anything not named here was named by
+    /// both runs and they agreed about it. That is the whole diff, because
+    /// `equal` is by far the largest of the four categories and the least
+    /// worth transmitting -- for the tree pair, 60 of 80 nodes.
+    ///
+    ///    A name is the same `Text` a scene object carries as its `label_`.
+    /// Both come from `debug_show` of the node's pointer, so a host can match
+    /// an object against these lists directly, with no second key scheme to
+    /// keep in step. `Scene.sceneObjects` and `Diff.nodeValsFromNodes` derive
+    /// it from the same expression, which is why the correspondence holds by
+    /// construction rather than by care.
+    ///
+    ///    This is what a host needs in order to say *how* two runs differ,
+    /// and it is small: for the tree pair, 4 names and 16 names against the
+    /// 0.8 MB the two histories cost. See issue #83.
+    public type DiffKeys = {
+        leftOnly : [Text];
+        rightOnly : [Text];
+        notEqual : [Text];
+    };
+
+    func namesOf(m : A.Diff.NodeVals) : [Text] {
+        var out = [];
+        for ((pointer, _) in m.vals()) { out #= [debug_show pointer] };
+        out
+    };
+
+    func namesOfPairs(m : A.Diff.NodeValPairs) : [Text] {
+        var out = [];
+        for ((pointer, _) in m.vals()) { out #= [debug_show pointer] };
+        out
+    };
+
+    public func diffKeys(d : A.Diff.NodeValsDiff) : DiffKeys {
+        { leftOnly = namesOf(d.onlyLeft);
+          rightOnly = namesOf(d.onlyRight);
+          notEqual = namesOfPairs(d.notEqual) }
+    };
+
     /// Two scenes, paired, with the node diff computed from their histories.
     ///
     /// The caller produces each side; this only relates them. Which two runs
@@ -145,7 +193,10 @@ module {
         let nodes = A.Diff.nodeValsDiff(
             A.Diff.nodeValsFromNodes(left.history.nodes),
             A.Diff.nodeValsFromNodes(right.history.nodes));
-        { left; right; nodes; sizes = diffSizes(nodes) }
+        { left = { objects = left.objects ; outline = left.outline };
+          right = { objects = right.objects ; outline = right.outline };
+          sizes = diffSizes(nodes);
+          keys = diffKeys(nodes) }
     };
 
     /// How much of the larger run the difference covers: the share of nodes a

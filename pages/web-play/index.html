@@ -244,6 +244,22 @@
         font: 400 0.7rem/1.4 var(--mono); color: var(--dim);
         pointer-events: none;
       }
+      /* What is being looked at, named on the picture itself. A screenshot
+         travels without its URL, so the picture has to say what it is. */
+      .viewport .caption {
+        position: absolute; left: 0.7rem; top: 0.55rem;
+        font: 400 0.72rem/1.5 var(--mono); color: var(--fg);
+        background: rgba(8, 8, 11, 0.66); padding: 0.2rem 0.45rem;
+        border-radius: 3px; pointer-events: none; max-width: 70%;
+      }
+      .viewport .caption .kind { color: var(--dim); }
+      /* Where the camera is, so a view can be described and returned to. */
+      .viewport .camera {
+        position: absolute; left: 0.7rem; bottom: 1.9rem;
+        font: 400 0.68rem/1.4 var(--mono); color: var(--dim);
+        pointer-events: none;
+      }
+
       /* The crossfader, opposite the hint: two runs in one canvas, and a
          slider to dissolve between them. */
       .viewport .fader {
@@ -1456,7 +1472,7 @@
         if (!reply.ok || reply.tag !== "Record") return null;
         const f = reply.value || {};
         return f.left !== undefined && f.right !== undefined &&
-               f.nodes !== undefined && f.sizes !== undefined ? f : null;
+               f.sizes !== undefined && f.keys !== undefined ? f : null;
       };
 
       /// The four numbers, from the pair's `sizes`, plus what they imply.
@@ -1688,6 +1704,8 @@
         mounted.renderer.domElement.remove();
         mounted.hint.remove();
         if (mounted.fader) mounted.fader.remove();
+        if (mounted.caption) mounted.caption.remove();
+        if (mounted.readout) mounted.readout.remove();
         mounted = null;
       };
 
@@ -1697,8 +1715,17 @@
       /// WebGL context to look at the same structure twice is a lot of
       /// machinery for a comparison that reads better as a dissolve. Each
       /// side goes under its own group, and `setMix` fades between them.
-      const mountObjects = async (input) => {
+      const mountObjects = async (input, diffKeys) => {
         const sides = Array.isArray(input) ? input : [{ list: input }];
+        // Names the two runs named but disagreed about. Everything else they
+        // either agree on or only one of them has, and the geometry says
+        // which. From `W.DiffKeys`, whose names are the same `Text` an object
+        // carries as its label.
+        const disagreed = new Set(
+          ((diffKeys && diffKeys.value && diffKeys.value.notEqual &&
+            diffKeys.value.notEqual.value) || [])
+            .map((t) => (t && t.value !== undefined ? String(t.value) : ""))
+        );
         const parsed = sides.map((s) => readObjects(s.list));
         const anything = parsed.some(
           (d) => d.shapes.length || d.links.length || d.actions.length);
@@ -1741,6 +1768,14 @@
         const sideGroups = [];
         let root = scene;
         let sideMats = materials;
+
+        // What each object is made of, so a matched object can be moved as a
+        // whole. An object is a mesh plus its label, its fields and its
+        // pointer dots, all placed in absolute coordinates; moving it means
+        // moving every part by the same delta.
+        const parts = [];
+        const edges = [];
+        const sideAt = [];
 
         /// Text as a texture, the way the replayground does it: draw the
         /// lines onto a canvas and hand the canvas to a plane. There is no
@@ -1816,21 +1851,27 @@
           mesh.position.set(sh.at[0], sh.at[1], sh.at[2]);
           mesh.userData.label = sh.label;
           root.add(mesh);
-          at.set(sh.label, mesh.position);
+          at.set(sh.label, mesh.position.clone());
           box.expandByPoint(mesh.position);
+          const own = (obj) => {
+            if (obj) parts.push({
+              side: sideIx, key: sh.label, obj, base: obj.position.clone(),
+            });
+          };
+          own(mesh);
 
           // The label, up and to the left; the fields, to the right. The same
           // offsets the replayground uses, so a scene sits the same way.
-          textPlane(
+          own(textPlane(
             sh.label,
             mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim)),
             0.7
-          );
-          textPlane(
+          ));
+          own(textPlane(
             sh.text,
             mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim)),
             0.5
-          );
+          ));
 
           const spacing = 0.1;
           const startX = mesh.position.x - ((sh.fields.length - 1) * spacing) / 2;
@@ -1838,7 +1879,8 @@
             const dot = new THREE.Mesh(dotGeo, dotMat);
             dot.position.set(startX + i * spacing, mesh.position.y - 0.17, mesh.position.z);
             root.add(dot);
-            dots.set(sh.label + ":" + name, dot.position);
+            dots.set(sh.label + ":" + name, dot.position.clone());
+            own(dot);
           });
         }
 
@@ -1850,7 +1892,16 @@
           const to = b.clone().add(new THREE.Vector3(0, BoxDim / 2, 0));
           const geo = new THREE.BufferGeometry().setFromPoints([a.clone(), to]);
           geometries.push(geo);
-          root.add(new THREE.Line(geo, lineMat));
+          const pointerLine = new THREE.Line(geo, lineMat);
+          root.add(pointerLine);
+          // A line is drawn between two objects rather than owned by one, so
+          // it follows both ends. Without this the boxes glide and their
+          // pointers stay where they were.
+          edges.push({
+            side: sideIx, geo, line: pointerLine,
+            fromKey: String(link.from).split(":")[0], toKey: link.to,
+            fromBase: a.clone(), toBase: to.clone(),
+          });
         }
 
         // Action edges: what the computation did, rather than what it points
@@ -1920,6 +1971,7 @@
           }
         }
 
+        sideAt[sideIx] = at;
         materials.push(...sideMats);
         }
 
@@ -2001,15 +2053,196 @@
           }
         };
 
+        /// Where every matched object has to travel, and which objects are
+        /// not matched at all.
+        ///
+        ///    Most of a pair is the same objects in different places: for the
+        /// tree pair, 54 of 61 differ only in position. So the two runs are
+        /// not two pictures to dissolve between, they are one picture whose
+        /// parts move -- and the fader is better read as a journey from the
+        /// old layout to the new one than as a crossfade.
+        ///
+        ///    An object matched in both runs is drawn once, from the left
+        /// run, and slid to where the right run puts it. Its counterpart in
+        /// the right run is never shown, or the same object would appear
+        /// twice. Only the objects one run has and the other does not are
+        /// left to fade, and there are few of them: 4 and 0 here.
+        const shift = new Map();
+        if (sideAt.length === 2 && sideAt[0] && sideAt[1]) {
+          for (const [key, here] of sideAt[0]) {
+            const there = sideAt[1].get(key);
+            if (there) shift.set(key, there.clone().sub(here));
+          }
+        }
+        const matched = (key) => shift.has(key);
+
+        /// The path each matched object travels, drawn as a line from where
+        /// the left run put it to where the right run does.
+        ///
+        ///    White where the two runs agree about the node, pink where they
+        /// named it and disagreed. So the picture separates "this moved" from
+        /// "this moved *and* changed", which the positions alone cannot say:
+        /// an object can travel a long way with identical content, and a
+        /// short way with different content.
+        ///
+        ///    Pink and not red, because red is what a node about to be lost
+        /// turns, and one colour cannot mean both. A changed node is still
+        /// there in both runs; a red one is leaving. Read together, red was
+        /// the louder signal attached to the milder event -- the deleted cell
+        /// faded away quietly while a node that merely changed a child
+        /// pointer got the alarm.
+        ///
+        ///    Only for objects that actually go somewhere. A path of zero
+        /// length is a dot, and there is nothing to learn from it.
+        const PATH_AGREE = 0xffffff;
+        const PATH_DISAGREE = 0xff66bb;
+        const paths = [];
+        if (shift.size) {
+          for (const [key, delta] of shift) {
+            if (delta.length() < 0.01) continue;
+            const from = sideAt[0].get(key);
+            if (!from) continue;
+            const mat = new THREE.LineBasicMaterial({
+              color: disagreed.has(key) ? PATH_DISAGREE : PATH_AGREE,
+              transparent: true,
+              opacity: 0,
+            });
+            const geo = new THREE.BufferGeometry().setFromPoints([
+              from.clone(),
+              from.clone().add(delta),
+            ]);
+            geometries.push(geo);
+            materials.push(mat);
+            const line = new THREE.Line(geo, mat);
+            sideGroups[0].group.add(line);
+            paths.push({ mat, disagreed: disagreed.has(key) });
+          }
+        }
+
+        /// Show the paths while the fader is moving, and let them go with the
+        /// glow. They answer "what is moving where", which is a question
+        /// about the gesture, not about the picture at rest.
+        const showPaths = (strength) => {
+          for (const p of paths) {
+            p.mat.opacity = strength * (p.disagreed ? 0.95 : 0.5);
+            p.mat.visible = p.mat.opacity > 0.02;
+            p.mat.needsUpdate = true;
+          }
+        };
+
+        /// Move the left run's objects along their paths, and redraw the
+        /// lines between them from wherever their ends now are.
+        const glide = (t) => {
+          for (const p of parts) {
+            if (p.side !== 0) continue;
+            const d = shift.get(p.key);
+            if (d) p.obj.position.copy(p.base).addScaledVector(d, t);
+          }
+          for (const e of edges) {
+            if (e.side !== 0) continue;
+            const df = shift.get(e.fromKey);
+            const dt = shift.get(e.toKey);
+            if (!df && !dt) continue;
+            const a = e.fromBase.clone();
+            const b = e.toBase.clone();
+            if (df) a.addScaledVector(df, t);
+            if (dt) b.addScaledVector(dt, t);
+            e.geo.setFromPoints([a, b]);
+          }
+        };
+
+        /// An object only one run has gets its own material, because the
+        /// fade and the colour below apply to it alone and the rest of its
+        /// side shares one material per shape kind.
+        const lone = [];
+        const loneEdges = [];
+        if (shift.size) {
+          for (const p of parts) {
+            const isLone = !matched(p.key);
+            if (!isLone) continue;
+            p.obj.material = p.obj.material.clone();
+            sideGroups[p.side].mats.push(p.obj.material);
+            materials.push(p.obj.material);
+            lone.push(p);
+          }
+          // A pointer line belongs to two objects, so it survives only while
+          // both its ends do. One touching an object the other run does not
+          // have gets its own material and fades with that object -- without
+          // this the removed cell's box faded out while the pointer into it
+          // stayed at full strength, pointing at nothing.
+          for (const e of edges) {
+            e.lonely = !matched(e.fromKey) || !matched(e.toKey);
+            if (!e.lonely) continue;
+            e.line.material = e.line.material.clone();
+            sideGroups[e.side].mats.push(e.line.material);
+            materials.push(e.line.material);
+            loneEdges.push(e);
+          }
+        }
+
         const setMix = (t) => {
           if (sideGroups.length < 2) return;
-          sideGroups.forEach((s, i) => {
-            s.opacity = fade(i === 0 ? t : 1 - t);
-            // A group at zero is not drawn at all: a fully transparent mesh
-            // still writes depth in some materials, and would punch holes in
-            // the side that is meant to be solid.
-            paintSide(s);
-          });
+          if (!shift.size) {
+            // Nothing matched, so there is nothing to glide: fall back to the
+            // dissolve, which is still the right answer for two unrelated
+            // scenes.
+            sideGroups.forEach((s, i) => {
+              s.opacity = fade(i === 0 ? t : 1 - t);
+              paintSide(s);
+            });
+            return;
+          }
+          glide(t);
+          // The left run carries every matched object and is always drawn;
+          // the right run contributes only what the left does not have.
+          sideGroups[0].opacity = 1;
+          sideGroups[1].opacity = 1;
+          sideGroups.forEach(paintSide);
+          for (const p of parts) {
+            if (matched(p.key)) p.obj.visible = p.side === 0;
+          }
+          // The left run's lines are redrawn to wherever their ends now are,
+          // so the right run's copies of the same lines are duplicates. At
+          // the far right they land on top of the originals, which read as
+          // twice as many edges as the scene has.
+          for (const e of edges) {
+            if (e.side === 0) { e.line.visible = true; continue; }
+            e.line.visible = e.lonely === true;
+          }
+          for (const e of loneEdges) {
+            const near = e.side === 0 ? 1 - t : t;
+            const m = e.line.material;
+            m.transparent = true;
+            m.opacity = near;
+            m.needsUpdate = true;
+            e.line.visible = near > 0.02;
+          }
+          // An object about to be lost fades as the fader leaves it, and an
+          // object about to arrive fades in as the fader reaches it.
+          for (const p of lone) {
+            const near = p.side === 0 ? 1 - t : t;
+            const m = p.obj.material;
+            m.transparent = true;
+            m.opacity = near;
+            m.visible = true;
+            p.obj.visible = near > 0.02;
+            if (m.emissive) {
+              // Red as it goes, and only for the side that is losing it.
+              // Leaving is the event worth marking here: an object the right
+              // run does not have is the edit itself, and it should be the
+              // loudest thing on screen at the moment it disappears rather
+              // than the quietest.
+              //
+              // An arriving object brightens in its own colour instead --
+              // green for a box, blue for an orb -- because it is not a loss
+              // and should not read as one.
+              const leaving = p.side === 0;
+              const heat = Math.max(0, 1 - near);
+              m.emissive.setHex(leaving ? 0xff2200 : 0xffffff);
+              m.emissiveIntensity = leaving ? heat * 1.2 : Math.max(0, near - 0.5) * 2 * 0.9;
+            }
+            m.needsUpdate = true;
+          }
         };
 
         /// Light the side the fader is moving towards, and push the decay
@@ -2019,6 +2252,7 @@
           if (sideGroups.length < 2) return;
           sideGroups.forEach((s, j) => { s.glow = j === i ? 1 : 0; });
           glowUntil = performance.now() + GLOW_MS;
+          showPaths(1);
         };
 
         let glowUntil = 0;
@@ -2037,6 +2271,7 @@
             sideGroups.forEach((s) => {
               if (s.glow > 0) { s.glow = g; paintSide(s); }
             });
+            showPaths(g);
             if (g === 0) {
               glowUntil = 0;
               sideGroups.forEach((s) => { s.glow = 0; });
@@ -2071,6 +2306,41 @@
           " · drag to orbit, scroll to zoom";
         host.appendChild(hint);
 
+        // Named on the picture, because a screenshot arrives without the URL
+        // that produced it and "which example is this" is the first question
+        // anyone asks of one.
+        let caption = null;
+        if (preset && preset.key) {
+          caption = document.createElement("div");
+          caption.className = "caption";
+          const kind = document.createElement("span");
+          kind.className = "kind";
+          kind.textContent =
+            (preset.kind === "body" ? "body of " : preset.kind + "  ");
+          const name = document.createElement("span");
+          name.textContent = preset.key;
+          caption.append(kind, name);
+          host.appendChild(caption);
+        }
+
+        // Where the camera is, in terms anyone can repeat: how far round, how
+        // far up, how far back. Written on a change rather than every frame,
+        // since it only moves when someone moves it.
+        const readout = document.createElement("div");
+        readout.className = "camera";
+        host.appendChild(readout);
+        const showCamera = () => {
+          const off = camera.position.clone().sub(controls.target);
+          const dist = off.length();
+          const az = (Math.atan2(off.x, off.z) * 180) / Math.PI;
+          const el = (Math.asin(dist ? off.y / dist : 0) * 180) / Math.PI;
+          const one = (n) => (Math.round(n * 10) / 10).toFixed(1);
+          readout.textContent =
+            `camera  around ${Math.round(az)}°  up ${Math.round(el)}°  ` +
+            `back ${one(dist)}  ·  looking at ` +
+            `(${one(controls.target.x)}, ${one(controls.target.y)}, ${one(controls.target.z)})`;
+        };
+
         // The crossfader, when two runs share the canvas.
         let fader = null;
         if (sideGroups.length > 1) {
@@ -2098,8 +2368,12 @@
           host.appendChild(fader);
         }
 
+        showCamera();
+        controls.addEventListener("change", showCamera);
+
         mounted = {
           renderer, controls, geometries, materials, textures, observer, hint,
+          caption, readout,
           setMix, glowTowards, sideCount: sideGroups.length, fader,
           get frame() { return anim.id; },
         };
@@ -2156,7 +2430,7 @@
           mountObjects([
             { list: L.objects, label: "left" },
             { list: R.objects, label: "right" },
-          ]).catch((e) => {
+          ], pair.keys).catch((e) => {
             host.hidden = true;
             $("objects-body").textContent = "could not draw the scene: " + e;
           });
@@ -2525,8 +2799,12 @@
         // A later run started while this one was finishing its last chunk.
         if (generation !== runGeneration) return;
         // What it actually cost, for the next wait and for the answer below.
-        const ranSteps =
-          reply.counts && Number.isFinite(Number(reply.counts.step))
+        // `steps` is the whole run where a chunked path reported one;
+        // `counts.step` is the last chunk, and is the fallback for the
+        // unlimited entry points that report no `steps`.
+        const ranSteps = Number.isFinite(Number(reply.steps))
+          ? Number(reply.steps)
+          : reply.counts && Number.isFinite(Number(reply.counts.step))
             ? Number(reply.counts.step) : null;
         if (ranSteps !== null) stepsSeen.set(text, ranSteps);
         // Both places: the panel is where it is meant to be read, the
