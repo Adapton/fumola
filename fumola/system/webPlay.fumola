@@ -43,26 +43,29 @@ module {
         outline : A.Outline.Outlines;
     };
 
-    /// What an `#[example]` returns.
+    /// What an `#[example]` returns: the components, in a record, directly.
     ///
-    /// A variant, so the playground can tell a scene from any other value a
-    /// program might evaluate to. Seeing `#scene` come back from the editor
-    /// is the whole trigger: nothing inspects the code, and nothing guesses.
-    public type ExampleOutput = { #scene : SceneComponents };
+    ///    No tag around them. A record carrying `objects` and `outline` is
+    /// recognisable as a scene by having those fields, and requiring a
+    /// wrapper only meant that code already holding the right shape had to
+    /// take it apart and put it back together. `A.Scene.Scene` is such a
+    /// record already, with a `history` beside them, so a scene built by the
+    /// library is one of these without being converted into one.
+    public type ExampleOutput = SceneComponents;
 
     /// Both components.
     public func scene(objects, outline) : ExampleOutput {
-        #scene { objects ; outline }
+        { objects ; outline }
     };
 
     /// Objects, and no outline.
     public func sceneOfObjects(objects) : ExampleOutput {
-        #scene { objects ; outline = [] }
+        { objects ; outline = [] }
     };
 
     /// Outlines, and no objects.
     public func sceneOfOutline(outline) : ExampleOutput {
-        #scene { objects = [] ; outline }
+        { objects = [] ; outline }
     };
 
     /// One tree, for the common case of portraying a single force.
@@ -78,29 +81,99 @@ module {
         sceneOfOutline(A.Outline.outlines())
     };
 
+    /// Two related runs, and what differs between them.
+    ///
+    ///    What was one panel becomes three. A comparative example answers
+    /// with a left run, a right run, and the difference between them --- and
+    /// each view a plain example offers has all three: left objects beside
+    /// right objects, left outline beside right outline, and for each a
+    /// statement of what changed.
+    ///
+    ///    Both sides are full scenes rather than bare components, because a
+    /// difference between two runs is mostly a difference between their
+    /// histories, and a component list cannot say what a run did. Each side
+    /// therefore has to be produced the way a scene is: reset, run, peek. An
+    /// example that does not reset between the two is not comparing two runs,
+    /// it is comparing a run against itself continued.
+    ///
+    ///    `nodes` is the diff that matters for reuse. `A.Diff.nodeValsDiff`
+    /// compares the two runs node by node, keyed on the pointer, ignoring
+    /// edge ids and meta times because neither affects whether a cached
+    /// result can be used. Its four output fields are the measurement: what
+    /// only the left run named, what only the right named, what both named
+    /// and agreed on, and what both named and disagreed on.
+    ///    `sizes` repeats what `nodes` already holds, as plain numbers, and
+    /// is not redundant. `A.Diff.NodeVals` is a `Map`, whose representation
+    /// is hidden, so a host reading this across a boundary receives it as an
+    /// opaque value --- a rendering, not a structure it can count. The counts
+    /// are the first thing any viewer of a pair wants, so the pair states
+    /// them rather than leaving each host to parse them back out.
+    public type ExamplePairOutput = {
+        left : A.Scene.Scene;
+        right : A.Scene.Scene;
+        nodes : A.Diff.NodeValsDiff;
+        sizes : DiffSizes;
+    };
+
+    /// The four numbers, and the two totals they came from.
+    ///
+    /// The maps themselves say which nodes; these say how many, which is what
+    /// a panel shows first and what a measurement over many runs collects.
+    public type DiffSizes = {
+        left : Nat;
+        right : Nat;
+        onlyLeft : Nat;
+        onlyRight : Nat;
+        equal : Nat;
+        notEqual : Nat;
+    };
+
+    public func diffSizes(d : A.Diff.NodeValsDiff) : DiffSizes {
+        { left = d.left.size();
+          right = d.right.size();
+          onlyLeft = d.onlyLeft.size();
+          onlyRight = d.onlyRight.size();
+          equal = d.equal.size();
+          notEqual = d.notEqual.size() }
+    };
+
+    /// Two scenes, paired, with the node diff computed from their histories.
+    ///
+    /// The caller produces each side; this only relates them. Which two runs
+    /// are worth comparing is a judgement, like the rest of an example.
+    public func pair(left : A.Scene.Scene, right : A.Scene.Scene) : ExamplePairOutput {
+        let nodes = A.Diff.nodeValsDiff(
+            A.Diff.nodeValsFromNodes(left.history.nodes),
+            A.Diff.nodeValsFromNodes(right.history.nodes));
+        { left; right; nodes; sizes = diffSizes(nodes) }
+    };
+
+    /// How much of the larger run the difference covers: the share of nodes a
+    /// repair would have to touch, were repair implemented.
+    ///
+    /// `onlyLeft + onlyRight + notEqual` over the larger of the two runs.
+    /// Nodes both runs named and agreed on are the ones a repair gets for
+    /// free, so they are what this measures against.
+    public func diffFraction(d : A.Diff.NodeValsDiff) : Float {
+        let s = diffSizes(d);
+        let changed = s.onlyLeft + s.onlyRight + s.notEqual;
+        let total = if (s.left >= s.right) { s.left } else { s.right };
+        if (total == 0) { 0.0 } else { (0.0 + changed) / (0.0 + total) }
+    };
+
     /// An example's components, plus the history the runtime kept: an
     /// `A.Scene.Scene`, exactly as that type stands.
     ///
-    /// Optional, and only for a forest of exactly one tree, because that is
-    /// what `A.Scene.Scene` can hold: it carries a single outline. An example
-    /// offering none is not a Scene, and one offering several is more than a
-    /// Scene; saying so is better than dropping trees quietly or inventing a
-    /// root to join them under. Reconciling the two shapes is #66.
+    /// No longer optional. `Scene.outline` is a forest now (#66), so any
+    /// number of trees fits, and without the tag the components are already
+    /// the fields a Scene wants.
     ///
     /// Call this from outside the example, after it has run, so the history
     /// is the one the example produced. An example that lays itself out
     /// inside `A.scratch` keeps that history to the subject rather than to
     /// the drawing of it.
-    public func withHistory(e : ExampleOutput) : ?A.Scene.Scene {
-        switch e {
-            case (#scene(s)) {
-                if (s.outline.size() == 1) {
-                    ?{ outline = s.outline[0] ;
-                       objects = s.objects ;
-                       history = A.peekHistory() }
-                } else { null }
-            }
-        }
+    public func withHistory(e : ExampleOutput) : A.Scene.Scene {
+        { outline = e.outline ; objects = e.objects ; history = A.peekHistory() }
     };
 
 }

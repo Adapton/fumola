@@ -1,5 +1,8 @@
-import A "adapton";
-import W "webPlay";
+import A "../system/adapton";
+import W "../system/webPlay";
+import Prim "../system/prim";
+import Array "array";
+import R "randomInput";
 
 module {
 
@@ -84,6 +87,22 @@ module {
   };
 
 
+  /// The same as `exampleList`, over symbols that carry entropy.
+  ///
+  /// A list's shape does not depend on its symbols, so this changes nothing
+  /// about the picture -- it is here so that the labels show what a symbol
+  /// with a random part looks like, beside the tree examples where the shape
+  /// does depend on them (#72).
+  #[example]
+  public func exampleListRandomSymbols() : W.ExampleOutput {
+    let array = R.generateRandomInputSymbols(10, 4);
+    let build = `buildList := thunk { fromIter(array.vals()) };
+    let _ = force build;
+    A.scratch(thunk {
+      W.scene(sceneObjectsFromThunk(build, A.Scene.zero), [ A.Outline.outline(build) ])
+    })
+  };
+
   /// A three-element list, and how to look at it.
   ///
   /// Derived from `testFromIter` and `testSceneObjects`: the same list, built
@@ -149,9 +168,9 @@ module {
     };
 
     public func previous(editor : Editor<X>) : ?Editor<X> {
-      prim "print" editor;
+      Prim.print editor;
       if (editor.previous.size() > 0) { 
-        let (previous, cursor) = prim "arrayPopBack" editor.previous;
+        let (previous, cursor) = Array.popBack(editor.previous);
         ?{ previous; cursor } 
       } else {
         null
@@ -227,7 +246,7 @@ module {
 
     #[test]
     public func testPrevious() {
-      prim "print" "TO DO";
+      Prim.print "TO DO";
     };
 
   };

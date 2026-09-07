@@ -124,31 +124,41 @@ fn the_library_is_readable() {
     assert!(mods.len() > 10, "expected the whole library, got {}", mods.len());
     assert!(mods.iter().any(|m| m["path"] == "fumola/system/prelude"));
 
-    // The symlinked copies are reported, and flagged, so a host can list the
-    // library without showing the same module several times.
-    let links: Vec<&str> = mods
-        .iter()
-        .filter(|m| m["link"] == true)
-        .map(|m| m["path"].as_str().unwrap())
-        .collect();
-    assert!(
-        links.contains(&"fumola/examples/mergeSort/adapton"),
-        "mergeSort/adapton is a symlink to system/adapton; got {:?}",
-        links
-    );
-    assert!(
-        links.contains(&"fumola/collections/adapton"),
-        "collections/adapton is a symlink to system/adapton; got {:?}",
-        links
-    );
-    // The real homes must not be flagged.
-    for real in ["fumola/system/adapton", "fumola/collections/hashMap",
-                 "fumola/examples/mergeSort/mergeSort", "fumola/system/prelude"] {
-        assert!(!links.contains(&real), "{} is a real file, not a link", real);
+    // Each module appears once, under the path its file is actually at.
+    // `collections/`, `examples/` and `examples/mergeSort/` used to hold
+    // symlinks to their dependencies -- a module could only import what was
+    // registered beside it -- so `adapton` was listed three times and a host
+    // had to filter the copies out by a `link` flag. Imports can say
+    // `../../system/adapton` now, and the listing is the library.
+    let paths: Vec<&str> = mods.iter().map(|m| m["path"].as_str().unwrap()).collect();
+    for path in &paths {
+        assert!(
+            !mods.iter().any(|m| m.get("link").is_some()),
+            "{} still carries a link flag; the symlinked copies are gone",
+            path
+        );
     }
-    // Every path is still registered, links included: a module's imports
-    // resolve relative to its own directory, which is what they are for.
-    assert!(mods.iter().any(|m| m["path"] == "fumola/examples/mergeSort/adapton"));
+    let mut unique = paths.clone();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(unique.len(), paths.len(), "a module is listed twice: {:?}", paths);
+    for gone in [
+        "fumola/collections/adapton",
+        "fumola/examples/adapton",
+        "fumola/examples/mergeSort/adapton",
+        "fumola/system/hashMap",
+    ] {
+        assert!(!paths.contains(&gone), "{} was a symlink and should be gone", gone);
+    }
+    // The real homes are all there.
+    for real in [
+        "fumola/system/adapton",
+        "fumola/collections/hashMap",
+        "fumola/examples/mergeSort/mergeSort",
+        "fumola/system/prelude",
+    ] {
+        assert!(paths.contains(&real), "{} is missing from the listing", real);
+    }
 
     let p: serde_json::Value =
         serde_json::from_str(&fumola_module_source("fumola/system/prelude")).unwrap();

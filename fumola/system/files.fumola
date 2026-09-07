@@ -1,0 +1,21 @@
+/// Files a program asks a host to write.
+///
+///    Nothing here reaches a filesystem. `write` puts a (path, text)
+/// pair into the agent's `output_files`, and what becomes of it is the host's
+/// business: the CLI drains that map in `post_eval` and turns each symbol
+/// into a filename, and a browser has no equivalent yet -- which is why a
+/// scene written this way cannot be read back there (#69).
+///
+/// ----------------------------------------------------------------------------
+module {
+
+    /// Ask the host to write `text` under the name `path`.
+    ///
+    /// The path is a symbol rather than a text, and the CLI renders it with
+    /// the backticks removed -- so `` `demand-`size-`dat `` becomes the file
+    /// `demand-size-dat`.
+    public func write(path : Symbol, text : Text) {
+        prim "writeFile" (path, text)
+    };
+
+}

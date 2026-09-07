@@ -1,0 +1,318 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[osf]{XCharter}
+\usepackage{amsmath}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+\usepackage{caption}
+\usepackage[colorlinks,linkcolor=black,citecolor=black,urlcolor=blue]{hyperref}
+\pgfplotsset{compat=1.18}
+
+\pgfplotstableread[col sep=comma]{data/tree-scaling.csv}\treescaling
+\pgfplotstableread[col sep=comma]{data/phases-16.csv}\phases
+\pgfplotstableread[col sep=comma]{data/by-position-16.csv}\bypos
+\pgfplotstableread[col sep=comma]{data/merge-scaling.csv}\mergescaling
+
+\title{Repair cost under a single list edit\\[2pt]
+  \large A measurement of DCG difference for \texttt{mergeSort}}
+\author{Fumola}
+\date{7 September 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+Fumola has no repair algorithm. That is deliberate while the specification for
+expected behaviour is still being written, and it means repair cost cannot be
+measured directly. What can be measured is the difference a small edit makes to
+the demanded computation graph, which bounds what any repair would have to do:
+nodes both runs name and agree on are what a repair gets for free, and
+everything else it must account for. This report samples that difference for
+the two phases of \texttt{mergeSort} under a single list removal. The
+list-into-tree phase is stable --- the number of changed nodes stays near
+constant from $n=16$ to $n=1000$ while the graph grows $62\times$, so the
+changed fraction falls from $0.171$ to $0.0035$. The merge network is not:
+its cost is heavier, far more variable, and tracks how many merge thunks a
+single symbol names.
+\end{abstract}
+
+\section{What is measured}
+
+Two runs are compared, identical but for one removed list cell. Each run is
+reset first, so its history is its own. The comparison is
+\texttt{A.Diff.nodeValsDiff}, which keys nodes by pointer and ignores edge ids
+and meta times because neither affects whether a cached result can be reused.
+It yields four numbers:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textsc{onlyLeft}  & the left run named this node; the right run did not \\
+\textsc{equal}     & both named it and agree on its content \\
+\textsc{notEqual}  & both named it and disagree \\
+\textsc{onlyRight} & the right run named it; the left did not \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Write \emph{changed} for $\textsc{onlyLeft}+\textsc{onlyRight}+\textsc{notEqual}$
+and \emph{diffFraction} for changed over the larger of the two runs' node
+counts. A repair that had to rebuild every changed node and could reuse every
+equal one would do work proportional to \emph{changed}.
+
+This is an upper bound on the useful measurement, not the measurement itself. A
+real repair may touch fewer nodes than differ, and it may touch nodes that do
+not differ in order to discover that they do not. The four numbers say what
+\emph{could} be reused, which is the part the naming decisions control.
+
+\paragraph{Sampling.} Each sample draws a fresh input seed and a fresh removal
+position, both from the seeded generator rather than swept, so no structure of
+a sampling grid can be mistaken for structure in the answer. Removal positions
+fall in $2 \ldots n$: the head is not addressable, because the edit cursor
+starts one cell in (issue \#77).
+
+\section{The list-into-tree phase scales}
+
+\begin{center}
+\pgfplotstabletypeset[
+  col sep=comma,
+  columns={size,n,nodes,changed,frac,fracMedian,fracP90,fracMax,lognOverN,ratio},
+  columns/size/.style={column name=$n$,int detect},
+  columns/n/.style={column name=samples,int detect},
+  columns/nodes/.style={column name=nodes,fixed,precision=0},
+  columns/changed/.style={column name=changed,fixed,precision=1},
+  columns/frac/.style={column name=mean,fixed,precision=4},
+  columns/fracMedian/.style={column name=median,fixed,precision=4},
+  columns/fracP90/.style={column name=p90,fixed,precision=4},
+  columns/fracMax/.style={column name=max,fixed,precision=4},
+  columns/lognOverN/.style={column name=$\log_2 n/n$,fixed,precision=4},
+  columns/ratio/.style={column name=ratio,fixed,precision=2},
+  every head row/.style={before row=\toprule,after row=\midrule},
+  every last row/.style={after row=\bottomrule},
+]{\treescaling}
+\captionof{table}{Repair cost for list-into-tree, by input size. \emph{nodes}
+and \emph{changed} are means; the four \emph{diffFraction} columns summarise its
+distribution; \emph{ratio} is the mean against $\log_2 n / n$.}
+\end{center}
+
+Two things stand out. The changed fraction falls by a factor of $49$ as $n$
+grows $62\times$, and it stays \emph{below} $\log_2 n / n$ at every size, with
+the ratio itself improving from $0.68$ to $0.35$. Figure~\ref{fig:frac} shows
+this against that reference.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{loglogaxis}[
+  width=0.72\textwidth, height=0.5\textwidth,
+  xlabel={input size $n$}, ylabel={diffFraction},
+  log basis x=2, grid=both, grid style={gray!22},
+  legend pos=south west, legend cell align=left,
+  legend style={draw=gray!40,font=\small},
+]
+\addplot[thick,mark=*,mark size=1.7pt] table[x=size,y=frac]{\treescaling};
+\addlegendentry{mean, measured}
+\addplot[thick,mark=triangle*,mark size=2pt,densely dashed]
+  table[x=size,y=fracP90]{\treescaling};
+\addlegendentry{90th percentile}
+\addplot[thick,dotted,mark=none] table[x=size,y=lognOverN]{\treescaling};
+\addlegendentry{$\log_2 n / n$}
+\end{loglogaxis}
+\end{tikzpicture}
+\caption{The changed fraction of the graph, against $\log_2 n/n$. Even the 90th
+percentile stays under the reference from $n=64$ up.}
+\label{fig:frac}
+\end{figure}
+
+The reason is Figure~\ref{fig:changed}: the \emph{absolute} number of changed
+nodes barely moves. It goes from $13.7$ at $n=16$ to $17.5$ at $n=1000$ --- a
+$1.28\times$ increase across a $62\times$ increase in size. \textsc{onlyLeft}
+is exactly $4.00$ at every size measured, and all of the growth is in
+\textsc{notEqual}, which rises from $9.7$ to $13.5$. Divided by $\log_2 n$ the
+count \emph{falls}, from $3.42$ to $1.76$, so over this range the phase is
+behaving better than $O(\log n)$ per edit rather than merely as well.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{semilogxaxis}[
+  width=0.72\textwidth, height=0.44\textwidth,
+  xlabel={input size $n$}, ylabel={nodes},
+  log basis x=2, grid=both, grid style={gray!22},
+  ymin=0, ymax=20,
+  legend pos=north west, legend cell align=left,
+  legend style={draw=gray!40,font=\small},
+]
+\addplot[thick,mark=*,mark size=1.7pt] table[x=size,y=changed]{\treescaling};
+\addlegendentry{changed}
+\addplot[thick,mark=square*,mark size=1.6pt,densely dashed]
+  table[x=size,y=notEqual]{\treescaling};
+\addlegendentry{\textsc{notEqual}}
+\addplot[thick,mark=o,mark size=1.6pt,dotted]
+  table[x=size,y=onlyLeft]{\treescaling};
+\addlegendentry{\textsc{onlyLeft}}
+\end{semilogxaxis}
+\end{tikzpicture}
+\caption{Changed nodes per edit, on a log size axis. Near constant:
+\textsc{onlyLeft} is $4.00$ throughout, and \textsc{onlyRight} is $0$ at every
+sample.}
+\label{fig:changed}
+\end{figure}
+
+\section{The two phases differ}
+
+Both phases can be separated from one pair of runs, because each is built
+inside its own space, and the space is the pointer's prefix. A node of the
+first reads \texttt{inputTree(3-element)}; a node of the second reads
+\texttt{lazyMergeSort(merge-11)(3)}. Table~\ref{tab:phases} compares them at
+$n=16$ over 12 seeds and all 15 addressable positions.
+
+\begin{center}
+\pgfplotstabletypeset[
+  col sep=comma,
+  columns={phase,n,nodes,changed,frac,fracMedian,fracP90,fracMax},
+  columns/phase/.style={string type,column name=phase},
+  columns/n/.style={column name=samples,int detect},
+  columns/nodes/.style={column name=nodes,fixed,precision=1},
+  columns/changed/.style={column name=changed,fixed,precision=1},
+  columns/frac/.style={column name=mean,fixed,precision=3},
+  columns/fracMedian/.style={column name=median,fixed,precision=3},
+  columns/fracP90/.style={column name=p90,fixed,precision=3},
+  columns/fracMax/.style={column name=max,fixed,precision=3},
+  every head row/.style={before row=\toprule,after row=\midrule},
+  every last row/.style={after row=\bottomrule},
+]{\phases}
+\captionof{table}{The three spaces at $n=16$. The merge network is costlier on
+average and much heavier in the tail.}
+\label{tab:phases}
+\end{center}
+
+The averages differ by less than a factor of two, but the tails do not. The
+merge network's 90th percentile is $0.590$ against the tree's $0.274$, and its
+worst case $0.758$ against $0.306$.
+
+\section{Only one of the two phases scales}
+
+Both phases can be sampled together, at the cost of full-demand runs, which is
+why this reaches only $n=100$ where the tree phase alone reaches $n=1000$.
+Sample counts are small --- 40, 30, 20 and 12 --- and the merge network's
+distribution is heavy-tailed, so read Table~\ref{tab:mergescaling} as a trend
+and not as an estimate.
+
+\begin{center}
+\pgfplotstabletypeset[
+  col sep=comma,
+  columns={size,treeChanged,treeFrac,treeRatio,mergeChanged,mergeFrac,mergeP90,mergeRatio},
+  columns/size/.style={column name=$n$,int detect},
+  columns/treeChanged/.style={column name=changed,fixed,precision=1},
+  columns/treeFrac/.style={column name=mean,fixed,precision=4},
+  columns/treeRatio/.style={column name=ratio,fixed,precision=2},
+  columns/mergeChanged/.style={column name=changed,fixed,precision=1},
+  columns/mergeFrac/.style={column name=mean,fixed,precision=4},
+  columns/mergeP90/.style={column name=p90,fixed,precision=4},
+  columns/mergeRatio/.style={column name=ratio,fixed,precision=2},
+  every head row/.style={
+    before row={\toprule & \multicolumn{3}{c}{tree} & \multicolumn{4}{c}{merge network}\\
+      \cmidrule(lr){2-4}\cmidrule(lr){5-8}},
+    after row=\midrule},
+  every last row/.style={after row=\bottomrule},
+]{\mergescaling}
+\captionof{table}{Both phases, from the same runs. \emph{ratio} is the mean
+diffFraction against $\log_2 n/n$. Samples per size: 40, 30, 20, 12.}
+\label{tab:mergescaling}
+\end{center}
+
+The tree phase's ratio improves steadily, $0.74 \to 0.54 \to 0.50 \to 0.41$,
+and its changed count stays near $11$ at every size. The merge network's ratio
+sits near $1$ for the first three sizes --- $1.02$, $0.89$, $1.09$ --- and its
+changed count grows with $n$ rather than staying flat. The drop to $0.47$ at
+$n=100$ comes from twelve samples and should not be read as the trend turning;
+at that sample size an expensive position simply may not have been drawn.
+
+What is solid at every size, because it does not depend on the small samples,
+is the ordering: the merge network changes two to four times as many nodes as
+the tree does, and its 90th percentile runs three to five times the tree's.
+
+\section{What the merge network's names cost}
+
+A merge thunk is currently named for the input-tree node whose stream it is
+built from --- the $S$ in \texttt{merge-}$S$. That makes a symbol's influence
+proportional to how many streams descend from its tree node, which is largest
+at the root. Counting over 12 seeds at $n=16$, a symbol names $5.2$ merge nodes
+on average and as many as $12.8$, against $\log_2 16 = 4$: the maximum is
+$3.2\times$ what an evenly spread naming would give.
+
+Figure~\ref{fig:pos} plots the consequence. Across the 15 positions, the
+correlation between a position's stream-owner count and the merge network's
+diffFraction is $+0.67$.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.86\textwidth, height=0.46\textwidth,
+  xlabel={removed position}, ylabel={diffFraction},
+  ybar=0pt, bar width=5.5pt,
+  xtick=data, grid=major, grid style={gray!22},
+  ymin=0, legend cell align=left,
+  legend style={draw=gray!40,font=\small,at={(0.5,1.04)},anchor=south,legend columns=3},
+]
+\addplot[fill=gray!75,draw=none] table[x=pos,y=mergeFrac]{\bypos};
+\addlegendentry{merge}
+\addplot[fill=gray!30,draw=none] table[x=pos,y=treeFrac]{\bypos};
+\addlegendentry{tree}
+\addplot[sharp plot,thick,mark=*,mark size=1.4pt,color=black,
+  y filter/.expression={y/40}] table[x=pos,y=streamOwner]{\bypos};
+\addlegendentry{stream-owner count ($/40$)}
+\end{axis}
+\end{tikzpicture}
+\caption{Cost by removed position at $n=16$. Positions 3 and 12 are the
+expensive ones; position 3 is the symbol whose level roots every tree over
+positional symbols (issue \#72).}
+\label{fig:pos}
+\end{figure}
+
+Removing cell 3 rebuilds $69.5\%$ of the merge network while changing only
+$27.4\%$ of the tree. Cell 3's symbol has the highest level of the first
+several hundred, so it roots every tree built over positional symbols, and its
+identity propagates into every stream built from it. Two effects compound:
+being a heavy stream owner, and sitting high in the tree. Positions 11 and 16
+own many streams but sit low, and stay cheap at $0.182$ and $0.183$ --- which
+is why the correlation is $0.67$ and not higher.
+
+This supports a renaming already proposed: name each merge thunk for the
+\emph{pair of input cells whose comparison produced it}, rather than for the
+tree node the stream came from. Under that scheme the root symbol should name
+$O(\log n)$ nodes like any other. This report does not test that scheme, which
+is not implemented; it measures the one that is, and finds the concentration
+the proposal predicts.
+
+\section{Limits}
+
+\begin{itemize}\itemsep2pt
+\item \textbf{No repair algorithm exists}, so nothing here measures repair. It
+  measures what a repair could reuse. A repair that walks nodes to discover
+  they are unchanged pays costs this does not capture.
+\item \textbf{One edit shape.} Only removal, and only one cell at a time.
+  Insertion and replacement are not sampled, and neither are edit
+  \emph{sequences} --- $K$ successive edits, where reuse across edits is the
+  thing that matters.
+\item \textbf{The head is not addressable}, so position 1 is absent from every
+  sample (issue \#77).
+\item \textbf{Merge-network scaling is under-powered.} It reaches only
+  $n=100$, on 40, 30, 20 and 12 samples, because it needs full-demand runs
+  where the tree phase alone can skip layout. The ordering between the phases
+  is solid at every size; the shape of the merge network's scaling curve is
+  not established by this data.
+\item \textbf{Positional symbols throughout.} Every input here is keyed
+  $1 \ldots n$, which is one fixed realisation of the level function rather
+  than a sample of them (issue \#72). Entropy-carrying symbols would change
+  which positions are expensive, though not that some are.
+\end{itemize}
+
+\end{document}

@@ -1,24 +1,29 @@
+import A "../system/adapton";
+
 //
-// test code for delayed puts.
+// Delayed puts: a put inside `do within time` takes effect when the block
+// for that time ends, not where it is written.
 //
-// The assert statements ensure the expected behavior:
-// The while loop runs exactly one iteration,
-// then it exits the loop, as the delayed
-// put takes effect when the block for time `t ends.
+// The assertions are the specification. The loop runs exactly one iteration:
+// inside the block the cell still reads null, and by the time control leaves
+// the block it holds the value, so the loop condition fails and it exits.
 //
 module {
+  #[test]
   public func go() {
-    let start = (prim "adaptonNow") ();
+    let start = A.now();
     let cell = 0 := null;
-    while ((@ cell) == null) { 
-      do within time `t { 
-        assert ((prim "adaptonNow" ()) == (prim "adaptonTime" `t));
+    while ((@ cell) == null) {
+      do within time `t {
+        assert (A.now() == A.time(`t));
         assert ((@ cell) == null);
         (cell, start) := ?1;
+        // Still null here: the put is delayed to the end of the block.
         assert ((@ cell) == null)
       };
+      // And in effect here.
       assert ((@ cell) == ?1);
-      assert ((prim "adaptonNow" ()) == start);
+      assert (A.now() == start);
     };
     assert ((@ cell) == ?1)
   }

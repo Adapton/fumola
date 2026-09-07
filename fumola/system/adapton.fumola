@@ -1,4 +1,5 @@
-import Map "hashMap";
+import Map "../collections/hashMap";
+import Prim "prim";
 
 /// Adapton's structures represented within Fumola.
 ///
@@ -225,15 +226,36 @@ module {
         prim "adaptonReset" ();
     };
 
+    /// What the runtime knows about the cell `p` points at, without
+    /// recording that anything looked.
+    public func peekCell(p : Pointer) : ?PeekInfo.NodeInfo {
+        prim "adaptonPeekCell" p
+    };
+
+    /// The same, for the symbol that names the cell.
+    ///
+    /// (The parameter is annotated `Pointer` and is in fact a `Symbol`, since
+    /// `pointer` is applied to it. Worth correcting; left alone here so that
+    /// this change is only about where the primitives live.)
     public func peekInfo(p : Pointer) : ?PeekInfo.NodeInfo {
-        let p = prim "adaptonPointer" p;
-        prim "adaptonPeekCell" p;
+        peekCell(pointer(p))
+    };
+
+    /// Write `value` into the cell `p` points at without recording it: no
+    /// dependency, and no edge in the graph.
+    ///
+    /// The counterpart of `peekCell`. Where `:=` is the archivist's write,
+    /// recorded like any other, this is the editor's -- how a layer outside a
+    /// computation keeps a tally of what it saw without becoming part of what
+    /// it is counting.
+    public func poke(p : Pointer, value : Any) {
+        prim "adaptonPoke" (p, value)
     };
 
     #[test]
     func testPeekInfo() {
         let p = 1 := 1;
-        prim "print" (debug_show (peekInfo(p)))
+        Prim.print (debug_show (peekInfo(p)))
 
         // TO DO
     };
@@ -274,6 +296,13 @@ module {
 
     public func space(s : Symbol) : Space {
         prim "adaptonSpace" s
+    };
+
+    /// The time that the symbol `s` names.
+    ///
+    /// The counterpart of `space`, which was here without it.
+    public func time(s : Symbol) : Time {
+        prim "adaptonTime" s
     };
 
     /// The pointer that the symbol `s` names, whether or not anything has
@@ -423,10 +452,10 @@ module {
       
         // set to true when this test fails to see the correct output
         if false {
-            prim "print" (evs.size());
+            Prim.print (evs.size());
             var count = 0;
             for (ev in evs.vals()) {
-                prim "print" (debug_show (count, ev));
+                Prim.print (debug_show (count, ev));
                 count += 1;
             }
         };

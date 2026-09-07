@@ -1,0 +1,112 @@
+/// Every primitive the runtime has, in one place.
+///
+///    This module is an index, not a layer. Each function here stands for one
+/// `prim "..."` under the primitive's own name, so that the whole surface the
+/// runtime exposes can be read in one file, in Fumola.
+///
+///    The modules that own these operations do not go through this one. The
+/// adapton primitives belong to `system/adapton`, the hash map primitives to
+/// `collections/hashMap`, and each of those calls its primitives directly and
+/// offers them under shorter names -- `Adapton.peek`, `HashMap.get`,
+/// `Files.write` -- because the module name already says which domain they
+/// are in. Reach for a domain module in ordinary code; reach for this one to
+/// find out what exists.
+///
+///    `print` and `symbolLevel` are the exceptions, and are defined here
+/// rather than merely indexed, because no other module is their proper home
+/// yet. A primitive whose home is written later should move out.
+///
+///    Arguments are passed through untyped: a primitive taking several takes
+/// a tuple, and this file is for reading rather than for type checking. See
+/// the owning module for a typed signature.
+///
+/// ----------------------------------------------------------------------------
+module {
+
+    //
+    // Defined here, for want of a better home.
+    //
+
+    /// Write `x` where the host shows output.
+    ///
+    /// The CLI puts it on stdout; the web playground collects it in a panel.
+    /// `prim "print"` is `DebugPrint` in the runtime, and its lines
+    /// accumulate in the agent's `debug_print_out` until a host drains them.
+    public func print(x) { prim "print" x };
+
+    /// The level a symbol hashes to.
+    ///
+    /// A level tree uses this to decide its shape, which is why it exists,
+    /// but nothing about it is specific to level trees or to adapton. The
+    /// hash is taken over the symbol's source rendering so that it does not
+    /// depend on the target's pointer width; it did once, and a level tree
+    /// took a different shape under wasm32 than natively (#59).
+    public func symbolLevel(s) { prim "symbolLevel" s };
+
+    /// The hash of a symbol.
+    public func symbolHash(s) { prim "symbolHash" s };
+
+    /// A Nat as text.
+    public func natToText(n) { prim "natToText" n };
+
+    /// A value as Rust's `{:?}` renders it. For looking at the runtime's own
+    /// representation rather than at Fumola's.
+    public func rustDebugText(x) { prim "rustDebugText" x };
+
+    //
+    // Reflection: a program's own text and state, as values.
+    //
+
+    public func reifyValue(x) { prim "reifyValue" x };
+    public func reflectValue(x) { prim "reflectValue" x };
+    public func reifyCore(x) { prim "reifyCore" x };
+    public func reflectCore(x) { prim "reflectCore" x };
+
+    //
+    // Adapton. Owned by `system/adapton`, which offers each under a shorter
+    // name; these are here so the set is visible.
+    //
+
+    public func adaptonReset(x) { prim "adaptonReset" x };
+    public func adaptonNow(x) { prim "adaptonNow" x };
+    public func adaptonHere(x) { prim "adaptonHere" x };
+    public func adaptonSpace(s) { prim "adaptonSpace" s };
+    public func adaptonTime(s) { prim "adaptonTime" s };
+    public func adaptonPointer(s) { prim "adaptonPointer" s };
+    public func adaptonPeek(p) { prim "adaptonPeek" p };
+    public func adaptonPoke(x) { prim "adaptonPoke" x };
+    public func adaptonPeekCell(p) { prim "adaptonPeekCell" p };
+    public func adaptonPeekHistory(x) { prim "adaptonPeekHistory" x };
+    public func adaptonScratch(t) { prim "adaptonScratch" t };
+
+    //
+    // Hash maps. Owned by `collections/hashMap`.
+    //
+
+    public func hashMapNew(x) { prim "hashMapNew" x };
+    public func hashMapGet(x) { prim "hashMapGet" x };
+    public func hashMapPut(x) { prim "hashMapPut" x };
+    public func hashMapRemove(x) { prim "hashMapRemove" x };
+
+    //
+    // Random iteration. Owned by `collections/randomInput`.
+    //
+
+    public func fastRandIterNew(x) { prim "fastRandIterNew" x };
+    public func fastRandIterNext(i) { prim "fastRandIterNext" i };
+
+    //
+    // Files. Owned by `system/files`.
+    //
+
+    public func writeFile(x) { prim "writeFile" x };
+
+    //
+    // NOT LISTED, because the runtime does not have it: `arrayPopBack`.
+    // `collections/array` wraps it and `List.Edit.previous` calls it, but
+    // `prim "arrayPopBack"` answers UnrecognizedPrim -- the use documents a
+    // primitive that is wanted and not yet implemented. It joins the list
+    // above when it exists.
+    //
+
+}

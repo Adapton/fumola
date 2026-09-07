@@ -1,6 +1,7 @@
 import Counters "Counters";
-import A "adapton";
-import W "webPlay";
+import A "../system/adapton";
+import W "../system/webPlay";
+import Prim "../system/prim";
 
 module {
 
@@ -108,7 +109,7 @@ module {
     assert out[0].1!.textFields == "(unforced)";
     let _ = takeN_(s, 3);
     let out = sceneObjectsMergeSortStream(s, A.Scene.zero, {x=0.0;y=0.0;z=1.0});
-    prim "print" (debug_show out);
+    Prim.print (debug_show out);
     assert out.size() == 5;
     assert out[4].1!.textFields == "null";
   };

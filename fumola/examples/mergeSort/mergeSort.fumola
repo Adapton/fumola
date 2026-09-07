@@ -1,9 +1,11 @@
-import Seq "levelTree";
-import LazyList "LazyList";
-import List "List";
-import A "adapton";
-import R "randomInput";
-import W "webPlay";
+import Seq "../../collections/levelTree";
+import LazyList "../../collections/LazyList";
+import List "../../collections/List";
+import A "../../system/adapton";
+import R "../../collections/randomInput";
+import W "../../system/webPlay";
+import Prim "../../system/prim";
+import Files "../../system/files";
 
 module {
     public func report( outputs ) {
@@ -11,10 +13,10 @@ module {
         // For now, just report about the
         // comparison counts and the related input trees' depths.
         //
-        prim "print" "";
-        prim "print" "## SeqTree input metrics";
+        Prim.print "";
+        Prim.print "## SeqTree input metrics";
         for (run in (outputs[0].1).vals()) {
-            prim "print" {
+            Prim.print {
                 _A_size = run.size;
                 _B_depth = run.inputSeqMetrics.depth;
                 _C_comparisonCount = run.counts.comparisonCount;
@@ -156,7 +158,7 @@ module {
         };
         if (false) {
             let outlineText = A.IntoText.outlines(outline);
-            prim "writeFile" (`mergeSort
+            Files.write (`mergeSort
                             -`FullDemand
                             -`seed-seed
                             -`size-size
@@ -165,7 +167,7 @@ module {
         // this step (generating JSON Text) takes about half of the runtime.
         if (true) {
             let sceneText = A.IntoJSON.fromScene(sceneData);
-            prim "writeFile" (`mergeSort
+            Files.write (`mergeSort
                             -`FullDemand
                             -`seed-seed
                             -`size-size
@@ -185,18 +187,17 @@ module {
     /// parts belong in space, and those are the two things returned.
     #[example]
     public func exampleMergeSort() : W.ExampleOutput {
-        let s = generateSceneFullDemand(10, 10, null).sceneData;
-        // Objects only. The outline component is left empty here, which is a
-        // choice rather than an omission: what this example is for is the
-        // shape of the merge network in space.
-        W.sceneOfObjects(s.objects)
+        // `sceneData` is already this shape: a record with `objects` and
+        // `outline`, and a `history` beside them that a scene simply
+        // ignores. With no tag to add, there is nothing to convert.
+        generateSceneFullDemand(10, 23, null).sceneData
     };
 
     #[test]
     public func testGenerateSceneFullDemand() {
         let scene = generateSceneFullDemand(10, 10, null).sceneData;
         // set to true when this test fails to see the new values and compare.
-        if true { prim "print" (debug_show ({
+        if true { Prim.print (debug_show ({
             _0_eventsSize = scene.history.events.size();
             _1_nodesSize = scene.history.nodes.size();
             _2_edgesSize = scene.history.edges.size();
@@ -238,7 +239,7 @@ module {
             equal = diff.equal.size();
             notEqual = diff.notEqual.size();
         };
-        prim "print" sizes;
+        Prim.print sizes;
         // Also downstream of `prim "symbolLevel"`; portable since that hash
         // stopped depending on the target's pointer width.
         assert (sizes == {
@@ -322,7 +323,7 @@ module {
         let dcg = dcg(seed, size, demand);
         let outline = [ A.Outline.outline(dcg.sorted) ];
         let text = A.IntoText.outlines(outline);
-        prim "writeFile" (`demand-demandSym(demand)-`size-size-`seed-seed-`DCG-`txt, text); 
+        Files.write (`demand-demandSym(demand)-`size-size-`seed-seed-`DCG-`txt, text); 
     };
 
     #[test]
@@ -407,7 +408,7 @@ module {
                            // [200,250,300,350,400,450],[500,750],
                            // [1000],[1500],[2000],[2500],[5000]
                        ].vals()) {
-                prim "print" { demand ; sizes };
+                Prim.print { demand ; sizes };
                 for (size in sizes.vals()) {
                     if (size <= 33) {
                         writeDcgText(R.defaultSeed, size, demand)
@@ -441,9 +442,9 @@ module {
                comparisonCounts #= ((debug_show out.counts.comparisonCount) # "\n");
             };
             let demand = demandSym(demand);
-            prim "writeFile" (`demand-demand-`size-`dat, sizes);
-            prim "writeFile" (`demand-demand-`depth-`dat, depths);
-            prim "writeFile" (`demand-demand-`comparisonCount-`dat, comparisonCounts);
+            Files.write (`demand-demand-`size-`dat, sizes);
+            Files.write (`demand-demand-`depth-`dat, depths);
+            Files.write (`demand-demand-`comparisonCount-`dat, comparisonCounts);
         };
 
         report(outputs);
