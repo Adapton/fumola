@@ -40,7 +40,7 @@ module {
     /// empty `objects` says about objects -- one convention rather than two.
     public type SceneComponents = {
         objects : [ A.Scene.SceneObject ];
-        outline : [ A.Outline.Outline ];
+        outline : A.Outline.Outlines;
     };
 
     /// What an `#[example]` returns.
@@ -75,9 +75,7 @@ module {
     /// The case that needs no decisions: each force begun from outside any
     /// other is the root of its own tree, and all of them are offered.
     public func sceneOfForces() : ExampleOutput {
-        var trees = [];
-        for (po in A.Outline.outlines().vals()) { trees #= [ po.1 ] };
-        sceneOfOutline(trees)
+        sceneOfOutline(A.Outline.outlines())
     };
 
     /// An example's components, plus the history the runtime kept: an
