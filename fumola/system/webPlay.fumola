@@ -30,16 +30,17 @@ module {
 
     /// The components of a scene that a program supplies for itself.
     ///
-    /// These are `A.Scene.Scene` minus its history, and they conform to it:
-    /// `objects` is its array of `SceneObject`, `outline` is its
-    /// `Outline.Outline`. The one addition is that the outline is optional,
-    /// which is the shape adapton already uses for an outline that may be
-    /// absent (`Outline.OutlineEdge.outline`). An empty array and a null
-    /// outline each mean the same thing -- a component this example did not
-    /// offer -- and the playground has nothing to show in that panel.
+    /// `objects` is `A.Scene.Scene`'s own array of `SceneObject`.
+    ///
+    /// `outline` is a forest: zero or more outline trees, in the order the
+    /// provider chose. A session has one force tree per force begun from
+    /// outside any other, so one tree is the special case rather than the
+    /// rule, and an example that wants to show two need not choose between
+    /// them. `[]` says this example offered no outline, which is what an
+    /// empty `objects` says about objects -- one convention rather than two.
     public type SceneComponents = {
         objects : [ A.Scene.SceneObject ];
-        outline : ?A.Outline.Outline;
+        outline : [ A.Outline.Outline ];
     };
 
     /// What an `#[example]` returns.
@@ -51,25 +52,42 @@ module {
 
     /// Both components.
     public func scene(objects, outline) : ExampleOutput {
-        #scene { objects ; outline = ?outline }
+        #scene { objects ; outline }
     };
 
     /// Objects, and no outline.
     public func sceneOfObjects(objects) : ExampleOutput {
-        #scene { objects ; outline = null }
+        #scene { objects ; outline = [] }
     };
 
-    /// An outline, and no objects.
+    /// Outlines, and no objects.
     public func sceneOfOutline(outline) : ExampleOutput {
-        #scene { objects = [] ; outline = ?outline }
+        #scene { objects = [] ; outline }
+    };
+
+    /// One tree, for the common case of portraying a single force.
+    public func sceneOfOneOutline(outline) : ExampleOutput {
+        sceneOfOutline([ outline ])
+    };
+
+    /// Every top-level force in the session, outlined, in the order forced.
+    ///
+    /// The case that needs no decisions: each force begun from outside any
+    /// other is the root of its own tree, and all of them are offered.
+    public func sceneOfForces() : ExampleOutput {
+        var trees = [];
+        for (po in A.Outline.outlines().vals()) { trees #= [ po.1 ] };
+        sceneOfOutline(trees)
     };
 
     /// An example's components, plus the history the runtime kept: an
     /// `A.Scene.Scene`, exactly as that type stands.
     ///
-    /// Optional because a Scene requires an outline and an example need not
-    /// have offered one; an example of objects alone is not a Scene, and
-    /// saying so is better than inventing an outline for it.
+    /// Optional, and only for a forest of exactly one tree, because that is
+    /// what `A.Scene.Scene` can hold: it carries a single outline. An example
+    /// offering none is not a Scene, and one offering several is more than a
+    /// Scene; saying so is better than dropping trees quietly or inventing a
+    /// root to join them under. Reconciling the two shapes is #66.
     ///
     /// Call this from outside the example, after it has run, so the history
     /// is the one the example produced. An example that lays itself out
@@ -78,12 +96,11 @@ module {
     public func withHistory(e : ExampleOutput) : ?A.Scene.Scene {
         switch e {
             case (#scene(s)) {
-                switch (s.outline) {
-                    case (?outline) {
-                        ?{ outline ; objects = s.objects ; history = A.peekHistory() }
-                    };
-                    case null { null };
-                }
+                if (s.outline.size() == 1) {
+                    ?{ outline = s.outline[0] ;
+                       objects = s.objects ;
+                       history = A.peekHistory() }
+                } else { null }
             }
         }
     };

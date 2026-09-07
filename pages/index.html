@@ -78,6 +78,26 @@
         color: var(--fg);
       }
 
+      /* The repository, directly under the tagline: someone who wants the
+         code should not have to read to the end of the page to find it. */
+      .masthead-repo {
+        margin: 1.1rem 0 0;
+        font-size: 0.95rem;
+        color: var(--dim);
+      }
+      .masthead-repo a {
+        display: inline-block;
+        padding: 0.3rem 0.6rem;
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        font-family: var(--mono);
+        font-size: 0.88rem;
+        color: var(--var);
+        text-decoration: none;
+      }
+      .masthead-repo a:hover { border-color: #3a3a40; background: var(--panel); }
+      .masthead-repo .what { margin-left: 0.6rem; }
+
       .masthead-note {
         margin: 1.6rem 0 0;
         padding-left: 0.9rem;
@@ -311,6 +331,10 @@
           <strong>Adapton</strong>: a program's run leaves behind a graph of
           what it named, read and demanded, and that graph is what the next run
           reuses.
+        </p>
+        <p class="masthead-repo">
+          <a href="https://github.com/Adapton/fumola">github.com/Adapton/fumola</a>
+          <span class="what">the source, the Fumola library, and the issues</span>
         </p>
         <p class="masthead-note">
           This host also serves the Fumola runtime compiled to WebAssembly
