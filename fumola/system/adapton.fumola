@@ -276,6 +276,13 @@ module {
         prim "adaptonSpace" s
     };
 
+    /// The time that the symbol `s` names.
+    ///
+    /// The counterpart of `space`, which was here without it.
+    public func time(s : Symbol) : Time {
+        prim "adaptonTime" s
+    };
+
     /// The pointer that the symbol `s` names, whether or not anything has
     /// been written there.
     public func pointer(s : Symbol) : Pointer {
