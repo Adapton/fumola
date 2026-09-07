@@ -87,12 +87,6 @@ module {
   };
 
 
-  /// A three-element list, and how to look at it.
-  ///
-  /// Derived from `testFromIter` and `testSceneObjects`: the same list, built
-  /// inside a thunk so that forcing it leaves a force tree worth outlining.
-  /// Both components are offered. The layout runs in a scratch, so the
-  /// history stays the list's rather than the drawing's.
   /// The same as `exampleList`, over symbols that carry entropy.
   ///
   /// A list's shape does not depend on its symbols, so this changes nothing
@@ -109,6 +103,12 @@ module {
     })
   };
 
+  /// A three-element list, and how to look at it.
+  ///
+  /// Derived from `testFromIter` and `testSceneObjects`: the same list, built
+  /// inside a thunk so that forcing it leaves a force tree worth outlining.
+  /// Both components are offered. The layout runs in a scratch, so the
+  /// history stays the list's rather than the drawing's.
   #[example]
   public func exampleList() : W.ExampleOutput {
     let build = `buildList := thunk { fromIter([(1,1), (2,2), (3,3)].vals()) };
