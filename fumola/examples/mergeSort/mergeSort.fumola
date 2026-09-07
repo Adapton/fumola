@@ -248,14 +248,23 @@ module {
     /// Removing the cell that roots the tree: the expensive case.
     #[examplePair]
     public func examplePairMergeSortRootCell() : W.ExamplePairOutput {
-        pairAfterRemoving(10, 16, 3)
+        let seed = 10;
+        let size = 16;
+        // The cell whose symbol roots the input tree, at this size.
+        let removed = 3;
+        pairAfterRemoving(seed, size, removed)
     };
 
     /// Removing an ordinary cell, for contrast. Same program, same size, same
     /// seed; only the name that goes is different, and that is the point.
     #[examplePair]
     public func examplePairMergeSortTypicalCell() : W.ExamplePairOutput {
-        pairAfterRemoving(10, 16, 13)
+        let seed = 10;
+        let size = 16;
+        // An ordinary cell, for contrast. Change this one and the other
+        // example's `removed` to compare any two edits.
+        let removed = 13;
+        pairAfterRemoving(seed, size, removed)
     };
 
     public func dcgDiffRemove(seed : Nat, size : Nat, removeSymbol : Symbol) {

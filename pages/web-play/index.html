@@ -449,13 +449,21 @@
       }
       .run-here:hover { color: var(--var); border-bottom-color: var(--var); }
       .run-here[aria-current="true"] { color: var(--var); background: #2a1c29; }
+      /* The link most often wanted while reading, so it is the one that
+         looks clickable: a brighter outline and the foreground colour,
+         against the dim border it used to share with every rule on the
+         page. */
       .body-here {
         font: inherit; font-size: 0.85em; font-style: normal;
-        color: var(--dim); background: none; cursor: pointer;
-        border: 1px solid var(--rule); border-radius: 2px;
+        color: var(--fg); background: none; cursor: pointer;
+        border: 1px solid var(--green); border-radius: 2px;
         padding: 0 0.3em; margin-left: 0.5em;
+        opacity: 0.85;
       }
-      .body-here:hover { color: var(--var); border-color: #3a3a40; }
+      .body-here:hover {
+        color: var(--bg); background: var(--green);
+        border-color: var(--green); opacity: 1;
+      }
 
       .source .empty { padding: 0.9rem; color: var(--dim); font: italic 0.85rem/1.5 var(--ui); }
 
@@ -1151,10 +1159,20 @@
               name: (t.scope ? t.scope + "." : "") + t.name,
               title: call.split("\n")[1],
               pick: (b) => {
-                // Both halves: run it, and open its module at the marker, so
-                // the test can be read as well as run.
+                // Both halves: open its module at the marker, so it can be
+                // read, and put it in the editor so it can be run.
+                //
+                // The body rather than the call. A call is a name and a pair
+                // of brackets: it runs, and there is almost nothing in it to
+                // change. The body shows the arguments and the shape of the
+                // work, which is what someone who clicked an example wants to
+                // see and to edit. The landing view has always opened on a
+                // body for that reason; this makes the library agree with it.
+                //
+                // `showModule` first: it sets the source the body is cut from.
                 showModule(path, b, t);
-                loadTest(path, t);
+                if (t.body) loadTestBody(path, t);
+                else loadTest(path, t);
               },
             });
           }

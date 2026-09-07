@@ -864,8 +864,14 @@ module {
   /// changed 27% of the tree's nodes where a typical position changed 11-16%.
   #[examplePair]
   public func examplePairTreeAfterRemoval() : W.ExamplePairOutput {
-    W.pair(treeFromListRun(10, 16, null),
-           treeFromListRun(10, 16, ?3))
+    // Bound rather than repeated, so the body can be edited in one place.
+    // Opening an example puts this text in the editor, and `size` written
+    // twice is a size that gets changed once and then disagrees with itself.
+    let seed = 10;
+    let size = 16;
+    let removed = 3;
+    W.pair(treeFromListRun(seed, size, null),
+           treeFromListRun(seed, size, ?removed))
   };
 
   #[test]
