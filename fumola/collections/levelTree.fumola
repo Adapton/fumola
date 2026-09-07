@@ -618,7 +618,7 @@ module {
     A.scratch(thunk {
       W.scene(
         Scene.sceneObjects(tree!, A.Scene.zero),
-        A.Outline.outline(buildTree)
+        [ A.Outline.outline(buildTree) ]
       )
     })
   };

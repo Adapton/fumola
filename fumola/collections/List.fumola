@@ -98,7 +98,7 @@ module {
       // `sceneObjectsFromThunk` rather than `sceneObjects`: the subject here
       // is the thunk that built the list, which is also what the outline
       // grows from, so both components describe the same root.
-      W.scene(sceneObjectsFromThunk(build, A.Scene.zero), A.Outline.outline(build))
+      W.scene(sceneObjectsFromThunk(build, A.Scene.zero), [ A.Outline.outline(build) ])
     })
   };
 

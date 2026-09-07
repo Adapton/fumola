@@ -193,6 +193,15 @@
       #outline-body .action-put, #outline-body .action-putForce { color: var(--green); }
       #outline-body .action-get { color: var(--blue); }
       #outline-body .result-arrow { color: var(--pink); }
+      /* Between the trees of a forest, so several read as several. */
+      .forest-rule {
+        margin: 0.7rem 0 0.2rem;
+        padding-top: 0.4rem;
+        border-top: 1px solid var(--rule);
+        font: 400 0.72rem/1.4 var(--mono);
+        letter-spacing: 0.06em;
+        color: var(--dim);
+      }
 
       /* The objects, drawn. Fills the panel; the canvas is sized to it. */
       #objects-panel { display: none; }
@@ -1337,7 +1346,7 @@
         "\n" +
         "#scene {\n" +
         "  objects : [ Adapton.Scene.SceneObject ];\n" +
-        "  outline : ? Adapton.Outline.Outline;\n" +
+        "  outline : [ Adapton.Outline.Outline ];\n" +
         "}";
 
       const sceneOf = (reply) =>
@@ -1730,13 +1739,27 @@
           host.hidden = true;
           disposeScene();
         }
-        const someOutline = outline && outline.tag !== "Null" ? vSome(outline) : null;
+        // A forest, in the order the provider chose. Empty says this example
+        // offered none, which is what an empty `objects` says about objects.
+        const forest = outline ? vArr(outline) : [];
         fillScenePanel(
           "outline",
           outline,
-          someOutline ? 1 : 0,
+          forest.length,
           "No outline. A program offers one by evaluating to:",
-          someOutline ? (body) => drawOutline(body, someOutline, 0) : null
+          forest.length
+            ? (body) => {
+                forest.forEach((tree, i) => {
+                  if (i > 0) {
+                    const rule = document.createElement("div");
+                    rule.className = "forest-rule";
+                    rule.textContent = `tree ${i + 1} of ${forest.length}`;
+                    body.appendChild(rule);
+                  }
+                  drawOutline(body, tree, 0);
+                });
+              }
+            : null
         );
       };
 

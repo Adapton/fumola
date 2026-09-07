@@ -159,7 +159,7 @@ module {
     A.scratch(thunk {
       W.scene(
         sceneObjectsMergeSortStream(p1, A.Scene.zero, A.Scene.zero),
-        A.Outline.outline(p1)
+        [ A.Outline.outline(p1) ]
       )
     })
   };
