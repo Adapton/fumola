@@ -149,19 +149,22 @@ module {
   /// Derived from `testTakeN_`: the same three thunks, and the same walk over
   /// them. Taking from a lazy list forces it one cell at a time, so the
   /// outline is the shape of that demand -- which is the thing about a lazy
-  /// list worth seeing. `sceneObjectsMergeSortStream` places the cells.
+  /// list worth seeing.
+  ///
+  ///    An outline and no objects, deliberately. The only layout function for
+  /// a lazy stream is `sceneObjectsMergeSortStream`, and it is for a stream
+  /// that is merging: it displaces each cell by an offset meant to separate
+  /// the parts of a merge. This list merges nothing, so there is no offset
+  /// that would mean anything, and passing `zero` puts every cell at the
+  /// origin on top of the others. Offering no objects is the honest answer
+  /// until a lazy list has a layout of its own.
   #[example]
   public func exampleLazyList() : W.ExampleOutput {
     let p3 = `p3 := thunk { null };
     let p2 = `p2 := thunk { ?{symbol=2; element=2; next=p3}};
     let p1 = `p1 := thunk { ?{symbol=1; element=1; next=p2}};
     let _ = takeN_(p1, 7);
-    A.scratch(thunk {
-      W.scene(
-        sceneObjectsMergeSortStream(p1, A.Scene.zero, A.Scene.zero),
-        [ A.Outline.outline(p1) ]
-      )
-    })
+    A.scratch(thunk { W.sceneOfOneOutline(A.Outline.outline(p1)) })
   };
 
   #[test]
