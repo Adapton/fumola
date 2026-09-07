@@ -138,11 +138,18 @@ a single outline (§11.4).
 | Example | objects | outline trees | derived from |
 | --- | --- | --- | --- |
 | `List.exampleList` | 7 | 1 | `testFromIter`, `testSceneObjects` |
-| `LazyList.exampleLazyList` | 4 | 1 | `testTakeN_`, `sceneObjectsMergeSortStream` |
+| `LazyList.exampleLazyList` | 0 | 1 | `testTakeN_` |
 | `levelTree.Scene.exampleLevelTree` | 37 | 1 | `testGeom2d` |
 | `mergeSort.exampleMergeSort` | 279 | 0 | `generateSceneFullDemand` |
 
-`exampleMergeSort` supplies no outline, and is retained as a test of the optional case.
+`exampleMergeSort` supplies no outline and `exampleLazyList` no objects, so both halves of the
+optional case are exercised by real examples.
+
+`exampleLazyList` offers no objects for a reason worth recording: the only layout function for
+a lazy stream is `sceneObjectsMergeSortStream`, whose third argument displaces each cell by an
+offset meant to separate the parts of a merge. A list that merges nothing has no meaningful
+offset, and passing zero places every cell at the origin. Offering no objects is correct until
+a lazy list has a layout of its own.
 
 ---
 
