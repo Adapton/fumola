@@ -5,7 +5,7 @@
 # Why this is a script and not steps in wasm-pages.yml: this is the mechanism
 # by which the runtime reaches every browser that loads it, including Hazel's
 # livelits, and a workflow can only be tested by deploying. Here it can be run
-# against a scratch directory (see test/assemble-site.test.sh) before it ever
+# against a scratch directory (see tools/assemble-site.test.sh) before it ever
 # publishes anything.
 #
 # See Adapton/fumola#69. In short: Pages stamps `Cache-Control: max-age=600` on
