@@ -589,7 +589,14 @@
       // This page owns the runtime, so a fixed id is enough.
       const REPL_INSTANCE = 1;
 
-      const START = "`n := 21;\nforce(`double := thunk { get(`n) * 2 })";
+      // What the page opens on. A scene rather than a two-line program:
+      // the objects panel is the thing here that a description cannot
+      // substitute for, and arriving at a drawn merge-sort network says more
+      // about what this is for than anything written above it would. The
+      // homepage's console keeps the two-line program, where the point is
+      // that a runtime is running at all.
+      const START =
+        'import M "fumola/examples/mergeSort/mergeSort";\nM.exampleMergeSort()';
 
       // ---- highlighting -------------------------------------------------
       // The kinds come from the language's own lexer, so there is no grammar
@@ -1334,26 +1341,30 @@
       /// What a program says about how to look at it.
       ///
       /// A scene is not extracted from a program; a program offers one, by
-      /// evaluating to `#scene`. Seeing that come back from the editor is the
-      /// whole trigger -- nothing reads the code, and nothing guesses. An
-      /// `#[example]` is how a library function opts into producing one.
+      /// evaluating to a record with these two fields. Seeing that come back
+      /// from the editor is the whole trigger -- nothing reads the code, and
+      /// nothing guesses. An `#[example]` is how a library function opts into
+      /// producing one.
       ///
-      /// The two components are `A.Scene.Scene`'s own, minus its history:
-      /// an array of objects placed in space, and an optional outline. Either
-      /// may be left out, and left out means the author did not offer it.
+      /// Recognised by its fields rather than by a tag around them, so that
+      /// code already holding the right shape is a scene without being
+      /// converted into one. `A.Scene.Scene` is such a record, with a
+      /// `history` beside them that a scene ignores.
       const SCENE_SCHEMA =
         'import W "fumola/system/webPlay";\n' +
         "\n" +
-        "#scene {\n" +
+        "{\n" +
         "  objects : [ Adapton.Scene.SceneObject ];\n" +
         "  outline : [ Adapton.Outline.Outline ];\n" +
         "}";
 
-      const sceneOf = (reply) =>
-        reply.ok && reply.tag === "Variant" && reply.value &&
-        reply.value.name === "scene" && reply.value.value
-          ? reply.value.value
+      const sceneOf = (reply) => {
+        if (!reply.ok || reply.tag !== "Record") return null;
+        const fields = reply.value || {};
+        return fields.objects !== undefined && fields.outline !== undefined
+          ? reply
           : null;
+      };
 
       const fillScenePanel = (name, component, count, lead, draw) => {
         const body = $(name + "-body");
@@ -1787,7 +1798,10 @@
         const hint = document.createElement("div");
         hint.className = "hint";
         hint.textContent =
-          `${shapes.length} objects, ${links.length} pointers` +
+          // "shapes" rather than "objects": the objects array holds all
+          // three kinds, and the output panel reports its total, so calling
+          // the boxes and orbs "objects" here reads as a contradiction.
+          `${shapes.length} shapes, ${links.length} pointers` +
           (actions.length ? `, ${actions.length} actions` : "") +
           " · drag to orbit, scroll to zoom";
         host.appendChild(hint);
@@ -2034,6 +2048,35 @@
           markLine(0);
           showHush(false);
           showScene(reply);
+          // A scene is shown in its panels, so the output panel says what
+          // arrived rather than printing it. `A.Scene.Scene` carries the
+          // whole history beside the components, and rendering that fills
+          // the panel with thousands of events nobody asked to read.
+          const scene = sceneOf(reply);
+          if (scene) {
+            const f = scene.value || {};
+            const objects = Array.isArray(f.objects && f.objects.value)
+              ? f.objects.value.length : 0;
+            const trees = Array.isArray(f.outline && f.outline.value)
+              ? f.outline.value.length : 0;
+            const events =
+              f.history && f.history.value && f.history.value.events &&
+              Array.isArray(f.history.value.events.value)
+                ? f.history.value.events.value.length : null;
+            outEl.classList.remove("stale");
+            outEl.textContent = "";
+            const tag = document.createElement("span");
+            tag.className = "tag";
+            tag.textContent = "Scene  ";
+            const body = document.createElement("span");
+            body.textContent =
+              `${objects} objects, ${trees} outline${trees === 1 ? "" : "s"}` +
+              (events === null ? "" : `, ${events} events`) +
+              " — see the objects and outline panels";
+            outEl.append(tag, body);
+            refreshEvents();
+            return;
+          }
           outEl.classList.remove("stale");
           outEl.textContent = "";
           const tag = document.createElement("span");
@@ -2258,7 +2301,10 @@
         setOutline(libEl.dataset.outline === "closed"));
       for (const t of document.querySelectorAll(".view-tab"))
         t.addEventListener("click", () => setView(t.dataset.view));
-      setView("library");
+      // Opens on the scene, not the library. The library is a click away and
+      // the tab says so; a drawn graph is not something the reader can
+      // imagine from a file tree.
+      setView("objects");
       showScene({ ok: false });
 
       srcEl.value = START;

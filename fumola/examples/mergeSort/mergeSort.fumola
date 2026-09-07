@@ -185,11 +185,10 @@ module {
     /// parts belong in space, and those are the two things returned.
     #[example]
     public func exampleMergeSort() : W.ExampleOutput {
-        let s = generateSceneFullDemand(10, 10, null).sceneData;
-        // Objects only. The outline component is left empty here, which is a
-        // choice rather than an omission: what this example is for is the
-        // shape of the merge network in space.
-        W.sceneOfObjects(s.objects)
+        // `sceneData` is already this shape: a record with `objects` and
+        // `outline`, and a `history` beside them that a scene simply
+        // ignores. With no tag to add, there is nothing to convert.
+        generateSceneFullDemand(10, 23, null).sceneData
     };
 
     #[test]

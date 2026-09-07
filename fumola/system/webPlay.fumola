@@ -43,26 +43,29 @@ module {
         outline : A.Outline.Outlines;
     };
 
-    /// What an `#[example]` returns.
+    /// What an `#[example]` returns: the components, in a record, directly.
     ///
-    /// A variant, so the playground can tell a scene from any other value a
-    /// program might evaluate to. Seeing `#scene` come back from the editor
-    /// is the whole trigger: nothing inspects the code, and nothing guesses.
-    public type ExampleOutput = { #scene : SceneComponents };
+    ///    No tag around them. A record carrying `objects` and `outline` is
+    /// recognisable as a scene by having those fields, and requiring a
+    /// wrapper only meant that code already holding the right shape had to
+    /// take it apart and put it back together. `A.Scene.Scene` is such a
+    /// record already, with a `history` beside them, so a scene built by the
+    /// library is one of these without being converted into one.
+    public type ExampleOutput = SceneComponents;
 
     /// Both components.
     public func scene(objects, outline) : ExampleOutput {
-        #scene { objects ; outline }
+        { objects ; outline }
     };
 
     /// Objects, and no outline.
     public func sceneOfObjects(objects) : ExampleOutput {
-        #scene { objects ; outline = [] }
+        { objects ; outline = [] }
     };
 
     /// Outlines, and no objects.
     public func sceneOfOutline(outline) : ExampleOutput {
-        #scene { objects = [] ; outline }
+        { objects = [] ; outline }
     };
 
     /// One tree, for the common case of portraying a single force.
@@ -81,26 +84,16 @@ module {
     /// An example's components, plus the history the runtime kept: an
     /// `A.Scene.Scene`, exactly as that type stands.
     ///
-    /// Optional, and only for a forest of exactly one tree, because that is
-    /// what `A.Scene.Scene` can hold: it carries a single outline. An example
-    /// offering none is not a Scene, and one offering several is more than a
-    /// Scene; saying so is better than dropping trees quietly or inventing a
-    /// root to join them under. Reconciling the two shapes is #66.
+    /// No longer optional. `Scene.outline` is a forest now (#66), so any
+    /// number of trees fits, and without the tag the components are already
+    /// the fields a Scene wants.
     ///
     /// Call this from outside the example, after it has run, so the history
     /// is the one the example produced. An example that lays itself out
     /// inside `A.scratch` keeps that history to the subject rather than to
     /// the drawing of it.
-    public func withHistory(e : ExampleOutput) : ?A.Scene.Scene {
-        switch e {
-            case (#scene(s)) {
-                if (s.outline.size() == 1) {
-                    ?{ outline = s.outline[0] ;
-                       objects = s.objects ;
-                       history = A.peekHistory() }
-                } else { null }
-            }
-        }
+    public func withHistory(e : ExampleOutput) : A.Scene.Scene {
+        { outline = e.outline ; objects = e.objects ; history = A.peekHistory() }
     };
 
 }
