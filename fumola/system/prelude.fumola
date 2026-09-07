@@ -1,13 +1,12 @@
 import Adapton "adapton";
+import Prim "prim";
 
 /// The prelude: the short names for the Adapton operations a program
 /// reaches for most often.
 ///
-///    Almost nothing is defined here. Each of the adapton names is the
-/// operation of the same name in `system/adapton`, re-exported under a bare
-/// name so that a program can write `get(`x)` rather than `Adapton.get(`x)`.
-/// `print` is the exception: it has no module to come from, so it stands
-/// directly for the primitive.
+///    Nothing is defined here. Each name is the operation of the same name
+/// in `system/adapton` or `system/prim`, re-exported under a bare name so
+/// that a program can write `get(`x)` rather than `Adapton.get(`x)`.
 ///
 /// A host embedding Fumola is expected to bind these at the top level of
 /// an instance; `crates/fumola_wasm` does exactly that.
@@ -25,8 +24,7 @@ module {
     public func peek(s) { Adapton.peek(s) };
 
     /// Write `x` to wherever the host shows output: stdout under the CLI,
-    /// the print panel in the web REPL. The value is rendered as Fumola
-    /// writes it, so a record prints as a record.
-    public func print(x) { prim "print" x };
+    /// the print panel in the web playground.
+    public func print(x) { Prim.print(x) };
 
 }

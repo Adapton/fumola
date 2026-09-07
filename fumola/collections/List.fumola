@@ -1,5 +1,7 @@
 import A "adapton";
 import W "webPlay";
+import Prim "prim";
+import Array "array";
 
 module {
 
@@ -149,9 +151,9 @@ module {
     };
 
     public func previous(editor : Editor<X>) : ?Editor<X> {
-      prim "print" editor;
+      Prim.print editor;
       if (editor.previous.size() > 0) { 
-        let (previous, cursor) = prim "arrayPopBack" editor.previous;
+        let (previous, cursor) = Array.popBack(editor.previous);
         ?{ previous; cursor } 
       } else {
         null
@@ -227,7 +229,7 @@ module {
 
     #[test]
     public func testPrevious() {
-      prim "print" "TO DO";
+      Prim.print "TO DO";
     };
 
   };
