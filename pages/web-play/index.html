@@ -174,6 +174,37 @@
       .library[data-view="objects"] #objects-panel,
       .library[data-view="outline"] #outline-panel { display: block; }
 
+      /* The outline, styled as the replayground styles it: each level a
+         step in and a rule down its left, so nesting is visible as nesting. */
+      .outline-node {
+        margin-left: 8px; padding-left: 2px;
+        border-left: 2px solid #2a2e37;
+        background: #0d0d11;
+      }
+      .outline-edge { margin-left: 8px; background: #101014; }
+      .outline-edge:hover, .outline-node:hover { background: #16161c; }
+      .outline-internal-result {
+        margin-left: 8px; border-left: 2px solid #2a2e37; background: #0d0d11;
+      }
+      #outline-body .nodeId { color: var(--sym); }
+      #outline-body .metaTime { color: var(--dim); }
+      #outline-body .outline-value-text { color: var(--fg); }
+      #outline-body .action-arrow { color: var(--op); }
+      #outline-body .action-put, #outline-body .action-putForce { color: var(--green); }
+      #outline-body .action-get { color: var(--blue); }
+      #outline-body .result-arrow { color: var(--pink); }
+
+      /* The objects, drawn. Fills the panel; the canvas is sized to it. */
+      #objects-panel { display: none; }
+      .library[data-view="objects"] #objects-panel { display: flex; flex-direction: column; }
+      .viewport { flex: 1; min-height: 0; position: relative; background: #08080b; }
+      .viewport canvas { display: block; }
+      .viewport .hint {
+        position: absolute; left: 0.7rem; bottom: 0.6rem;
+        font: 400 0.7rem/1.4 var(--mono); color: var(--dim);
+        pointer-events: none;
+      }
+
       /* The two scene panels: what a program said about how to look at it. */
       .scene { flex: 1; min-height: 0; overflow: auto; }
       .scene-body {
@@ -485,7 +516,8 @@
             <div class="empty" id="events-empty">No events yet.</div>
           </div>
           <div class="scene" id="objects-panel">
-            <div class="scene-body" id="objects-body"></div>
+            <div class="viewport" id="viewport" hidden></div>
+            <div class="scene-body" id="objects-body" hidden></div>
             <div class="empty" id="objects-empty"></div>
           </div>
           <div class="scene" id="outline-panel">
@@ -1314,12 +1346,14 @@
           ? reply.value.value
           : null;
 
-      const fillScenePanel = (name, component, count, lead) => {
+      const fillScenePanel = (name, component, count, lead, draw) => {
         const body = $(name + "-body");
         const empty = $(name + "-empty");
         const tab = document.querySelector(`.view-tab[data-view="${name}"]`);
         if (count) {
-          body.innerHTML = highlight(show(component)).replace(/\n$/, "");
+          body.textContent = "";
+          if (draw) draw(body);
+          else body.innerHTML = highlight(show(component)).replace(/\n$/, "");
           body.hidden = false;
           empty.hidden = true;
         } else {
@@ -1337,22 +1371,293 @@
         tab.classList.toggle("has-output", count > 0);
       };
 
+      // ---- the outline, drawn the way the replayground draws it ----------
+      //
+      // A port of `renderOutline` from replayground-www/index.template.html,
+      // over the values as they cross the wasm boundary rather than over the
+      // JSON that `IntoJSON.fromOutline` writes. Same nesting, same arrows,
+      // same `(begin, end)` pairs, same result row hanging off a nested edge.
+      //
+      // Left behind on purpose: the chips there are wired to a time cursor
+      // and to meshes, and neither exists here yet. This draws; it does not
+      // yet cross-link.
+
+      const vRec = (v) => (v && v.tag === "Record" ? v.value : null);
+      const vArr = (v) => (v && (v.tag === "List" || v.tag === "Tuple") ? v.value : []);
+      const vVariant = (v) => (v && v.tag === "Variant" ? v.value : null);
+      const vSome = (v) => (v && v.tag === "Option" ? v.value : null);
+      const vFlat = (v) => show(v).replace(/\n+/g, " ").trim();
+
+      const ARROWS = {
+        put: " ───» ", get: " ───> ", putForce: " ══▷» ", force_: " ═══▷ ",
+      };
+
+      const span = (cls, text) => {
+        const e = document.createElement("span");
+        e.className = cls;
+        e.textContent = text;
+        return e;
+      };
+
+      /// `metaTimes` is a pair; a nested edge spans from one to the other.
+      const metaPair = (v) => {
+        const a = vArr(v);
+        if (a.length === 2) return [vFlat(a[0]), vFlat(a[1])];
+        const one = vFlat(v);
+        return [one, one];
+      };
+
+      const drawOutline = (into, outline, depth) => {
+        const node = vVariant(outline);
+        if (!node) return;
+        const fields = vRec(node.value);
+        if (!fields) return;
+
+        const div = document.createElement("div");
+        div.className = "outline-node";
+        if (depth === 0) {
+          const id = fields.nodeId || fields.__nodeId;
+          if (id) div.appendChild(span("nodeId", vFlat(id)));
+        }
+        into.appendChild(div);
+
+        for (const edgeValue of vArr(fields.edges)) {
+          const e = vRec(edgeValue);
+          if (!e) continue;
+          const row = document.createElement("div");
+          row.className = "outline-edge";
+
+          const [begin, end] = metaPair(e.metaTimes);
+          const nested = vSome(e.outline);
+          // The same convention as `IntoText.metaTimesIntoText`: a pair only
+          // when the two differ, so an edge that happened at one moment says
+          // one moment.
+          row.appendChild(
+            span("metaTime", begin === end ? `(${begin})` : `(${begin}, ${end})`)
+          );
+
+          const action = vVariant(e.action);
+          const name = action ? action.name : "";
+          row.appendChild(
+            span("action-arrow action-" + name, ARROWS[name] || ` ${name} `)
+          );
+          row.appendChild(span("nodeId", vFlat(e.actionTarget)));
+          into.appendChild(row);
+
+          if (nested) {
+            drawOutline(into, nested, depth + 1);
+            // The value a nested force came back with, on a line of its own.
+            const result = document.createElement("div");
+            result.className = "outline-internal-result";
+            result.appendChild(span("action-arrow result-arrow", "╰〜〜> "));
+            result.appendChild(span("outline-value-text", vFlat(e.value)));
+            into.appendChild(result);
+          } else {
+            row.appendChild(span("outline-value-text", " " + vFlat(e.value)));
+          }
+        }
+      };
+
+      // ---- the objects, drawn ------------------------------------------
+      //
+      // Follows the construction in replayground-www: a box or an orb per
+      // labelled object at the position the program chose, and a line for
+      // each pointer between them. three.js is vendored beside this page
+      // rather than fetched from a CDN, and imported the first time a scene
+      // actually needs it -- 670KB is not something to charge someone for
+      // opening the page.
+
+      let three = null, viewport = null;
+
+      const loadThree = async () => {
+        if (three) return three;
+        const [THREE, orbit] = await Promise.all([
+          import("../vendor/three.module.min.js"),
+          import("../vendor/OrbitControls.js"),
+        ]);
+        three = { THREE, OrbitControls: orbit.OrbitControls };
+        return three;
+      };
+
+      const vNum = (v) => (v && v.value !== undefined ? Number(v.value) : 0);
+      const vStr = (v) => (v && typeof v.value === "string" ? v.value : vFlat(v));
+      const vec3 = (v) => {
+        const r = vRec(v) || {};
+        return [vNum(r.x), vNum(r.y), vNum(r.z)];
+      };
+
+      /// Take the scene apart into what a renderer needs.
+      const readObjects = (list) => {
+        const shapes = [], links = [];
+        for (const item of vArr(list)) {
+          const v = vVariant(item);
+          if (!v) continue;
+          const f = vRec(v.value) || {};
+          if (v.name === "box" || v.name === "orb") {
+            shapes.push({
+              kind: v.name,
+              label: vStr(f.label_),
+              at: vec3(f.position),
+              text: vStr(f.textFields),
+            });
+          } else if (v.name === "pointer") {
+            links.push({ from: vStr(f.from), to: vStr(f.to) });
+          }
+          // `#action` edges carry a time cursor's worth of meaning and are
+          // left for when there is a cursor to hang them on.
+        }
+        return { shapes, links };
+      };
+
+      /// Everything a mounted scene owns, so it can be given back.
+      let mounted = null;
+
+      const disposeScene = () => {
+        if (!mounted) return;
+        cancelAnimationFrame(mounted.frame);
+        mounted.observer.disconnect();
+        mounted.controls.dispose();
+        for (const g of mounted.geometries) g.dispose();
+        for (const m of mounted.materials) m.dispose();
+        mounted.renderer.dispose();
+        // Everything this scene put in the host, not just the canvas: a hint
+        // left behind would sit under the next scene describing the last one.
+        mounted.renderer.domElement.remove();
+        mounted.hint.remove();
+        mounted = null;
+      };
+
+      const mountObjects = async (list) => {
+        const { shapes, links } = readObjects(list);
+        if (!shapes.length && !links.length) { disposeScene(); return false; }
+        const { THREE, OrbitControls } = await loadThree();
+        disposeScene();
+
+        const host = $("viewport");
+        const width = host.clientWidth || 600;
+        const height = host.clientHeight || 400;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x08080b);
+        const camera = new THREE.PerspectiveCamera(55, width / height, 0.1, 2000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio || 1);
+        renderer.setSize(width, height);
+        host.appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+        const key = new THREE.DirectionalLight(0xffffff, 0.8);
+        key.position.set(4, 8, 6);
+        scene.add(key);
+
+        const geometries = [], materials = [];
+        const boxGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+        const orbGeo = new THREE.SphereGeometry(0.36, 20, 14);
+        geometries.push(boxGeo, orbGeo);
+        // A box is a value that is simply there; an orb is a thunk, which is
+        // a value that might be. The two colours are the theme's own.
+        const boxMat = new THREE.MeshLambertMaterial({ color: 0x569cd6 });
+        const orbMat = new THREE.MeshLambertMaterial({ color: 0x6a9955 });
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x6b6b75 });
+        materials.push(boxMat, orbMat, lineMat);
+
+        const at = new Map();
+        const box = new THREE.Box3();
+        for (const sh of shapes) {
+          const mesh = new THREE.Mesh(
+            sh.kind === "box" ? boxGeo : orbGeo,
+            sh.kind === "box" ? boxMat : orbMat
+          );
+          mesh.position.set(sh.at[0], sh.at[1], sh.at[2]);
+          mesh.userData.label = sh.label;
+          scene.add(mesh);
+          at.set(sh.label, mesh.position);
+          box.expandByPoint(mesh.position);
+        }
+        for (const link of links) {
+          const a = at.get(link.from.replace(/:.*$/, "")) || at.get(link.from);
+          const b = at.get(link.to);
+          if (!a || !b) continue;
+          const geo = new THREE.BufferGeometry().setFromPoints([a.clone(), b.clone()]);
+          geometries.push(geo);
+          scene.add(new THREE.Line(geo, lineMat));
+        }
+
+        // Frame whatever was built, rather than assuming where it is.
+        const centre = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const span = Math.max(size.x, size.y, size.z, 1);
+        camera.position.set(centre.x + span, centre.y + span * 0.8, centre.z + span * 1.6);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.copy(centre);
+        controls.enableDamping = true;
+        controls.update();
+
+        const anim = { id: 0 };
+        const tick = () => {
+          anim.id = requestAnimationFrame(tick);
+          controls.update();
+          renderer.render(scene, camera);
+        };
+        tick();
+
+        const observer = new ResizeObserver(() => {
+          const w = host.clientWidth, h = host.clientHeight;
+          if (!w || !h) return;
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          renderer.setSize(w, h);
+        });
+        observer.observe(host);
+
+        const hint = document.createElement("div");
+        hint.className = "hint";
+        hint.textContent =
+          `${shapes.length} objects, ${links.length} pointers` +
+          " · drag to orbit, scroll to zoom";
+        host.appendChild(hint);
+
+        mounted = {
+          renderer, controls, geometries, materials, observer, hint,
+          get frame() { return anim.id; },
+        };
+        return true;
+      };
+
       const showScene = (reply) => {
         const scene = sceneOf(reply);
         const fields = scene && scene.value ? scene.value : {};
         const objects = fields.objects;
         const outline = fields.outline;
+        const objectCount =
+          objects && Array.isArray(objects.value) ? objects.value.length : 0;
         fillScenePanel(
           "objects",
           objects,
-          objects && Array.isArray(objects.value) ? objects.value.length : 0,
+          objectCount,
           "Nothing placed in space. A program offers objects by evaluating to:"
         );
+        const host = $("viewport");
+        if (objectCount) {
+          host.hidden = false;
+          $("objects-body").hidden = true;
+          mountObjects(objects).catch((e) => {
+            // If three.js will not load, say so and fall back to the value.
+            host.hidden = true;
+            $("objects-body").hidden = false;
+            $("objects-body").textContent = "could not draw the scene: " + e;
+          });
+        } else {
+          host.hidden = true;
+          disposeScene();
+        }
+        const someOutline = outline && outline.tag !== "Null" ? vSome(outline) : null;
         fillScenePanel(
           "outline",
           outline,
-          outline && outline.tag !== "Null" ? 1 : 0,
-          "No outline. A program offers one by evaluating to:"
+          someOutline ? 1 : 0,
+          "No outline. A program offers one by evaluating to:",
+          someOutline ? (body) => drawOutline(body, someOutline, 0) : null
         );
       };
 
