@@ -1628,11 +1628,15 @@
           scene.add(mesh);
           return mesh;
         };
-        // A box is a value that is simply there; an orb is a thunk, which is
-        // a value that might be. The two colours are the theme's own.
-        const boxMat = new THREE.MeshLambertMaterial({ color: 0x569cd6 });
-        const orbMat = new THREE.MeshLambertMaterial({ color: 0x6a9955 });
-        const lineMat = new THREE.LineBasicMaterial({ color: 0x6b6b75 });
+        // The replayground's own colours, so a scene laid out for it looks
+        // like itself here: a box and a pointer share one green
+        // (`color.box`, `color.pointer`), and an orb is the blue that
+        // `createOrb` gives it. These had been swapped, with the pointers
+        // grey, which made every scene read as the negative of the same one
+        // drawn there.
+        const boxMat = new THREE.MeshLambertMaterial({ color: 0x55aa44 });
+        const orbMat = new THREE.MeshLambertMaterial({ color: 0x4488aa });
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x55aa44 });
         materials.push(boxMat, orbMat, lineMat);
 
         const at = new Map();       // label -> the object's position
