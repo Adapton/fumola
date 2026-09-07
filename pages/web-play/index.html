@@ -1499,6 +1499,11 @@
               label: vStr(f.label_),
               at: vec3(f.position),
               text: vStr(f.textFields),
+              // The named slots a pointer can leave from. Each becomes a dot
+              // under the object, and a pointer line starts at its dot rather
+              // than at the object's middle -- which is how the replayground
+              // can show two pointers leaving one box in different directions.
+              fields: vArr(f.pointerFields).map(vStr),
             });
           } else if (v.name === "pointer") {
             links.push({ from: vStr(f.from), to: vStr(f.to) });
@@ -1519,6 +1524,7 @@
         mounted.controls.dispose();
         for (const g of mounted.geometries) g.dispose();
         for (const m of mounted.materials) m.dispose();
+        for (const t of mounted.textures) t.dispose();
         mounted.renderer.dispose();
         // Everything this scene put in the host, not just the canvas: a hint
         // left behind would sit under the next scene describing the last one.
@@ -1550,10 +1556,54 @@
         key.position.set(4, 8, 6);
         scene.add(key);
 
-        const geometries = [], materials = [];
-        const boxGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
-        const orbGeo = new THREE.SphereGeometry(0.36, 20, 14);
-        geometries.push(boxGeo, orbGeo);
+        const geometries = [], materials = [], textures = [];
+        // The replayground's own dimension, so a scene laid out for it reads
+        // at the same scale here.
+        const BoxDim = 0.33;
+        const boxGeo = new THREE.BoxGeometry(BoxDim, BoxDim, BoxDim);
+        const orbGeo = new THREE.SphereGeometry(BoxDim / 2, 20, 14);
+        const dotGeo = new THREE.SphereGeometry(0.03, 10, 8);
+        geometries.push(boxGeo, orbGeo, dotGeo);
+
+        /// Text as a texture, the way the replayground does it: draw the
+        /// lines onto a canvas and hand the canvas to a plane. There is no
+        /// text in three.js itself, and a plane per label costs less than a
+        /// font loader.
+        const textTexture = (text) => {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          const fontSize = 48, lineHeight = fontSize * 1.2, pad = 20;
+          const lines = String(text).split("\n");
+          ctx.font = `${fontSize}px monospace`;
+          const width = Math.max(1, ...lines.map((l) => ctx.measureText(l).width));
+          canvas.width = width + pad * 2;
+          canvas.height = lineHeight * lines.length + pad * 2;
+          ctx.font = `${fontSize}px monospace`;
+          ctx.fillStyle = "#d4d4d4";
+          lines.forEach((l, i) => {
+            ctx.fillText(l, pad, pad + (i + 1) * lineHeight - (lineHeight - fontSize));
+          });
+          const texture = new THREE.CanvasTexture(canvas);
+          texture.minFilter = THREE.LinearFilter;
+          textures.push(texture);
+          return { texture, aspect: canvas.height / canvas.width };
+        };
+
+        /// A plane carrying that texture, placed relative to an object.
+        const textPlane = (text, anchor, size) => {
+          if (!text) return;
+          const { texture, aspect } = textTexture(text);
+          const geo = new THREE.PlaneGeometry(size, size * aspect);
+          const mat = new THREE.MeshBasicMaterial({
+            map: texture, transparent: true, alphaTest: 0.05, depthWrite: false,
+          });
+          geometries.push(geo);
+          materials.push(mat);
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.position.copy(anchor);
+          scene.add(mesh);
+          return mesh;
+        };
         // A box is a value that is simply there; an orb is a thunk, which is
         // a value that might be. The two colours are the theme's own.
         const boxMat = new THREE.MeshLambertMaterial({ color: 0x569cd6 });
@@ -1561,8 +1611,12 @@
         const lineMat = new THREE.LineBasicMaterial({ color: 0x6b6b75 });
         materials.push(boxMat, orbMat, lineMat);
 
-        const at = new Map();
+        const at = new Map();       // label -> the object's position
+        const dots = new Map();     // "label:field" -> where a pointer leaves
         const box = new THREE.Box3();
+        const dotMat = new THREE.MeshLambertMaterial({ color: 0xbdbdc6 });
+        materials.push(dotMat);
+
         for (const sh of shapes) {
           const mesh = new THREE.Mesh(
             sh.kind === "box" ? boxGeo : orbGeo,
@@ -1573,12 +1627,37 @@
           scene.add(mesh);
           at.set(sh.label, mesh.position);
           box.expandByPoint(mesh.position);
+
+          // The label, up and to the left; the fields, to the right. The same
+          // offsets the replayground uses, so a scene sits the same way.
+          textPlane(
+            sh.label,
+            mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim)),
+            0.7
+          );
+          textPlane(
+            sh.text,
+            mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim)),
+            0.5
+          );
+
+          const spacing = 0.1;
+          const startX = mesh.position.x - ((sh.fields.length - 1) * spacing) / 2;
+          sh.fields.forEach((name, i) => {
+            const dot = new THREE.Mesh(dotGeo, dotMat);
+            dot.position.set(startX + i * spacing, mesh.position.y - 0.17, mesh.position.z);
+            scene.add(dot);
+            dots.set(sh.label + ":" + name, dot.position);
+          });
         }
+
         for (const link of links) {
-          const a = at.get(link.from.replace(/:.*$/, "")) || at.get(link.from);
+          // From the named slot if there is one, else from the object itself.
+          const a = dots.get(link.from) || at.get(link.from);
           const b = at.get(link.to);
           if (!a || !b) continue;
-          const geo = new THREE.BufferGeometry().setFromPoints([a.clone(), b.clone()]);
+          const to = b.clone().add(new THREE.Vector3(0, BoxDim / 2, 0));
+          const geo = new THREE.BufferGeometry().setFromPoints([a.clone(), to]);
           geometries.push(geo);
           scene.add(new THREE.Line(geo, lineMat));
         }
@@ -1618,7 +1697,7 @@
         host.appendChild(hint);
 
         mounted = {
-          renderer, controls, geometries, materials, observer, hint,
+          renderer, controls, geometries, materials, textures, observer, hint,
           get frame() { return anim.id; },
         };
         return true;
