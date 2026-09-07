@@ -79,24 +79,53 @@ jobs:
 
       - name: Generate bindings
         run: |
-          mkdir -p site
-          wasm-bindgen --target web --out-dir site \
+          mkdir -p bindings
+          wasm-bindgen --target web --out-dir bindings \
             target/wasm32-unknown-unknown/release/fumola_wasm.wasm
-          rm -f site/*.d.ts
-          ls -la site
+          rm -f bindings/*.d.ts
+          ls -la bindings
+
+      # Every published version lives on gh-pages and nowhere else, and the
+      # publish step below replaces that branch wholesale (force_orphan). So
+      # carrying versions forward means fetching them first, before anything
+      # is assembled. A first publish has no such branch, which is not an
+      # error -- hence continue-on-error rather than a guard.
+      - name: Fetch the currently published site
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: previous
+
+      # The assembly is a script rather than steps here because this decides
+      # what every browser receives, Hazel's livelits included, and a workflow
+      # can only be tested by publishing. tools/assemble-site.test.sh covers
+      # it against scratch directories. See #69.
+      - name: Assemble the site
+        run: |
+          if [ -d previous ]; then
+            previous_arg=(--previous previous)
+          else
+            echo "no published site yet; this is a first publish"
+            previous_arg=()
+          fi
+          ./tools/assemble-site.sh \
+            --bindings bindings \
+            --pages pages \
+            --out site \
+            --commit "${{ github.sha }}" \
+            --keep 10 \
+            "${previous_arg[@]}"
+          cat site/runtime.json
 
       # The pages are checked in rather than written here: they explain
       # Fumola and load the runtime published beside them, which is a
       # document to review in a diff, not a heredoc buried in a workflow.
-      #
-      # The whole tree is copied, so pages/web-play/index.html is served at
-      # /web-play/. A directory rather than web-play.html because Pages does
-      # not route extensionless paths with .nojekyll in place. pages/web-repl/
-      # is a redirect to it, kept because links to the old path were shared.
-      - name: Add the site pages
-        run: |
-          cp -r pages/. site/
-          ls -R site
+      # assemble-site.sh copies the whole tree, so pages/web-play/index.html
+      # is served at /web-play/. A directory rather than web-play.html because
+      # Pages does not route extensionless paths with .nojekyll in place.
+      # pages/web-repl/ is a redirect to it, kept because links to the old
+      # path were shared.
 
       # `cname` is not decoration: force_orphan replaces gh-pages with the
       # contents of ./site and nothing else, so without this the CNAME file

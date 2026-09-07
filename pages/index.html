@@ -976,13 +976,35 @@
           the only thing this artifact exists to do. Pages serves it with CORS
           and the right content type.
         </p>
-        <pre><code><span class="k">import</span> init, { fumola_create, fumola_eval_top }
-  <span class="k">from</span> <span class="st">"https://fumola.org/fumola_wasm.js"</span>;
+        <pre><code><span class="c">// The current build. runtime.json names a content-addressed</span>
+<span class="c">// directory, so a new publish is a new URL and never a stale cache.</span>
+<span class="k">const</span> m = <span class="k">await</span> (<span class="k">await</span> fetch(<span class="st">"https://fumola.org/runtime.json"</span>,
+                        { cache: <span class="st">"no-cache"</span> })).json();
+<span class="k">const</span> { <span class="k">default</span>: init, fumola_create, fumola_eval_top } =
+  <span class="k">await</span> <span class="k">import</span>(<span class="st">"https://fumola.org"</span> + m.js);
+<span class="k">await</span> init({ module_or_path: <span class="st">"https://fumola.org"</span> + m.wasm });
 
-<span class="k">await</span> init();
 <span class="k">const</span> id = fumola_create();
 fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
 <span class="c">// -> {"ok":true,"tag":"Int","value":"42"}</span></code></pre>
+        <p>
+          To pin a build instead, skip the manifest and name the version
+          directly &mdash; <code>/v/&lt;hash&gt;/fumola_wasm.js</code> and its
+          <code>.wasm</code> sibling. Those bytes never change. Take the glue
+          and the binary from the same directory: wasm-bindgen emits them as a
+          matched pair and they will not load if their versions disagree.
+          Recent versions are listed in
+          <code><a href="/versions.json">versions.json</a></code>; only a
+          bounded number are kept, so a pin is good for the near term rather
+          than forever.
+        </p>
+        <p>
+          The stable <code>fumola_wasm.js</code> and
+          <code>fumola_wasm_bg.wasm</code> beside this page still work and are
+          always the current build at publish time. They are what a browser
+          can serve you a version behind, which is what the manifest exists to
+          avoid.
+        </p>
         <p>
           Fetch them from <code>fumola.org</code>, which is where this site
           lives. The older <code>adapton.github.io/fumola</code> path still
@@ -1105,11 +1127,41 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
         }
       });
 
-      import init, {
-        fumola_create,
-        fumola_ensure_mode,
-        fumola_eval_top,
-      } from "./fumola_wasm.js";
+      // The glue and the binary are a matched pair -- wasm-bindgen emits them
+      // together and they do not load if their versions disagree -- so both
+      // come from whichever version `runtime.json` names. That is the whole
+      // fix for #69: Pages stamps `max-age=600` on everything and gives us no
+      // say in it, so a deploy cannot be made to invalidate a cached binary.
+      // A new build gets a new URL instead, and the stale copy is simply
+      // never asked for again. The manifest is the one mutable URL left in
+      // this path, and it is a few hundred bytes.
+      //
+      // Bound late rather than imported statically because the import URL is
+      // not known until the manifest is read, and read lazily rather than at
+      // page load so that the manifest fetch cannot delay the page for a
+      // reader who never runs anything.
+      let fumola_create, fumola_ensure_mode, fumola_eval_top;
+      const loadRuntime = async () => {
+        let glue = "./fumola_wasm.js",
+            wasm = "./fumola_wasm_bg.wasm",
+            version = "stable";
+        try {
+          const reply = await fetch("./runtime.json", { cache: "no-cache" });
+          if (reply.ok) {
+            const manifest = await reply.json();
+            glue = manifest.js;
+            wasm = manifest.wasm;
+            version = manifest.hash;
+          }
+        } catch (e) {
+          // The copies beside this page, which are always the current build
+          // at publish time. Reached only if the manifest is unavailable.
+        }
+        const mod = await import(glue);
+        ({ fumola_create, fumola_ensure_mode, fumola_eval_top } = mod);
+        await mod.default({ module_or_path: wasm });
+        console.info("Fumola runtime " + version);
+      };
 
       const $ = (id) => document.getElementById(id);
       const srcEl = $("src");
@@ -1185,15 +1237,14 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
         }
       };
 
-      // The runtime is 5 MB and most readers never run anything, so it is
-      // fetched on the first attempt rather than on page load. The static
-      // import above costs only the 16 KB of wasm-bindgen glue; init() is
-      // what pulls the binary.
+      // The runtime is 5 MB and most readers never run anything, so nothing
+      // is fetched until the first attempt to run -- not the manifest, not
+      // the 16 KB of wasm-bindgen glue, and not the binary.
       let starting = null;
       const ensureRuntime = () => {
         if (starting) return starting;
         statusEl.textContent = "starting the runtime\u2026";
-        starting = init()
+        starting = loadRuntime()
           .then(() => {
             instance = fumola_create();
             // Graphical, which is Fumola's own default: the VM constructs
