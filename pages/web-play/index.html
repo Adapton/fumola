@@ -203,6 +203,37 @@
         color: var(--dim);
       }
 
+      /* Something moving beside the wait message, so it reads as working
+         rather than as a sentence that happens to be there.
+
+         The animation is on `transform`, and that is the whole point rather
+         than a detail of taste. A run holds the main thread for its whole
+         duration, so anything driven from JavaScript -- setInterval, or a
+         frame callback -- is frozen for exactly the period the spinner is
+         meant to cover. Transform and opacity are composited, so they can
+         keep going while the thread is busy. A colour or width animation
+         would stall with everything else. */
+      .waiting-spin {
+        display: inline-block; width: 0.62rem; height: 0.62rem;
+        margin-right: 0.55rem; vertical-align: -0.06rem;
+        border: 2px solid var(--rule);
+        border-top-color: var(--green);
+        border-radius: 50%;
+        animation: waiting-spin 0.7s linear infinite;
+      }
+      @keyframes waiting-spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) {
+        /* Still says something is happening, without the movement. */
+        .waiting-spin {
+          animation: waiting-pulse 1.1s ease-in-out infinite;
+          border-color: var(--green);
+        }
+        @keyframes waiting-pulse {
+          0%, 100% { opacity: 0.25; }
+          50%      { opacity: 1; }
+        }
+      }
+
       /* The objects, drawn. Fills the panel; the canvas is sized to it. */
       #objects-panel { display: none; }
       .library[data-view="objects"] #objects-panel { display: flex; flex-direction: column; }
@@ -212,6 +243,18 @@
         position: absolute; left: 0.7rem; bottom: 0.6rem;
         font: 400 0.7rem/1.4 var(--mono); color: var(--dim);
         pointer-events: none;
+      }
+      /* The crossfader, opposite the hint: two runs in one canvas, and a
+         slider to dissolve between them. */
+      .viewport .fader {
+        position: absolute; right: 0.7rem; bottom: 0.5rem;
+        display: flex; align-items: center; gap: 0.5rem;
+        font: 400 0.7rem/1.4 var(--mono); color: var(--dim);
+        background: rgba(8, 8, 11, 0.72); padding: 0.25rem 0.5rem;
+        border: 1px solid var(--rule); border-radius: 3px;
+      }
+      .viewport .fader input[type="range"] {
+        width: 8rem; accent-color: var(--green); margin: 0;
       }
 
       /* The two scene panels: what a program said about how to look at it. */
@@ -829,11 +872,15 @@
             pending = text(i + 2);
             continue;
           }
-          // `#[test] public func NAME`, and `#[example]` the same way. Both
-          // are a public function the library offers to be run; what differs
-          // is what running one is for, and which section it is listed under.
+          // `#[test] public func NAME`, and `#[example]` and
+          // `#[examplePair]` the same way. All three are a public function
+          // the library offers to be run; what differs is what running one is
+          // for, and which section it is listed under. A pair answers with
+          // two runs and the difference between them, so one panel becomes
+          // three.
           if (w === "#" && text(i + 1) === "[" &&
-              (text(i + 2) === "test" || text(i + 2) === "example") &&
+              (text(i + 2) === "test" || text(i + 2) === "example" ||
+               text(i + 2) === "examplePair") &&
               text(i + 3) === "]" && text(i + 4) === "public" &&
               text(i + 5) === "func" && t[i + 6] && t[i + 6].kind === "ident") {
             found.push({
@@ -909,13 +956,34 @@
       /// importing file's directory -- which is what the symlinks under
       /// `fumola/` are working around -- so re-addressing one from the top
       /// level is just putting that directory in front of it.
+      /// Re-address one of a module's imports for use at the top level.
+      ///
+      /// A module's imports resolve against its own directory, and since #74
+      /// they say so out loud: `../system/adapton` rather than a symlinked
+      /// `adapton`. Hoisting such a line into a top-level program moves the
+      /// base it is relative to, so the path must be rebuilt against the
+      /// module's directory with its `..` segments folded away. Testing
+      /// merely for a `/` is what used to distinguish an absolute path from a
+      /// bare neighbour, and no longer does -- every relative path has one
+      /// now. A path already starting at the library root is left alone.
+      const resolveImport = (dir, spec) => {
+        if (/^fumola\//.test(spec)) return spec;
+        const out = [];
+        for (const part of `${dir}/${spec}`.split("/")) {
+          if (part === "" || part === ".") continue;
+          if (part === "..") out.pop();
+          else out.push(part);
+        }
+        return out.join("/");
+      };
+
       const importsOf = (source, path) => {
         const dir = path.replace(/\/[^/]*$/, "");
         const out = [];
         const re = /\bimport\s+([A-Za-z_][A-Za-z0-9_]*)\s+"([^"]*)"/g;
         let m;
         while ((m = re.exec(source)) !== null)
-          out.push({ alias: m[1], path: m[2].includes("/") ? m[2] : `${dir}/${m[2]}` });
+          out.push({ alias: m[1], path: resolveImport(dir, m[2]) });
         return out;
       };
 
@@ -1022,8 +1090,9 @@
         // modules above, so where each one comes from is visible rather than
         // something to look up. A module becomes a directory of its own.
         const examples = emptyTree();
+        const pairs = emptyTree();
         const tests = emptyTree();
-        let count = 0, exampleCount = 0;
+        let count = 0, exampleCount = 0, pairCount = 0;
         for (const path of real) {
           const src = JSON.parse(fumola_module_source(path));
           if (!src.ok) continue;
@@ -1031,8 +1100,11 @@
             const dirs = path.replace(/^fumola\//, "").split("/");
             const call = invocationFor(path, t);
             presets.set(presetKey(path, t), { path, test: t });
-            const into = t.kind === "example" ? examples : tests;
-            if (t.kind === "example") exampleCount += 1; else count += 1;
+            const into = t.kind === "example" ? examples
+                       : t.kind === "examplePair" ? pairs : tests;
+            if (t.kind === "example") exampleCount += 1;
+            else if (t.kind === "examplePair") pairCount += 1;
+            else count += 1;
             place(into, dirs, {
               name: (t.scope ? t.scope + "." : "") + t.name,
               title: call.split("\n")[1],
@@ -1065,6 +1137,7 @@
         // Examples first: they are what someone opening the page is most
         // likely to want, and each one answers with a picture of itself.
         if (exampleCount) section("examples-root", "examples/", examples);
+        if (pairCount) section("examples-root", "examplePairs/", pairs);
         if (count) section("tests-root", "tests/", tests);
       };
 
@@ -1373,6 +1446,41 @@
           : null;
       };
 
+      /// An `#[examplePair]` answers with two scenes and their node diff.
+      /// Recognised by having those three fields, the way a scene is
+      /// recognised by having `objects` and `outline` -- no tag to carry.
+      const pairOf = (reply) => {
+        if (!reply.ok || reply.tag !== "Record") return null;
+        const f = reply.value || {};
+        return f.left !== undefined && f.right !== undefined &&
+               f.nodes !== undefined && f.sizes !== undefined ? f : null;
+      };
+
+      /// The four numbers, from the pair's `sizes`, plus what they imply.
+      ///
+      /// From `sizes` and not from `nodes`: the diff's maps are `Map`s, whose
+      /// representation is hidden, so they arrive here as an opaque rendering
+      /// rather than something countable. The pair states the counts for that
+      /// reason.
+      const diffCounts = (sizes) => {
+        const f = (sizes && sizes.value) || {};
+        const n = (k) => {
+          const v = f[k];
+          const raw = v && v.value !== undefined ? v.value : v;
+          const num = Number(raw);
+          return Number.isFinite(num) ? num : 0;
+        };
+        const c = {
+          left: n("left"), right: n("right"),
+          onlyLeft: n("onlyLeft"), onlyRight: n("onlyRight"),
+          equal: n("equal"), notEqual: n("notEqual"),
+        };
+        c.changed = c.onlyLeft + c.onlyRight + c.notEqual;
+        c.total = Math.max(c.left, c.right);
+        c.fraction = c.total ? c.changed / c.total : 0;
+        return c;
+      };
+
       const fillScenePanel = (name, component, count, lead, draw) => {
         const body = $(name + "-body");
         const empty = $(name + "-empty");
@@ -1576,12 +1684,22 @@
         // left behind would sit under the next scene describing the last one.
         mounted.renderer.domElement.remove();
         mounted.hint.remove();
+        if (mounted.fader) mounted.fader.remove();
         mounted = null;
       };
 
-      const mountObjects = async (list) => {
-        const { shapes, links, actions } = readObjects(list);
-        if (!shapes.length && !links.length && !actions.length) {
+      /// Draw one scene, or several into the same canvas.
+      ///
+      /// A pair's two runs belong in one canvas rather than two: a second
+      /// WebGL context to look at the same structure twice is a lot of
+      /// machinery for a comparison that reads better as a dissolve. Each
+      /// side goes under its own group, and `setMix` fades between them.
+      const mountObjects = async (input) => {
+        const sides = Array.isArray(input) ? input : [{ list: input }];
+        const parsed = sides.map((s) => readObjects(s.list));
+        const anything = parsed.some(
+          (d) => d.shapes.length || d.links.length || d.actions.length);
+        if (!anything) {
           disposeScene();
           return false;
         }
@@ -1613,6 +1731,13 @@
         const orbGeo = new THREE.SphereGeometry(BoxDim / 2, 20, 14);
         const dotGeo = new THREE.SphereGeometry(0.03, 10, 8);
         geometries.push(boxGeo, orbGeo, dotGeo);
+
+        // What each side owns: a group to add to, and the materials whose
+        // opacity the crossfader moves. Reassigned once per side; the build
+        // below is synchronous, so the closures see the right one.
+        const sideGroups = [];
+        let root = scene;
+        let sideMats = materials;
 
         /// Text as a texture, the way the replayground does it: draw the
         /// lines onto a canvas and hand the canvas to a plane. There is no
@@ -1647,12 +1772,23 @@
             map: texture, transparent: true, alphaTest: 0.05, depthWrite: false,
           });
           geometries.push(geo);
-          materials.push(mat);
+          sideMats.push(mat);
           const mesh = new THREE.Mesh(geo, mat);
           mesh.position.copy(anchor);
-          scene.add(mesh);
+          root.add(mesh);
           return mesh;
         };
+        // Bounds accumulate across sides, so a pair is framed as a whole
+        // and the two runs stay registered against each other.
+        const box = new THREE.Box3();
+
+        for (let sideIx = 0; sideIx < parsed.length; sideIx += 1) {
+        const { shapes, links, actions } = parsed[sideIx];
+        root = new THREE.Group();
+        sideMats = [];
+        scene.add(root);
+        sideGroups.push({ group: root, mats: sideMats, label: sides[sideIx].label });
+
         // The replayground's own colours, so a scene laid out for it looks
         // like itself here: a box and a pointer share one green
         // (`color.box`, `color.pointer`), and an orb is the blue that
@@ -1662,13 +1798,12 @@
         const boxMat = new THREE.MeshLambertMaterial({ color: 0x55aa44 });
         const orbMat = new THREE.MeshLambertMaterial({ color: 0x4488aa });
         const lineMat = new THREE.LineBasicMaterial({ color: 0x55aa44 });
-        materials.push(boxMat, orbMat, lineMat);
+        sideMats.push(boxMat, orbMat, lineMat);
 
         const at = new Map();       // label -> the object's position
         const dots = new Map();     // "label:field" -> where a pointer leaves
-        const box = new THREE.Box3();
         const dotMat = new THREE.MeshLambertMaterial({ color: 0xbdbdc6 });
-        materials.push(dotMat);
+        sideMats.push(dotMat);
 
         for (const sh of shapes) {
           const mesh = new THREE.Mesh(
@@ -1677,7 +1812,7 @@
           );
           mesh.position.set(sh.at[0], sh.at[1], sh.at[2]);
           mesh.userData.label = sh.label;
-          scene.add(mesh);
+          root.add(mesh);
           at.set(sh.label, mesh.position);
           box.expandByPoint(mesh.position);
 
@@ -1699,7 +1834,7 @@
           sh.fields.forEach((name, i) => {
             const dot = new THREE.Mesh(dotGeo, dotMat);
             dot.position.set(startX + i * spacing, mesh.position.y - 0.17, mesh.position.z);
-            scene.add(dot);
+            root.add(dot);
             dots.set(sh.label + ":" + name, dot.position);
           });
         }
@@ -1712,7 +1847,7 @@
           const to = b.clone().add(new THREE.Vector3(0, BoxDim / 2, 0));
           const geo = new THREE.BufferGeometry().setFromPoints([a.clone(), to]);
           geometries.push(geo);
-          scene.add(new THREE.Line(geo, lineMat));
+          root.add(new THREE.Line(geo, lineMat));
         }
 
         // Action edges: what the computation did, rather than what it points
@@ -1730,7 +1865,7 @@
               transparent: true,
               opacity: heavy ? 0.6 : 0.8,
             });
-            materials.push(mat);
+            sideMats.push(mat);
             actionMat.set(kind, mat);
           }
           return actionMat.get(kind);
@@ -1758,7 +1893,7 @@
           const shaft = new THREE.Mesh(shaftGeo, mat);
           shaft.position.copy(a.clone().add(head).multiplyScalar(0.5));
           shaft.quaternion.setFromUnitVectors(UP, dir);
-          scene.add(shaft);
+          root.add(shaft);
 
           const coneGeo = new THREE.ConeGeometry(0.12, 0.12, 10);
           geometries.push(coneGeo);
@@ -1773,13 +1908,16 @@
             group.add(up, down);
             group.position.copy(head);
             group.quaternion.setFromUnitVectors(UP, dir);
-            scene.add(group);
+            root.add(group);
           } else {
             const cone = new THREE.Mesh(coneGeo, mat);
             cone.position.copy(head);
             cone.quaternion.setFromUnitVectors(UP, dir);
-            scene.add(cone);
+            root.add(cone);
           }
+        }
+
+        materials.push(...sideMats);
         }
 
         // Frame whatever was built, rather than assuming where it is.
@@ -1807,9 +1945,100 @@
         controls.enableDamping = true;
         controls.update();
 
+        /// The crossfader. `t` runs 0 (all left) to 1 (all right).
+        ///
+        /// At either end one side is solid and the other is gone. In the
+        /// middle both sit at 0.7, which is what makes the comparison
+        /// legible: two structures at full strength read as one confused
+        /// structure, and two at half strength read as neither. So the curve
+        /// is 1 to 0.7 over the first half and 0.7 to 0 over the second --
+        /// a slow give and then a quick one, the way a DJ's fader is not
+        /// linear either.
+        const fade = (u) =>
+          u <= 0.5 ? 1 - 0.6 * u : Math.max(0, 0.7 - 1.4 * (u - 0.5));
+
+        /// White emissive, at the strength the replayground uses to mark a
+        /// node under the cursor. Here it marks the side being faded *into*:
+        /// the fader says how much of each run is visible, and the glow says
+        /// which way you are going, which the opacities alone do not.
+        ///
+        /// One thing scales it: movement. Every nudge of the fader relights
+        /// the side being entered and pushes the decay back, so the glow
+        /// holds while the fader is moving and falls away once it stops. It
+        /// is a cue about motion, so a fader at rest does not carry it.
+        ///
+        /// The strength does not depend on where the fader is. Tying it to
+        /// how near an end you were made the same gesture mean different
+        /// things in different places, and the cue is about direction, which
+        /// is the same claim wherever it is made. So the brightness is
+        /// constant and only its lifetime varies.
+        ///
+        /// The decay is long on purpose. A glow that goes out as soon as the
+        /// fader stops reads as a flicker rather than as a direction, and the
+        /// gesture it marks is a slow one -- you push the fader, look at what
+        /// arrived, and push again.
+        ///
+        /// Only the lit materials take it. Boxes, orbs, pointer dots and
+        /// action arrows are Lambert and have an emissive channel; the
+        /// pointer lines and the text planes are Basic and do not, so they
+        /// fade without glowing.
+        const GLOW_PEAK = 1.0;
+        const GLOW_MS = 2000;
+
+        const paintSide = (s) => {
+          s.group.visible = s.opacity > 0.01;
+          for (const m of s.mats) {
+            m.transparent = true;
+            m.opacity = s.opacity;
+            if (m.emissive) {
+              m.emissive.setHex(0xffffff);
+              m.emissiveIntensity = s.glow * GLOW_PEAK;
+            }
+            m.needsUpdate = true;
+          }
+        };
+
+        const setMix = (t) => {
+          if (sideGroups.length < 2) return;
+          sideGroups.forEach((s, i) => {
+            s.opacity = fade(i === 0 ? t : 1 - t);
+            // A group at zero is not drawn at all: a fully transparent mesh
+            // still writes depth in some materials, and would punch holes in
+            // the side that is meant to be solid.
+            paintSide(s);
+          });
+        };
+
+        /// Light the side the fader is moving towards, and push the decay
+        /// back. Called per input, so holding the fader in motion holds the
+        /// glow, and releasing it lets the glow go.
+        const glowTowards = (i) => {
+          if (sideGroups.length < 2) return;
+          sideGroups.forEach((s, j) => { s.glow = j === i ? 1 : 0; });
+          glowUntil = performance.now() + GLOW_MS;
+        };
+
+        let glowUntil = 0;
+        sideGroups.forEach((s) => { s.glow = 0; s.opacity = 1; });
+        setMix(0.5);
+
         const anim = { id: 0 };
         const tick = () => {
           anim.id = requestAnimationFrame(tick);
+          // The glow decays on the clock rather than per frame, so it lasts
+          // the same time whatever the frame rate, and stops touching
+          // materials once it is spent.
+          if (glowUntil) {
+            const left = (glowUntil - performance.now()) / GLOW_MS;
+            const g = left > 0 ? left : 0;
+            sideGroups.forEach((s) => {
+              if (s.glow > 0) { s.glow = g; paintSide(s); }
+            });
+            if (g === 0) {
+              glowUntil = 0;
+              sideGroups.forEach((s) => { s.glow = 0; });
+            }
+          }
           controls.update();
           renderer.render(scene, camera);
         };
@@ -1826,23 +2055,131 @@
 
         const hint = document.createElement("div");
         hint.className = "hint";
+        // Totals across every side, since `shapes` and friends belong to one
+        // side's turn through the loop above.
+        const tot = (k) => parsed.reduce((n, d) => n + d[k].length, 0);
         hint.textContent =
           // "shapes" rather than "objects": the objects array holds all
           // three kinds, and the output panel reports its total, so calling
           // the boxes and orbs "objects" here reads as a contradiction.
-          `${shapes.length} shapes, ${links.length} pointers` +
-          (actions.length ? `, ${actions.length} actions` : "") +
+          `${tot("shapes")} shapes, ${tot("links")} pointers` +
+          (tot("actions") ? `, ${tot("actions")} actions` : "") +
+          (sideGroups.length > 1 ? " · across both runs" : "") +
           " · drag to orbit, scroll to zoom";
         host.appendChild(hint);
 
+        // The crossfader, when two runs share the canvas.
+        let fader = null;
+        if (sideGroups.length > 1) {
+          fader = document.createElement("div");
+          fader.className = "fader";
+          const left = document.createElement("span");
+          left.textContent = sideGroups[0].label || "left";
+          const right = document.createElement("span");
+          right.textContent = sideGroups[1].label || "right";
+          const range = document.createElement("input");
+          range.type = "range";
+          range.min = "0";
+          range.max = "1";
+          range.step = "0.01";
+          range.value = "0.5";
+          range.setAttribute("aria-label", "Fade between the two runs");
+          let was = Number(range.value);
+          range.addEventListener("input", () => {
+            const now = Number(range.value);
+            if (now !== was) glowTowards(now > was ? 1 : 0);
+            was = now;
+            setMix(now);
+          });
+          fader.append(left, range, right);
+          host.appendChild(fader);
+        }
+
         mounted = {
           renderer, controls, geometries, materials, textures, observer, hint,
+          setMix, glowTowards, sideCount: sideGroups.length, fader,
           get frame() { return anim.id; },
         };
         return true;
       };
 
+      /// A heading inside a panel, saying which run is below it.
+      const runRule = (into, text) => {
+        const rule = document.createElement("div");
+        rule.className = "forest-rule";
+        rule.textContent = text;
+        into.appendChild(rule);
+      };
+
+      /// What differs, as a line of counts, above both runs.
+      const diffLine = (into, c) => {
+        const d = document.createElement("div");
+        d.className = "forest-rule";
+        d.textContent =
+          `${c.changed} of ${c.total} nodes differ ` +
+          `(${(c.fraction * 100).toFixed(1)}%) — ` +
+          `${c.equal} equal, ${c.notEqual} not equal, ` +
+          `${c.onlyLeft} only left, ${c.onlyRight} only right`;
+        into.appendChild(d);
+      };
+
+      /// An `#[examplePair]`: the left run, the right run, and the diff.
+      ///
+      /// Both runs share the one canvas, under a group each, with a
+      /// crossfader to dissolve between them: a second WebGL context to look
+      /// at the same structure twice is a lot of machinery for a comparison
+      /// that reads better as a dissolve. The outline panel has room for
+      /// both side by side, so it shows both.
+      const showPair = (pair) => {
+        const counts = diffCounts(pair.sizes);
+        const side = (s) => (s && s.value) || {};
+        const L = side(pair.left), R = side(pair.right);
+        const arr = (v) => (v && Array.isArray(v.value) ? v.value : []);
+        const lObj = arr(L.objects), rObj = arr(R.objects);
+
+        fillScenePanel(
+          "objects", L.objects, lObj.length + rObj.length,
+          "Neither run placed anything in space. A pair offers objects by evaluating to:",
+          (body) => {
+            diffLine(body, counts);
+            runRule(body,
+              `both runs drawn above — left ${lObj.length} objects, ` +
+              `right ${rObj.length} — fade between them with the slider`);
+          }
+        );
+        const host = $("viewport");
+        if (lObj.length || rObj.length) {
+          host.hidden = false;
+          mountObjects([
+            { list: L.objects, label: "left" },
+            { list: R.objects, label: "right" },
+          ]).catch((e) => {
+            host.hidden = true;
+            $("objects-body").textContent = "could not draw the scene: " + e;
+          });
+        } else {
+          host.hidden = true;
+          disposeScene();
+        }
+
+        const lOut = L.outline ? vArr(L.outline) : [];
+        const rOut = R.outline ? vArr(R.outline) : [];
+        fillScenePanel(
+          "outline", L.outline, lOut.length + rOut.length,
+          "Neither run offered an outline. A pair offers one by evaluating to:",
+          (body) => {
+            diffLine(body, counts);
+            [["left", lOut], ["right", rOut]].forEach(([name, forest]) => {
+              runRule(body, `${name} — ${forest.length} tree${forest.length === 1 ? "" : "s"}`);
+              forest.forEach((tree) => drawOutline(body, tree, 0));
+            });
+          }
+        );
+      };
+
       const showScene = (reply) => {
+        const asPair = pairOf(reply);
+        if (asPair) return showPair(asPair);
         const scene = sceneOf(reply);
         const fields = scene && scene.value ? scene.value : {};
         const objects = fields.objects;
@@ -1901,9 +2238,15 @@
       };
 
       const loadTest = (path, test) => {
+        // An example answers with a picture, so show the picture --
+        // whichever panel was last open, since arriving at an example's
+        // objects is the point of clicking one. A test answers with a value,
+        // and the panel that belongs in is already the one showing.
+        if (test.kind === "example" || test.kind === "examplePair")
+          setView("objects");
         srcEl.value = invocationFor(path, test);
         // A link says which kind of thing it names, so it reads as what it is.
-        setPreset(test.kind === "example" ? "example" : "test", path, test);
+        setPreset(test.kind === "test" ? "test" : test.kind, path, test);
         paint();
         evaluate();
       };
@@ -1914,6 +2257,13 @@
       // fix by hand, which is the point of having it here.
       const loadTestBody = (path, test) => {
         if (!test.body) return;
+        // An example answers with a picture, so show the picture --
+        // whichever panel was last open, since arriving at an example's
+        // objects is the point of clicking one. A test answers with a value,
+        // and the panel that belongs in is already the one showing.
+        if (test.kind === "example" || test.kind === "examplePair")
+          setView("objects");
+
         const name = `${test.scope ? test.scope + "." : ""}${test.name}`;
         const { text, changed } = qualify(
           dedent(currentSource.slice(test.body.start, test.body.end)), test, currentSource
@@ -2044,6 +2394,43 @@
       };
 
       let timer = null;
+      /// Say that a run is under way, in the panel the answer will land in.
+      ///
+      /// Not an overlay. An overlay needs a visibility flag, and a flag can
+      /// be left set -- which is what happened: the wait was on a frame, a
+      /// frame does not come in a hidden or throttled tab, and the message
+      /// stayed up with the run not yet begun. A line of text in the output
+      /// panel has no such state. Whatever the run does next overwrites it,
+      /// including every failure path, so there is nothing to get stuck.
+      ///
+      /// `fumola_eval_top` is one synchronous call and holds the main thread
+      /// for its whole duration, so a message shown in the same task never
+      /// paints. Hence the yield -- and `setTimeout` rather than
+      /// `requestAnimationFrame`, because a timer fires in a background tab
+      /// and a frame does not.
+      /// What a program cost last time it ran, so the next wait can say what
+      /// to expect. Keyed by the program text, which is what determines it.
+      ///
+      /// This is as close to progress as the page can get today. A run is one
+      /// synchronous call that returns when it is finished, so there is no
+      /// count to watch rise -- only last time's total to compare against.
+      /// #79 is what would turn this into real progress.
+      const stepsSeen = new Map();
+      const commas = (n) => n.toLocaleString("en-US");
+
+      const sayWaiting = (what) => {
+        outEl.classList.remove("stale");
+        // Built as nodes rather than markup: the message shares this element
+        // with rendered program output, and `textContent` is what replaces it.
+        outEl.textContent = "";
+        const spinner = document.createElement("span");
+        spinner.className = "waiting-spin";
+        const label = document.createElement("span");
+        label.textContent = what;
+        outEl.append(spinner, label);
+        return new Promise((r) => setTimeout(r, 0));
+      };
+
       const evaluate = async () => {
         try { await ensureRuntime(); } catch (e) { return; }
         const text = srcEl.value;
@@ -2056,12 +2443,30 @@
         // a Core clones in about constant time.
         if (!persistEl.checked) fumola_reset(instance);
 
+        // A pair says what the wait is for; anything else just says to wait.
+        // Neither can say how far along it is -- the run is one call that
+        // returns when it is finished -- so what stands in for progress is
+        // what the same program cost last time, when that is known.
+        const expected = stepsSeen.get(text);
+        await sayWaiting(
+          (preset && preset.kind === "examplePair"
+            ? "wait… running the left, then the right, then comparing them"
+            : "wait…") +
+          (expected === undefined
+            ? ""
+            : ` · about ${commas(expected)} Fumola steps`)
+        );
         let reply;
         try {
           reply = JSON.parse(fumola_eval_top(instance, text));
         } catch (e) {
           return;
         }
+        // What it actually cost, for the next wait and for the answer below.
+        const ranSteps =
+          reply.counts && Number.isFinite(Number(reply.counts.step))
+            ? Number(reply.counts.step) : null;
+        if (ranSteps !== null) stepsSeen.set(text, ranSteps);
         // Both places: the panel is where it is meant to be read, the
         // console is where a browser's own tooling can search it.
         //
@@ -2101,6 +2506,7 @@
             body.textContent =
               `${objects} objects, ${trees} outline${trees === 1 ? "" : "s"}` +
               (events === null ? "" : `, ${events} events`) +
+              (ranSteps === null ? "" : `, ${commas(ranSteps)} Fumola steps`) +
               " — see the objects and outline panels";
             outEl.append(tag, body);
             refreshEvents();
@@ -2193,7 +2599,8 @@
       };
 
       const openFromHash = () => {
-        const m = /^#(test|example|body)=(.+)$/.exec(decodeURIComponent(location.hash));
+        const m = /^#(test|examplePair|example|body)=(.+)$/.exec(
+          decodeURIComponent(location.hash));
         if (!m) return false;
         const found = presets.get(m[2]);
         if (!found) {

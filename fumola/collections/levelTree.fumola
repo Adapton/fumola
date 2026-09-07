@@ -740,6 +740,134 @@ module {
     })
   };
 
+  /// One run of list-into-tree, as its own scene.
+  ///
+  /// Reset first, so the history belongs to this run alone --- a pair of
+  /// these is only comparable if neither carries the other's events. The
+  /// layout runs in a scratch, so what the runtime hands over is the history
+  /// of building the tree and not of drawing it.
+  ///
+  /// `remove` names a cell to drop from the list before the tree is built.
+  /// `null` is the unedited run. The head cannot be named: the cursor starts
+  /// one cell in, which is issue #77.
+  public func treeFromListRun(seed : Nat, size : Nat, remove : ?Symbol) : A.Scene.Scene {
+    A.reset();
+    let array = R.generateRandomInput(seed, size);
+    let list_ = `ListFromArray := thunk {
+      do within space `inputList { List.fromIter(array.vals()) }
+    };
+    let list = force list_;
+    do ? {
+      let editor = List.Edit.cursor(list!.next);
+      let editor = List.Edit.gotoSymbol(editor, remove!)!;
+      List.Edit.remove(editor);
+    };
+    let tree_ = `LevelTreeFromList := thunk {
+      do within space `inputTree { fromList(list) }
+    };
+    let tree = force tree_;
+    W.withHistory(A.scratch(thunk {
+      W.scene(Scene.sceneObjects(tree!, A.Scene.zero),
+              [ A.Outline.outline(tree_) ])
+    }))
+  };
+
+  /// One run of list-into-tree, keeping only the node map the diff needs.
+  ///
+  /// No objects and no outline: a scaling study wants histories, and laying
+  /// out a thousand elements costs more than building the tree does. Same
+  /// reset-run-peek shape as `treeFromListRun` otherwise.
+  public func treeNodesRun(seed : Nat, size : Nat, remove : ?Symbol) : A.Diff.NodeVals {
+    A.reset();
+    let array = R.generateRandomInput(seed, size);
+    let list_ = `ListFromArray := thunk {
+      do within space `inputList { List.fromIter(array.vals()) }
+    };
+    let list = force list_;
+    do ? {
+      let editor = List.Edit.cursor(list!.next);
+      let editor = List.Edit.gotoSymbol(editor, remove!)!;
+      List.Edit.remove(editor);
+    };
+    let tree_ = `LevelTreeFromList := thunk {
+      do within space `inputTree { fromList(list) }
+    };
+    let _ = force tree_;
+    A.Diff.nodeValsFromNodes(A.peekHistory().nodes)
+  };
+
+  /// Random samples: a fresh input seed and a fresh removal position each.
+  ///
+  ///    Both drawn from the seeded generator rather than swept, so no
+  ///    structure of the sampling grid can be mistaken for structure in the
+  ///    answer. Each sample builds its own unedited run, since its input
+  ///    differs from every other sample's.
+  ///
+  /// Positions fall in `2 .. size`; the head is not addressable (#77).
+  public func treeRepairRandom(sampleSeed : Nat, size : Nat, samples : Nat) : Text {
+    let seeds = R.generateRandomInput(sampleSeed, samples);
+    let posns = R.generateRandomInput(sampleSeed + 7919, samples);
+    var out = "";
+    var i = 0;
+    while (i < samples) {
+      let (_, sd) = seeds[i];
+      let (_, pr) = posns[i];
+      let pos = 2 + (pr % (size - 1));
+      let left = treeNodesRun(sd, size, null);
+      let right = treeNodesRun(sd, size, ?pos);
+      let d = A.Diff.nodeValsDiff(left, right);
+      out #= (debug_show sd) # "," # (debug_show size) # "," # (debug_show pos) # ","
+           # (debug_show (d.left.size())) # "," # (debug_show (d.right.size())) # ","
+           # (debug_show (d.onlyLeft.size())) # "," # (debug_show (d.onlyRight.size())) # ","
+           # (debug_show (d.equal.size())) # "," # (debug_show (d.notEqual.size())) # ";";
+      i += 1
+    };
+    out
+  };
+
+  /// Sweep removal positions and report the four numbers for each.
+  ///
+  ///    The unedited run is built once and compared against each edited run,
+  /// because its history is a value: `A.reset()` inside a later run cannot
+  /// disturb a node map already taken.
+  ///
+  /// Positions run from 2 by `step`; the head is not addressable (#77).
+  public func treeRepairSweep(seed : Nat, size : Nat, step : Nat) : Text {
+    let left = treeNodesRun(seed, size, null);
+    var out = "";
+    var r = 2;
+    while (r <= size) {
+      let right = treeNodesRun(seed, size, ?r);
+      let d = A.Diff.nodeValsDiff(left, right);
+      out #= (debug_show seed) # "," # (debug_show size) # "," # (debug_show r) # ","
+           # (debug_show (d.left.size())) # "," # (debug_show (d.right.size())) # ","
+           # (debug_show (d.onlyLeft.size())) # "," # (debug_show (d.onlyRight.size())) # ","
+           # (debug_show (d.equal.size())) # "," # (debug_show (d.notEqual.size())) # ";";
+      r += step
+    };
+    out
+  };
+
+  /// The same list built into a tree twice, differing by one removed cell.
+  ///
+  ///    What a repair would cost, if repair were implemented. Neither run
+  /// reuses anything from the other --- there is no repair algorithm yet, and
+  /// that is deliberate while the specification is still being written. What
+  /// the pair gives instead is the shape of the answer a repair would have to
+  /// produce: which named nodes both runs agree on, which they disagree on,
+  /// and which exist in only one of them.
+  ///
+  ///    Cell 3 is removed rather than any other. Its symbol has the highest
+  /// level of the first several hundred, so it roots every tree over
+  /// positional symbols, and removing it is the worst case rather than a
+  /// typical one (#72). Sampled over twelve seeds at size 16, removing cell 3
+  /// changed 27% of the tree's nodes where a typical position changed 11-16%.
+  #[examplePair]
+  public func examplePairTreeAfterRemoval() : W.ExamplePairOutput {
+    W.pair(treeFromListRun(10, 16, null),
+           treeFromListRun(10, 16, ?3))
+  };
+
   #[test]
   public func testGeom2d<X>(tree : Pointer<SeqTree<X>>) : Geom2D {
     let a = R.generateRandomInput(10, 10);

@@ -81,6 +81,86 @@ module {
         sceneOfOutline(A.Outline.outlines())
     };
 
+    /// Two related runs, and what differs between them.
+    ///
+    ///    What was one panel becomes three. A comparative example answers
+    /// with a left run, a right run, and the difference between them --- and
+    /// each view a plain example offers has all three: left objects beside
+    /// right objects, left outline beside right outline, and for each a
+    /// statement of what changed.
+    ///
+    ///    Both sides are full scenes rather than bare components, because a
+    /// difference between two runs is mostly a difference between their
+    /// histories, and a component list cannot say what a run did. Each side
+    /// therefore has to be produced the way a scene is: reset, run, peek. An
+    /// example that does not reset between the two is not comparing two runs,
+    /// it is comparing a run against itself continued.
+    ///
+    ///    `nodes` is the diff that matters for reuse. `A.Diff.nodeValsDiff`
+    /// compares the two runs node by node, keyed on the pointer, ignoring
+    /// edge ids and meta times because neither affects whether a cached
+    /// result can be used. Its four output fields are the measurement: what
+    /// only the left run named, what only the right named, what both named
+    /// and agreed on, and what both named and disagreed on.
+    ///    `sizes` repeats what `nodes` already holds, as plain numbers, and
+    /// is not redundant. `A.Diff.NodeVals` is a `Map`, whose representation
+    /// is hidden, so a host reading this across a boundary receives it as an
+    /// opaque value --- a rendering, not a structure it can count. The counts
+    /// are the first thing any viewer of a pair wants, so the pair states
+    /// them rather than leaving each host to parse them back out.
+    public type ExamplePairOutput = {
+        left : A.Scene.Scene;
+        right : A.Scene.Scene;
+        nodes : A.Diff.NodeValsDiff;
+        sizes : DiffSizes;
+    };
+
+    /// The four numbers, and the two totals they came from.
+    ///
+    /// The maps themselves say which nodes; these say how many, which is what
+    /// a panel shows first and what a measurement over many runs collects.
+    public type DiffSizes = {
+        left : Nat;
+        right : Nat;
+        onlyLeft : Nat;
+        onlyRight : Nat;
+        equal : Nat;
+        notEqual : Nat;
+    };
+
+    public func diffSizes(d : A.Diff.NodeValsDiff) : DiffSizes {
+        { left = d.left.size();
+          right = d.right.size();
+          onlyLeft = d.onlyLeft.size();
+          onlyRight = d.onlyRight.size();
+          equal = d.equal.size();
+          notEqual = d.notEqual.size() }
+    };
+
+    /// Two scenes, paired, with the node diff computed from their histories.
+    ///
+    /// The caller produces each side; this only relates them. Which two runs
+    /// are worth comparing is a judgement, like the rest of an example.
+    public func pair(left : A.Scene.Scene, right : A.Scene.Scene) : ExamplePairOutput {
+        let nodes = A.Diff.nodeValsDiff(
+            A.Diff.nodeValsFromNodes(left.history.nodes),
+            A.Diff.nodeValsFromNodes(right.history.nodes));
+        { left; right; nodes; sizes = diffSizes(nodes) }
+    };
+
+    /// How much of the larger run the difference covers: the share of nodes a
+    /// repair would have to touch, were repair implemented.
+    ///
+    /// `onlyLeft + onlyRight + notEqual` over the larger of the two runs.
+    /// Nodes both runs named and agreed on are the ones a repair gets for
+    /// free, so they are what this measures against.
+    public func diffFraction(d : A.Diff.NodeValsDiff) : Float {
+        let s = diffSizes(d);
+        let changed = s.onlyLeft + s.onlyRight + s.notEqual;
+        let total = if (s.left >= s.right) { s.left } else { s.right };
+        if (total == 0) { 0.0 } else { (0.0 + changed) / (0.0 + total) }
+    };
+
     /// An example's components, plus the history the runtime kept: an
     /// `A.Scene.Scene`, exactly as that type stands.
     ///
