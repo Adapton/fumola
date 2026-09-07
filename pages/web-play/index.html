@@ -282,6 +282,30 @@
         accent-color: var(--green);
       }
 
+      /* Walking around the scene: where to stand, how fast to circle, how
+         far out. Top right, the corner the other controls left free. */
+      .viewport .orbit {
+        position: absolute; right: 0.7rem; top: 0.55rem;
+        display: flex; flex-direction: column; gap: 0.3rem;
+        font: 400 0.64rem/1.3 var(--mono); color: var(--dim);
+        background: rgba(8, 8, 11, 0.72); padding: 0.35rem 0.45rem;
+        border: 1px solid var(--rule); border-radius: 3px;
+      }
+      .viewport .orbit .where { display: flex; gap: 0.25rem; }
+      .viewport .orbit button {
+        font: inherit; color: var(--fg); background: none; cursor: pointer;
+        border: 1px solid var(--rule); border-radius: 2px;
+        padding: 0.1rem 0.35rem;
+      }
+      .viewport .orbit button:hover { border-color: var(--green); }
+      .viewport .orbit button[aria-pressed="true"] {
+        color: var(--bg); background: var(--green); border-color: var(--green);
+      }
+      .viewport .orbit label { display: flex; align-items: center; gap: 0.3rem; }
+      .viewport .orbit input[type="range"] {
+        width: 5rem; margin: 0; accent-color: var(--green);
+      }
+
       /* The crossfader, opposite the hint: two runs in one canvas, and a
          slider to dissolve between them. */
       .viewport .fader {
@@ -1796,6 +1820,7 @@
         mounted.hint.remove();
         if (mounted.fader) mounted.fader.remove();
         if (mounted.trail) mounted.trail.remove();
+        if (mounted.orbit) mounted.orbit.remove();
         if (mounted.caption) mounted.caption.remove();
         if (mounted.readout) mounted.readout.remove();
         mounted = null;
@@ -2094,6 +2119,10 @@
         const away = new THREE.Vector3(0.45, 0.35, 1).normalize()
           .multiplyScalar(fit * 0.85);
         camera.position.copy(centre).add(away);
+        // What the fit chose. The distance control moves relative to this
+        // rather than in absolute units, so it means the same thing whatever
+        // the scene's size.
+        const fittedDistance = away.length();
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.target.copy(centre);
         controls.enableDamping = true;
@@ -2402,8 +2431,60 @@
 
         let movingUntil = 0;
         let lastCool = performance.now();
+        let lastSpin = performance.now();
         sideGroups.forEach((s) => { s.opacity = 1; });
         setMix(0.5);
+
+        /// Sweeping the fader by itself, so a pair can be watched with both
+        /// hands free -- which is what it is for when it is being shown to
+        /// someone rather than driven.
+        ///
+        ///    Eased rather than linear, and with a pause at each end. A
+        /// linear sweep arrives at an end and leaves immediately, so the
+        /// arrangement you were trying to see is gone before you have seen
+        /// it; the dwell is what makes the two runs legible as two runs. The
+        /// motion between is a cosine, which is the sine-wave feel of easing
+        /// out of one end and into the other.
+        const PING_DWELL = 0.18;
+        let pinging = false;
+        let pingButton = null;
+        // Declared here rather than where the control is built: the frame
+        // loop reads it, and the loop starts first.
+        let faderInput = null;
+        let pingPhase = 0;
+        let pingPeriodMs = 6000;
+
+        const pingAt = (phase) => {
+          const move = (1 - 2 * PING_DWELL) / 2;
+          if (phase < PING_DWELL) return 0;
+          if (phase < PING_DWELL + move) {
+            const u = (phase - PING_DWELL) / move;
+            return 0.5 - 0.5 * Math.cos(u * Math.PI);
+          }
+          if (phase < 2 * PING_DWELL + move) return 1;
+          const u = (phase - 2 * PING_DWELL - move) / move;
+          return 0.5 + 0.5 * Math.cos(u * Math.PI);
+        };
+
+        const HEIGHTS = { above: 52, beside: 6, below: -38 };
+        let orbiting = null;
+        let orbitAz = (Math.atan2(away.x, away.z) * 180) / Math.PI;
+        let orbitRate = 12;
+        let orbitReach = 1;
+
+        const placeCamera = () => {
+          if (orbiting === null) return;
+          const d = fittedDistance * orbitReach;
+          const el = (HEIGHTS[orbiting] * Math.PI) / 180;
+          const az = (orbitAz * Math.PI) / 180;
+          const flat = Math.cos(el) * d;
+          camera.position.set(
+            controls.target.x + Math.sin(az) * flat,
+            controls.target.y + Math.sin(el) * d,
+            controls.target.z + Math.cos(az) * flat
+          );
+          camera.lookAt(controls.target);
+        };
 
         const anim = { id: 0 };
         const tick = () => {
@@ -2430,6 +2511,21 @@
             showPaths(g);
             if (g === 0 && !anyHeat) movingUntil = 0;
           }
+          if (orbiting !== null) {
+            orbitAz = (orbitAz + (orbitRate * (now - lastSpin)) / 1000) % 360;
+            placeCamera();
+          }
+          if (pinging && sideGroups.length > 1) {
+            pingPhase = (pingPhase + (now - lastSpin) / pingPeriodMs) % 1;
+            const t = pingAt(pingPhase);
+            // The control is moved to match, without dispatching: an `input`
+            // event is how the user's own hand is told apart from this, and
+            // that is what stops the sweep.
+            if (faderInput) faderInput.value = String(t);
+            noteMoved();
+            setMix(t);
+          }
+          lastSpin = now;
           controls.update();
           renderer.render(scene, camera);
         };
@@ -2512,6 +2608,10 @@
           range.setAttribute("aria-label", "Fade between the two runs");
           let was = Number(range.value);
           range.addEventListener("input", () => {
+            // Only the user's own hand reaches here; the sweep sets `value`
+            // without dispatching, precisely so that this can tell them apart.
+            pinging = false;
+            if (pingButton) pingButton.setAttribute("aria-pressed", "false");
             const now = Number(range.value);
             if (now !== was) noteMoved();
             was = now;
@@ -2519,6 +2619,7 @@
           });
           fader.append(left, range, right);
           host.appendChild(fader);
+          faderInput = range;
         }
 
         // Only when there is something for it to govern.
@@ -2547,13 +2648,99 @@
           host.appendChild(trail);
         }
 
+        /// Walk around the scene, from above, beside, or below.
+        ///
+        ///    Three heights and a circle. Aiming from a fixed elevation and
+        /// turning is how a person looks at a thing on a table, and it shows
+        /// depth in a way no single view does -- which for a pair matters,
+        /// since the two runs differ in three dimensions and a still picture
+        /// flattens one of them away.
+        ///
+        ///    Dragging stops it. A control that fights the mouse is worse
+        /// than no control, and wanting to look at something is exactly when
+        /// the automatic motion should get out of the way.
+        const orbit = document.createElement("div");
+        orbit.className = "orbit";
+        const where = document.createElement("div");
+        where.className = "where";
+        const buttons = {};
+        for (const name of ["above", "beside", "below"]) {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.textContent = name;
+          b.setAttribute("aria-pressed", "false");
+          b.addEventListener("click", () => {
+            // Pressing the one already running stops it, so the same button
+            // both starts and ends the walk.
+            orbiting = orbiting === name ? null : name;
+            for (const [n, el] of Object.entries(buttons))
+              el.setAttribute("aria-pressed", String(orbiting === n));
+            placeCamera();
+            showCamera();
+          });
+          buttons[name] = b;
+          where.appendChild(b);
+        }
+        const dial = (text, min, max, step, value, onInput) => {
+          const label = document.createElement("label");
+          const cap = document.createElement("span");
+          cap.textContent = text;
+          const r = document.createElement("input");
+          r.type = "range";
+          r.min = String(min); r.max = String(max);
+          r.step = String(step); r.value = String(value);
+          r.setAttribute("aria-label", text);
+          r.addEventListener("input", () => onInput(Number(r.value)));
+          label.append(cap, r);
+          return label;
+        };
+        orbit.append(
+          where,
+          dial("spin", 0, 60, 1, orbitRate, (v) => { orbitRate = v; }),
+          dial("out", 0.4, 3, 0.05, orbitReach, (v) => {
+            orbitReach = v;
+            placeCamera();
+            showCamera();
+          })
+        );
+        if (sideGroups.length > 1) {
+          const row = document.createElement("div");
+          row.className = "where";
+          pingButton = document.createElement("button");
+          pingButton.type = "button";
+          pingButton.textContent = "ping-pong";
+          pingButton.setAttribute("aria-pressed", "false");
+          pingButton.addEventListener("click", () => {
+            pinging = !pinging;
+            pingButton.setAttribute("aria-pressed", String(pinging));
+          });
+          row.appendChild(pingButton);
+          orbit.append(
+            row,
+            // Seconds for a there-and-back, which is the unit anyone watching
+            // it would use. Inverted, so rightwards is faster like the others.
+            dial("pace", 1.5, 14, 0.5, pingPeriodMs / 1000, (v) => {
+              pingPeriodMs = (15.5 - v) * 1000;
+            })
+          );
+        }
+        host.appendChild(orbit);
+
+        // Taking hold of the scene ends the walk.
+        controls.addEventListener("start", () => {
+          if (orbiting === null) return;
+          orbiting = null;
+          for (const el of Object.values(buttons))
+            el.setAttribute("aria-pressed", "false");
+        });
+
         showCamera();
         controls.addEventListener("change", showCamera);
 
         mounted = {
           renderer, controls, geometries, materials, textures, observer, hint,
           caption, readout,
-          setMix, sideCount: sideGroups.length, fader, trail,
+          setMix, sideCount: sideGroups.length, fader, trail, orbit,
           get frame() { return anim.id; },
         };
         return true;
