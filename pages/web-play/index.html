@@ -579,23 +579,36 @@
       // not known until the manifest is read. Every use below is already
       // either behind `ready` or inside a try/catch that falls back to plain
       // text, so the window before they are assigned needs no new guard.
+      // Fetched once and shared: the runtime and the vendored libraries are
+      // both versioned by it, and two fetches could straddle a deploy and
+      // disagree. `no-cache` revalidates rather than trusting the 600s
+      // window -- this is the one request whose staleness would defeat the
+      // point, and it is a few hundred bytes answered by a 304.
+      let manifestPromise = null;
+      const manifest = () => {
+        if (manifestPromise) return manifestPromise;
+        manifestPromise = fetch("../runtime.json", { cache: "no-cache" })
+          .then((reply) => (reply.ok ? reply.json() : null))
+          .catch(() => null);
+        return manifestPromise;
+      };
+
       let fumola_ensure_mode, fumola_eval_top, fumola_reset,
           fumola_tokens, fumola_modules, fumola_module_source;
       const loadRuntime = async () => {
         let glue = "../fumola_wasm.js",
             wasm = "../fumola_wasm_bg.wasm",
             version = "stable";
-        try {
-          const reply = await fetch("../runtime.json", { cache: "no-cache" });
-          if (reply.ok) {
-            const manifest = await reply.json();
-            glue = manifest.js;
-            wasm = manifest.wasm;
-            version = manifest.hash;
-          }
-        } catch (e) {
-          // The copies beside the site root, which are the current build at
-          // publish time. Reached only if the manifest is unavailable.
+        const m = await manifest();
+        // Both or neither: wasm-bindgen emits the glue and the binary as a
+        // matched set and they do not load if their versions disagree, so a
+        // half-applied manifest would be worse than ignoring one. Without a
+        // manifest, the copies beside the site root -- the current build at
+        // publish time.
+        if (m && m.js && m.wasm) {
+          glue = m.js;
+          wasm = m.wasm;
+          version = m.hash || "unknown";
         }
         const mod = await import(glue);
         ({ fumola_ensure_mode, fumola_eval_top, fumola_reset,
@@ -1533,9 +1546,19 @@
 
       const loadThree = async () => {
         if (three) return three;
+        // Versioned like the runtime, and for the same reason: served from a
+        // stable URL under a cache window we do not control, three.js can be
+        // a deploy behind the page that uses it. An outline once drew as raw
+        // text for exactly this reason. See #69.
+        //
+        // Both come from one directory, which is what keeps OrbitControls'
+        // own `import './three.module.min.js'` resolving inside the same
+        // version -- a mismatched pair would find two copies of three.js.
+        const m = await manifest();
+        const dir = (m && m.vendor) || "../vendor";
         const [THREE, orbit] = await Promise.all([
-          import("../vendor/three.module.min.js"),
-          import("../vendor/OrbitControls.js"),
+          import(dir + "/three.module.min.js"),
+          import(dir + "/OrbitControls.js"),
         ]);
         three = { THREE, OrbitControls: orbit.OrbitControls };
         return three;

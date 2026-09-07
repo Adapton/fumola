@@ -67,6 +67,24 @@ done
 HASH="$(cat "$WASM" "$GLUE" | sha256sum | cut -c1-16)"
 BUILT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
+# The vendored libraries get the same treatment for the same reason: they are
+# served from stable URLs under max-age, so a page can pick up a new module and
+# an old three.js. They are versioned as a set rather than per file, because
+# OrbitControls.js imports './three.module.min.js' -- a relative path, which a
+# versioned directory keeps correct without touching vendor code, and which
+# would break the moment the two were allowed to come from different versions.
+#
+# Names are hashed along with contents, so adding or renaming a file is a new
+# version even when the bytes already present are unchanged.
+VENDOR_HASH=""
+if [ -d "$PAGES/vendor" ]; then
+  VENDOR_HASH="$(
+    cd "$PAGES/vendor" && find . -type f | LC_ALL=C sort | \
+      while IFS= read -r f; do printf '%s\0' "$f"; cat "$f"; done | \
+      sha256sum | cut -c1-16
+  )"
+fi
+
 if [ -e "$OUT" ]; then
   echo "$OUT already exists; refusing to assemble into it" >&2
   exit 1
@@ -80,6 +98,13 @@ mkdir -p "$OUT/v"
 if [ -n "$PREVIOUS" ] && [ -d "$PREVIOUS/v" ]; then
   cp -r "$PREVIOUS/v/." "$OUT/v/"
   echo "carried forward $(find "$OUT/v" -mindepth 1 -maxdepth 1 -type d | wc -l) previous version(s)"
+fi
+
+# The same for vendor, but only the hashed directories: the unhashed files
+# beside them come from pages/ on every publish and are not history.
+if [ -n "$PREVIOUS" ] && [ -d "$PREVIOUS/vendor" ]; then
+  mkdir -p "$OUT/vendor"
+  find "$PREVIOUS/vendor" -mindepth 1 -maxdepth 1 -type d -exec cp -r {} "$OUT/vendor/" \;
 fi
 
 # This build's version. Overwritten rather than skipped when the hash is
@@ -99,6 +124,7 @@ fi
 
 VERSIONS="$(
   HASH="$HASH" COMMIT="$COMMIT" BUILT="$BUILT" KEEP="$KEEP" \
+  VENDOR_HASH="$VENDOR_HASH" \
   python3 -c '
 import json, os, sys
 prev = json.loads(sys.stdin.read() or "[]")
@@ -107,7 +133,8 @@ hash_, commit, built, keep = (
 # A rehash of identical content keeps its place in history rather than
 # appearing twice; its metadata is refreshed to this build.
 prev = [v for v in prev if v.get("hash") != hash_]
-entry = {"hash": hash_, "commit": commit, "built": built}
+entry = {"hash": hash_, "commit": commit, "built": built,
+         "vendor": os.environ.get("VENDOR_HASH", "")}
 print(json.dumps(([entry] + prev)[:keep], indent=2))
 ' <<< "$PREV_VERSIONS"
 )"
@@ -127,13 +154,18 @@ done
 # What a client fetches to find the current version. The only mutable URL in
 # the loading path, and a few hundred bytes, so revalidating it is a
 # conditional request answered by a 304 -- as against revalidating 5.6 MB.
+VENDOR_FIELD=""
+if [ -n "$VENDOR_HASH" ]; then
+  VENDOR_FIELD=",
+  \"vendor\": \"/vendor/$VENDOR_HASH\""
+fi
 cat > "$OUT/runtime.json" <<JSON
 {
   "hash": "$HASH",
   "commit": "$COMMIT",
   "built": "$BUILT",
   "js": "/v/$HASH/fumola_wasm.js",
-  "wasm": "/v/$HASH/fumola_wasm_bg.wasm"
+  "wasm": "/v/$HASH/fumola_wasm_bg.wasm"$VENDOR_FIELD
 }
 JSON
 
@@ -144,10 +176,35 @@ JSON
 # together, which at least works.
 cp "$GLUE" "$WASM" "$OUT/"
 
-# The pages last, so they can never be shadowed by a generated file.
+# The pages last, so they can never be shadowed by a generated file. This also
+# lays down the unhashed vendor/ files, which stay for the same reason the
+# unhashed runtime pair does: pages already published reference them.
 cp -r "$PAGES/." "$OUT/"
+
+# The hashed vendor set, copied after the pages so it cannot be clobbered by
+# them. Both files land in one directory, which is what keeps OrbitControls'
+# relative import of three.module.min.js resolving within its own version.
+if [ -n "$VENDOR_HASH" ]; then
+  mkdir -p "$OUT/vendor/$VENDOR_HASH"
+  cp -r "$PAGES/vendor/." "$OUT/vendor/$VENDOR_HASH/"
+  # A carried-forward vendor version stays while any retained entry still
+  # names it. Vendor changes far less often than the runtime, so one directory
+  # usually serves the whole window rather than one per entry.
+  KEPT_VENDOR="$(printf '%s' "$VERSIONS" | python3 -c '
+import json, sys
+print("\n".join(v.get("vendor", "") for v in json.load(sys.stdin) if v.get("vendor")))')"
+  for dir in "$OUT"/vendor/*/; do
+    [ -d "$dir" ] || continue
+    name="$(basename "$dir")"
+    if ! grep -qxF "$name" <<< "$KEPT_VENDOR"; then
+      echo "pruning vendor $name"
+      rm -rf "$dir"
+    fi
+  done
+fi
 
 echo
 echo "assembled $OUT"
 echo "  version $HASH  (commit ${COMMIT:-unknown})"
 echo "  retaining $(python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' < "$OUT/versions.json") version(s), keep=$KEEP"
+echo "  vendor  ${VENDOR_HASH:-none}"

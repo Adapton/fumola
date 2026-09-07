@@ -48,11 +48,15 @@ bindings() { # bindings <dir> <marker>
   printf 'fake wasm %s\n' "$2" > "$1/fumola_wasm_bg.wasm"
 }
 
-pages() {
-  mkdir -p "$1/web-play"
+pages() { # pages <dir> [vendor marker]
+  mkdir -p "$1/web-play" "$1/vendor"
   echo '<html>index</html>' > "$1/index.html"
   echo '<html>web-play</html>' > "$1/web-play/index.html"
+  printf 'three %s\n' "${2:-v1}" > "$1/vendor/three.module.min.js"
+  printf "import './three.module.min.js'; // %s\n" "${2:-v1}" > "$1/vendor/OrbitControls.js"
 }
+
+vendor_of() { python3 -c 'import json,sys; m=json.load(sys.stdin); print(m.get("vendor",""))' < "$1/runtime.json"; }
 
 hash_of() { python3 -c 'import json,sys; print(json.load(sys.stdin)["hash"])' < "$1/runtime.json"; }
 version_count() { python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' < "$1/versions.json"; }
@@ -76,6 +80,18 @@ check "the manifest names the commit"      "aaaa111" \
   "$(python3 -c 'import json,sys; print(json.load(sys.stdin)["commit"])' < "$WORK/s1/runtime.json")"
 check "the manifest js path is absolute"   "/v/$H1/fumola_wasm.js" \
   "$(python3 -c 'import json,sys; print(json.load(sys.stdin)["js"])' < "$WORK/s1/runtime.json")"
+
+V1="$(vendor_of "$WORK/s1")"
+check "the manifest names a vendor version" "yes" "$([ -n "$V1" ] && echo yes || echo no)"
+check_file "the hashed three.js"      "$WORK/s1${V1}/three.module.min.js"
+check_file "the hashed OrbitControls" "$WORK/s1${V1}/OrbitControls.js"
+check_file "the unhashed vendor files stay for already-published pages" \
+  "$WORK/s1/vendor/three.module.min.js"
+# The whole reason for hashing the directory rather than the files: this
+# relative import has to resolve inside one version.
+check "OrbitControls' sibling import resolves within its own version" "yes" \
+  "$(grep -q "\./three.module.min.js" "$WORK/s1${V1}/OrbitControls.js" \
+     && [ -f "$WORK/s1${V1}/three.module.min.js" ] && echo yes || echo no)"
 
 echo
 echo "the stable copies match the hashed ones -- a client on either path gets the same bytes"
@@ -126,6 +142,26 @@ check "history is capped at keep"  "3" "$(version_count "$WORK/s6")"
 check "directories match history"  "3" \
   "$(find "$WORK/s6/v" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
 check_absent "the oldest version's directory is gone" "$WORK/s6/v/$H1"
+
+echo
+echo "vendor is versioned independently of the runtime"
+# Same vendor, new runtime: the vendor version must not churn.
+check "an unchanged vendor keeps its hash across a runtime-only publish" "$V1" \
+  "$(vendor_of "$WORK/s2")"
+# Changed vendor: a new version, and the old one still reachable.
+pages "$WORK/pages2" v2
+bindings "$WORK/b7" seven
+"$ASSEMBLE" --bindings "$WORK/b7" --pages "$WORK/pages2" --out "$WORK/s7" \
+  --previous "$WORK/s2" --commit eeee777 >/dev/null
+V2="$(vendor_of "$WORK/s7")"
+check "a changed vendor gets a new hash" "different" \
+  "$([ "$V1" != "$V2" ] && echo different || echo same)"
+check_file "the new vendor version"       "$WORK/s7${V2}/three.module.min.js"
+check_file "the old vendor version survives for pinned pages" \
+  "$WORK/s7${V1}/three.module.min.js"
+check "the old vendor version still has its ORIGINAL bytes" "same" \
+  "$(cmp -s "$WORK/s7${V1}/three.module.min.js" "$WORK/pages/vendor/three.module.min.js" \
+     && echo same || echo differ)"
 
 echo
 echo "refusals"
