@@ -1,14 +1,18 @@
 # The Fumola web playground: requirements, design, and measurements
 
 **Artifact:** <https://fumola.org/web-play> · **Source:** `pages/web-play/index.html`,
-`pages/vendor/` · **Status:** running; 17 of 17 library tests and 4 of 4 examples execute
-green in the browser.
+`pages/vendor/` · **Status:** running; 32 of 32 library tests execute green in the browser,
+alongside seven examples and four example pairs.
 
 This document records what was built, why each part exists, and what was measured. It is
 organised by requirement rather than chronologically. §10 places the playground in the
-project's history, which begins in 2022 and reaches Adapton in 2025. §6 lists two defects in
-the Fumola implementation that were found by building the tool, and is the section most likely
-to matter outside this page.
+project's history, which begins in 2022 and reaches Adapton in 2025. §6 lists defects in the
+Fumola implementation that were found by building the tool, and is the section most likely to
+matter outside this page.
+
+Three companion documents cover ground this one only summarises: how the pair view's encoding
+was arrived at and what broke on the way, how to present the demo, and what an edit costs a
+demanded computation graph. They are listed in §13.
 
 ---
 
@@ -21,6 +25,12 @@ framework, and no runtime network dependency.
 It replaces a small "try it" box on the Fumola homepage. It is intended to overlap with, and
 eventually replace, `replayground-www/`, an existing DCG viewer that renders a scene captured
 to a JSON file in advance.
+
+Its subject has widened since. It began as a way to run Fumola in a browser and show one run;
+it is now also a way to show the difference between **two** runs, which is what a tool about
+incremental computation has to be able to do. That is what `#[examplePair]` (§4.4) and the pair
+view (§9) are for, and it is the direction the remaining work points in: incrementally built
+scenes (§11.5) and scene deltas (§11.10).
 
 ---
 
@@ -43,7 +53,7 @@ Each row states the observation that motivated the requirement and the feature b
 | R11 | Library source had no line numbers | Gutter, sticky under horizontal scroll |
 | R12 | Examples could not be shared | URL anchors and a copy button |
 | R13 | Editing a test body fails one assertion at a time | `// assert` button: comments out all assertion statements |
-| R14 | A program had no way to state how it should be drawn | `#[example]` and the `#scene` return shape |
+| R14 | A program had no way to state how it should be drawn | `#[example]`, returning the components directly |
 | R15 | Drawing a scene polluted the graph being drawn | `A.scratch`, a new primitive |
 | R16 | Scenes were not rendered | 3D viewport; outline panel |
 
@@ -82,7 +92,7 @@ module. It is removed as soon as the editor content differs from what was loaded
 
 ---
 
-## 4. `#[example]` and the `#scene` shape
+## 4. `#[example]`, `#[examplePair]`, and what a program hands over
 
 ### 4.1 Motivation
 
@@ -105,7 +115,7 @@ public type SceneComponents = {
     objects : [ A.Scene.SceneObject ];
     outline : [ A.Outline.Outline ];
 };
-public type ExampleOutput = { #scene : SceneComponents };
+public type ExampleOutput = SceneComponents;
 ```
 
 `objects` is `A.Scene.Scene`'s own array of `SceneObject`. `outline` is a forest: zero or more
@@ -118,17 +128,50 @@ Constructors `scene`, `sceneOfObjects`, `sceneOfOutline`, `sceneOfOneOutline` an
 `sceneOfForces` are provided; the last offers every top-level force in the order forced, and
 requires no decisions from the author.
 
-`withHistory : ExampleOutput -> ?A.Scene.Scene` adds the runtime's history. Its result is
-optional, and non-empty only for a forest of exactly one tree, because `A.Scene.Scene` carries
-a single outline (§11.4).
+`withHistory` adds the runtime's history.
 
-### 4.3 Contract
+The `#scene` tag these values once carried has been dropped. A record carrying `objects` and
+`outline` is recognisable as a scene by having those fields, and requiring a wrapper only meant
+that code already holding the right shape had to take it apart and put it back together —
+`A.Scene.Scene` is such a record already.
+
+### 4.4 `#[examplePair]`
+
+An example may instead answer with two related runs and the difference between them:
+
+```fumola
+public type ExamplePairOutput = {
+    left : SceneComponents;
+    right : SceneComponents;
+    sizes : DiffSizes;      // the four counts
+    keys : DiffKeys;        // leftOnly, rightOnly, notEqual, as [Text]
+};
+```
+
+Two decisions in that shape were forced by measurement rather than taste.
+
+**The counts are stated, not derived.** `A.Diff.NodeVals` is a `Map`, whose representation is
+hidden, so it crosses the boundary as an opaque *rendering* — a string, not a structure. The
+first version counted it with `Array.isArray` and every panel confidently reported "0 of 0 nodes
+differ" while the CLI reported 60 equal, 16 not equal, 4 only left. Parsing that rendering in
+JavaScript would have been the wrong repair.
+
+**The histories do not cross.** They are what the diff is computed *from*, not what anyone looks
+at, and they were 69% of the payload. `keys` carries what a host needs to say *how* two runs
+differ: three lists of names, and the assumption that anything unnamed was named by both runs and
+agreed. A name is the same `Text` an object carries as its `label_`, because both come from
+`debug_show` of the node's pointer — so a host matches an object against these lists directly,
+with no second key scheme to keep in step.
+
+The outlines do not cross either, until their panel is opened. See §8 for what each of those cost.
+
+### 4.5 Contract
 
 - An `#[example]` takes `()` and must succeed when applied to `()`. This is not enforced by the
   playground; it is a lint for CI and the CLI, and is currently unimplemented.
 - The playground's trigger is the **value** the editor evaluates to, not the presence of the
-  attribute. Any expression evaluating to `#scene` fills the panels. `#[example]` is how a
-  library function opts into producing such a value and into being listed.
+  attribute. Any expression carrying `objects` and `outline` fills the panels. `#[example]` is
+  how a library function opts into producing such a value and into being listed.
 - `#[example]` required no parser or lexer change: attributes are already generic in the AST,
   and `handle_test` matches only the identifier `"test"`, so `#[example]` parsed and was
   ignored before any Rust was written.
@@ -305,6 +348,27 @@ a `pre` inherits. Both stacked-layer techniques in the page were affected.
 | Scene generation, sizes 4 / 10 / 16 / 24 / 44 | 119 / 279 / 484 / 1159 / 2527 ms |
 | `A.scratch` overhead | not measurable; two heaviest tests unchanged at ~2.1 s |
 | three.js, vendored | 692 KB, fetched on first scene only |
+| Tree pair: stepping / boundary handoff / rendering | 56 ms / 196 ms / ~950 ms |
+| Tree pair reply, as first written | 1.173 MB, 232 ms |
+| … without the two histories | 0.355 MB, 178 ms |
+| … also without the outlines, fetched on demand | 0.037 MB, 45 ms |
+| Fader move, mergeSort pair, before and after the repaint fix | ~1000 ms → 1.26 ms |
+| One `treeFromListRun` | 56,866 steps |
+| Whole tree pair | 138,271 steps |
+
+The three-way split in the first row is the finding that shaped the rest. A
+step-limited eval was built to report progress on a run that felt slow (§12),
+and the stepping turned out to be 56 ms of it. The 196 ms is one
+`value_to_json` over a megabyte and cannot be chunked; the ~950 ms is
+rendering. Progress reporting is therefore honest about a fifth of the
+boundary cost and blind to the rest, which is why the payload was cut instead.
+
+Two further measurements bear on incremental structure rather than on the
+page, and are set out in `docs/repair-cost/repair-cost.pdf`: an edit to a
+level tree changes a near-constant number of nodes as the input grows 62×
+(13.7 at n=16, 17.5 at n=1000), while the same edit to mergeSort's merge
+network changes 50% or 17% of the graph depending only on **which** cell is
+removed.
 
 The browser-generated scene JSON is byte-identical to the file `replayground-www/scene.json` was
 produced from, so the existing renderer accepts browser-generated data unmodified.
@@ -313,20 +377,38 @@ produced from, so the existing renderer accepts browser-generated data unmodifie
 
 ## 9. Feature inventory
 
-**Library panel.** Module tree; `examples/` section; `tests/` section. Source view with a line
-number gutter, attribute highlighting, and clickable `#[test]` / `#[example]` markers each with a
-`body` button. Independent font size controls; width snaps; draggable dividers.
+**Library panel.** Module tree; `examples/`, `examplePairs/` and `tests/` sections. Source view
+with a line number gutter, attribute highlighting, and clickable `#[test]` / `#[example]` /
+`#[examplePair]` markers each with a `body` button. Clicking any entry opens its **body** rather
+than a call to it: a call is a name and brackets with nothing to edit, while a body shows the
+arguments and the shape of the work. Independent font size controls; width snaps; draggable dividers.
 
 **Editor.** Lexer-based highlighting; evaluation on input; error line number and banding;
 `// assert`; `share`.
 
 **Panels.** `objects` (3D), `outline`, `events`, `print`. Each indicates non-emptiness on its tab.
-Empty `objects` and `outline` panels display the `#scene` type.
+Empty `objects` and `outline` panels display the type a program would evaluate to. A pair is
+described by a summary line rather than printed, since its value is large and nobody reads it.
+
+**Pair view.** Two runs in one canvas: matched objects are drawn once and slide from where the
+left run puts them to where the right run does, with their pointer lines and action geometry
+following. A crossfader moves between the runs; glide indicators show each object's path, white
+or the object's own colour where the runs agree and magenta where they do not; a node only one
+run has peaks in magenta at the halfway mark. `trail` sets how strongly the indicators show. How
+the encoding was arrived at, and the defects found on the way, are recorded separately in
+`docs/diff-view-log.md`.
 
 **3D viewport.** A box or sphere per labelled object at its stated position; a label plane and a
 `textFields` plane per object, as canvas textures; a dot per `pointerFields` name; a line per
 pointer, from the originating dot to the target's top. Orbit controls. Dimensions and offsets
 follow `replayground-www` (`BoxDim = 0.33`), so a scene laid out for it reads at the same scale.
+
+The viewport also names itself and can move by itself. The example's path and the camera's
+position are drawn on the picture, because a screenshot travels without the URL that produced it.
+`above` / `beside` / `below` walk the camera around the scene at a fixed height, with `spin` and
+`out` for rate and distance; while a walk is on, the wheel changes the distance and a drag moves
+what is being walked around, and only a click stops it. `ping-pong` sweeps the crossfader on its
+own, eased with a pause at each end so both arrangements can be seen.
 
 **Outline panel.** A port of `renderOutline` from `replayground-www/index.template.html`,
 operating on values as they cross the wasm boundary rather than on `IntoJSON.fromOutline` output.
@@ -377,9 +459,32 @@ All on 2026-09-06, in approximately this order. Requirement numbers refer to §2
 | Symbol hashing made target-independent (#59, #60) | §6.2 |
 | Renamed to `/web-play`, with `/web-repl` retained as a redirect | |
 | `A.scratch` | §5 |
-| `#[example]` and `#scene`; examples section in the library | §4 |
+| `#[example]`; examples section in the library | §4 |
 | Error line reporting; line number gutter; share links; `// assert` | R10–R13 |
 | 3D viewport; outline panel | R16 |
+
+### 10.4 The pair view
+
+All on 2026-09-07. Requirement numbers refer to §2 where one applies.
+
+| Step | |
+| --- | --- |
+| Repair cost measured: what an edit costs a level tree, and a merge network | `docs/repair-cost/` |
+| `#[examplePair]`: two runs, their node diff, and the counts | §4 |
+| Both runs in one canvas, crossfaded | |
+| Hoisted imports re-addressed after `..` imports landed | §6 |
+| A step limit becomes a pause that can be resumed; `counts` cross the boundary | §12 |
+| The crossfade becomes a glide: matched objects move rather than dissolve | |
+| Glide indicators, with a trail and an intensity dial | |
+| `W.DiffKeys`; the pair sheds its histories, then its outlines | §8 |
+| mergeSort as a pair, and tree-into-list as the rung between | `docs/demo-notes.md` |
+| Walking the camera, and sweeping the fader | §9 |
+
+Three defects in that list are the same defect: shapes, then pointer lines,
+then action geometry were each drawn from both runs at once, because the test
+for whether to draw a thing asked whether its *ends* were in both runs rather
+than whether *it* was. `docs/diff-view-log.md` records those and eight others,
+with how each was found.
 
 Two of those steps are corrections to the language rather than additions to the page, and both
 were prompted by the page failing to run library code that the CLI ran. That is the pattern
@@ -395,22 +500,92 @@ Each is tracked as an issue.
 2. **The outline panel does not cross-link** to the viewport or the events table (#64).
 3. **The `()` contract for `#[example]` is unenforced** (#65). It belongs in `fumola test` or
    CI, not in the page.
-4. **`A.Scene.Scene.outline` is a single outline** (#66). The `#scene` component is now a
-   forest, so an example no longer has to choose which tree to portray, but the two shapes
-   still differ: `withHistory` produces a `Scene` only for a forest of exactly one tree.
-   Changing `A.Scene.Scene` reaches `IntoJSON.fromScene` and the JSON `replayground-www`
-   consumes, so it was not done at the same time.
+4. **`A.Scene.Scene.outline` is a single outline** (#66, outline forests). The components are
+   now a forest, so an example no longer has to choose which tree to portray, but the two
+   shapes still differ. Changing `A.Scene.Scene` reaches `IntoJSON.fromScene` and the JSON
+   `replayground-www` consumes, so it was not done at the same time.
 5. **No scene is built incrementally** (#67). `generateSceneFullDemand` begins with
    `A.reset()`, so repeated runs cost the same. This is the principal obstacle to
    demonstrating incremental computation in a tool built to demonstrate it, and the only item
    here with research content rather than engineering content.
-6. **Evaluation is synchronous** (#68); a size-44 scene blocks the tab for about 2.5 s. A
-   worker is needed before raising the input size, and is also the only means observed of
-   reclaiming memory: `fumola_reset` and `fumola_drop` both leave heap usage unchanged.
-7. **Published assets have stable URLs** (#69), so a deploy leaves browsers a version behind
-   until a hard reload. A content hash would remove the problem.
+6. **Evaluation is synchronous** (#68, no worker); a size-44 scene blocks the tab for about
+   2.5 s. Partly addressed: a run now returns between chunks and reports its step count (§12),
+   so the page is no longer blind to its own progress. It does not fix the tab freezing, and
+   cannot — the largest single cost is one `value_to_json` that a trampoline cannot divide. A
+   worker remains the answer, and is also the only means observed of reclaiming memory:
+   `fumola_reset` and `fumola_drop` both leave heap usage unchanged.
+7. ~~**Published assets have stable URLs** (#69, stale deploys)~~ — **resolved** by
+   content-addressed runtime versions. Observed once from the outside before the fix: a
+   post-deploy fetch returned an object byte-identical to the pre-deploy one while the page was
+   already current, and a minute later the same URL served the right bytes.
+8. **One non-ASCII character hides every attribute below it** (#80, byte vs UTF-16 spans).
+   `fumola_tokens` reports byte offsets and the page reads them as UTF-16 code units. Latent
+   only because every `.fumola` file is currently pure ASCII. The fix wants making once at the
+   boundary rather than at each of the six places the page uses spans.
+9. **A `!` failure inside an edit closure reports the wrong thing** (#77, misleading
+   UnboundIdentifer), which is why the list head is absent from every repair-cost sample.
+10. **Scenes are re-derived and re-sent in full** (#83, scene deltas). Consecutive scenes are
+    mostly the same scene, which is the situation Adapton exists for, applied to the boundary
+    rather than to the computation. Measured, a naive delta is worth less than it looks: 75%
+    of graph nodes are equal between two runs where only 13% of object *bytes* are, because
+    layout is a global function of the input.
+11. **Tutorial mode is not built** (#85, tour the examples). The demo has an argument that
+    depends on order, and reproducing it means remembering three links, which camera suits
+    each, and which numbers to quote. A design is proposed in `docs/tutorial-design.md` and
+    is deliberately not settled: whether an example carries its tutorial or a tutorial names
+    its example, and how much view state is worth recording, are open.
 
-## 12. Relationship to `replayground-www`
+## 12. A step limit that is a pause
+
+The VM has had a step limit since long before the page: `Interruption::Limit`
+was recoverable, excluded from `ends_the_computation`, and `run` already left
+the stack standing for it. Nothing resumed from one, the wasm exposed none of
+it, and the CLI's `--step-limit` was parsed and thrown away beside a `// to do`.
+
+It is wired up now. `fumola_eval_top_limited` runs at most *n* steps and
+answers a value, an error, or `{ok, paused, steps}`; `fumola_resume` continues;
+`fumola_abandon` drops a run nobody is waiting for. Every reply carries
+`counts` — `step`, `redex`, `send` — as the difference across the run rather
+than the instance's lifetime totals, and on the failure path too, since a
+program that failed still did the work it did before failing.
+
+Two details are worth recording because both were got wrong first.
+
+**The limit is a mark, not an allowance.** `Limit::Step` fires when the
+*cumulative* count reaches the limit, so a caller asking for a bare 1000 after
+5000 steps stops immediately and never progresses. `Core::step_budget` is that
+arithmetic, and one test is exactly that regression.
+
+**Progress is the run's, not the instance's.** Importing the library costs tens
+of thousands of steps, so a lifetime total opens high and its rise says nothing
+about the program asked for. Shipped as a total first, it read 137,680 on the
+first chunk of a 138,271-step run, which looked like the limit had failed.
+
+The guarantee that nearly went: `fumola_eval_top` evaluates against a copy and
+commits only on success, so an edit that does not work costs nothing. A
+resumable run cannot do that — a copy would be dropped between calls and take
+the paused computation with it — so it runs against the instance and keeps the
+copy in a thread-local, restoring it on failure and on abandon.
+
+What it does *not* buy is set out in §8: stepping is a fifth of the boundary
+cost, and the rest is one indivisible call.
+
+---
+
+## 13. Companion documents
+
+Three documents, three jobs. This one is what the playground is and why.
+
+| | |
+| --- | --- |
+| `docs/diff-view-log.md` | What broke while building the pair view, and how the encoding was decided. Eleven defects with their mechanisms, and the design reasoning behind the glide, the trail, and the colours. |
+| `docs/demo-notes.md` | How to show it. Three examples in order, what each demonstrates, what to say, with every number measured. |
+| `docs/repair-cost/` | What an edit costs a demanded computation graph. A TeX report with its data; the source of the stability measurements quoted in §8. |
+| `docs/tutorial-design.md` | A proposal for the page presenting the demo itself. Not built, and not settled. |
+
+---
+
+## 14. Relationship to `replayground-www`
 
 `replayground-www` renders a pre-captured scene and has a time cursor with playback, a 3D
 viewport, and a cross-linked outline with clickable chips. The playground has a live runtime, a
@@ -424,3 +599,8 @@ mounting and disposal is written as a unit that owns and releases its resources.
 Remaining work, in dependency order: a metaTime cursor over the events table; a scene object
 retained in the page; outline cross-linking; `#action` rendering. `replayground-www` can be
 retired at that point.
+
+The playground has since acquired one thing `replayground-www` has no equivalent for: a view of
+two runs at once, with the objects they share gliding between their two layouts. That is not a
+port of anything, and it is the part most specific to what Fumola is about — a static log can be
+replayed, but only a live runtime can be asked the same question twice with one thing changed.
