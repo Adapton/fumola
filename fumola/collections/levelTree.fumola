@@ -750,7 +750,7 @@ module {
   /// `remove` names a cell to drop from the list before the tree is built.
   /// `null` is the unedited run. The head cannot be named: the cursor starts
   /// one cell in, which is issue #77.
-  func treeFromListRun(seed : Nat, size : Nat, remove : ?Symbol) : A.Scene.Scene {
+  public func treeFromListRun(seed : Nat, size : Nat, remove : ?Symbol) : A.Scene.Scene {
     A.reset();
     let array = R.generateRandomInput(seed, size);
     let list_ = `ListFromArray := thunk {

@@ -29,7 +29,7 @@ use fumola_semantics::adapton::{Space, Time};
 use fumola_semantics::format::format_one_line;
 use fumola_semantics::value::Value;
 use fumola_syntax::ast::Id;
-use fumola_semantics::vm_types::{ActiveBorrow, LocalPointer, Pointer, ScheduleChoice};
+use fumola_semantics::vm_types::{ActiveBorrow, Counts, LocalPointer, Pointer, ScheduleChoice};
 use wasm_bindgen::prelude::*;
 
 pub mod symbol;
@@ -490,20 +490,30 @@ fn eval_against(id: FumolaInstanceId, program: &str, effects: Effects) -> String
         // to lose every top-level binding in the instance, so a program that
         // failed once made all later programs fail too. An edit that does not
         // work should cost nothing.
+        // Read before the run, so what is reported is what this program
+        // cost rather than what the instance has cost since it was made.
+        let before = state.semantic_state.agent.counts.clone();
         let mut attempt = state.clone();
         let outcome = attempt.eval(program);
         // Drained either way: a program that failed still printed whatever it
         // printed before it failed, and that is usually the interesting part.
         let printed = drain_print(&mut attempt);
+        // Counted either way too. A program that failed still did the work it
+        // did before failing, and how much that was is worth knowing.
+        let counts = counts_since(&before, &attempt.semantic_state.agent.counts);
         match outcome {
             Ok(value) => {
                 let json = with_print(value_to_json(&value), printed);
+                let json = insert_key(json, "counts", counts);
                 if let Effects::Keep = effects {
                     *state = attempt;
                 }
                 json
             }
-            Err(e) => with_print(error_of_with_trace(&e, &mut attempt), printed),
+            Err(e) => {
+                let json = with_print(error_of_with_trace(&e, &mut attempt), printed);
+                insert_key(json, "counts", counts)
+            }
         }
     })
 }
@@ -553,6 +563,22 @@ fn with_print(json: String, printed: Vec<String>) -> String {
 ///
 /// Splicing after the opening brace does neither, and assumes only what is
 /// always true here: the reply is a JSON object.
+/// What a single program cost, from the instance's running totals.
+///
+/// `Counts` accumulates over an instance's whole life, so one program's work
+/// is the difference across it. A host wants that difference: the totals only
+/// ever grow, and say nothing about the run just asked for.
+///
+/// Saturating, because the instance is restored from a copy on failure and a
+/// later total is not guaranteed to be the larger one.
+fn counts_since(before: &Counts, after: &Counts) -> serde_json::Value {
+    serde_json::json!({
+        "step": after.step.saturating_sub(before.step),
+        "redex": after.redex.saturating_sub(before.redex),
+        "send": after.send.saturating_sub(before.send),
+    })
+}
+
 fn insert_key(json: String, key: &str, value: serde_json::Value) -> String {
     let trimmed = json.trim_start();
     if !trimmed.starts_with('{') {
