@@ -28,6 +28,7 @@ use fumola::state::State;
 use fumola_semantics::adapton::{Space, Time};
 use fumola_semantics::format::format_one_line;
 use fumola_semantics::value::Value;
+use fumola_semantics::Interruption;
 use fumola_syntax::ast::Id;
 use fumola_semantics::vm_types::{ActiveBorrow, Counts, LocalPointer, Pointer, ScheduleChoice};
 use wasm_bindgen::prelude::*;
@@ -551,18 +552,165 @@ fn with_print(json: String, printed: Vec<String>) -> String {
     insert_key(json, "printed", serde_json::json!(printed))
 }
 
-/// Add one key to a JSON object without parsing the object.
+thread_local! {
+    /// The instance as it stood before a chunked run began.
+    ///
+    /// `fumola_eval_top` evaluates against a copy and commits only on
+    /// success, so an edit that does not work costs nothing. A resumable run
+    /// cannot do that -- a copy would be dropped between calls, taking the
+    /// paused computation with it -- so it runs against the instance and
+    /// keeps the copy here instead. On failure, or when a host abandons the
+    /// run, the copy goes back. The guarantee is the same; only where the
+    /// copy lives has moved.
+    static BEFORE_CHUNKS: RefCell<HashMap<FumolaInstanceId, State>> =
+        RefCell::new(HashMap::new());
+}
+
+/// Evaluate at the top level, stopping after `steps` and reporting progress.
 ///
-/// The obvious route -- `from_str`, insert, `to_string` -- loses the key in
-/// silence on exactly the values worth printing about. serde's default
-/// recursion limit is 128 and a scene value nests past 200, so the parse
-/// fails and the old code returned the reply unchanged: a program that
-/// printed its way through building a scene had its output dropped, with
-/// nothing to say so. It would also re-serialise a value that can run to
-/// megabytes, to add a few hundred bytes.
+///    One synchronous call cannot say how far along it is, so a host that
+/// wants to show progress has to be handed control back. This runs at most
+/// `steps` steps and answers either the program's outcome or
+/// `{"ok": true, "paused": true, "steps": n}`, which `fumola_resume`
+/// continues from.
 ///
-/// Splicing after the opening brace does neither, and assumes only what is
-/// always true here: the reply is a JSON object.
+///    Paused work lives in the instance, not here. The continuation and the
+/// stack are left standing -- `run` unwinds a scratch only for an
+/// interruption that ends the computation, and a limit is deliberately not
+/// one -- so the instance is mid-computation until it is resumed or
+/// abandoned. `fumola_abandon` is how a host drops it.
+///
+///    Unlike `fumola_eval_top` this evaluates against the instance itself
+/// rather than against a copy. A copy cannot be resumed: the next call would
+/// have to find the same paused computation, and it would have been dropped
+/// with the copy. So a program that fails here can leave the instance
+/// altered, which is the cost of being resumable and the reason the
+/// unlimited entry points still exist.
+#[wasm_bindgen]
+pub fn fumola_eval_top_limited(
+    id: FumolaInstanceId,
+    program_text: &str,
+    steps: usize,
+) -> String {
+    INSTANCES.with(|m| {
+        let mut m = m.borrow_mut();
+        let state = match m.get_mut(&id) {
+            Some(state) => state,
+            None => return error_json(&format!("no Fumola instance with id {}", id)),
+        };
+        state.semantic_state.clear_cont();
+        // Taken before anything runs, and only for the first chunk: a resume
+        // must not overwrite the snapshot with a half-run instance.
+        BEFORE_CHUNKS.with(|b| {
+            b.borrow_mut().insert(id, state.clone());
+        });
+        let before = state.semantic_state.agent.counts.clone();
+        let outcome = state.eval_limited(program_text, steps.max(1));
+        finish_chunk(id, state, outcome, &before)
+    })
+}
+
+/// Continue a computation that `fumola_eval_top_limited` paused.
+///
+/// Answers the same three shapes: a value, a pause, or an error. Resuming an
+/// instance that is not paused answers whatever its standing continuation
+/// evaluates to, which for an idle agent is its last value.
+#[wasm_bindgen]
+pub fn fumola_resume(id: FumolaInstanceId, steps: usize) -> String {
+    INSTANCES.with(|m| {
+        let mut m = m.borrow_mut();
+        let state = match m.get_mut(&id) {
+            Some(state) => state,
+            None => return error_json(&format!("no Fumola instance with id {}", id)),
+        };
+        let before = state.semantic_state.agent.counts.clone();
+        let outcome = state.resume_limited(steps.max(1));
+        finish_chunk(id, state, outcome, &before)
+    })
+}
+
+/// Drop a paused computation, leaving the instance idle.
+///
+/// A host that stops resuming -- the user edited the program, or navigated
+/// away -- would otherwise leave a continuation standing that the next
+/// unlimited eval would refuse, since `eval_prog` asserts an idle agent.
+#[wasm_bindgen]
+pub fn fumola_abandon(id: FumolaInstanceId) -> String {
+    INSTANCES.with(|m| {
+        let mut m = m.borrow_mut();
+        match m.get_mut(&id) {
+            Some(state) => {
+                // Abandoning is a cancel, so it costs nothing either: the
+                // instance goes back to before the run rather than keeping
+                // whatever the part that ran happened to write.
+                let restored = BEFORE_CHUNKS.with(|b| b.borrow_mut().remove(&id));
+                match restored {
+                    Some(snapshot) => *state = snapshot,
+                    None => state.semantic_state.clear_cont(),
+                }
+                serde_json::json!({ "ok": true, "abandoned": true }).to_string()
+            }
+            None => error_json(&format!("no Fumola instance with id {}", id)),
+        }
+    })
+}
+
+/// The three shapes a chunk can answer with, and the counts on all of them.
+///
+/// A pause is `ok` and not an error: nothing went wrong, the host simply has
+/// its turn back. It is told `paused` so it knows to call `fumola_resume`,
+/// and `steps` so it has something true to show.
+fn finish_chunk(
+    id: FumolaInstanceId,
+    state: &mut State,
+    outcome: Result<fumola_semantics::value::Value_, fumola::Error>,
+    before: &Counts,
+) -> String {
+    let printed = drain_print(state);
+    let counts = counts_since(before, &state.semantic_state.agent.counts);
+    // Progress is what *this run* has done, not what the instance has done
+    // since it was made. Importing the library costs tens of thousands of
+    // steps, so a lifetime total starts high and its rise says nothing about
+    // the program asked for. The snapshot already records where the run
+    // began, so no further bookkeeping is needed to subtract it.
+    let began_at = BEFORE_CHUNKS.with(|b| {
+        b.borrow()
+            .get(&id)
+            .map(|snapshot| snapshot.semantic_state.agent.counts.step)
+    });
+    let total = state.semantic_state.agent.counts.step;
+    let ran = match began_at {
+        Some(start) => total.saturating_sub(start),
+        None => total,
+    };
+    match outcome {
+        Ok(value) => {
+            BEFORE_CHUNKS.with(|b| b.borrow_mut().remove(&id));
+            let json = with_print(value_to_json(&value), printed);
+            insert_key(json, "counts", counts)
+        }
+        Err(fumola::Error::Interruption(i)) if matches!(i, Interruption::Limit(_)) => {
+            // The snapshot stays: the run is not over.
+            let json = serde_json::json!({
+                "ok": true, "paused": true, "steps": ran, "stepsTotal": total
+            })
+            .to_string();
+            let json = with_print(json, printed);
+            insert_key(json, "counts", counts)
+        }
+        Err(e) => {
+            // Read the error from the failed instance, then put the instance
+            // back. The trace describes what went wrong and has to be taken
+            // before the state that produced it is discarded.
+            let json = with_print(error_of_with_trace(&e, state), printed);
+            if let Some(snapshot) = BEFORE_CHUNKS.with(|b| b.borrow_mut().remove(&id)) {
+                *state = snapshot;
+            }
+            insert_key(json, "counts", counts)
+        }
+    }
+}
+
 /// What a single program cost, from the instance's running totals.
 ///
 /// `Counts` accumulates over an instance's whole life, so one program's work
@@ -579,6 +727,18 @@ fn counts_since(before: &Counts, after: &Counts) -> serde_json::Value {
     })
 }
 
+/// Add one key to a JSON object without parsing the object.
+///
+/// The obvious route -- `from_str`, insert, `to_string` -- loses the key in
+/// silence on exactly the values worth printing about. serde's default
+/// recursion limit is 128 and a scene value nests past 200, so the parse
+/// fails and the old code returned the reply unchanged: a program that
+/// printed its way through building a scene had its output dropped, with
+/// nothing to say so. It would also re-serialise a value that can run to
+/// megabytes, to add a few hundred bytes.
+///
+/// Splicing after the opening brace does neither, and assumes only what is
+/// always true here: the reply is a JSON object.
 fn insert_key(json: String, key: &str, value: serde_json::Value) -> String {
     let trimmed = json.trim_start();
     if !trimmed.starts_with('{') {

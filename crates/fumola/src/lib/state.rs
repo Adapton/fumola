@@ -27,6 +27,33 @@ impl State {
         Ok(self.semantic_state.eval_prog(prog)?)
     }
 
+    /// Evaluate, stopping after `steps` more steps than have been taken.
+    ///
+    /// `Err(Error::Interruption(Interruption::Limit(_)))` is a pause: call
+    /// `resume` to continue. Anything else is an ordinary outcome.
+    pub fn eval_limited(&mut self, input: &str, steps: usize) -> Result<Value_, crate::Error> {
+        let prog = check::parse(input)?;
+        let limits = self.semantic_state.step_budget(steps);
+        Ok(self.semantic_state.eval_prog_limited(prog, &limits)?)
+    }
+
+    /// Continue a computation a limit paused, for `steps` more steps.
+    ///
+    /// No parse and no idle assertion: the continuation is already standing,
+    /// and the agent is mid-computation rather than idle.
+    ///
+    /// Named apart from `resume`, which continues a *program fragment* after
+    /// an actor send and takes source text. Different thing entirely.
+    pub fn resume_limited(&mut self, steps: usize) -> Result<Value_, crate::Error> {
+        let limits = self.semantic_state.step_budget(steps);
+        Ok(self.semantic_state.run(&limits)?)
+    }
+
+    /// Steps taken over this state's whole life.
+    pub fn steps_taken(&self) -> usize {
+        self.semantic_state.steps_taken()
+    }
+
     /// Call an actor method.
     pub fn call(
         &mut self,

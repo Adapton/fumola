@@ -722,10 +722,44 @@ impl Core {
 
     /// Evaluate a new program fragment, assuming agent is idle.
     pub fn eval_prog(&mut self, prog: Prog) -> Result<Value_, Interruption> {
+        self.eval_prog_limited(prog, &Limits::none())
+    }
+
+    /// Evaluate a program, stopping where `limits` say to.
+    ///
+    ///    `Err(Interruption::Limit(_))` from this is a pause and not a
+    /// failure. `run` unwinds a scratch only for an interruption that
+    /// `ends_the_computation`, and a limit is deliberately not one, so the
+    /// continuation and the stack are left standing exactly as they were.
+    /// Calling `run` again continues from there.
+    ///
+    ///    The limits are absolute, not per call: `Limit::Step` is raised when
+    /// the agent's *cumulative* step count reaches `limits.step`. To run
+    /// another thousand steps, ask for `counts().step + 1000`. `step_budget`
+    /// is that arithmetic, so a caller does not have to remember it.
+    pub fn eval_prog_limited(
+        &mut self,
+        prog: Prog,
+        limits: &Limits,
+    ) -> Result<Value_, Interruption> {
         self.assert_idle_agent()
             .map_err(Interruption::EvalInitError)?;
         self.agent.active.cont = Cont::Decs(prog.vec);
-        self.run(&Limits::none())
+        self.run(limits)
+    }
+
+    /// Limits that stop `more` steps from now, wherever the count stands.
+    ///
+    /// The VM's step limit is a mark to reach, not an allowance to spend, so
+    /// a caller resuming in chunks would otherwise have to add the current
+    /// total to every request -- and would stop immediately if it forgot.
+    pub fn step_budget(&self, more: usize) -> Limits {
+        Limits::none().step(self.agent.counts.step.saturating_add(more))
+    }
+
+    /// How many steps this agent has taken, over its whole life.
+    pub fn steps_taken(&self) -> usize {
+        self.agent.counts.step
     }
 
     /// Evaluate a new program fragment, assuming agent is idle.

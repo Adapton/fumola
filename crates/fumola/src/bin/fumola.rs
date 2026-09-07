@@ -7,7 +7,7 @@ use log::{debug, error, info, trace};
 use fumola::state::State;
 use fumola_parser::parser_types;
 use fumola_semantics::format::{format_one_line, format_pretty, ToDoc};
-use fumola_semantics::vm_types::{self, Active, Limits};
+use fumola_semantics::vm_types::{self, Active};
 
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -169,11 +169,36 @@ fn main() -> OurResult<()> {
             println!("{}", format_pretty(&p, width));
         }
         CliCommand::Eval { input, step_limit } => {
-            let _limits = match step_limit {
-                None => Limits::none(),
-                Some(limit) => Limits::none().step(limit),
+            // `--step-limit` used to be accepted and thrown away, which is
+            // worse than not having it: the flag looked like it worked. It
+            // now stops where it says, in chunks, reporting what it cost.
+            //
+            // Chunked rather than one bounded run, so the limit reads as a
+            // budget per turn rather than a ceiling on the whole program.
+            // Reaching it is not a failure -- the same program run without
+            // the flag would have carried on -- so this says so and exits 0.
+            let result = match step_limit {
+                None => state.eval(&input),
+                Some(limit) => {
+                    let mut outcome = state.eval_limited(&input, limit);
+                    let mut chunks = 1;
+                    while matches!(
+                        &outcome,
+                        Err(Error::Interruption(Interruption::Limit(_)))
+                    ) {
+                        info!(
+                            "Step limit reached after {} steps ({} chunk{}); continuing.",
+                            state.steps_taken(),
+                            chunks,
+                            if chunks == 1 { "" } else { "s" }
+                        );
+                        chunks += 1;
+                        outcome = state.resume_limited(limit);
+                    }
+                    info!("Took {} steps in {} chunks.", state.steps_taken(), chunks);
+                    outcome
+                }
             };
-            let result = state.eval(&input); // to do -- use _limits
             post_eval(&mut state, result)
         }
         CliCommand::Repl {} => repl(&mut state),
