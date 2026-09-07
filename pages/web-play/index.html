@@ -1521,9 +1521,16 @@
           if (v.name === "box" || v.name === "orb") {
             shapes.push({
               kind: v.name,
-              label: vStr(f.label_),
+              // `unescapeText` here for the same reason the print panel needs
+              // it: Fumola's lexer never turns `\n` into a line break, so the
+              // Text holds a backslash and an `n`. The replayground never had
+              // to do this -- the CLI expands escapes when it writes the
+              // scene file, so its `scene.json` holds real newlines by the
+              // time `makeTextTexture` splits on them. Reading the value
+              // across the wasm boundary skips that step.
+              label: unescapeText(vStr(f.label_)),
               at: vec3(f.position),
-              text: vStr(f.textFields),
+              text: unescapeText(vStr(f.textFields)),
               // The named slots a pointer can leave from. Each becomes a dot
               // under the object, and a pointer line starts at its dot rather
               // than at the object's middle -- which is how the replayground
