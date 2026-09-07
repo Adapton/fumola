@@ -203,6 +203,27 @@
         color: var(--dim);
       }
 
+      /* Says a run is under way, over whatever the panel is showing.
+         Positioned against the panel, so it covers the output rather than
+         moving it. */
+      .library { position: relative; }
+      .library .busy {
+        position: absolute; inset: 0; z-index: 5;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(8, 8, 11, 0.82);
+        font: 400 0.8rem/1.5 var(--mono); color: var(--fg);
+        letter-spacing: 0.04em; text-align: center; padding: 1rem;
+      }
+      .library .busy::before {
+        content: ""; width: 0.55rem; height: 0.55rem; margin-right: 0.6rem;
+        border-radius: 50%; background: var(--green);
+        animation: busy-pulse 1s ease-in-out infinite;
+      }
+      @keyframes busy-pulse {
+        0%, 100% { opacity: 0.25; transform: scale(0.8); }
+        50%      { opacity: 1;    transform: scale(1.1); }
+      }
+
       /* The objects, drawn. Fills the panel; the canvas is sized to it. */
       #objects-panel { display: none; }
       .library[data-view="objects"] #objects-panel { display: flex; flex-direction: column; }
@@ -506,6 +527,10 @@
 
       <div class="panes">
         <aside class="library">
+          <!-- Says that something is happening, over whichever panel is
+               showing. An examplePair builds two runs and compares them, so
+               it takes noticeably longer than an example that builds one. -->
+          <div class="busy" id="busy" hidden></div>
           <div class="lib-head">
             <span class="views">
               <button type="button" class="view-tab" data-view="library">library</button>
@@ -1926,26 +1951,88 @@
         const fade = (u) =>
           u <= 0.5 ? 1 - 0.6 * u : Math.max(0, 0.7 - 1.4 * (u - 0.5));
 
+        /// White emissive, at the strength the replayground uses to mark a
+        /// node under the cursor. Here it marks the side being faded *into*:
+        /// the fader says how much of each run is visible, and the glow says
+        /// which way you are going, which the opacities alone do not.
+        ///
+        /// One thing scales it: movement. Every nudge of the fader relights
+        /// the side being entered and pushes the decay back, so the glow
+        /// holds while the fader is moving and falls away once it stops. It
+        /// is a cue about motion, so a fader at rest does not carry it.
+        ///
+        /// The strength does not depend on where the fader is. Tying it to
+        /// how near an end you were made the same gesture mean different
+        /// things in different places, and the cue is about direction, which
+        /// is the same claim wherever it is made. So the brightness is
+        /// constant and only its lifetime varies.
+        ///
+        /// The decay is long on purpose. A glow that goes out as soon as the
+        /// fader stops reads as a flicker rather than as a direction, and the
+        /// gesture it marks is a slow one -- you push the fader, look at what
+        /// arrived, and push again.
+        ///
+        /// Only the lit materials take it. Boxes, orbs, pointer dots and
+        /// action arrows are Lambert and have an emissive channel; the
+        /// pointer lines and the text planes are Basic and do not, so they
+        /// fade without glowing.
+        const GLOW_PEAK = 1.0;
+        const GLOW_MS = 2000;
+
+        const paintSide = (s) => {
+          s.group.visible = s.opacity > 0.01;
+          for (const m of s.mats) {
+            m.transparent = true;
+            m.opacity = s.opacity;
+            if (m.emissive) {
+              m.emissive.setHex(0xffffff);
+              m.emissiveIntensity = s.glow * GLOW_PEAK;
+            }
+            m.needsUpdate = true;
+          }
+        };
+
         const setMix = (t) => {
           if (sideGroups.length < 2) return;
-          sideGroups.forEach(({ group, mats }, i) => {
-            const o = fade(i === 0 ? t : 1 - t);
+          sideGroups.forEach((s, i) => {
+            s.opacity = fade(i === 0 ? t : 1 - t);
             // A group at zero is not drawn at all: a fully transparent mesh
             // still writes depth in some materials, and would punch holes in
             // the side that is meant to be solid.
-            group.visible = o > 0.01;
-            for (const m of mats) {
-              m.transparent = true;
-              m.opacity = o;
-              m.needsUpdate = true;
-            }
+            paintSide(s);
           });
         };
+
+        /// Light the side the fader is moving towards, and push the decay
+        /// back. Called per input, so holding the fader in motion holds the
+        /// glow, and releasing it lets the glow go.
+        const glowTowards = (i) => {
+          if (sideGroups.length < 2) return;
+          sideGroups.forEach((s, j) => { s.glow = j === i ? 1 : 0; });
+          glowUntil = performance.now() + GLOW_MS;
+        };
+
+        let glowUntil = 0;
+        sideGroups.forEach((s) => { s.glow = 0; s.opacity = 1; });
         setMix(0.5);
 
         const anim = { id: 0 };
         const tick = () => {
           anim.id = requestAnimationFrame(tick);
+          // The glow decays on the clock rather than per frame, so it lasts
+          // the same time whatever the frame rate, and stops touching
+          // materials once it is spent.
+          if (glowUntil) {
+            const left = (glowUntil - performance.now()) / GLOW_MS;
+            const g = left > 0 ? left : 0;
+            sideGroups.forEach((s) => {
+              if (s.glow > 0) { s.glow = g; paintSide(s); }
+            });
+            if (g === 0) {
+              glowUntil = 0;
+              sideGroups.forEach((s) => { s.glow = 0; });
+            }
+          }
           controls.update();
           renderer.render(scene, camera);
         };
@@ -1991,14 +2078,20 @@
           range.step = "0.01";
           range.value = "0.5";
           range.setAttribute("aria-label", "Fade between the two runs");
-          range.addEventListener("input", () => setMix(Number(range.value)));
+          let was = Number(range.value);
+          range.addEventListener("input", () => {
+            const now = Number(range.value);
+            if (now !== was) glowTowards(now > was ? 1 : 0);
+            was = now;
+            setMix(now);
+          });
           fader.append(left, range, right);
           host.appendChild(fader);
         }
 
         mounted = {
           renderer, controls, geometries, materials, textures, observer, hint,
-          setMix, sideCount: sideGroups.length, fader,
+          setMix, glowTowards, sideCount: sideGroups.length, fader,
           get frame() { return anim.id; },
         };
         return true;
@@ -2139,6 +2232,13 @@
       };
 
       const loadTest = (path, test) => {
+        lastRunMs = Infinity;
+        // An example answers with a picture, so show the picture --
+        // whichever panel was last open, since arriving at an example's
+        // objects is the point of clicking one. A test answers with a value,
+        // and the panel that belongs in is already the one showing.
+        if (test.kind === "example" || test.kind === "examplePair")
+          setView("objects");
         srcEl.value = invocationFor(path, test);
         // A link says which kind of thing it names, so it reads as what it is.
         setPreset(test.kind === "test" ? "test" : test.kind, path, test);
@@ -2152,6 +2252,14 @@
       // fix by hand, which is the point of having it here.
       const loadTestBody = (path, test) => {
         if (!test.body) return;
+        lastRunMs = Infinity;
+        // An example answers with a picture, so show the picture --
+        // whichever panel was last open, since arriving at an example's
+        // objects is the point of clicking one. A test answers with a value,
+        // and the panel that belongs in is already the one showing.
+        if (test.kind === "example" || test.kind === "examplePair")
+          setView("objects");
+
         const name = `${test.scope ? test.scope + "." : ""}${test.name}`;
         const { text, changed } = qualify(
           dedent(currentSource.slice(test.body.start, test.body.end)), test, currentSource
@@ -2282,6 +2390,41 @@
       };
 
       let timer = null;
+      /// How long the last run took, and so what to expect of the next one.
+      ///
+      /// `Infinity` means "no measurement, assume slow": set when a preset is
+      /// loaded, so clicking an example acknowledges the click. A program
+      /// being typed into has a measurement, and a fast one never flashes the
+      /// overlay.
+      let lastRunMs = Infinity;
+
+      /// Say that something is happening, before it starts happening.
+      ///
+      /// `fumola_eval_top` is one synchronous call into wasm and holds the
+      /// main thread for its whole duration, so anything shown in the same
+      /// task never paints. The overlay goes up, the frame is given away, and
+      /// only then does the run begin. Two frames rather than one: the first
+      /// applies the change, the second is the one that renders it.
+      const showBusy = (what) => {
+        const el = $("busy");
+        el.textContent = what;
+        el.hidden = false;
+        // Two frames is the reliable way to know a change has painted. But
+        // `requestAnimationFrame` does not fire in a hidden or throttled tab,
+        // and a run must never wait on a frame that will not come -- that
+        // left the overlay up for good, with the run not yet begun. So the
+        // frames race a timer, and the timer wins wherever they are not
+        // running. Either way this settles, which is the only part the run
+        // depends on.
+        return new Promise((resolve) => {
+          let settled = false;
+          const finish = () => { if (!settled) { settled = true; resolve(); } };
+          requestAnimationFrame(() => requestAnimationFrame(finish));
+          setTimeout(finish, 120);
+        });
+      };
+      const hideBusy = () => { $("busy").hidden = true; };
+
       const evaluate = async () => {
         try { await ensureRuntime(); } catch (e) { return; }
         const text = srcEl.value;
@@ -2294,12 +2437,27 @@
         // a Core clones in about constant time.
         if (!persistEl.checked) fumola_reset(instance);
 
+        // A pair says what the wait is for; anything else just says it runs.
+        // The step count is not available to say more: the run is one call
+        // that returns when it is finished. See issue on a step-limited eval.
+        if (lastRunMs > 200) {
+          await showBusy(
+            preset && preset.kind === "examplePair"
+              ? "running the left, then the right, then comparing them…"
+              : "running…"
+          );
+        }
         let reply;
+        const began = performance.now();
         try {
           reply = JSON.parse(fumola_eval_top(instance, text));
         } catch (e) {
+          hideBusy();
           return;
+        } finally {
+          lastRunMs = performance.now() - began;
         }
+        hideBusy();
         // Both places: the panel is where it is meant to be read, the
         // console is where a browser's own tooling can search it.
         //
