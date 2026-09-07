@@ -2121,16 +2121,25 @@
         const GLOW_PEAK = 1.0;
         const GLOW_MS = 2000;
 
+        /// Repaint a side.
+        ///
+        ///    No `needsUpdate` here, and that is a performance fix rather
+        ///    than an omission. Setting it asks three.js to recompile the
+        /// material's shader, and opacity and emissive intensity are uniforms
+        /// that need no such thing. Setting it per material per fader move
+        /// cost about a second a move on the mergeSort pair, which has some
+        /// nine hundred materials across its two runs.
+        ///
+        ///    `transparent` does affect compilation, so it is set once when
+        /// the material is made and never touched here.
         const paintSide = (s) => {
           s.group.visible = s.opacity > 0.01;
           for (const m of s.mats) {
-            m.transparent = true;
             m.opacity = s.opacity;
             if (m.emissive) {
               m.emissive.setHex(0xffffff);
               m.emissiveIntensity = s.glow * GLOW_PEAK;
             }
-            m.needsUpdate = true;
           }
         };
 
@@ -2274,7 +2283,6 @@
               p.mat.emissive.setHex(p.hue);
               p.mat.emissiveIntensity = Math.min(2, p.heat * 0.9 * trailGain);
             }
-            p.mat.needsUpdate = true;
           }
         };
 
@@ -2312,7 +2320,12 @@
             const b = e.toBase.clone();
             if (df) a.addScaledVector(df, k);
             if (dt) b.addScaledVector(dt, k);
-            e.geo.setFromPoints([a, b]);
+            // Written in place: `setFromPoints` allocates a new attribute
+            // every call, once per edge per fader move.
+            const pos = e.geo.attributes.position;
+            pos.setXYZ(0, a.x, a.y, a.z);
+            pos.setXYZ(1, b.x, b.y, b.z);
+            pos.needsUpdate = true;
           }
         };
 
@@ -2326,6 +2339,7 @@
             const isLone = !matched(p.key);
             if (!isLone) continue;
             p.obj.material = p.obj.material.clone();
+            p.obj.material.transparent = true;
             sideGroups[p.side].mats.push(p.obj.material);
             materials.push(p.obj.material);
             lone.push(p);
@@ -2346,6 +2360,7 @@
             if (inBoth) continue;
             // Only in one run, so it has to arrive or leave.
             e.line.material = e.line.material.clone();
+            e.line.material.transparent = true;
             sideGroups[e.side].mats.push(e.line.material);
             materials.push(e.line.material);
             loneEdges.push(e);
@@ -2387,9 +2402,7 @@
           for (const e of loneEdges) {
             const near = e.side === 0 ? 1 - t : t;
             const m = e.line.material;
-            m.transparent = true;
             m.opacity = near;
-            m.needsUpdate = true;
             e.line.visible = near > 0.02;
           }
           // An object about to be lost fades as the fader leaves it, and an
@@ -2397,7 +2410,6 @@
           for (const p of lone) {
             const near = p.side === 0 ? 1 - t : t;
             const m = p.obj.material;
-            m.transparent = true;
             m.opacity = near;
             m.visible = true;
             p.obj.visible = near > 0.02;
@@ -2415,7 +2427,6 @@
               m.emissive.setHex(PAIR_DISAGREE);
               m.emissiveIntensity = leaving ? heat * 1.2 : Math.max(0, near - 0.5) * 2 * 1.2;
             }
-            m.needsUpdate = true;
           }
         };
 
