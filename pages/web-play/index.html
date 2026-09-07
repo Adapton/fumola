@@ -2809,11 +2809,70 @@
             el.setAttribute("aria-pressed", "false");
         };
 
-        // Taking hold of the scene ends the walk -- but only taking hold of
-        // it. `controls` raises the same event for a wheel as for a drag, so
-        // listening to that made a scroll stop the walk, when a scroll is
-        // the one gesture that clearly means "keep going, but closer".
-        renderer.domElement.addEventListener("pointerdown", stopOrbit);
+        /// While the walk is on, the pointer means something different, and
+        /// the difference is whether it moved.
+        ///
+        ///    A drag moves what the walk is walking around. Circling a scene
+        /// is only useful if you can choose what to circle, and stopping the
+        /// walk to reposition and starting it again is three actions for one
+        /// intention. So a drag pans the centre and the walk keeps going
+        /// around wherever it now is.
+        ///
+        ///    A click -- pressed and released without moving -- stops it.
+        /// That is the gesture for "enough, let me look", and it needs to
+        /// stay available or the walk cannot be dismissed by hand at all.
+        ///
+        ///    Taken before `controls` sees any of it, since its own reading
+        /// of a left-drag is to rotate, and a rotation fights a walk.
+        const DRAG_SLOP = 3;
+        let holding = null;
+
+        const panTarget = (dx, dy) => {
+          const d = fittedDistance * orbitReach;
+          const vHalf = (camera.fov * Math.PI) / 360;
+          const perPixel =
+            (2 * Math.tan(vHalf) * d) /
+            Math.max(1, renderer.domElement.clientHeight);
+          const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+          const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+          controls.target.addScaledVector(right, -dx * perPixel);
+          controls.target.addScaledVector(up, dy * perPixel);
+        };
+
+        renderer.domElement.addEventListener("pointerdown", (e) => {
+          if (orbiting === null) return;
+          e.preventDefault();
+          e.stopPropagation();
+          holding = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
+          renderer.domElement.setPointerCapture(e.pointerId);
+        }, { capture: true });
+
+        renderer.domElement.addEventListener("pointermove", (e) => {
+          if (orbiting === null || !holding) return;
+          const dx = e.clientX - holding.x;
+          const dy = e.clientY - holding.y;
+          if (!holding.moved &&
+              Math.abs(dx) + Math.abs(dy) < DRAG_SLOP) return;
+          holding.moved = true;
+          holding.x = e.clientX;
+          holding.y = e.clientY;
+          panTarget(dx, dy);
+          placeCamera();
+          showCamera();
+        }, { capture: true });
+
+        const releaseHold = (e) => {
+          if (!holding) return;
+          const wasClick = !holding.moved;
+          try { renderer.domElement.releasePointerCapture(holding.id); } catch (_) {}
+          holding = null;
+          if (wasClick) stopOrbit();
+        };
+        renderer.domElement.addEventListener("pointerup", releaseHold, { capture: true });
+        renderer.domElement.addEventListener("pointercancel", releaseHold, { capture: true });
+
+        // Not walking: the pointer belongs to `controls`, and taking hold of
+        // the scene is just taking hold of the scene.
 
         // So the wheel moves the distance instead, while the walk is on.
         // Taken before `controls` sees it, or the camera would be dollied as
