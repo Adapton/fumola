@@ -658,21 +658,14 @@ module {
     }})
   };
 
-  /// A level tree, and the program's own account of how to look at it.
-  ///
-  /// Two phases, and the difference between them is the point. Building the
-  /// tree is the subject: it runs in the session and the graph records it.
-  /// Laying it out is the portrayal: it runs in a scratch, so the graph
-  /// records none of it, and the history the runtime hands over afterwards is
-  /// of the tree rather than of the drawing of the tree.
   /// The same tree, over symbols that carry entropy.
   ///
   ///    A duplicate of `exampleLevelTree` differing in one call:
   /// `generateRandomInputSymbols` rather than `generateRandomInput`. Its
-  /// symbols are `sym-1-470`, `sym-2-274`, ... rather than 1, 2, ..., so the
-  /// levels -- and therefore the shape -- depend on the seed. Change the
-  /// first argument and the tree changes; with the other generator it does
-  /// not, whatever the seed (#72).
+  /// symbols are `sym-1-482710`, `sym-2-1826057930`, ... rather than 1, 2,
+  /// ..., so the levels -- and therefore the shape -- depend on the seed.
+  /// Change the first argument and the tree changes; with the other
+  /// generator it does not, whatever the seed (#72).
   ///
   ///    Kept beside the original rather than replacing it: the existing
   /// examples and tests assert on values built from positional symbols.
@@ -689,6 +682,13 @@ module {
     })
   };
 
+  /// A level tree, and the program's own account of how to look at it.
+  ///
+  /// Two phases, and the difference between them is the point. Building the
+  /// tree is the subject: it runs in the session and the graph records it.
+  /// Laying it out is the portrayal: it runs in a scratch, so the graph
+  /// records none of it, and the history the runtime hands over afterwards is
+  /// of the tree rather than of the drawing of the tree.
   #[example]
   public func exampleLevelTree() : W.ExampleOutput {
     let array = R.generateRandomInput(10, 10);

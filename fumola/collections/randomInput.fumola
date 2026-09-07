@@ -27,9 +27,10 @@ module {
     // library came out the same, and degenerate (issue #72).
     //
     //    These symbols carry a random part beside the position --
-    // `sym-1-470`, `sym-2-0` -- drawn from the same seeded generator as the
-    // elements. The position keeps them ordered and tells you where each came
-    // from; the random part gives the seed something to affect.
+    // `sym-1-482710`, `sym-2-1826057930` -- taken from the same seeded
+    // generator as the elements, but from the raw word rather than the
+    // reduced one. The position keeps them ordered and tells you where each
+    // came from; the random part gives the seed something to affect.
     //
     //    Added rather than substituted: `generateRandomInput` is what the
     // existing tests and their asserted values are built on.
@@ -44,7 +45,16 @@ module {
             count += 1;
             let index = count + startIndex;
             let element = x % maxValue;
-            result #= [(`sym-index-element, element)]
+            // The symbol takes the raw word, not `element`. The `* 137`
+            // above exists to make elements collide, so `element` is capped at
+            // `maxValue` -- and a symbol's level is a function of its
+            // rendering, so spending a capped value on the symbol caps the
+            // level too. Measured at size 20 over 1500 seeds: reusing
+            // `element` reaches exactly 2740 distinct suffixes, which is
+            // `20 * 137`, about eleven bits, and each position draws from that
+            // one small pool for every seed. The raw word reaches 29999 of
+            // 30000, about thirty-one bits.
+            result #= [(`sym-index-x, element)]
         };
         result
     };
