@@ -2097,39 +2097,106 @@
         ///
         ///    Only for objects that actually go somewhere. A path of zero
         /// length is a dot, and there is nothing to learn from it.
+        ///    Drawn with thickness, like an action arrow, and not as a line.
+        /// `linewidth` is ignored in WebGL -- a `Line` is one pixel wide
+        /// whatever it asks for -- so a path with any presence has to be a
+        /// solid, and a cylinder from one position to the other is the same
+        /// shape an action shaft already uses.
+        ///
+        ///    Faint, because there are as many paths as there are moving
+        /// objects and they cross the whole scene. They are there to be read
+        /// as a field of motion rather than followed one at a time, and at
+        /// full strength they hid the structure they are about. `depthWrite`
+        /// stays off so they never occlude a box.
+        ///    Each indicator is cut into segments rather than drawn whole, and
+        /// a segment lights when the fader passes through it and dims again
+        /// over the next second. So dragging leaves a trail behind the
+        /// object, in whichever direction you drag, and an indicator says how
+        /// far along the move is rather than only where it goes.
+        ///
+        ///    The decay is in time and not in distance from the fader. A
+        /// window around the fader's position would be a highlight: it would
+        /// sit symmetrically ahead and behind, and would not know which way
+        /// you were going. Heat applied on passage and shed on a clock knows,
+        /// and it keeps glowing for a moment after you stop, which is what
+        /// makes it read as something left behind.
+        let mixNow = 0.5;
         const PATH_AGREE = 0xffffff;
         const PATH_DISAGREE = 0xff66bb;
+        const PATH_RADIUS = 0.055;
+        const PATH_OPACITY_AGREE = 0.22;
+        const PATH_OPACITY_DISAGREE = 0.45;
+        const PATH_SEGMENTS = 10;
+        // How long a segment takes to cool after the fader has gone through
+        // it. Long enough to see a trail from an ordinary drag.
+        const TRAIL_MS = 900;
+        // What an unlit segment still shows, so a path reads as a path.
+        const TRAIL_FLOOR = 0.12;
         const paths = [];
         if (shift.size) {
+          const along = new THREE.Vector3(0, 1, 0);
           for (const [key, delta] of shift) {
-            if (delta.length() < 0.01) continue;
+            const span = delta.length();
+            if (span < 0.01) continue;
             const from = sideAt[0].get(key);
             if (!from) continue;
-            const mat = new THREE.LineBasicMaterial({
-              color: disagreed.has(key) ? PATH_DISAGREE : PATH_AGREE,
-              transparent: true,
-              opacity: 0,
-            });
-            const geo = new THREE.BufferGeometry().setFromPoints([
-              from.clone(),
-              from.clone().add(delta),
-            ]);
+            const differs = disagreed.has(key);
+            const dir = delta.clone().normalize();
+            const turn = new THREE.Quaternion().setFromUnitVectors(along, dir);
+            // One geometry for the whole indicator; the segments differ only
+            // in where they sit and how brightly they are lit.
+            const geo = new THREE.CylinderGeometry(
+              PATH_RADIUS, PATH_RADIUS, span / PATH_SEGMENTS, 8
+            );
             geometries.push(geo);
-            materials.push(mat);
-            const line = new THREE.Line(geo, mat);
-            sideGroups[0].group.add(line);
-            paths.push({ mat, disagreed: disagreed.has(key) });
+            for (let i = 0; i < PATH_SEGMENTS; i += 1) {
+              const at = (i + 0.5) / PATH_SEGMENTS;
+              const mat = new THREE.MeshLambertMaterial({
+                color: differs ? PATH_DISAGREE : PATH_AGREE,
+                transparent: true,
+                opacity: 0,
+                depthWrite: false,
+              });
+              materials.push(mat);
+              const seg = new THREE.Mesh(geo, mat);
+              seg.position.copy(from).addScaledVector(delta, at);
+              seg.quaternion.copy(turn);
+              sideGroups[0].group.add(seg);
+              paths.push({ mat, differs, at, heat: 0 });
+            }
           }
         }
 
         /// Show the paths while the fader is moving, and let them go with the
         /// glow. They answer "what is moving where", which is a question
         /// about the gesture, not about the picture at rest.
+        /// Paint the indicators from each segment's own heat, plus a faint
+        /// baseline while the fader is in motion at all.
         const showPaths = (strength) => {
           for (const p of paths) {
-            p.mat.opacity = strength * (p.disagreed ? 0.95 : 0.5);
-            p.mat.visible = p.mat.opacity > 0.02;
+            const base = p.differs ? PATH_OPACITY_DISAGREE : PATH_OPACITY_AGREE;
+            const lit = Math.max(p.heat, TRAIL_FLOOR * strength);
+            p.mat.opacity = base * lit;
+            p.mat.visible = p.mat.opacity > 0.005;
+            if (p.mat.emissive) {
+              p.mat.emissive.setHex(p.differs ? PATH_DISAGREE : PATH_AGREE);
+              p.mat.emissiveIntensity = p.heat * 0.9;
+            }
             p.mat.needsUpdate = true;
+          }
+        };
+
+        /// Light whichever segments the fader has just gone through.
+        ///
+        /// Every segment between where it was and where it is, not only the
+        /// one it landed on: a fader can jump -- a click on the track, or a
+        /// fast drag between frames -- and a trail with holes in it looks
+        /// like a fault rather than a gesture.
+        const heatTrail = (from, to) => {
+          const lo = Math.min(from, to) - 0.5 / PATH_SEGMENTS;
+          const hi = Math.max(from, to) + 0.5 / PATH_SEGMENTS;
+          for (const p of paths) {
+            if (p.at >= lo && p.at <= hi) p.heat = 1;
           }
         };
 
@@ -2195,6 +2262,8 @@
 
         const setMix = (t) => {
           if (sideGroups.length < 2) return;
+          if (t !== mixNow) heatTrail(mixNow, t);
+          mixNow = t;
           if (!shift.size) {
             // Nothing matched, so there is nothing to glide: fall back to the
             // dissolve, which is still the right answer for two unrelated
@@ -2270,6 +2339,7 @@
         };
 
         let glowUntil = 0;
+        let lastCool = performance.now();
         sideGroups.forEach((s) => { s.glow = 0; s.opacity = 1; });
         setMix(0.5);
 
@@ -2279,8 +2349,20 @@
           // The glow decays on the clock rather than per frame, so it lasts
           // the same time whatever the frame rate, and stops touching
           // materials once it is spent.
-          if (glowUntil) {
-            const left = (glowUntil - performance.now()) / GLOW_MS;
+          // The trail cools whether or not the fader is still moving, so it
+          // is shed on elapsed time rather than per frame.
+          const now = performance.now();
+          const shed = (now - lastCool) / TRAIL_MS;
+          lastCool = now;
+          let anyHeat = false;
+          for (const p of paths) {
+            if (p.heat > 0) {
+              p.heat = Math.max(0, p.heat - shed);
+              anyHeat = true;
+            }
+          }
+          if (glowUntil || anyHeat) {
+            const left = glowUntil ? (glowUntil - performance.now()) / GLOW_MS : 0;
             const g = left > 0 ? left : 0;
             sideGroups.forEach((s) => {
               if (s.glow > 0) { s.glow = g; paintSide(s); }
