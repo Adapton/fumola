@@ -857,15 +857,29 @@ module {
   /// produce: which named nodes both runs agree on, which they disagree on,
   /// and which exist in only one of them.
   ///
-  ///    Cell 3 is removed rather than any other. Its symbol has the highest
-  /// level of the first several hundred, so it roots every tree over
-  /// positional symbols, and removing it is the worst case rather than a
-  /// typical one (#72). Sampled over twelve seeds at size 16, removing cell 3
-  /// changed 27% of the tree's nodes where a typical position changed 11-16%.
+  ///    Cell 7 is removed rather than any other, because this is a picture
+  /// before it is a measurement: the edit lands in the middle of the tree,
+  /// where what a repair would have to do is legible, rather than at its root
+  /// where it swamps the frame.
+  ///
+  ///    That makes it a typical case and not the worst one, which is a
+  /// deliberate change of subject. Cell 3 has the highest level of the first
+  /// several hundred symbols, so it roots every tree over positional symbols;
+  /// removing it changed 27% of the tree's nodes over twelve seeds at size 16
+  /// where a typical position changed 11-16% (#72). Here cell 7 changes 13 of
+  /// 80 nodes and cell 3 changed 20 --- the extreme is the paper's subject
+  /// ("Removing cell 3 rebuilds 69.5% of the merge network"), and the panel's
+  /// job is to show the ordinary shape of a repair clearly.
+  ///
+  ///    Kept ASCII deliberately. A non-ASCII character anywhere in a module's
+  /// source silently hides every attribute after it from the web-play
+  /// listing: the lexer reports byte offsets and the page slices with
+  /// `substr`, which counts UTF-16 units, so the spans drift apart. A section
+  /// sign here was enough to make this very function disappear from the page.
   #[examplePair]
   public func examplePairTreeAfterRemoval() : W.ExamplePairOutput {
     W.pair(treeFromListRun(10, 16, null),
-           treeFromListRun(10, 16, ?3))
+           treeFromListRun(10, 16, ?7))
   };
 
   #[test]
