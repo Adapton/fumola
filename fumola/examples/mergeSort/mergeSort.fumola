@@ -142,7 +142,7 @@ module {
                 merge = { x =  0.0; y = 0.0; z = -mergeGap };
             });
 
-        let outline = A.Outline.outline(scene_);
+        let outline = [ A.Outline.outline(scene_) ];
         let sceneData = {
             history ;
             outline ;
@@ -155,7 +155,7 @@ module {
                     ;
         };
         if (false) {
-            let outlineText = A.IntoText.outline(outline);
+            let outlineText = A.IntoText.outlines(outline);
             prim "writeFile" (`mergeSort
                             -`FullDemand
                             -`seed-seed
@@ -201,7 +201,7 @@ module {
             _1_nodesSize = scene.history.nodes.size();
             _2_edgesSize = scene.history.edges.size();
             _3_objectsSize = scene.objects.size();
-            _4_finalMetaTime = ((scene.outline.1).0).value!.0;
+            _4_finalMetaTime = ((scene.outline[0].1).0).value!.0;
         }))};
         // Downstream of the level tree, so downstream of `prim "symbolLevel"`.
         // These moved when that hash stopped depending on the target's pointer
@@ -210,7 +210,7 @@ module {
         assert scene.history.nodes.size() == 184;
         assert scene.history.edges.size() == 271;
         assert scene.objects.size() == 279;
-        assert ((scene.outline.1).0).value!.0 == 295; // Final Meta Time.
+        assert ((scene.outline[0].1).0).value!.0 == 295; // Final Meta Time.
     };
 
     public func dcgDiffRemove(seed : Nat, size : Nat, removeSymbol : Symbol) {
@@ -320,8 +320,8 @@ module {
     public func writeDcgText(seed : Nat, size : Nat, demand) {
         prim "adaptonReset" ();
         let dcg = dcg(seed, size, demand);
-        let outline = A.Outline.outline(dcg.sorted);
-        let text = A.IntoText.outline(outline);
+        let outline = [ A.Outline.outline(dcg.sorted) ];
+        let text = A.IntoText.outlines(outline);
         prim "writeFile" (`demand-demandSym(demand)-`size-size-`seed-seed-`DCG-`txt, text); 
     };
 

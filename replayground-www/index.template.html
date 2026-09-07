@@ -1975,7 +1975,12 @@
 
         // --- OUTLINE PANEL (recursive) ---
         function renderOutline(json) {
-            const outline = json.outline;
+            // A scene's outline is a forest: zero or more trees, in the order
+            // whoever produced it chose. It used to be a single tree, and an
+            // older scene.json will still hold one, so both are accepted.
+            const outline = Array.isArray(json.outline)
+                ? json.outline
+                : (json.outline ? [json.outline] : []);
             const panel = document.getElementById("outline");
             var lastMetaTimeAnchor = null;
 
@@ -2078,7 +2083,7 @@
                 }
             }
 
-            walk(panel, outline);
+            outline.forEach(tree => walk(panel, tree));
         }
 
         const glowingMeshes = new Set();

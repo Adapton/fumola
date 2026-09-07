@@ -469,6 +469,15 @@ module {
             #leaf : LeafNode;
             #internal : InternalNode; 
         };
+        /// Zero or more outline trees, in the order whoever produced them
+        /// chose.
+        ///
+        ///    A session has one force tree per force begun from outside any
+        /// other, so a single tree is the special case rather than the rule.
+        /// Anything that carries "the outline" of something carries this, and
+        /// `[]` is how it says there is none -- the same way an empty array of
+        /// objects says there are none.
+        public type Outlines = [ Outline ];
         public type LeafNode = {
             nodeId : NodeId;
             shape : NodeShape;
@@ -686,10 +695,13 @@ module {
         };
 
         /// One outline per top-level force, in the order they were forced.
-        public func outlines() : [(Pointer, Outline)] {
+        ///
+        /// The pointer each grew from is not returned beside it: a tree's root
+        /// nodeId is already inside the tree.
+        public func outlines() : Outlines {
             var out = [];
             for (p in topLevelForced(peekHistory()).vals()) {
-                out #= [(p, outline(p))]
+                out #= [ outline(p) ]
             };
             out
         };
@@ -751,14 +763,14 @@ module {
             outlineRec(o, 0) # "\n"
         };
 
-        /// Every top-level force tree, one after another.
+        /// A forest, one tree after another.
         ///
         /// Each tree already begins with the name of what was forced, so
-        /// nothing is added to tell them apart -- a session reads as the list
-        /// of things it forced, in the order it forced them.
-        public func outlines(os : [(Pointer, Outline)]) : Text {
+        /// nothing is added to tell them apart -- a session reads as the
+        /// things it forced, in the order it forced them.
+        public func outlines(os : Outline.Outlines) : Text {
             var text = "";
-            for (po in os.vals()) { text #= outline(po.1) };
+            for (o in os.vals()) { text #= outline(o) };
             text
         };
     };
@@ -793,7 +805,7 @@ module {
      
         public type Scene = {
             objects : [ SceneObject ];
-            outline : Outline.Outline;
+            outline : Outline.Outlines;
             history : {
                 events : [PeekInfo.History.Event];
                 nodes : [PeekInfo.History.Node];
@@ -847,7 +859,7 @@ module {
             let edgesText = "{}";
             "{ " # 
             "\"objects\" : \n" # fromObjects(s.objects) # "\n,\n" #
-            "\"outline\" : \n" # fromOutline(s.outline) # "\n,\n" #
+            "\"outline\" : \n" # fromOutlines(s.outline) # "\n,\n" #
             "\"events\": \n" # fromEvents(s.history.events) # "\n,\n" #
             "\"nodes\": \n" # fromNodeHistoryItems(s.history.nodes) # "\n,\n" #
             "\"edges\": \n" # fromEdgeHistoryItems(s.history.edges) # "\n\n" #
@@ -1052,6 +1064,13 @@ module {
                     "}"
                 };
             }
+        };
+
+        /// A forest, as a JSON array. A consumer that used to receive one
+        /// outline object here now receives an array of them; `[]` is the
+        /// empty case that `null` used to be.
+        public func fromOutlines(outlines : Outlines) : Text {
+            fromArray(outlines, fromOutline)
         };
 
         public func fromOutlineOption(outline : ?Outline) : Text {
