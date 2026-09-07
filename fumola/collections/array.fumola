@@ -1,0 +1,15 @@
+/// Arrays.
+///
+///    A home for the array primitives, so that no other module has to reach
+/// for `prim "..."` to use one. There is one so far, and the module exists as
+/// much to say where the next belongs.
+///
+/// ----------------------------------------------------------------------------
+module {
+
+    /// The array without its last element, and that element.
+    ///
+    /// Answers a pair: `(everything but the last, the last)`.
+    public func popBack(xs) { prim "arrayPopBack" xs };
+
+}

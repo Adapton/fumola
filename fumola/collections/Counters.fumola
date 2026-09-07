@@ -1,19 +1,42 @@
+import A "adapton";
+
+/// Counting things, without the counting showing up in the graph.
+///
+///    A mode of use of the adapton module rather than a data structure. A
+/// counter lives in a cell like anything else, but it is written with `poke`
+/// and read with `peek`, so incrementing it records no dependency and adds no
+/// edge. That is what makes it usable from inside a computation one is
+/// measuring: the tally does not become part of what is being tallied.
+///
+///    This module predates the adapton module, and until now reached for
+/// `prim "adaptonPointer"`, `prim "adaptonPeek"` and `prim "adaptonPoke"`
+/// directly. Those are adapton's primitives, and this is one of its clients.
+///
+/// ----------------------------------------------------------------------------
 module {
-    public func ptr (symbol:Symbol) {
-      prim "adaptonPointer" (symbol);
+
+    /// The cell a counter lives in.
+    public func ptr(symbol : Symbol) : A.PeekInfo.Pointer {
+        A.pointer(symbol)
     };
-    public func get (symbol:Symbol) {
-      (prim "adaptonPeek" (ptr symbol))
+
+    /// What the counter stands at, or null if it has never been incremented.
+    public func get(symbol : Symbol) : ?Any {
+        A.peek(symbol)
     };
-    public func inc (symbol:Symbol) {
-      let p = ptr(symbol); 
-      switch (prim "adaptonPeek" p) {
-        case null {
-	          prim "adaptonPoke" (p, 1);
-        };
-        case (?n) {
-           prim "adaptonPoke" (p, n + 1);
-        };
-      }
-    }
+
+    /// One more than it stood at, counting an absent counter as zero.
+    public func inc(symbol : Symbol) {
+        let p = ptr(symbol);
+        switch (A.peekCell(p)) {
+            case null { A.poke(p, 1) };
+            case _ {
+                switch (A.peek(symbol)) {
+                    case null { A.poke(p, 1) };
+                    case (?n) { A.poke(p, n + 1) };
+                }
+            };
+        }
+    };
+
 }
