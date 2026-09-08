@@ -119,6 +119,25 @@ module {
   #[listing]
   public type GenSymThk = Thunk<(Symbol, GenSymThk)>;
   
+  /// The symbol of a sequence's first element, or null if it has none.
+  ///
+  ///    A break carries the symbol of the element it sits before, so the
+  /// break that `append` introduces between two sequences carries the first
+  /// symbol of the second one. Walks the left spine, and falls to the right
+  /// only for a malformed node with an empty left child.
+  func firstSymbol<X>(t : LevelTree_<X>) : ?Symbol {
+    switch (@ t) {
+      case (#empty) null;
+      case (#element(e)) ?e.symbol;
+      case (#binary(b)) {
+        switch (firstSymbol(b.left)) {
+          case (?s) ?s;
+          case null firstSymbol(b.right);
+        }
+      };
+    }
+  };
+
   /// Append two sequences, allocating the pointers the join needs.
   ///
   ///    `appendSym` names this append. Every pointer the operation allocates
@@ -185,29 +204,80 @@ module {
     switch(@ tree1, @ tree2) {
       case(#empty, _) { tree2 };
       case(_, #empty) { tree1 };
+      case(_, _) {
+        switch (firstSymbol(tree2)) {
+          // No elements on the right, so nothing to join.
+          case null tree1;
+          case (?midSym) {
+            appendRec(appendSym, midSym, Prim.symbolLevel midSym, tree1, tree2)
+          };
+        }
+      };
+    }
+  };
 
-      // Nothing to compare: two single elements have one break between them,
-      // and it is the one this returns. Its symbol is `tree2`'s element, since
-      // a break carries the symbol of the element it sits before.
-      case(#element(_), #element(e2)) {
-        // TO DO -- `append(appendSym)(e2.symbol) := #binary {
-        //            symbol = e2.symbol; level = Prim.symbolLevel e2.symbol;
-        //            left = tree1; right = tree2 }
+  /// `append`'s recursion, carrying the break it would introduce.
+  ///
+  ///    `midSym` is the first symbol of the original right-hand sequence and
+  /// `midLevel` its level -- the paper's `level(T0)`, the one quantity in
+  /// Figure 5.3 a `#binary` here does not cache. It is carried rather than
+  /// recomputed because it never changes: descending into `T0` keeps the same
+  /// leftmost element, and descending into `S1` does not touch the right-hand
+  /// sequence at all. So the walk stays O(log |tree1| + log |tree2|), which is
+  /// Theorem 5.6, without adding a field to the node.
+  ///
+  ///    Every node this builds is named `append(appendSym)(sym)` for the
+  /// symbol of the break it carries, which is why the precondition on
+  /// `append` has to include the two sequences being symbol-disjoint: a
+  /// symbol in both trees would have its pairing claimed twice.
+  func appendRec<X>(
+    appendSym : Symbol,
+    midSym : Symbol,
+    midLevel : Nat,
+    tree1 : LevelTree_<X>,
+    tree2 : LevelTree_<X>
+  ) : LevelTree_<X> {
+    let node = func(sym : Symbol, level : Nat,
+                    left : LevelTree_<X>, right : LevelTree_<X>) : LevelTree_<X> {
+      `append(appendSym)(sym) := #binary {
+        symbol = sym; level = level; left = left; right = right
+      }
+    };
+    switch(@ tree1, @ tree2) {
+      case(#empty, _) { tree2 };
+      case(_, #empty) { tree1 };
+
+      // Nothing to compare: two single elements have exactly one break
+      // between them, and it is the one this returns.
+      case(#element(_), #element(_)) {
+        node(midSym, midLevel, tree1, tree2)
       };
 
       // Paper: if level(T0) <= level(T1) then cList(append(S, T0), T1)
-      //                                 else cList(S, T)
+      //                                  else cList(S, T)
       case(#element(_), #binary(b2)) {
-        // TO DO -- level(T0) is `tree2`'s leftmost level, level(T1) is b2.level
+        if (midLevel <= b2.level) {
+          node(b2.symbol, b2.level,
+               appendRec(appendSym, midSym, midLevel, tree1, b2.left),
+               b2.right)
+        } else {
+          node(midSym, midLevel, tree1, tree2)
+        }
       };
 
       // Paper: if level(S1) <= level(T) then cList(S, T)
       //                                 else cList(S0, append(S1, T))
       //
-      // This case was missing, and Fumola's check is parse-only, so it would
-      // have failed at run time rather than at build time.
-      case(#binary(b1), #element(e2)) {
-        // TO DO -- level(S1) is b1.level, level(T) is Prim.symbolLevel e2.symbol
+      // `level(T)` for a single element is its own level, which is `midLevel`
+      // here, since a one-element sequence's first element is that element.
+      case(#binary(b1), #element(_)) {
+        if (b1.level <= midLevel) {
+          node(midSym, midLevel, tree1, tree2)
+        } else {
+          node(b1.symbol, b1.level,
+               b1.left,
+               appendRec(appendSym, midSym, midLevel, b1.right, tree2))
+        }
       };
 
       // Paper: if      level(S1) <= level(T1) and level(T0) <= level(T1)
@@ -216,10 +286,21 @@ module {
       //          then  cList(S, T)
       //        else    cList(S0, append(S1, T))
       //
-      // The asymmetry between <= and < is the tie-breaking rule of
-      // Definition 5.2: of two breaks at equal level the rightmost wins.
+      // The asymmetry between <= and < is Definition 5.2's tie-breaking rule:
+      // of two breaks at equal level the rightmost wins. Writing these the way
+      // they read aloud loses it.
       case(#binary(b1), #binary(b2)) {
-        // TO DO
+        if (b1.level <= b2.level and midLevel <= b2.level) {
+          node(b2.symbol, b2.level,
+               appendRec(appendSym, midSym, midLevel, tree1, b2.left),
+               b2.right)
+        } else if (b1.level <= midLevel and b2.level < midLevel) {
+          node(midSym, midLevel, tree1, tree2)
+        } else {
+          node(b1.symbol, b1.level,
+               b1.left,
+               appendRec(appendSym, midSym, midLevel, b1.right, tree2))
+        }
       };
     }
   };
@@ -242,16 +323,74 @@ module {
     thunk { (s-n, genSymsFrom(s, n + 1))}
   };
 
+  /// A tree's shape as text, ignoring which cells hold it.
+  ///
+  ///    Plain recursion and no allocation, so it can be compared against a
+  /// tree built another way. Pointer equality cannot do that job here: an
+  /// appended tree's nodes live in `append(...)` cells and the same sequence
+  /// built by `fromArray` lives in `sym-`binary` cells, so the two are equal
+  /// as sequences and as shapes while sharing no cell at all -- which is
+  /// exactly the cost of pointer naming that `docs/cache-naming.md` is about.
+  func shapeOf<X>(t : ?LevelTree_<X>) : Text {
+    switch t {
+      case null "_";
+      case (?p) {
+        switch (@ p) {
+          case (#empty) "_";
+          case (#element(e)) debug_show e.symbol;
+          case (#binary(b)) {
+            "(" # shapeOf(?b.left) # " " # (debug_show b.symbol)
+                # "@" # (debug_show b.level) # " " # shapeOf(?b.right) # ")"
+          };
+        }
+      };
+    }
+  };
+
+  /// Appending two representations represents the appended sequences, and
+  /// builds the very tree `fromArray` would have built for the concatenation.
+  ///
+  ///    The second is the stronger claim and the one that checks the break
+  /// selection: contents alone would pass for any tree holding the right
+  /// elements in the right order, however badly shaped. Canonicity is the
+  /// property the whole representation exists for -- a sequence's shape is a
+  /// function of its contents, however it was arrived at -- so an append that
+  /// broke it would quietly cost every later reuse.
+  ///
+  ///    Swept over small sizes because the six cases of Figure 5.3 need
+  /// different shapes to reach: one element against one, one against many,
+  /// many against one, and many against many, with the level comparisons
+  /// going each way.
+  #[test]
+  public func testAppendShape() {
+    var l = 1;
+    while (l <= 6) {
+      var r = 1;
+      while (r <= 6) {
+        let xs = R.generateRandomInput(10, l);
+        let ys = R.generateRandomInput_(10, l, r);
+        let out = append_(`a(l)(r), fromArray(xs), fromArray(ys));
+        let whole = fromArray(xs # ys);
+        assert (debug_show (intoArray(out)) == debug_show (intoArray(whole)));
+        assert (shapeOf(out) == shapeOf(whole));
+        r += 1
+      };
+      l += 1
+    };
+  };
+
   #[test]
   public func testAppend() {
     let (lSize, rSize) = (3, 3);
     let left = fromArray(R.generateRandomInput(10, lSize));
     let right = fromArray(R.generateRandomInput_(10, lSize, rSize));
 
-    Prim.print (debug_show (intoArray(left), intoArray(right)));
-
     let out = append_(`x, left, right);
-    Prim.print out;
+    // The whole correctness criterion: appending the representations
+    // represents the appended sequences. Compared through `debug_show` so
+    // this is a text equality rather than a structural one.
+    assert (debug_show (intoArray(out))
+            == debug_show (intoArray(left) # intoArray(right)));
   };
 
   /// Which naming the merge network uses, if a program has asked for one.
