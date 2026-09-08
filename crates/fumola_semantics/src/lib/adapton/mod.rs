@@ -33,6 +33,10 @@ pub trait AdaptonState {
     fn put_symbol_delay(&mut self, symbol: Symbol_, time: Time, value: Value_) -> Res<Pointer>;
     fn force_begin(&mut self, pointer: Pointer) -> Res<ForceBeginResult>;
     fn force_end(&mut self, value: Value_) -> Res<()>;
+    /// Advance the repair at the top of the stack; see `RepairStep`.
+    fn repair_step(&mut self) -> Res<RepairStep>;
+    /// The value of the target a repair asked to have forced (`RepairStep::Force`).
+    fn repair_resume(&mut self, value: Value_) -> Res<()>;
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()>;
     fn navigate_end(&mut self) -> Res<()>;
     fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>>;
@@ -53,11 +57,31 @@ pub enum Error {
     CannotPutFutureReservedSymbol(Symbol_),
 }
 
-/// A force either results in a cache hit, or a cache miss; the execution of each situation continues differently.
+/// A force either results in a cache hit, or a cache miss, or -- when the thunk has a cached
+/// result but its trace holds a signaled edge -- a repair; the execution of each situation
+/// continues differently.
+///
+/// Repair cannot finish inside the graph: checking a force edge means forcing its target
+/// (Algorithm 1 of the PLDI 2014 paper, line 11), which may run Fumola code. So `Repair` hands
+/// control to the VM, which drives the repair one `RepairStep` at a time.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ForceBeginResult {
     CacheMiss(ThunkBody),
     CacheHit(MetaTime, Value_),
+    Repair,
+}
+
+/// What the graph asks of the VM at each step of a repair (see `AdaptonState::repair_step`).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RepairStep {
+    /// Every edge of the thunk's trace is aligned again: its cached result stands.
+    Aligned(MetaTime, Value_),
+    /// A signaled force edge is being checked: force this pointer, then hand its value to
+    /// `AdaptonState::repair_resume`.
+    Force(Pointer),
+    /// An edge could not be realigned: the thunk is misaligned, and this body is to be
+    /// evaluated as a cache miss of a new version of it.
+    Reevaluate(ThunkBody),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]

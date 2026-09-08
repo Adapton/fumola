@@ -1,10 +1,88 @@
+//! The graphical cache: Fumola's demanded computation graph (DCG), its construction, and its
+//! realignment after an edit.
+//!
+//! # Reading guide
+//!
+//! Three formal accounts stand behind this file, and the comments below refer to all three:
+//!
+//! - **Adapton** (Hammer, Phang, Hicks, Foster; PLDI 2014), Algorithm 1 in section 5.2:
+//!   `dirty` (lines 1-5) and `propagate` (lines 6-15), pseudocode over a DCG whose edges carry
+//!   a dirty bit and a label -- the value the edge observed.
+//! - **Nominal Adapton** (Hammer, Dunfield, Headley, Labich, Foster, Hicks, Van Horn;
+//!   OOPSLA 2015), Figures 5, 6 and 8: a graph semantics with allocation by name.
+//!   `Eval-refDirty` / `Eval-thunkDirty` overwrite an existing name and `dirty-paths-in` marks
+//!   every path to it; `Eval-refClean` / `Eval-thunkClean` re-allocate an unchanged name and
+//!   touch nothing; `Eval-forceClean` reuses a thunk when `all-clean-out` holds;
+//!   `Eval-scrubEdge` cleans one edge whose target is up to date and whose action is
+//!   `consistent-action`; `Eval-computeDep` re-evaluates after `del-edges-out`. Figure 8 is
+//!   well-formedness: every edge into the source of a dirty edge is dirty (`Grwf-dirtyEdge`),
+//!   and a clean edge's action is consistent with an all-clean target (`Grwf-cleanEdge`).
+//! - **The Adapton recipe** (`adapton-recipe.ott`, in progress): the current formalism, with
+//!   symbolic space and time, meta-moments as node versions, and the rules `dirtyNode`, `DT-*`
+//!   (dirtying a trace), `CN-aligned` / `CN-misaligned` (cleaning a node), `CT-*` (cleaning a
+//!   trace) and `IE-emptyForce` / `IE-cleanForce`. The recipe is written to agree with this
+//!   code: where the two differ, this code is the reference, and the difference is listed below
+//!   as something for the recipe to take up.
+//!
+//! # Terms
+//!
+//! Fumola's words differ from the papers' -- in terms, not in algorithms:
+//!
+//! | papers                   | here         |
+//! |--------------------------|--------------|
+//! | dirtying                 | signaling    |
+//! | dirty (an edge's state)  | signaled     |
+//! | clean (an edge's state)  | aligned      |
+//! | cleaning                 | repair       |
+//! | change propagation       | realignment  |
+//!
+//! A `put` that changes a cell with readers *signals*; a `force` of a thunk whose trace holds
+//! a signaled edge *repairs*; and the whole, from an edit to the next consistent demand, is
+//! *realignment*, made of signal and repair steps. `Align` is the edge status.
+//! `Event::SignalingBegin`..`SignalingEnd` and `Event::RepairBegin`..`RepairEnd` bracket the two
+//! traversals in the history, as `ForceBegin`..`ForceEnd` brackets a force.
+//!
+//! # Where this code and the formalisms differ
+//!
+//! 1. **Edge targets.** An edge's `target` is typed `NodeId`, but its meta-time is the moment
+//!    of the access, not the version read (see `new_edge_to_pointer`). The recipe agrees in
+//!    substance: its edges target a full pointer `qq` = (Space, Moment), with no meta-moment.
+//!    Readers are therefore indexed by `(Space, Time)` -- `edges_by_target` -- which is the
+//!    recipe's `incomingEdges`.
+//! 2. **Re-evaluation makes a new version.** The recipe's `CN-misaligned` re-evaluates at
+//!    `nextMetaMoment`; Nominal Adapton's `Eval-computeDep` overwrites the node in place after
+//!    `del-edges-out`; Algorithm 1 clears `node.outgoinglist`. This code does both halves: a new
+//!    version (recipe) and the old trace's edges removed from the live graph (papers). The
+//!    history keeps the removed edges, so `history` is the recipe's lossless graph and
+//!    `edges` / `edges_by_target` are the live one.
+//! 3. **What signaling marks.** Algorithm 1 marks every incoming edge; Nominal Adapton's
+//!    `dirty-paths-in` marks every path, allocation edges included; the recipe marks an edge
+//!    only when its action is `misaligned(Space, v)` with the new contents, and past the first
+//!    hop follows `forces` only. This code follows the recipe. Consequence: a `Put` edge is
+//!    never signaled, so the double-use check Nominal Adapton gets from
+//!    `consistent-action(G, alloc e, q)` is not performed here.
+//! 4. **A matched put.** Nominal Adapton's `Eval-refClean` / `Eval-thunkClean` add an
+//!    allocation edge and change nothing else when the contents are unchanged. This code does
+//!    the same while `Settings::put_matches_equal_values` holds (the default), and counts it in
+//!    `Counts::put_matched`. The recipe's prose implies it (every action would be aligned with
+//!    the update) but has no graphical `put` rule yet.
+//! 5. **`get` of a thunk pointer** yields the thunk here; the recipe's `E-getThunk` yields the
+//!    pair (space, thunk). Signaling compares a recorded `Get` value with the new contents, so
+//!    the two agree only because a thunk's space is not part of what `get` observes here.
+//! 6. **Undelay.** A node re-homed by `undelay` neither matches nor signals
+//!    (`PutBeh::Undelay`). The recipe says undelay "uses dirtying"; that remains to be written
+//!    on both sides.
+//! 7. **No cycle check.** A thunk that forces itself, through any path, is not detected here or
+//!    in the recipe (whose `putImmediate` side condition, `∉ Path`, is the nearest thing).
+//!    Repair adds no new way to form one -- it re-forces only what a from-scratch run forced.
+//!
 use crate::ToMotoko;
 use crate::Value;
 use crate::adapton::MetaTime;
 use crate::adapton::peek_value::PeekValue;
 use crate::adapton::state::PutBeh;
 use crate::adapton::state::{CacheState, Counts, Settings};
-use crate::adapton::{Error, ForceBeginResult, Navigation, Pointer, Res, Space, Time};
+use crate::adapton::{Error, ForceBeginResult, Navigation, Pointer, RepairStep, Res, Space, Time};
 use crate::value::{Symbol_, ThunkBody, Value_};
 use im_rc::vector;
 use im_rc::{HashMap, Vector};
@@ -16,9 +94,35 @@ pub enum Event {
     AddNode(NodeId),
     AddEdge(EdgeId),
     UpdateEdge(EdgeId),
+    /// An edge leaving the live graph: a re-evaluated thunk's old trace (Nominal Adapton's
+    /// `del-edges-out`; Algorithm 1 line 13). Defined before repair existed, emitted only now.
     RemoveEdge(EdgeId),
     ForceBegin(EdgeId, Option<MetaTime>),
     ForceEnd(EdgeId),
+    /// Signaling: a put changed a cell that has readers. Between these two, the edges that
+    /// observed the old contents, and the force edges upstream of them, are marked `Signaled`.
+    /// The node is the new version the put made.
+    SignalingBegin(NodeId),
+    SignalingEnd(NodeId),
+    /// An edge a signaling traversal marked `Signaled` (Algorithm 1 line 4).
+    EdgeSignaled(EdgeId),
+    /// Repair: a thunk with a cached result was forced while its trace held a signaled edge.
+    /// Between these two its edges are checked in order, and either all realign or the thunk is
+    /// re-evaluated; the outcome says which.
+    RepairBegin(NodeId),
+    RepairEnd(NodeId, RepairOutcome),
+    /// An edge a repair found consistent again and marked `Aligned` (Algorithm 1 line 9, when
+    /// line 12 finds the values equal; Nominal Adapton's `Eval-scrubEdge`).
+    EdgeAligned(EdgeId),
+}
+
+/// How a repair ended.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum RepairOutcome {
+    /// Every edge realigned; the cached result stands (the recipe's `CN-aligned`).
+    Aligned,
+    /// An edge could not be realigned; a new version was evaluated (`CN-misaligned`).
+    Reevaluated,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -108,7 +212,30 @@ impl History {
 pub enum FrameKind {
     Navigation(Navigation),
     Force(NodeId, EdgeId),
-    Clean(NodeId),
+    Repair(RepairFrame),
+}
+
+/// A repair in progress: Algorithm 1's `propagate(node)` with its loop counter kept on the
+/// stack, because the loop body (line 11) can force a thunk, and forcing runs Fumola code that
+/// only the VM can run. `repair_step` advances the walk; `repair_resume` receives what the VM
+/// forced.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RepairFrame {
+    /// The thunk being repaired.
+    pub node_id: NodeId,
+    /// The edge by which it was demanded: a new edge from the current node for an ordinary
+    /// force, or the edge an enclosing repair is checking when this force is on its behalf.
+    /// It receives the `ForceEnd`, and it is the edge a re-evaluation's `force_end` completes.
+    pub demand_edge: EdgeId,
+    /// The trace as it stood when repair began, walked in order (Algorithm 1 line 7).
+    pub trace: Vector<EdgeId>,
+    /// The next edge to check.
+    pub index: usize,
+    /// The edge whose target the VM is forcing on this repair's behalf, and the value the edge
+    /// recorded, for the comparison of Algorithm 1 line 12 when the value comes back.
+    pub awaiting: Option<(EdgeId, Value_)>,
+    /// Set when an edge could not be realigned: the next step re-evaluates.
+    pub misaligned: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -128,7 +255,22 @@ pub type NodeId = (Space, Time, MetaTime);
 pub struct EdgeId(pub BigUint);
 
 pub type EdgesByEdgeId = HashMap<EdgeId, Edge>;
-pub type EdgeIdsByTarget = HashMap<NodeId, Vector<EdgeId>>;
+/// The readers of a cell: every live edge whose target is any version of the pointer, at that
+/// time. Keyed by pointer rather than node because an edge reads whichever version is latest
+/// when it is made, and a later version supersedes it for every reader at once. This is the
+/// recipe's `incomingEdges`, and what signaling walks.
+pub type EdgeIdsByTarget = HashMap<(Space, Time), Vector<EdgeId>>;
+
+/// The status of an edge: whether what it recorded is known to agree with the graph.
+///
+/// The papers' dirty bit -- `edge.dirty` in Algorithm 1, `b ::= clean | dirty` in Nominal
+/// Adapton and the recipe -- under Fumola's names. An edge is made `Aligned`; a put that changes
+/// what it observed makes it `Signaled`; repair makes it `Aligned` again or removes it.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum Align {
+    Aligned,
+    Signaled,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Edge {
@@ -136,6 +278,7 @@ pub struct Edge {
     pub target: NodeId,
     pub action: Action,
     pub meta_times: (MetaTime, MetaTime),
+    pub align: Align,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -300,7 +443,8 @@ impl GraphicalState {
         self.next_edge_id = self.next_edge_id.next();
         self.trace.push_back(id.clone());
         let source = self.current_node();
-        match self.edges_by_target.get_mut(&target) {
+        let readers_key = (target.0.clone(), target.1.clone());
+        match self.edges_by_target.get_mut(&readers_key) {
             Some(edge_ids) => {
                 if !edge_ids.contains(&id) {
                     edge_ids.push_back(id.clone());
@@ -308,7 +452,7 @@ impl GraphicalState {
             }
             None => {
                 self.edges_by_target
-                    .insert(target.clone(), vector!(id.clone()));
+                    .insert(readers_key, vector!(id.clone()));
             }
         };
         let meta_time = self.meta_time.clone();
@@ -317,6 +461,8 @@ impl GraphicalState {
             target,
             action,
             meta_times: MetaTime::pair(meta_time_begin, meta_time),
+            // Every edge is made aligned: it records what it observed just now.
+            align: Align::Aligned,
         };
         self.history.edges.push_back(EdgeHistoryItem {
             meta_time: self.meta_time.clone(),
@@ -326,6 +472,12 @@ impl GraphicalState {
         self.edges.insert(id.clone(), edge);
         Ok(id)
     }
+    /// An edge from the current node to the cell at `target`.
+    ///
+    /// The target's meta-time is the moment of this access, not the meta-time of the version
+    /// read: an edge reads whichever version is latest, and the readers index keys on the
+    /// pointer and time alone (see `EdgeIdsByTarget`). The recipe's edges target `qq`, a full
+    /// pointer with no meta-moment, and mean the same thing.
     fn new_edge_to_pointer(
         &mut self,
         action: Action,
@@ -352,6 +504,10 @@ impl GraphicalState {
                 target: edge.target,
                 action: updated_action,
                 meta_times: MetaTime::pair(meta_time_begin, meta_time),
+                // A completed force records the result it just saw, so the edge is aligned
+                // whatever it was before -- this is how a repair's re-force of a target
+                // realigns the edge it was checking.
+                align: Align::Aligned,
             },
         );
         Ok(())
@@ -392,15 +548,28 @@ impl GraphicalState {
         for ((pointer, _meta_time), node) in delayed_nodes.iter() {
             let node_value = node.get_value()?;
             let mut dummy: Counts = Counts::new();
-            self.put_pointer(&mut dummy, pointer.clone(), node_value, PutBeh::Undelay)?;
+            // Undelay neither matches nor signals (module notes, item 6), so the settings it
+            // is handed do not matter.
+            self.put_pointer(
+                &Settings::new(),
+                &mut dummy,
+                pointer.clone(),
+                node_value,
+                PutBeh::Undelay,
+            )?;
         }
         Ok(())
     }
 
     fn get_incoming_edges<'a>(&'a self, pointer: &Pointer) -> Res<Vector<(EdgeId, Edge)>> {
         let (nid, _) = self.get_node(pointer)?;
-
-        let edge_ids = self.edges_by_target.get(&nid).unwrap_or(&vector!()).clone();
+        // Every reader of the cell, whichever version each read (see `EdgeIdsByTarget`).
+        let readers_key = (nid.0, nid.1);
+        let edge_ids = self
+            .edges_by_target
+            .get(&readers_key)
+            .unwrap_or(&vector!())
+            .clone();
         Ok(edge_ids
             .into_iter()
             .map(|edge_id| {
@@ -425,6 +594,195 @@ impl GraphicalState {
                     .collect();
                 Ok(edges)
             }
+        }
+    }
+
+    /// The node a `NodeId` names, exactly: that pointer, that time, that version.
+    fn node_by_id(&self, id: &NodeId) -> Option<&Node> {
+        self.space_time.get(&id.0)?.get(&id.1)?.get(&id.2)
+    }
+
+    /// The latest version of the cell at `pointer` in the current time, if it has one there.
+    /// Unlike `get_node` this does not fall back to an earlier time: a put makes a version at
+    /// the current time, and the version it supersedes is the one already there.
+    fn latest_version_at_now(&self, pointer: &Pointer) -> Option<(MetaTime, Node)> {
+        let versions = self.space_time.get(pointer)?.get(&self.time)?;
+        let mut latest: Option<(&MetaTime, &Node)> = None;
+        for (m, n) in versions.iter() {
+            match latest {
+                Some((m0, _)) if m0.0 >= m.0 => {}
+                _ => latest = Some((m, n)),
+            }
+        }
+        latest.map(|(m, n)| (m.clone(), n.clone()))
+    }
+
+    /// Record `node` as a new version of `pointer` at `time`, stamped with the current
+    /// meta-time -- the recipe's `nextMetaMoment`.
+    fn insert_version(&mut self, pointer: &Pointer, time: &Time, node: Node) -> NodeId {
+        let mut by_meta = HashMap::new();
+        by_meta.insert(self.meta_time.clone(), node);
+        let by_time = match self.space_time.get(pointer) {
+            Some(by_time) => by_time.update_with(time.clone(), by_meta, |old, new| old.union(new)),
+            None => HashMap::new().update(time.clone(), by_meta),
+        };
+        self.space_time = self.space_time.update(pointer.clone(), by_time);
+        (pointer.clone(), time.clone(), self.meta_time.clone())
+    }
+
+    /// The bookkeeping of a put that made a node: the counts, the `AddNode` event and the `Put`
+    /// edge from the current node. A poke or an undelay makes the node and no edge.
+    fn count_and_link_put(
+        &mut self,
+        counts: &mut Counts,
+        value: &Value_,
+        is_thunk: bool,
+        beh: PutBeh,
+        node_id: &NodeId,
+    ) -> Res<()> {
+        if beh == PutBeh::Put {
+            counts.cells += 1;
+            if is_thunk {
+                counts.thunk_cells += 1
+            } else {
+                counts.non_thunk_cells += 1;
+            }
+            self.extend_history_with_event(Event::AddNode(node_id.clone()));
+            let edge_id =
+                self.new_edge_helper(Action::Put(value.clone()), node_id.clone(), None)?;
+            self.extend_history_with_event(Event::AddEdge(edge_id));
+        }
+        Ok(())
+    }
+
+    /// Set an edge's status, and say so in the history: an `EdgeSignaled` or `EdgeAligned`
+    /// event, and the edge as it now stands.
+    fn set_align(&mut self, edge_id: &EdgeId, align: Align) {
+        let edge = match self.edges.get(edge_id) {
+            Some(edge) => edge.clone(),
+            None => return,
+        };
+        let edge = Edge {
+            align: align.clone(),
+            ..edge
+        };
+        self.edges = self.edges.update(edge_id.clone(), edge.clone());
+        let event = match align {
+            Align::Signaled => Event::EdgeSignaled(edge_id.clone()),
+            Align::Aligned => Event::EdgeAligned(edge_id.clone()),
+        };
+        self.extend_history_with_event(event);
+        self.history.edges.push_back(EdgeHistoryItem {
+            meta_time: self.meta_time.clone(),
+            edge_id: edge_id.clone(),
+            edge,
+        });
+    }
+
+    /// Take an edge out of the live graph -- `edges` and the readers index -- leaving it in
+    /// the history, with a `RemoveEdge` event to say when it left.
+    fn remove_edge(&mut self, edge_id: &EdgeId) {
+        let edge = match self.edges.get(edge_id) {
+            Some(edge) => edge.clone(),
+            None => return,
+        };
+        let readers_key = (edge.target.0.clone(), edge.target.1.clone());
+        if let Some(ids) = self.edges_by_target.get(&readers_key) {
+            let kept: Vector<EdgeId> = ids.iter().filter(|id| *id != edge_id).cloned().collect();
+            self.edges_by_target.insert(readers_key, kept);
+        }
+        self.edges.remove(edge_id);
+        self.extend_history_with_event(Event::RemoveEdge(edge_id.clone()));
+    }
+
+    /// Signaling: the traversal an edit starts.
+    ///
+    /// Algorithm 1 (PLDI 2014) lines 1-5: from the changed node, follow the incoming edges,
+    /// mark each that is not already marked, and recurse at its source. The recipe's
+    /// `dirtyNode` and `DT-*` rules say the same with two refinements, both kept here:
+    ///
+    /// - An edge is signaled only when its recorded action is misaligned with the new contents
+    ///   (`DT-cleanIntoDirty` under the pattern `misaligned(Space, v)`): a `Get` that recorded
+    ///   the very value the cell holds again stays aligned (`DT-stillClean`), and so does every
+    ///   `Put`, an allocation rather than an observation. Nominal Adapton's `dirty-paths-in`
+    ///   marks every path instead, allocation edges included; see the module notes, item 3.
+    /// - Past the first hop the pattern is `forces`: the source of a signaled edge is a thunk
+    ///   whose *result* may now differ, and only its forcers observed that result. Its getters
+    ///   observed its body, which nothing here has changed.
+    ///
+    /// Stopping at an edge already signaled (`DT-alreadyDirty`; Algorithm 1 line 3) is sound
+    /// by the invariant Nominal Adapton states as `Grwf-dirtyEdge`: every edge into the source
+    /// of a signaled edge is already signaled. The traversal is bracketed by `SignalingBegin`
+    /// and `SignalingEnd`, naming the new version that started it, whenever the cell has a
+    /// reader at all.
+    fn signal(&mut self, counts: &mut Counts, pointer: &Pointer, new_value: &Value_, from: NodeId) {
+        let start = (pointer.clone(), self.time.clone());
+        let observed = |action: &Action| {
+            matches!(
+                action,
+                Action::Get(_) | Action::Force(..) | Action::ForceBegin(_)
+            )
+        };
+        let has_readers = self
+            .edges_by_target
+            .get(&start)
+            .map(|ids| {
+                ids.iter()
+                    .any(|id| self.edges.get(id).map_or(false, |e| observed(&e.action)))
+            })
+            .unwrap_or(false);
+        if !has_readers {
+            return;
+        }
+        counts.signalings += 1;
+        self.extend_history_with_event(Event::SignalingBegin(from.clone()));
+        // (readers of this pointer, past the first hop?)
+        let mut work: Vec<((Space, Time), bool)> = vec![(start, false)];
+        while let Some((readers_key, forces_only)) = work.pop() {
+            let ids = self
+                .edges_by_target
+                .get(&readers_key)
+                .cloned()
+                .unwrap_or_default();
+            for id in ids.iter() {
+                let edge = match self.edges.get(id) {
+                    Some(edge) => edge.clone(),
+                    None => continue,
+                };
+                if edge.align == Align::Signaled {
+                    continue; // DT-alreadyDirty
+                }
+                let misaligned = match &edge.action {
+                    Action::Put(_) => false, // DT-stillClean: an allocation is not an observation
+                    Action::Get(seen) => !forces_only && seen != new_value, // misaligned(Space, v)
+                    Action::Force(..) | Action::ForceBegin(_) => true, // both patterns match a force
+                };
+                if !misaligned {
+                    continue;
+                }
+                self.set_align(id, Align::Signaled); // DT-cleanIntoDirty ...
+                counts.edges_signaled += 1;
+                // ... whose recursive premise dirties the `forces` into the edge's source.
+                work.push(((edge.source.0.clone(), edge.source.1.clone()), true));
+            }
+        }
+        self.extend_history_with_event(Event::SignalingEnd(from));
+    }
+
+    /// The edge a repair is checking by forcing its target, if the topmost frame is a repair
+    /// paused on such a check. A force made on its behalf records no new edge.
+    fn repair_awaiting_edge(&self) -> Option<EdgeId> {
+        match self.stack.back().map(|frame| &frame.kind) {
+            Some(FrameKind::Repair(rf)) => rf.awaiting.as_ref().map(|(edge_id, _)| edge_id.clone()),
+            _ => None,
+        }
+    }
+
+    /// Put an updated repair frame back on top of the stack, in place of the one there.
+    fn replace_repair_frame(&mut self, rf: RepairFrame) {
+        if let Some(mut frame) = self.stack.pop_back() {
+            frame.kind = FrameKind::Repair(rf);
+            self.stack.push_back(frame);
         }
     }
 
@@ -510,13 +868,20 @@ impl CacheState for GraphicalState {
         }
     }
 
-    fn put_symbol(&mut self, counts: &mut Counts, symbol: Symbol_, value: Value_) -> Res<Pointer> {
+    fn put_symbol(
+        &mut self,
+        settings: &Settings,
+        counts: &mut Counts,
+        symbol: Symbol_,
+        value: Value_,
+    ) -> Res<Pointer> {
         let p: Pointer = self.space.apply(symbol);
-        self.put_pointer(counts, p.clone(), value, PutBeh::Put)?;
+        self.put_pointer(settings, counts, p.clone(), value, PutBeh::Put)?;
         Ok(p)
     }
     fn put_pointer(
         &mut self,
+        settings: &Settings,
         counts: &mut Counts,
         pointer: Pointer,
         value: Value_,
@@ -525,41 +890,45 @@ impl CacheState for GraphicalState {
         self.meta_time.incr();
         let space = self.space.clone();
         let new_node = Self::new_node(space, value.clone());
-        self.extend_history_with_new_node(&pointer, None, &new_node);
         let is_thunk = new_node.is_thunk();
-        let mut node_by_meta_time0 = HashMap::new();
-        node_by_meta_time0.insert(self.meta_time.clone(), new_node);
-        let nodes_by_time = self.space_time.get(&pointer);
-        match nodes_by_time {
-            Some(nodes_by_time) => {
-                self.space_time = self.space_time.update(
-                    pointer.clone(),
-                    nodes_by_time.update_with(self.time.clone(), node_by_meta_time0, |old, new| {
-                        old.union(new)
-                    }),
-                );
+        let time = self.time.clone();
+
+        // Allocation by a name already taken at this time. Nominal Adapton (Figure 5) has two
+        // rules for it, and this is where they part:
+        //
+        // - `Eval-refClean` / `Eval-thunkClean`: the contents are what the cell already holds.
+        //   Nothing in the graph changes; only the allocation edge is added. A *matched put*.
+        // - `Eval-refDirty` / `Eval-thunkDirty`: the contents differ. The node is overwritten
+        //   and `dirty-paths-in` marks every path to it. Here the overwrite is a new version
+        //   (the recipe's meta-moments) and `signal` marks the readers.
+        //
+        // An undelay re-homes a delayed node and does neither (module notes, item 6).
+        if beh != PutBeh::Undelay {
+            if let Some((old_meta, old_node)) = self.latest_version_at_now(&pointer) {
+                let same = match (&old_node, &new_node) {
+                    (Node::NonThunk(a), Node::NonThunk(b)) => a == b,
+                    (Node::Thunk(a), Node::Thunk(b)) => a.body == b.body && a.space == b.space,
+                    _ => false,
+                };
+                if same && settings.put_matches_equal_values {
+                    counts.put_matched += 1;
+                    if beh == PutBeh::Put {
+                        let target = (pointer, time, old_meta);
+                        let edge_id = self.new_edge_helper(Action::Put(value), target, None)?;
+                        self.extend_history_with_event(Event::AddEdge(edge_id));
+                    }
+                    return Ok(());
+                }
+                self.extend_history_with_new_node(&pointer, None, &new_node);
+                let node_id = self.insert_version(&pointer, &time, new_node);
+                self.count_and_link_put(counts, &value, is_thunk, beh, &node_id)?;
+                self.signal(counts, &pointer, &value, node_id);
+                return Ok(());
             }
-            None => {
-                self.space_time = self.space_time.update(
-                    pointer.clone(),
-                    HashMap::new().update(self.time.clone(), node_by_meta_time0),
-                )
-            }
-        };
-        if beh == PutBeh::Put {
-            counts.cells += 1;
-            if is_thunk {
-                counts.thunk_cells += 1
-            } else {
-                counts.non_thunk_cells += 1;
-            }
-            let put_action = Action::Put(value.clone());
-            let target = (pointer.clone(), self.time.clone(), self.meta_time.clone());
-            self.extend_history_with_event(Event::AddNode(target.clone()));
-            let edge_id = self.new_edge_helper(put_action, target, None)?;
-            self.extend_history_with_event(Event::AddEdge(edge_id));
-        };
-        Ok(())
+        }
+        self.extend_history_with_new_node(&pointer, None, &new_node);
+        let node_id = self.insert_version(&pointer, &time, new_node);
+        self.count_and_link_put(counts, &value, is_thunk, beh, &node_id)
     }
 
     fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_> {
@@ -601,40 +970,81 @@ impl CacheState for GraphicalState {
     ) -> Res<ForceBeginResult> {
         self.meta_time.incr();
         let (node_id, node) = {
-            let (i, n) = self.get_node(&pointer)?.clone();
+            let (i, n) = self.get_node(&pointer)?;
             (i, n.clone())
         };
-        if let Node::Thunk(tc) = node.clone() {
-            if let Some(cache_value) = tc.result.clone()
-                && !settings.force_begin_always_misses
-            {
-                counts.force_begin_cache_hit += 1;
-                let action = node.clone().force_action()?;
-                let edge_id = self.new_edge_to_pointer(action, pointer, None)?;
-
+        let tc = match &node {
+            Node::Thunk(tc) => tc.clone(),
+            Node::NonThunk(_) => return Err(Error::TypeMismatch(line!())),
+        };
+        // A force that repair makes to check one of its edges records no edge of its own: the
+        // edge under check already states the dependency, and what repair does is update that
+        // edge's status (Nominal Adapton's `Eval-scrubEdge`; the recipe's `CT-dirtyIntoClean`).
+        // Every other force records a new edge from the current node, as before.
+        let repairing_for = self.repair_awaiting_edge();
+        let cached = if settings.force_begin_always_misses {
+            None
+        } else {
+            tc.result.clone()
+        };
+        match cached {
+            Some((cache_meta, cache_value)) => {
+                let edge_id = match &repairing_for {
+                    Some(edge_id) => edge_id.clone(),
+                    None => {
+                        let action = node.clone().force_action()?;
+                        self.new_edge_to_pointer(action, pointer, None)?
+                    }
+                };
                 self.extend_history_with_event(Event::ForceBegin(
                     edge_id.clone(),
-                    Some(cache_value.0.clone()),
+                    Some(cache_meta.clone()),
                 ));
-
-                // TODO -- clean.
-                self.extend_history_with_event(Event::ForceEnd(edge_id.clone()));
-                Ok(ForceBeginResult::CacheHit(cache_value.0, cache_value.1))
-            } else {
-                let action = node.clone().force_begin_action()?;
-                let edge_id = self.new_edge_to_pointer(action, pointer, None)?;
-
-                self.extend_history_with_event(Event::AddEdge(edge_id.clone()));
+                // Nominal Adapton's `Eval-forceClean` asks `all-clean-out`: is every outgoing
+                // edge aligned? Then the cached result stands -- Algorithm 1's `propagate` finds
+                // no dirty edge to follow. Otherwise the thunk is repaired before its result can
+                // be used (the recipe's `IE-cleanForce`: clean first, then read the cache), and
+                // the VM drives that, one `RepairStep` at a time.
+                let signaled = tc.trace.iter().any(|id| {
+                    self.edges
+                        .get(id)
+                        .map_or(false, |e| e.align == Align::Signaled)
+                });
+                if !signaled {
+                    counts.force_begin_cache_hit += 1;
+                    self.extend_history_with_event(Event::ForceEnd(edge_id));
+                    Ok(ForceBeginResult::CacheHit(cache_meta, cache_value))
+                } else {
+                    counts.repairs += 1;
+                    self.extend_history_with_event(Event::RepairBegin(node_id.clone()));
+                    self.push_stack(FrameKind::Repair(RepairFrame {
+                        node_id,
+                        demand_edge: edge_id,
+                        trace: tc.trace.clone(),
+                        index: 0,
+                        awaiting: None,
+                        misaligned: false,
+                    }));
+                    Ok(ForceBeginResult::Repair)
+                }
+            }
+            None => {
+                let edge_id = match &repairing_for {
+                    Some(edge_id) => edge_id.clone(),
+                    None => {
+                        let action = node.clone().force_begin_action()?;
+                        let edge_id = self.new_edge_to_pointer(action, pointer, None)?;
+                        self.extend_history_with_event(Event::AddEdge(edge_id.clone()));
+                        edge_id
+                    }
+                };
                 self.extend_history_with_event(Event::ForceBegin(edge_id.clone(), None));
-
                 counts.force_begin_cache_miss += 1;
-                self.push_stack(FrameKind::Force(node_id.clone(), edge_id.clone()));
+                self.push_stack(FrameKind::Force(node_id.clone(), edge_id));
                 self.current_node = node_id;
                 self.space = tc.space.clone();
                 Ok(ForceBeginResult::CacheMiss(tc.body.clone()))
             }
-        } else {
-            Err(Error::TypeMismatch(line!()))
         }
     }
     fn force_end(&mut self, settings: &Settings, value: Value_) -> Res<()> {
@@ -663,6 +1073,131 @@ impl CacheState for GraphicalState {
             }
             _ => unreachable!(),
         };
+        Ok(())
+    }
+
+    /// Repair: Algorithm 1's `propagate(node)`, lines 6-15, as far as the graph can take it
+    /// on its own.
+    ///
+    /// The trace is walked in order (line 7). An aligned edge is passed over (line 8; the
+    /// recipe's `CT-alreadyClean`). A signaled `Get` edge is checked on the spot: the target is
+    /// a cell, so there is nothing to bring up to date first (line 10 skips `propagate` for an
+    /// aref), only the comparison of line 12. A signaled `Force` edge needs its target brought
+    /// up to date before the comparison (lines 10-11; the recipe's `clean(qq)`), and that is a
+    /// force, which may run Fumola code -- so the walk pauses, remembers the edge and what it
+    /// recorded, and asks the VM (`RepairStep::Force`); `repair_resume` finishes the check.
+    ///
+    /// When every edge is aligned the node is aligned (`CN-aligned`; `all-clean-out` holds and
+    /// `Eval-forceClean` applies) and its cached result is the answer. When an edge cannot be
+    /// realigned the node is misaligned (`CT-misaligned`, `CN-misaligned`) and is re-evaluated:
+    /// Algorithm 1 lines 13-15 clear the outgoing edges and evaluate; Nominal Adapton's
+    /// `Eval-computeDep` is `del-edges-out` then evaluation; the recipe evaluates into a new
+    /// version at `nextMetaMoment`. All three, here: the old trace's edges leave the live graph
+    /// (`RemoveEdge`; the history keeps them), and the evaluation runs as the cache miss of a
+    /// new version of the node -- the same `Force` frame an ordinary miss pushes, on the same
+    /// demand edge, so `force_end` completes it exactly as it would a miss.
+    fn repair_step(&mut self, counts: &mut Counts) -> Res<RepairStep> {
+        let mut rf = match self.stack.back().map(|frame| frame.kind.clone()) {
+            Some(FrameKind::Repair(rf)) => rf,
+            _ => return Err(Error::Internal(line!())),
+        };
+        while !rf.misaligned && rf.index < rf.trace.len() {
+            let edge_id = rf.trace[rf.index].clone();
+            let edge = match self.edges.get(&edge_id) {
+                Some(edge) => edge.clone(),
+                None => return Err(Error::Internal(line!())),
+            };
+            if edge.align == Align::Aligned {
+                rf.index += 1; // CT-alreadyClean; also every Put edge, which signaling never marks
+                continue;
+            }
+            match edge.action.clone() {
+                Action::Put(_) => {
+                    rf.index += 1;
+                }
+                Action::Get(seen) => {
+                    // The recipe's `CT-dirtyIntoClean` asks `clean(qq)` of the target first and
+                    // has no rule for a non-thunk `qq`; this is that rule: nothing to do.
+                    let current = {
+                        let (_, target) = self.get_node(&edge.target.0)?;
+                        target.get_value()?
+                    };
+                    if current == seen {
+                        self.set_align(&edge_id, Align::Aligned); // line 12 equal: CT-dirtyIntoClean
+                        counts.edges_aligned += 1;
+                        rf.index += 1;
+                    } else {
+                        rf.misaligned = true; // CT-misaligned
+                    }
+                }
+                Action::Force(_, seen) => {
+                    rf.awaiting = Some((edge_id, seen));
+                    self.replace_repair_frame(rf);
+                    return Ok(RepairStep::Force(edge.target.0));
+                }
+                Action::ForceBegin(_) => {
+                    // A force that never completed recorded no value to compare against.
+                    rf.misaligned = true;
+                }
+            }
+        }
+        if !rf.misaligned {
+            let (meta, value) = match self.node_by_id(&rf.node_id) {
+                Some(Node::Thunk(tc)) => tc.result.clone().ok_or(Error::Internal(line!()))?,
+                _ => return Err(Error::Internal(line!())),
+            };
+            self.pop_stack()?;
+            self.extend_history_with_event(Event::RepairEnd(rf.node_id, RepairOutcome::Aligned));
+            self.extend_history_with_event(Event::ForceEnd(rf.demand_edge));
+            return Ok(RepairStep::Aligned(meta, value));
+        }
+        let (space, body) = match self.node_by_id(&rf.node_id) {
+            Some(Node::Thunk(tc)) => (tc.space.clone(), tc.body.clone()),
+            _ => return Err(Error::Internal(line!())),
+        };
+        self.pop_stack()?;
+        for edge_id in rf.trace.iter() {
+            self.remove_edge(edge_id); // del-edges-out; Algorithm 1 line 13
+        }
+        self.meta_time.incr();
+        let new_node = Node::Thunk(ThunkNode {
+            body: body.clone(),
+            space: space.clone(),
+            trace: Vector::new(),
+            begin: Some(self.meta_time.clone()),
+            result: None,
+        });
+        let pointer = rf.node_id.0.clone();
+        let time = rf.node_id.1.clone();
+        self.extend_history_with_new_node(&pointer, Some(&time), &new_node);
+        let new_id = self.insert_version(&pointer, &time, new_node);
+        self.extend_history_with_event(Event::AddNode(new_id.clone()));
+        self.extend_history_with_event(Event::RepairEnd(rf.node_id, RepairOutcome::Reevaluated));
+        counts.reevaluations += 1;
+        self.push_stack(FrameKind::Force(new_id.clone(), rf.demand_edge));
+        self.current_node = new_id;
+        self.space = space;
+        Ok(RepairStep::Reevaluate(body))
+    }
+
+    /// The target of the edge under check is up to date now (`repair_step` asked for it to be
+    /// forced): does it still hold what the edge recorded? Algorithm 1 line 12. If so the edge
+    /// is aligned (`Eval-scrubEdge`; `CT-dirtyIntoClean`) and the walk goes on; if not the node
+    /// is misaligned (`CT-misaligned`) and the next step re-evaluates it.
+    fn repair_resume(&mut self, counts: &mut Counts, value: Value_) -> Res<()> {
+        let mut rf = match self.stack.back().map(|frame| frame.kind.clone()) {
+            Some(FrameKind::Repair(rf)) => rf,
+            _ => return Err(Error::Internal(line!())),
+        };
+        let (edge_id, seen) = rf.awaiting.take().ok_or(Error::Internal(line!()))?;
+        if value == seen {
+            self.set_align(&edge_id, Align::Aligned);
+            counts.edges_aligned += 1;
+            rf.index += 1;
+        } else {
+            rf.misaligned = true;
+        }
+        self.replace_repair_frame(rf);
         Ok(())
     }
 

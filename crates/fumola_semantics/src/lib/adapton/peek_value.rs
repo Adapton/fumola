@@ -2,8 +2,8 @@ use fumola_syntax::ast::{Id, Mut};
 use fumola_syntax::shared::Share;
 
 use crate::adapton::graphical::{
-    Action, Edge, EdgeHistoryItem, EdgeId, Event, EventHistoryItem, History, Node, NodeHistoryItem,
-    NodeInfo, ThunkNode,
+    Action, Align, Edge, EdgeHistoryItem, EdgeId, Event, EventHistoryItem, History, Node,
+    NodeHistoryItem, NodeInfo, RepairOutcome, ThunkNode,
 };
 use crate::adapton::simple::{Cell, ThunkCell};
 use crate::adapton::{MetaTime, Space, Time};
@@ -98,6 +98,7 @@ impl PeekValue for Edge {
                 ("target", self.target.into_value_()),
                 ("action", self.action.into_value_()),
                 ("metaTimes", self.meta_times.into_value_()),
+                ("align", self.align.into_value_()),
             ]
             .iter(),
         )
@@ -107,6 +108,28 @@ impl PeekValue for Edge {
 
 fn variant(tag: &str, payload: Value_) -> Value_ {
     Value::Variant(Id::new(tag.to_string()), Some(payload)).share()
+}
+
+fn unit_variant(tag: &str) -> Value_ {
+    Value::Variant(Id::new(tag.to_string()), None).share()
+}
+
+impl PeekValue for Align {
+    fn into_value_(self) -> Value_ {
+        match self {
+            Align::Aligned => unit_variant("aligned"),
+            Align::Signaled => unit_variant("signaled"),
+        }
+    }
+}
+
+impl PeekValue for RepairOutcome {
+    fn into_value_(self) -> Value_ {
+        match self {
+            RepairOutcome::Aligned => unit_variant("aligned"),
+            RepairOutcome::Reevaluated => unit_variant("reevaluated"),
+        }
+    }
 }
 
 impl PeekValue for Action {
@@ -214,6 +237,15 @@ impl PeekValue for Event {
                 (node_id.into_value_(), cache_hit.into_value_()).into_value_(),
             ),
             Event::ForceEnd(edge_id) => variant("forceEnd", edge_id.into_value_()),
+            Event::SignalingBegin(node_id) => variant("signalingBegin", node_id.into_value_()),
+            Event::SignalingEnd(node_id) => variant("signalingEnd", node_id.into_value_()),
+            Event::EdgeSignaled(edge_id) => variant("edgeSignaled", edge_id.into_value_()),
+            Event::RepairBegin(node_id) => variant("repairBegin", node_id.into_value_()),
+            Event::RepairEnd(node_id, outcome) => variant(
+                "repairEnd",
+                (node_id.into_value_(), outcome.into_value_()).into_value_(),
+            ),
+            Event::EdgeAligned(edge_id) => variant("edgeAligned", edge_id.into_value_()),
         }
     }
 }

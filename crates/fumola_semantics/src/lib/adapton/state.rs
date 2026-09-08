@@ -1,11 +1,12 @@
 use crate::adapton::{
-    AdaptonState, Error, ForceBeginResult, Navigation, Pointer, Res, Space, Strategy, Time,
+    AdaptonState, Error, ForceBeginResult, Navigation, Pointer, RepairStep, Res, Space, Strategy,
+    Time,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::adapton::MetaTime;
-use crate::adapton::graphical::EdgeId;
 use crate::adapton::graphical;
+use crate::adapton::graphical::EdgeId;
 use crate::adapton::reserved::{self, ReservedSymbol};
 use crate::adapton::simple::{self};
 
@@ -37,6 +38,18 @@ pub struct Counts {
     pub force_end: u64,
     pub force_begin_cache_hit: u64,
     pub force_begin_cache_miss: u64,
+    /// Puts of what a cell already held: no new version, nothing signaled.
+    pub put_matched: u64,
+    /// Signaling traversals: puts that changed a cell with readers.
+    pub signalings: u64,
+    /// Edges marked signaled by those traversals.
+    pub edges_signaled: u64,
+    /// Repairs: forces of a thunk whose trace held a signaled edge.
+    pub repairs: u64,
+    /// Edges a repair found consistent and marked aligned again.
+    pub edges_aligned: u64,
+    /// Thunks a repair re-evaluated.
+    pub reevaluations: u64,
 }
 
 impl Counts {
@@ -52,6 +65,12 @@ impl Counts {
             force_end: 0,
             force_begin_cache_hit: 0,
             force_begin_cache_miss: 0,
+            put_matched: 0,
+            signalings: 0,
+            edges_signaled: 0,
+            repairs: 0,
+            edges_aligned: 0,
+            reevaluations: 0,
         }
     }
 }
@@ -60,6 +79,10 @@ impl Counts {
 pub struct Settings {
     pub force_begin_always_misses: bool,
     pub force_end_forgets_result: bool,
+    /// A put of what a cell already holds keeps the cell and its readers as they are, and
+    /// records only the allocation edge -- Nominal Adapton's `Eval-refClean` / `Eval-thunkClean`.
+    /// Off, every put makes a new version and signals the readers of the old one.
+    pub put_matches_equal_values: bool,
 }
 
 impl Settings {
@@ -67,11 +90,12 @@ impl Settings {
         Settings {
             force_begin_always_misses: false,
             force_end_forgets_result: false,
+            put_matches_equal_values: true,
         }
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum PutBeh {
     Put,
     Poke,
@@ -87,12 +111,19 @@ pub trait CacheState {
     fn here(&self) -> Space;
     fn put_pointer(
         &mut self,
+        settings: &Settings,
         counts: &mut Counts,
         _pointer: Pointer,
         value: Value_,
         beh: PutBeh,
     ) -> Res<()>;
-    fn put_symbol(&mut self, counts: &mut Counts, _symbol: Symbol_, value: Value_) -> Res<Pointer>;
+    fn put_symbol(
+        &mut self,
+        settings: &Settings,
+        counts: &mut Counts,
+        _symbol: Symbol_,
+        value: Value_,
+    ) -> Res<Pointer>;
     fn get_pointer(&mut self, pointer: Pointer) -> Res<Value_>;
     fn put_pointer_delay(&mut self, pointer: Pointer, time: Time, value: Value_) -> Res<()>;
     fn put_symbol_delay(&mut self, symbol: Symbol_, time: Time, value: Value_) -> Res<Pointer>;
@@ -103,6 +134,8 @@ pub trait CacheState {
         _pointer: Pointer,
     ) -> Res<ForceBeginResult>;
     fn force_end(&mut self, settings: &Settings, value: Value_) -> Res<()>;
+    fn repair_step(&mut self, counts: &mut Counts) -> Res<RepairStep>;
+    fn repair_resume(&mut self, counts: &mut Counts, value: Value_) -> Res<()>;
     fn navigate_begin(&mut self, nav: Navigation, symbol: Symbol_) -> Res<()>;
     fn navigate_end(&mut self) -> Res<()>;
     fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>>;
@@ -123,6 +156,11 @@ impl State {
                     value.as_ref().into_bool_or(Error::TypeMismatch(line!()))?;
                 Ok(())
             }
+            ReservedSymbol::SettingsPutMatchesEqualValues => {
+                self.settings.put_matches_equal_values =
+                    value.as_ref().into_bool_or(Error::TypeMismatch(line!()))?;
+                Ok(())
+            }
             _ => Err(Error::CannotPutReadOnlyReservedSymbol(symbol)),
         }
     }
@@ -136,6 +174,15 @@ impl State {
             ReservedSymbol::SettingsForceEndForgetsResult => {
                 self.settings.force_end_forgets_result.to_motoko_shared()
             }
+            ReservedSymbol::SettingsPutMatchesEqualValues => {
+                self.settings.put_matches_equal_values.to_motoko_shared()
+            }
+            ReservedSymbol::CountsPutMatched => self.counts.put_matched.to_motoko_shared(),
+            ReservedSymbol::CountsSignalings => self.counts.signalings.to_motoko_shared(),
+            ReservedSymbol::CountsEdgesSignaled => self.counts.edges_signaled.to_motoko_shared(),
+            ReservedSymbol::CountsRepairs => self.counts.repairs.to_motoko_shared(),
+            ReservedSymbol::CountsEdgesAligned => self.counts.edges_aligned.to_motoko_shared(),
+            ReservedSymbol::CountsReevaluations => self.counts.reevaluations.to_motoko_shared(),
             ReservedSymbol::CountsCells => self.counts.cells.to_motoko_shared(),
             ReservedSymbol::CountsThunkCells => self.counts.thunk_cells.to_motoko_shared(),
             ReservedSymbol::CountsNonThunkCells => self.counts.non_thunk_cells.to_motoko_shared(),
@@ -216,10 +263,7 @@ impl AdaptonState for State {
         };
         State {
             inner,
-            settings: Settings {
-                force_begin_always_misses: false,
-                force_end_forgets_result: false,
-            },
+            settings: Settings::new(),
             counts: Counts::new(),
         }
     }
@@ -239,8 +283,12 @@ impl AdaptonState for State {
             self.counts.put += 1;
             let beh = PutBeh::Put;
             match &mut self.inner {
-                InnerState::Simple(s) => s.put_pointer(&mut self.counts, pointer, value, beh),
-                InnerState::Graphical(g) => g.put_pointer(&mut self.counts, pointer, value, beh),
+                InnerState::Simple(s) => {
+                    s.put_pointer(&self.settings, &mut self.counts, pointer, value, beh)
+                }
+                InnerState::Graphical(g) => {
+                    g.put_pointer(&self.settings, &mut self.counts, pointer, value, beh)
+                }
             }
         }
     }
@@ -254,8 +302,12 @@ impl AdaptonState for State {
         } else {
             self.counts.put += 1;
             match &mut self.inner {
-                InnerState::Simple(s) => s.put_symbol(&mut self.counts, symbol, value),
-                InnerState::Graphical(g) => g.put_symbol(&mut self.counts, symbol, value),
+                InnerState::Simple(s) => {
+                    s.put_symbol(&self.settings, &mut self.counts, symbol, value)
+                }
+                InnerState::Graphical(g) => {
+                    g.put_symbol(&self.settings, &mut self.counts, symbol, value)
+                }
             }
         }
     }
@@ -286,6 +338,20 @@ impl AdaptonState for State {
         match &mut self.inner {
             InnerState::Simple(s) => s.force_end(&self.settings, value),
             InnerState::Graphical(g) => g.force_end(&self.settings, value),
+        }
+    }
+
+    fn repair_step(&mut self) -> Res<RepairStep> {
+        match &mut self.inner {
+            InnerState::Simple(s) => s.repair_step(&mut self.counts),
+            InnerState::Graphical(g) => g.repair_step(&mut self.counts),
+        }
+    }
+
+    fn repair_resume(&mut self, value: Value_) -> Res<()> {
+        match &mut self.inner {
+            InnerState::Simple(s) => s.repair_resume(&mut self.counts, value),
+            InnerState::Graphical(g) => g.repair_resume(&mut self.counts, value),
         }
     }
 
@@ -359,9 +425,11 @@ impl AdaptonState for State {
             None => {
                 let beh = PutBeh::Poke;
                 match &mut self.inner {
-                    InnerState::Simple(s) => s.put_pointer(&mut self.counts, pointer, value, beh),
+                    InnerState::Simple(s) => {
+                        s.put_pointer(&self.settings, &mut self.counts, pointer, value, beh)
+                    }
                     InnerState::Graphical(g) => {
-                        g.put_pointer(&mut self.counts, pointer, value, beh)
+                        g.put_pointer(&self.settings, &mut self.counts, pointer, value, beh)
                     }
                 }
             }

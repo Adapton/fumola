@@ -60,10 +60,31 @@ module {
             #addNode : NodeId;
             #addEdge : EdgeId;
             #updateEdge : EdgeId;
+            // A re-evaluated thunk's old trace leaving the live graph. Emitted by repair.
             #removeEdge : EdgeId;
-            #forceBegin : NodeId;
-            #forceEnd : (NodeId, EdgeId);
+            // The edge by which the thunk was demanded, and the meta time of the cached
+            // result when this force found one. (Corrected to what the runtime emits;
+            // these two used to be documented as a NodeId and a pair.)
+            #forceBegin : (EdgeId, ?MetaTime);
+            #forceEnd : EdgeId;
+            // Realignment. A put that changes a cell with readers *signals*: between these
+            // two, the edges that observed the old contents, and the force edges upstream of
+            // them, are marked signaled. The node is the new version the put made.
+            #signalingBegin : NodeId;
+            #signalingEnd : NodeId;
+            #edgeSignaled : EdgeId;
+            // A force of a thunk whose trace holds a signaled edge *repairs*: between these
+            // two its edges are checked in order, and either all realign or the thunk is
+            // re-evaluated as a new version. The outcome says which.
+            #repairBegin : NodeId;
+            #repairEnd : (NodeId, RepairOutcome);
+            #edgeAligned : EdgeId;
         };
+
+        public type RepairOutcome = { #aligned; #reevaluated };
+
+        // The status of an edge: aligned with the graph, or signaled that it may not be.
+        public type Align = { #aligned; #signaled };
         
         public type MetaTime = Nat;
        
@@ -97,6 +118,7 @@ module {
             target : NodeId;
             action : Action;
             metaTimes : MetaTimes;
+            align : Align;
         };
 
         public type Action = {
@@ -375,6 +397,82 @@ module {
         });
         assert r == 13;
         assert peek(`scribble) == null;
+    };
+
+    /// Realignment, smallest case: a cell with one reader is changed, and the reader's next
+    /// force repairs it by re-evaluation. The PLDI 2014 paper's Figure 1, in three cells.
+    #[test]
+    func testRepairReevaluatesAReader() {
+        reset();
+        let x = `x := 1;
+        let t = `t := thunk { get(`x) + 1 };
+        let before = force(t);
+        assert before == 2;
+        x := 5;
+        let after = force(t);
+        assert after == 6;
+        let signalings = @(`adapton(`counts)(`signalings));
+        assert signalings == 1;
+        let reevaluations = @(`adapton(`counts)(`reevaluations));
+        assert reevaluations == 1;
+    };
+
+    /// The cutoff that makes repair cheaper than a re-run: `a` reads `x` and comes to the
+    /// same answer regardless, so `t`, which only forces `a`, realigns without re-evaluation.
+    /// Algorithm 1 line 12, when the values are equal.
+    #[test]
+    func testRepairStopsWhereTheValueIsUnchanged() {
+        reset();
+        let x = `x := 1;
+        let a = `a := thunk { get(`x) * 0 };
+        let t = `t := thunk { let v = force(a); v + 1 };
+        let before = force(t);
+        assert before == 1;
+        x := 7;
+        let after = force(t);
+        assert after == 1;
+        // `a` was re-evaluated; `t` was not.
+        let reevaluations = @(`adapton(`counts)(`reevaluations));
+        assert reevaluations == 1;
+        // The one edge realigned by comparison is `t`'s edge to `a`.
+        let aligned = @(`adapton(`counts)(`edgesAligned));
+        assert aligned == 1;
+    };
+
+    /// Putting what a cell already holds is a matched put: no new version, nothing signaled,
+    /// and the reader's cached result still stands.
+    #[test]
+    func testMatchedPutSignalsNothing() {
+        reset();
+        let x = `x := 1;
+        let t = `t := thunk { get(`x) };
+        let before = force(t);
+        assert before == 1;
+        x := 1;
+        let matched = @(`adapton(`counts)(`putMatched));
+        assert matched == 1;
+        let signalings = @(`adapton(`counts)(`signalings));
+        assert signalings == 0;
+        let cells = @(`adapton(`counts)(`cells));
+        assert cells == 2;
+        let after = force(t);
+        assert after == 1;
+        let repairs = @(`adapton(`counts)(`repairs));
+        assert repairs == 0;
+    };
+
+    /// A thunk put again with a different body: its forcers are signaled, and see the new
+    /// body on their next force. Nominal Adapton's `Eval-thunkDirty`.
+    #[test]
+    func testRepairSeesANewThunkBody() {
+        reset();
+        let a = `a := thunk { 1 };
+        let t = `t := thunk { let v = force(a); v * 10 };
+        let before = force(t);
+        assert before == 10;
+        `a := thunk { 2 };
+        let after = force(t);
+        assert after == 20;
     };
 
     #[test]
@@ -958,6 +1056,30 @@ module {
                     case (#forceEnd(edge_id)) {
                             ", \"type\": \"forceEnd\"" # 
                             ", \"edgeId\": " # fromEdgeId(edge_id)
+                    };
+                    // Realignment: the two bracketed traversals and their per-edge steps.
+                    case (#signalingBegin(node_id)) {
+                            ", \"type\": \"signalingBegin\", \"nodeId\": " # fromNodeId(node_id)
+                    };
+                    case (#signalingEnd(node_id)) {
+                            ", \"type\": \"signalingEnd\", \"nodeId\": " # fromNodeId(node_id)
+                    };
+                    case (#edgeSignaled(edge_id)) {
+                            ", \"type\": \"edgeSignaled\", \"edgeId\": " # fromEdgeId(edge_id)
+                    };
+                    case (#repairBegin(node_id)) {
+                            ", \"type\": \"repairBegin\", \"nodeId\": " # fromNodeId(node_id)
+                    };
+                    case (#repairEnd(node_id, outcome)) {
+                            ", \"type\": \"repairEnd\", \"nodeId\": " # fromNodeId(node_id) #
+                            ", \"outcome\": " #
+                            (switch outcome {
+                                case (#aligned) "\"aligned\"";
+                                case (#reevaluated) "\"reevaluated\"";
+                            })
+                    };
+                    case (#edgeAligned(edge_id)) {
+                            ", \"type\": \"edgeAligned\", \"edgeId\": " # fromEdgeId(edge_id)
                     };
                 })
                 # "}"
