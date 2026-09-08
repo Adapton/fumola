@@ -119,9 +119,48 @@ module {
   #[listing]
   public type GenSymThk = Thunk<(Symbol, GenSymThk)>;
   
+  /// Append two sequences, allocating the pointers the join needs.
+  ///
+  ///    `appendSym` names this append. Every pointer the operation allocates
+  /// is named by pairing it with a symbol already in the trees, so the whole
+  /// operation occupies one path of its own in the graph and cannot land on
+  /// cells some unrelated computation is using:
+  ///
+  ///     `append(appendSym)(localSym)
+  ///
+  ///    The `append head is not decoration. `#cartesian` merge naming already
+  /// builds names of the form `a(b)` out of two symbols carried by the data,
+  /// so a bare `appendSym(localSym)` would collide with one of those the day
+  /// an append symbol coincided with an element symbol. A literal head gives
+  /// every append its own space and makes that impossible rather than
+  /// unlikely.
+  ///
+  /// PRECONDITION: each pairing of `appendSym` with a symbol in either tree
+  /// is unused. One fresh `appendSym` per append is enough to give that,
+  /// since the symbols paired with it come from the trees and a spine walk
+  /// visits each node once. It is a precondition rather than a check because
+  /// nothing here can see what else the graph holds -- and getting it wrong
+  /// does not fail, it silently rebinds a pointer somebody else is reading.
+  ///
+  ///    One symbol rather than a stream. A `GenSymThk` would name each
+  /// allocation by its position in the recursion, which is `pathwise` naming,
+  /// and a position survives only as long as the shape it addresses --
+  /// measured on the merge network, that multiplies the cost of a reshaping
+  /// edit by five and a half. Pairing with a symbol from the tree keeps the
+  /// name attached to the data it is about, which is what survives an edit
+  /// elsewhere. `GenSymThk` and `genSymsFrom` remain for a pathwise variant
+  /// to use, if one is ever wanted for comparison.
+  ///
+  ///    The recursive cases follow Pugh and Teitelbaum, "Incremental
+  /// Computation via Function Caching", POPL 1989, Figure 5.3, and their
+  /// Theorem 5.6 gives the bound: each step walks down a right branch of
+  /// `tree1` or a left branch of `tree2`, so the whole append is
+  /// O(log |tree1| + log |tree2|) in expectation. The three candidate breaks
+  /// are the most preferable break in `tree1`, the break between the two, and
+  /// the most preferable break in `tree2`; the level comparisons choose which.
   #[listing]
   public func append<X>(
-    genSym : GenSymThk,
+    appendSym : Symbol,
     tree1 : LevelTree<X>,
     tree2 : LevelTree<X>
   ) : LevelTree<X> {
@@ -152,15 +191,14 @@ module {
 
   #[listing]
   public func append_<X>(
-    genSym : GenSymThk,
+    appendSym : Symbol,
     left : ?LevelTree_<X>, right : ?LevelTree_<X>
   ) : ?LevelTree_ {
-    // prim "print" (debug_show (force genSym));
     switch (left, right) {
       case (null, _) right;
       case (_, null) left;
       case (?l, ?r) {
-        append(genSym, @ l, @ r)
+        append(appendSym, @ l, @ r)
       }
     }
   };
@@ -177,7 +215,7 @@ module {
 
     Prim.print (debug_show (intoArray(left), intoArray(right)));
 
-    let out = append_(genSymsFrom(`x, 0), left, right);
+    let out = append_(`x, left, right);
     Prim.print out;
   };
 
