@@ -464,6 +464,135 @@ module {
     }
   };
 
+  /// A sorted sequence's elements as a pure list, left to right.
+  ///
+  ///    `reduceUp`'s remaining use case. The result carries no pointers, so
+  /// nothing about the conversion can reach the graph -- which is the point:
+  /// an intermediate that has cells has names, and names chosen by an
+  /// operation are exactly what `appendSortedRebuild` exists to avoid.
+  ///
+  ///    `reduceUp` itself does allocate, one cell per node it passes through,
+  /// so the call belongs in `A.scratch`: the list it computed is kept and the
+  /// cells it wrote are not. `intoPureList` does that, and callers should use
+  /// it rather than `reduceUp` directly.
+  func intoPureListRaw<X>(t : ?SeqTree_<X>) : PureList<X> {
+    switch t {
+      case null null;
+      case (?p) {
+        reduceUp(
+          @ p,
+          null,
+          func(s : Symbol, x : X) : PureList<X> {
+            ?{ symbol = s; element = x; next = null }
+          },
+          func(_ : Symbol, l : PureList<X>, r : PureList<X>) : PureList<X> {
+            appendPure(l, r)
+          }
+        )
+      };
+    }
+  };
+
+  func appendPure<X>(l : PureList<X>, r : PureList<X>) : PureList<X> {
+    switch l {
+      case null r;
+      case (?c) ?{ symbol = c.symbol; element = c.element; next = appendPure(c.next, r) };
+    }
+  };
+
+  public func intoPureList<X>(t : ?SeqTree_<X>) : PureList<X> {
+    A.scratch(thunk { intoPureListRaw(t) })
+  };
+
+  /// Merge two sorted pure lists. No cells, so no names.
+  func mergePure<X>(xs : PureList<X>, ys : PureList<X>) : PureList<X> {
+    switch (xs, ys) {
+      case (null, _) ys;
+      case (_, null) xs;
+      case (?x, ?y) {
+        if (x.element <= y.element) {
+          ?{ symbol = x.symbol; element = x.element; next = mergePure(x.next, ys) }
+        } else {
+          ?{ symbol = y.symbol; element = y.element; next = mergePure(xs, y.next) }
+        }
+      };
+    }
+  };
+
+  /// Append two sorted sequences by rebuilding, rather than by splitting and
+  /// joining.
+  ///
+  ///    The same job as `appendSorted` and the opposite approach to it, and the
+  /// difference is what the result's cells are called.
+  ///
+  ///    `appendSorted` works on the trees and names every cell it allocates
+  /// after the operation that allocated it -- `append(appendSym)(local)`. So
+  /// its output shares no cell with the same sequence arrived at any other
+  /// way, and two runs share only what their operations happened to have in
+  /// common. Measured, that costs three to thirteen times the repair of the
+  /// lazy merge network.
+  ///
+  ///    This one drops to pure lists, merges them, and hands the result to
+  /// `fromPureList`, which names each node after its own element -- `sym-`element`
+  /// for a leaf and `sym-`binary` for a gap. Those are the names any route to
+  /// that sequence produces, so the output is identified by what it holds
+  /// rather than by how it was built. That is the structural end of the axis
+  /// `docs/cache-naming.md` describes, and this is the first place in the
+  /// library where that document's recommendation is tested rather than
+  /// asserted.
+  ///
+  ///    The intermediates are pure and therefore nameless, and the conversion
+  /// runs in `scratch`, so the only cells this leaves behind are the answer's.
+  /// A literal fusion -- the merge feeding the builder without a list in
+  /// between -- would save host allocation and change nothing about the names,
+  /// so it is an optimisation rather than part of the design.
+  ///
+  ///    `sym` gives the intermediate a space of its own, since a symbol that
+  /// is a gap in one intermediate can be a gap in another, and `fromPureList`
+  /// would otherwise write the same cell twice with different contents.
+  public func appendSortedRebuild<X>(sym : Symbol, a : ?SeqTree_<X>, b : ?SeqTree_<X>)
+    : ?SeqTree_<X> {
+    let merged = mergePure(intoPureList(a), intoPureList(b));
+    do within space (`sorted(sym)) { fromPureList(merged) }
+  };
+
+  /// Sort by rebuilding at each step. The counterpart of `eagerMergeSort`.
+  public func eagerMergeSortRebuild<X>(t : ?SeqTree_<X>) : ?SeqTree_<X> {
+    switch t {
+      case null null;
+      case (?p) {
+        reduce_(
+          p,
+          null,
+          func(symbol : Symbol, element : X) : ?SeqTree_<X> {
+            ?(symbol-`element := #element { symbol = symbol; element = element })
+          },
+          func(symbol : Symbol, l : ?SeqTree_<X>, r : ?SeqTree_<X>) : ?SeqTree_<X> {
+            appendSortedRebuild(symbol, l, r)
+          }
+        )
+      };
+    }
+  };
+
+  /// The rebuilding sort agrees with the splitting one, element for element
+  /// and shape for shape.
+  ///
+  ///    Two implementations of one function is the strongest test available
+  /// here: they share no code below `reduce_`, so agreeing means both are
+  /// right about the order and about the shape a sorted sequence must take.
+  #[test]
+  public func testEagerMergeSortRebuild() {
+    var size = 1;
+    while (size <= 12) {
+      let xs = R.generateRandomInput(10, size);
+      let bySplitting = eagerMergeSort(fromArray(xs));
+      let byRebuilding = eagerMergeSortRebuild(fromArray(xs));
+      assert (Pure.equal(erase(bySplitting), erase(byRebuilding)));
+      size += 1
+    };
+  };
+
   /// Sort a sequence, merging eagerly, keeping a level tree throughout.
   ///
   ///    The counterpart of `lazyMergeSort`. That one builds a network of
@@ -1059,6 +1188,61 @@ module {
              action = edge.action;
              edgeId = edge.edgeId;
     } 
+  };
+
+  /// Objects for an outline of any shape.
+  ///
+  ///    `sceneObjectsFromList` and `sceneObjectsLazyMergeSort_` each know the
+  /// force tree they were written for: they switch on how many edges a node
+  /// has and read particular indices out of it. This one knows nothing about
+  /// its input -- one orb per node, one action per edge, and a layout from the
+  /// walk itself. Plainer than either, and it works on a force tree nobody has
+  /// drawn before, which is what a new algorithm needs.
+  ///
+  ///    Depth down, visit order across. `step.y` is how far each level drops
+  /// and `step.x` how far each node advances, and the x cursor is carried
+  /// rather than computed from an index because a Nat is not a Float and
+  /// nothing here converts one.
+  ///
+  ///    The reason to draw a force tree at all is that a diff between two runs
+  /// counts cells, and a scene that draws only the data structure leaves most
+  /// of what differs off screen: the eager sort's pair reports that 56% of its
+  /// nodes differ while showing two trees that differ in eight objects,
+  /// because the rest are `split` and `append` cells nobody drew.
+  public func sceneObjectsOfOutline(outline, origin, step) : A.Scene.SceneObjects {
+    var cursor = 0.0;
+    func ports(n) : [Text] {
+      var ps = [];
+      var i = 0;
+      while (i < n.edges.size()) { ps #= [ "e" # (debug_show i) ]; i += 1 };
+      ps
+    };
+    func go(o, drop : Float) : A.Scene.SceneObjects {
+      let position = { x = origin.x + cursor; y = origin.y - drop; z = origin.z };
+      cursor += step.x;
+      switch o {
+        case (#leaf(n)) {
+          let label_ = (debug_show ((n.nodeId.0).0));
+          [#orb { label_; position; textFields = ""; pointerFields = [] }]
+        };
+        case (#internal(n)) {
+          let label_ = (debug_show ((n.__nodeId.0).0));
+          var objs = [#orb { label_; position; textFields = ""; pointerFields = ports(n) }];
+          var i = 0;
+          while (i < n.edges.size()) {
+            let e = n.edges[i];
+            objs #= [ objectFromEdge(label_, "e" # (debug_show i), e) ];
+            switch (e.outline) {
+              case null { };
+              case (?sub) { objs #= go(sub, drop + step.y) };
+            };
+            i += 1
+          };
+          objs
+        };
+      }
+    };
+    go(outline, 0.0)
   };
 
   public func sceneObjectsFromList(outline, position, offsets) : A.Scene.SceneObjects {
@@ -1774,6 +1958,7 @@ module {
     };
     let sorted = force sorted_;
     W.withHistory(A.scratch(thunk {
+      let outline = A.Outline.outline(sorted_);
       let treeObjects = Scene.sceneObjects(tree!, A.Scene.zero);
       let geom = Scene.geom2d(tree!);
       let above = { x = 0.0; y = 1.618 * geom.height; z = 0.0 };
@@ -1781,7 +1966,15 @@ module {
         case null [];
         case (?s) Scene.sceneObjects(s, above);
       };
-      W.scene(treeObjects # sortedObjects, [ A.Outline.outline(sorted_) ])
+      // The work itself, above the two structures it went between. Without
+      // this the pair reports a cost it does not show: the cells that differ
+      // between two runs are mostly `split` and `append`, and neither tree
+      // contains them.
+      let network = Scene.sceneObjectsOfOutline(
+        outline,
+        { x = 0.0 - geom.width; y = 3.2 * geom.height; z = 0.0 },
+        { x = 0.9; y = 1.3; z = 0.0 });
+      W.scene(treeObjects # sortedObjects # network, [ outline ])
     }))
   };
 
