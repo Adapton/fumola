@@ -158,33 +158,68 @@ module {
   /// O(log |tree1| + log |tree2|) in expectation. The three candidate breaks
   /// are the most preferable break in `tree1`, the break between the two, and
   /// the most preferable break in `tree2`; the level comparisons choose which.
+  ///    Pointers in and a pointer out, not bare trees. The `#empty` cases and
+  /// every subtree the join does not rebuild are then returned as the
+  /// pointers they arrived as, which is what keeps their sharing -- taking
+  /// values would leave the break-between-the-two case holding two subtrees
+  /// with no pointers to put in the node it has to build, and re-putting them
+  /// under fresh names would duplicate them.
+  ///
+  ///    A note on reading the level comparisons. The paper's `level(X)` is the
+  /// level of X's *first element*, while a `#binary` here caches the level of
+  /// its *break*, which is the level of the first element of its right child.
+  /// So `b.level` is the paper's `level(right child)`, and of the three
+  /// quantities Figure 5.3 compares we hold two directly: their `level(S1)`
+  /// is `b1.level` and their `level(T1)` is `b2.level`. Their `level(T0)` is
+  /// the level of `tree2`'s leftmost element, which is not cached -- but it
+  /// does not need to be, because it never changes: recursing into `T0` keeps
+  /// the same leftmost element, and recursing into `S1` does not touch
+  /// `tree2`. Compute it once on entry and carry it, and the walk stays
+  /// O(log n) without a new field on the node.
   #[listing]
   public func append<X>(
     appendSym : Symbol,
-    tree1 : LevelTree<X>,
-    tree2 : LevelTree<X>
-  ) : LevelTree<X> {
-    switch(tree1, tree2) {
-      case(#empty, tree2) { tree2 };
-      case(tree1, #empty) { tree1 };
-      case(#element(_), #element(_)) {
-        // TO DO -- compare symbol levels
-      
-      };
-      case(#element(_), #binary(_)) {
-        // TO DO -- compare levels
+    tree1 : LevelTree_<X>,
+    tree2 : LevelTree_<X>
+  ) : LevelTree_<X> {
+    switch(@ tree1, @ tree2) {
+      case(#empty, _) { tree2 };
+      case(_, #empty) { tree1 };
 
+      // Nothing to compare: two single elements have one break between them,
+      // and it is the one this returns. Its symbol is `tree2`'s element, since
+      // a break carries the symbol of the element it sits before.
+      case(#element(_), #element(e2)) {
+        // TO DO -- `append(appendSym)(e2.symbol) := #binary {
+        //            symbol = e2.symbol; level = Prim.symbolLevel e2.symbol;
+        //            left = tree1; right = tree2 }
       };
+
+      // Paper: if level(T0) <= level(T1) then cList(append(S, T0), T1)
+      //                                 else cList(S, T)
+      case(#element(_), #binary(b2)) {
+        // TO DO -- level(T0) is `tree2`'s leftmost level, level(T1) is b2.level
+      };
+
+      // Paper: if level(S1) <= level(T) then cList(S, T)
+      //                                 else cList(S0, append(S1, T))
+      //
+      // This case was missing, and Fumola's check is parse-only, so it would
+      // have failed at run time rather than at build time.
+      case(#binary(b1), #element(e2)) {
+        // TO DO -- level(S1) is b1.level, level(T) is Prim.symbolLevel e2.symbol
+      };
+
+      // Paper: if      level(S1) <= level(T1) and level(T0) <= level(T1)
+      //          then  cList(append(S, T0), T1)
+      //        else if level(S1) <= level(T0) and level(T1) <  level(T0)
+      //          then  cList(S, T)
+      //        else    cList(S0, append(S1, T))
+      //
+      // The asymmetry between <= and < is the tie-breaking rule of
+      // Definition 5.2: of two breaks at equal level the rightmost wins.
       case(#binary(b1), #binary(b2)) {
-        if (b1.level > b2.level) {
-          // b2_right_ = append(b1.right, tree2)
-          // TO DO ...
-        
-        } else {
-          // b1_left_ = append(tree1, b1.left)
-          // TO DO ...  
-
-        }
+        // TO DO
       };
     }
   };
@@ -193,12 +228,12 @@ module {
   public func append_<X>(
     appendSym : Symbol,
     left : ?LevelTree_<X>, right : ?LevelTree_<X>
-  ) : ?LevelTree_ {
+  ) : ?LevelTree_<X> {
     switch (left, right) {
       case (null, _) right;
       case (_, null) left;
       case (?l, ?r) {
-        append(appendSym, @ l, @ r)
+        ?append(appendSym, l, r)
       }
     }
   };
