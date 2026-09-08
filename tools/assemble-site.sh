@@ -56,6 +56,28 @@ for f in "$GLUE" "$WASM"; do
   fi
 done
 
+# A runtime pair in the pages tree would win, and it is never the one wanted.
+#
+# The pages are copied last on purpose, so a hand-written file can never be
+# shadowed by a generated one. That is right for index.html and wrong for the
+# runtime: a `fumola_wasm*` sitting in the pages tree lands on top of the
+# freshly built pair and the site serves whatever that stale file holds. The
+# hashed copy under /v/ is still correct, so the manifest looks right and a
+# browser following it loads fine -- only the stable root path, the one older
+# clients and Hazel's loader fall back to, goes quietly stale. That is a bad
+# way to find out, and it is how Adapton/fumola#87 started.
+#
+# These files are build output and .gitignore covers them, so a checkout never
+# has them and CI is unaffected. A local tree that does is asking to publish
+# something it did not build, so say so instead of resolving it.
+for stray in fumola_wasm.js fumola_wasm_bg.wasm; do
+  if [ -e "$PAGES/$stray" ]; then
+    echo "$PAGES/$stray would shadow the runtime built in $BINDINGS." >&2
+    echo "It is build output, not page content -- remove it and run again." >&2
+    exit 1
+  fi
+done
+
 # The pair is hashed together, never separately. wasm-bindgen generates the
 # glue and the binary as a matched set, and Hazel's loader passes both URLs
 # explicitly (prebundle.js), where a mismatch fails to load rather than
@@ -202,6 +224,22 @@ print("\n".join(v.get("vendor", "") for v in json.load(sys.stdin) if v.get("vend
     fi
   done
 fi
+
+# What the guard above protects, checked rather than assumed. The stable pair
+# is the fallback path, so a mistake here is invisible until something old asks
+# for it; and the ordering that makes it possible is three copies apart from
+# the assertion, which is exactly the distance a later edit does not notice.
+for pair in "fumola_wasm.js:$GLUE" "fumola_wasm_bg.wasm:$WASM"; do
+  name="${pair%%:*}"
+  built="${pair#*:}"
+  for path in "$OUT/$name" "$OUT/v/$HASH/$name"; do
+    if ! cmp -s "$built" "$path"; then
+      echo "$path does not match the runtime built in $BINDINGS." >&2
+      echo "Something in the assembly is shadowing it." >&2
+      exit 1
+    fi
+  done
+done
 
 echo
 echo "assembled $OUT"

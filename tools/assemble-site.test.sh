@@ -174,6 +174,27 @@ set +e
 set -e
 check "refuses when the bindings are missing" "1" "$rc"
 
+# A stale runtime in the pages tree used to be copied over the fresh one, and
+# only the stable root path went wrong -- the hashed copy stayed correct, so
+# nothing looked broken. Adapton/fumola#87.
+mkdir -p "$WORK/dirtypages"
+cp -r "$WORK/pages/." "$WORK/dirtypages/"
+printf 'stale glue from an older build\n' > "$WORK/dirtypages/fumola_wasm.js"
+set +e
+out="$("$ASSEMBLE" --bindings "$WORK/b1" --pages "$WORK/dirtypages" --out "$WORK/s10" 2>&1)"; rc=$?
+set -e
+check "refuses when the pages carry a stale runtime" "1" "$rc"
+check "and says which file it objected to" "yes" \
+  "$(grep -q "fumola_wasm.js would shadow" <<< "$out" && echo yes || echo no)"
+check_absent "and assembles nothing" "$WORK/s10/runtime.json"
+
+rm -f "$WORK/dirtypages/fumola_wasm.js"
+printf 'stale wasm from an older build\n' > "$WORK/dirtypages/fumola_wasm_bg.wasm"
+set +e
+"$ASSEMBLE" --bindings "$WORK/b1" --pages "$WORK/dirtypages" --out "$WORK/s11" >/dev/null 2>&1; rc=$?
+set -e
+check "refuses for the binary as well as the glue" "1" "$rc"
+
 echo
 echo "$passed passed, $failed failed"
 [ "$failed" -eq 0 ]
