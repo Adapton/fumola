@@ -137,25 +137,86 @@ counterpart, so it and everything built on it begin again. By name-match share
 (equal + notEqual) at size 16: root removal 85.7% to 89.2% for cartesian, leaf
 removal identical.
 
-### At scale the whole question shrinks
+### At the root, at scale: the measurement the rest was missing
 
-Removal at cell 3, both strategies, whole-history diff:
+Every earlier figure here removed a cell chosen without reference to the tree
+it sits in. That is the flaw: what an edit costs depends on how much of the
+tree the removed node carried, so a removal has to be chosen *as* the root or
+*as* a leaf, and at size 1000 the root is not cell 3 -- it is cell 586, whose
+`symbolLevel` of 2121729 outranks everything else in range.
 
-| n | inductive unmatched | cartesian unmatched | union | churn as % of union |
-|---|---|---|---|---|
-| 100 | 113 | 109 | 1,496 | 7.6% |
-| 500 | 276 | 282 | 8,910 | 3.1% |
-| 1000 | 310 | 304 | 18,402 | 1.7% |
-| 2000 | 276 | 274 | 39,465 | 0.70% |
-| 5000 | 269 | 275 | 103,824 | 0.26% |
+Removing the root, and removing a level-0 leaf, at size 1000, seed 10:
 
-Churn from one removal is roughly constant -- nodes touched (unmatched plus
-notEqual) are 591, 663, 594, 572 at n = 500, 1000, 2000, 5000 -- while the
-graph grows to 103,800. So the fraction decays like 1/n and either naming
-already reuses 99.4% at n=5000. The merge network's reputation for instability
-is a small-input effect, and a claim about it measured at size 16 does not
-survive scale. Whether the *tail* also shrinks with n is not yet measured; see
-below.
+| naming | removal | equal | notEqual | onlyLeft | onlyRight | unmatched | share |
+|---|---|---|---|---|---|---|---|
+| inductive | root 586 | 14501 | 2872 | 1009 | 732 | 1741 | 9.1% |
+| cartesian | root 586 | 14304 | 3524 | 554 | 277 | **831** | 4.5% |
+| pathwise | root 586 | 11862 | 2721 | 3799 | 3522 | 7321 | 33.4% |
+| inductive | leaf 42 | 18336 | 27 | 19 | 0 | 19 | 0.10% |
+| cartesian | leaf 42 | 18330 | 30 | 22 | 3 | 25 | 0.14% |
+| pathwise | leaf 42 | 18336 | 27 | 19 | 0 | 19 | 0.10% |
+
+Three things, and the first answers the question this file listed as open.
+
+**Cartesian's advantage survives scale and grows.** 831 against 1741 is 0.48,
+where the best case at size 100 was 0.80. The open question was whether the
+tail gap widened or closed with n; it widens.
+
+**Pathwise's penalty is stable in ratio.** 4.2 times inductive here, 5.6 times
+at size 16 -- so it is not a small-input artifact either, and an address really
+does survive only as long as the shape it addresses.
+
+**And the leaf row is flat: 19, 25, 19.** Across strategies whose root figures
+span a factor of nine, a removal that barely moves the tree costs the same
+under all three. Naming matters where the tree moves and nowhere else.
+
+The `notEqual` column says the same thing it said at size 16: cartesian holds
+*more* of it (3524 against 2872) and less unmatched, so it moves work from
+rebuild into repair rather than removing it.
+
+### Eager merging costs more repair than lazy merging
+
+The same removals, against `eagerMergeSort`, which merges as it goes and keeps
+a level tree throughout. It has one naming -- the reduction node's own symbol
+-- since it never consults the strategy cell.
+
+| sort | size | removal | unmatched | union | share |
+|---|---|---|---|---|---|
+| lazy, inductive | 250 | root 3 | 177 | 3848 | 4.6% |
+| eager | 250 | root 3 | **2318** | 6201 | 37.4% |
+| lazy, inductive | 1000 | root 586 | 1741 | 19114 | 9.1% |
+| eager | 1000 | root 586 | **5176** | 26715 | 19.4% |
+| lazy, inductive | 1000 | leaf 42 | 19 | 18382 | 0.10% |
+| eager | 1000 | leaf 42 | 52 | 24161 | 0.22% |
+
+Eager is worse everywhere: thirteen times the unmatched nodes at size 250,
+three times at size 1000, and between two and three times even for a leaf
+removal. Its graph is also larger -- 26715 nodes against 19114 -- because
+`split` and `append` allocate.
+
+That is the larger effect than any naming difference measured, which reframes
+the whole exercise: how much structure an operation rebuilds matters more than
+what the rebuilt nodes are called. The lazy network re-forces stream cells; the
+eager sort rebuilds tree structure, and every node it rebuilds is a node whose
+name pairs with tree symbols that move when the tree moves.
+
+Two cautions about reading the sizes against each other. The root at 250 and
+the root at 1000 are different draws and not comparable: cell 3 roots a 2 : 248
+split, which is the degeneracy of issue #72, while cell 586 roots a 585 : 415
+one. So the share falling from 37.4% to 19.4% is a change of shape, not a
+scaling law. And a single removal per cell is a sample of one -- deterministic,
+so repeatable, but a sample of one draw all the same.
+
+### What the earlier scaling table actually measured
+
+The table that used to stand here removed cell 3 at every size and found churn
+roughly constant, around 300 nodes from size 500 to 5000, concluding that the
+naming question shrinks with n. Cell 3 has a high level and so sits high in
+every tree, but at size 1000 it is not the root, and the numbers above show a
+root removal costing 1741 rather than 310. So that table measured a
+high-but-not-highest node, and the conclusion drawn from it -- that either
+naming already reuses 99.4% of the graph -- holds for that case and not for the
+worst one.
 
 ## How to play with each
 
@@ -220,10 +281,11 @@ understanding on its own.
 
 ## Open questions
 
-- **Does the tail shrink with n?** The constant-churn result above is the
-  average at one position. The interesting claim is about the maximum over
-  positions, which is only measured at n=100 (193 against 155). A random
-  sample of positions at n=1000 would say whether the gap widens or closes.
+- ~~**Does the tail shrink with n?**~~ Answered above: it widens. Cartesian is
+  0.48 of inductive at the root at size 1000, against 0.80 at size 100.
+- **Why is eager so much worse, in detail?** The allocation counts of `split`
+  and `append` would say how much of the gap is extra nodes and how much is
+  nodes that failed to match. The union sizes suggest both.
 - **A level-dependent hybrid.** The namespace taint is O(N) only near the
   root, and partner churn dominates near the leaves, so cartesian above some
   treap level and inductive below should give the capped tail and the low
