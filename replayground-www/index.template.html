@@ -117,6 +117,11 @@
       --now:      yellowgreen;
       --now-edge: yellow;
 
+      /* something the sidebar names that the scene has no object for. Magenta
+         because it is the one hue no door kind already owns. */
+      --absent:     #f06ecb;
+      --absent-dim: #8d3f78;
+
       /* interaction */
       --hover:  #252b36;
       --active: #303848;
@@ -461,6 +466,20 @@
     .action-arrow:hover  { border-color: var(--focus-ring); }
     .action-arrow:active { background-color: var(--void); color: var(--focus-ring); border-color: var(--focus-ring); }
 
+    /* Named here, drawn nowhere. Looks like its neighbours until you reach
+       for it: `help` rather than `pointer` because the click explains itself
+       instead of doing the thing, and magenta on the way down.
+
+       These come after the shape and arrow rules on purpose -- all of them are
+       two-class selectors, so source order is what breaks the tie. */
+    .absent { cursor: help; }
+    .absent:hover  { border-color: var(--absent-dim); color: var(--absent); }
+    .absent:active {
+      background-color: var(--void);
+      color: var(--absent);
+      border-color: var(--absent);
+    }
+
     .result-arrow    { color: var(--blue-dark); }
     .action-put      { color: var(--purple-dark); }
     .action-putForce { color: var(--purple); }
@@ -599,6 +618,18 @@
       cursor: pointer;
     }
 
+    /* Narrow and fixed, so it never competes with the time cursor above for
+       the row's spare width. */
+    .dim-slider {
+      flex: 0 0 4.5rem;
+      width: 4.5rem;
+      margin: 0;
+      accent-color: var(--text-faint);
+      background: transparent;
+      cursor: pointer;
+    }
+    .dim-readout { min-width: 2.2rem; text-align: right; }
+
     #bpmDisplay {
       font-family: var(--mono);
       font-size: 0.78rem;
@@ -606,6 +637,35 @@
       min-width: 2.8rem;
       text-align: center;
     }
+
+    /* ---- the report in the corner --------------------------------------
+       Pressing something the scene cannot show says so here, rather than
+       leaving the reader to discover the tooltip. */
+    #toast {
+      position: absolute;
+      right: 0.6rem;
+      bottom: 0.6rem;
+      z-index: 4;
+      max-width: min(26rem, calc(100% - 1.2rem));
+      padding: 0.45rem 0.6rem;
+      border: 1px solid var(--absent-dim);
+      border-left: 3px solid var(--absent);
+      border-radius: 6px;
+      background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+      font-family: var(--ui);
+      font-size: 0.78rem;
+      cursor: pointer;
+      opacity: 0;
+      transform: translateY(6px);
+      pointer-events: none;
+      transition: opacity 140ms ease, transform 140ms ease;
+    }
+    #toast.showing { opacity: 1; transform: none; pointer-events: auto; }
+    #toast .headline { color: var(--absent); font-family: var(--mono); overflow-wrap: anywhere; }
+    #toast .detail   { color: var(--text-faint); padding-top: 0.15rem; }
 
     /* A scene this size takes a moment to build; say so rather than show
        an empty black rectangle. */
@@ -671,7 +731,6 @@
 
       <div id="playerBar">
         <div class="player-group">
-          <button id="gotoStartBtn"    class="player-button" title="Back to the first moment">⏮</button>
           <button id="tickBackBtn"     class="player-button player-button-small" title="One moment back">◀▌</button>
           <button id="playPauseBtn"    class="player-button" title="Play / pause">▶</button>
           <button id="tickForwardBtn"  class="player-button player-button-small" title="One moment on">▐▶</button>
@@ -689,9 +748,15 @@
           <button id="bpmUpBtn"   class="player-button player-button-small" title="Faster">+</button>
         </div>
 
-        <button id="growBtn" class="player-button player-button-wide"
-                title="Reveal objects as their moment arrives, instead of showing the whole scene">grow</button>
+        <div class="player-group" title="Take the colour out of objects whose moment has not arrived yet. All the way up, playback builds the graph out of the dark.">
+          <span class="player-caption">future</span>
+          <input id="futureDim" class="dim-slider" type="range" min="0" max="100" value="0" step="5"
+                 aria-label="dim objects whose moment is still ahead">
+          <span id="futureDimReadout" class="player-caption dim-readout">0%</span>
+        </div>
       </div>
+
+      <div id="toast" role="status" aria-live="polite"></div>
 
       <div id="boot">building the scene…</div>
 
@@ -717,6 +782,30 @@
     const log  = (...a) => { if (debug.on) console.log(...a); };
 
     const $ = (id) => document.getElementById(id);
+
+    /// Say something in the corner of the 3D view, for a few seconds.
+    ///
+    /// This exists for one situation: a chip that names something the scene has
+    /// no object for. Hovering would tell you, but only if you already suspected
+    /// there was something to hover for -- pressing it should say so outright.
+    const TOAST_MS = 4000;
+    let toastTimer = null;
+
+    function say(headline, detail) {
+      const toast = $("toast");
+      toast.replaceChildren(el("div", "headline", headline), el("div", "detail", detail));
+      toast.classList.add("showing");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(hush, TOAST_MS);
+    }
+    const hush = () => { clearTimeout(toastTimer); $("toast").classList.remove("showing"); };
+
+    /// What every chip that names something undrawn does when pressed.
+    const NOT_DRAWN = "No object in the scene data carries this label, so there is nowhere to fly.";
+    const reportAbsent = (label, detail = NOT_DRAWN) => (event) => {
+      event.stopPropagation();
+      say(label, detail);
+    };
 
     /// Append to a Map<key, array>, creating the array on first use. Used for
     /// every index in this file.
@@ -747,22 +836,27 @@
     /// the way to find it in the 3D scene -- and the `#edgeId(...)` beside it
     /// is the way to read what the scene data knows about it.
     ///
-    /// Without an `edgeId` there is no edge to fly to, so the arrow is plain:
-    /// an arrow that looks clickable and is not is worse than one that does not.
+    /// An arrow for an edge the scene never drew says so when pressed rather
+    /// than going quiet -- see `markAbsent`.
     const actionArrow = (action, edgeId) => {
       const e = span("action-arrow action-" + action, ARROWS[action] || " " + action + " ");
       // Every chip is built after the scene is, so "is this edge drawn?" has an
-      // answer here. 134 of the outline's 959 edges are not, and an arrow with
-      // nowhere to fly should not offer to.
-      if (edgeId === undefined || !meshesByLabel.has(edgeId)) {
-        e.style.cursor = "default";
-        if (edgeId !== undefined) e.title = edgeId + " has no object in the 3D view";
-        return e;
-      }
+      // answer right here. 134 of the outline's 959 edges are not.
+      if (!meshesByLabel.has(edgeId)) return markAbsent(e, edgeId);
       e.title = "Fly to " + edgeId;
       e.onclick = flyToEdge(edgeId);
       return e;
     };
+
+    /// Turn a chip into one that reports instead of acting: magenta on the way
+    /// down, a `help` cursor, the reason on hover, and the reason again in the
+    /// corner of the 3D view when pressed.
+    function markAbsent(e, label, detail) {
+      e.classList.add("absent");
+      e.title = detail || (label + " has no object in the 3D view");
+      e.onclick = reportAbsent(label, detail);
+      return e;
+    }
 
     /// The click handler behind every arrow.
     const flyToEdge = (edgeId) => (event) => {
@@ -907,9 +1001,8 @@
       // and has no revisions of its own. Naming it is right; offering a door
       // that opens on nothing is not.
       if (!nodeRevisions.has(space)) {
-        e.style.cursor = "default";
-        e.title = "no revisions recorded for " + space;
-        return e;
+        return markAbsent(e, space,
+          "No revisions of this space were recorded, so it has no door to open.");
       }
       e.classList.add("pointer");
       e.pointer = space;
@@ -946,11 +1039,7 @@
                      thunk ? "◉" : "▣");
       // The forest root ("scene") is the run itself and was never placed, so
       // its glyph has nowhere to go either.
-      if (!meshesByLabel.has(label)) {
-        e.style.cursor = "default";
-        e.title = label + " has no object in the 3D view";
-        return e;
-      }
+      if (!meshesByLabel.has(label)) return markAbsent(e, label);
       e.title = "Fly to " + label;
       e.onclick = doorClick("objectShape", label);
       return e;
@@ -1253,7 +1342,7 @@
               resultArrow.title = "Fly to " + e.edgeId;
               resultArrow.onclick = flyToEdge(e.edgeId);
             } else {
-              resultArrow.style.cursor = "default";
+              markAbsent(resultArrow, e.edgeId);
             }
             result.appendChild(resultArrow);
             result.appendChild(longText("outline-value-text", e.value));
@@ -1268,7 +1357,8 @@
           // The forest root's value is not any one edge's, so this arrow has
           // nowhere to fly and says so.
           const rootArrow = span("action-arrow result-arrow", "╰〜〜>");
-          rootArrow.style.cursor = "default";
+          markAbsent(rootArrow, "the run's value",
+            "What the outline as a whole came back with, which is not any one edge's result.");
           result.appendChild(rootArrow);
           result.appendChild(longText("outline-value-text", node.value));
           if (node.valueMetaTime !== undefined) {
@@ -1281,20 +1371,60 @@
       forest.forEach((tree) => walk(panel, tree, 0));
     }
 
-    /// Bring a moment into view in whichever panes printed an anchor for it.
+    /// Anchors, grouped by the pane they live in and ordered, so each pane can
+    /// scroll to the last anchor *it* has at or before the cursor.
+    ///
+    /// The panes do not print the same moments. 217 of the 1,747 carry only a
+    /// node revision -- no event row, no outline row -- and the outline runs
+    /// out of rows some way before the run ends. Scrolling only on an exact
+    /// match left a pane frozen across those; falling back to the nearest
+    /// moment *anywhere* moved the pane that had it and left the other behind.
+    const anchoredPanes = [];   // [{ moments: [n, ...], first: Map<"n", el> }]
+
+    function indexAnchorsByPane() {
+      const byPane = new Map();
+      for (const [moment, anchors] of anchorIndex) {
+        for (const anchor of anchors) {
+          const pane = anchor.closest(".panel-body");
+          if (!pane) continue;
+          let entry = byPane.get(pane);
+          if (!entry) byPane.set(pane, entry = { moments: [], first: new Map() });
+          if (entry.first.has(moment)) continue;   // one anchor per moment per pane
+          entry.first.set(moment, anchor);
+          entry.moments.push(Number(moment));
+        }
+      }
+      anchoredPanes.length = 0;
+      for (const entry of byPane.values()) {
+        entry.moments.sort((a, b) => a - b);
+        anchoredPanes.push(entry);
+      }
+    }
+
+    /// The last value at or before `t`, by binary search; the first if none is.
+    function lastAtOrBefore(sorted, t) {
+      let lo = 0, hi = sorted.length - 1, best = sorted[0];
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (sorted[mid] <= t) { best = sorted[mid]; lo = mid + 1; }
+        else hi = mid - 1;
+      }
+      return best;
+    }
+
+    /// Bring a moment into view in every pane that prints one.
     function scrollToMetaTime(metaTime, behavior) {
-      // One is enough. The original scrolled to every anchor for the moment,
-      // so the pane jumped once per match and only the last one stuck.
-      const [first] = anchorIndex.get(String(metaTime)) || [];
-      if (first) first.scrollIntoView({ behavior, block: "nearest", inline: "nearest" });
+      for (const { moments, first } of anchoredPanes) {
+        const anchor = first.get(String(lastAtOrBefore(moments, metaTime)));
+        if (anchor) anchor.scrollIntoView({ behavior, block: "nearest", inline: "nearest" });
+      }
     }
 
     // ---- the player ------------------------------------------------------
     //
-    // One cursor over the metaTimes, shared by every pane. `growWithTime`
-    // decides what the 3D view does with it: off (the default) the whole
-    // scene stands there and the cursor only lights things up; on, an object
-    // is invisible until its moment arrives, so playing builds the graph.
+    // One cursor over the metaTimes, shared by every pane: it moves the
+    // highlight in the outline and the event log, and it is what the 3D view's
+    // glow and its future-dimmer (see `applyFutureDim`) are measured against.
 
     const playerState = {
       isPlaying: false,
@@ -1302,10 +1432,9 @@
       maxMetaTime,
       stopResetsTo: 1,
       bpm: 1337,
-      growWithTime: false,
-      // Whether the scene is currently showing all of itself, so the "show
-      // everything" pass runs on the change rather than on every beat.
-      everythingVisible: false,
+      // 0 leaves the scene exactly as it stands; 1 takes objects whose moment
+      // is still ahead all the way to black.
+      futureDim: 0,
       timer: null,
     };
 
@@ -1323,7 +1452,7 @@
       slider.value = playerState.metaTime;
       slider.max = playerState.maxMetaTime;
       $("playPauseBtn").textContent = playerState.isPlaying ? "⏸" : "▶";
-      $("growBtn").classList.toggle("on", playerState.growWithTime);
+      $("futureDimReadout").textContent = Math.round(playerState.futureDim * 100) + "%";
     }
 
     /// Park on a moment. Everything that moves the cursor goes through here,
@@ -1374,7 +1503,6 @@
     $("stopBtn").onclick        = stopPlayback;
     $("tickBackBtn").onclick    = () => { pausePlayback(); seekTo(playerState.metaTime - 1); };
     $("tickForwardBtn").onclick = () => { pausePlayback(); seekTo(playerState.metaTime + 1); };
-    $("gotoStartBtn").onclick   = () => { pausePlayback(); seekTo(1); };
 
     $("bpmUpBtn").onclick   = () => { playerState.bpm = Math.min(BPM_MAX, playerState.bpm + BPM_STEP); renderPlayerUI(); };
     $("bpmDownBtn").onclick = () => { playerState.bpm = Math.max(BPM_MIN, playerState.bpm - BPM_STEP); renderPlayerUI(); };
@@ -1388,9 +1516,9 @@
       seekTo(to, "instant");
     };
 
-    $("growBtn").onclick = () => {
-      playerState.growWithTime = !playerState.growWithTime;
-      renderPlayerFocus("instant");
+    $("futureDim").oninput = (e) => {
+      playerState.futureDim = Number(e.target.value) / 100;
+      applyFutureDim();
       renderPlayerUI();
     };
 
@@ -1448,6 +1576,11 @@
     const labelByField       = new Map();   // "label:field" -> label
 
     function addMesh(label, mesh, { decor = false } = {}) {
+      // The colour it was built with, so the future-dimmer can scale towards
+      // black and back without ever needing to know what it started as.
+      if (!mesh.material.userData.baseColor) {
+        mesh.material.userData.baseColor = mesh.material.color.clone();
+      }
       scene.add(mesh);
       labelByMesh.set(mesh, label);
       pushInto(meshesByLabel, label, mesh);
@@ -1754,7 +1887,9 @@
 
     const pickAt = (ndc) => {
       raycaster.setFromCamera(ndc, camera);
-      return raycaster.intersectObjects(pickable, false)[0] || null;
+      // An object dimmed all the way out is not on screen, and must not be
+      // pickable either -- the raycaster does not check `visible` itself.
+      return raycaster.intersectObjects(pickable, false).find((hit) => hit.object.visible) || null;
     };
 
     // ---- flying the camera --------------------------------------------------
@@ -1777,7 +1912,7 @@
     /// its name plate.
     function lookAtLabel(label) {
       const meshes = meshesByLabel.get(label);
-      if (!meshes) { console.warn("nothing in the scene is labelled", label); return; }
+      if (!meshes) { say(label, NOT_DRAWN); return; }
       lookAtMesh(meshes[0]);
     }
 
@@ -1790,7 +1925,7 @@
     /// door but nowhere to fly to, and saying nothing is the right answer.
     function lookAtEdge(edgeId) {
       const meshes = meshesByLabel.get(edgeId);
-      if (!meshes) { log("edge has a door but no geometry:", edgeId); return; }
+      if (!meshes) { say(edgeId, NOT_DRAWN); return; }
       const shaft = meshes[0];
       shaft.geometry.computeBoundingSphere();
       const radius = shaft.geometry.boundingSphere ? shaft.geometry.boundingSphere.radius : 0;
@@ -1846,6 +1981,46 @@
     /// pane that should scroll to it, and the objects it touched.
     let playerFocusedChips = [];
 
+    // ---- objects whose moment is still ahead ------------------------------
+    //
+    // The old ⏮ did this in one step and only one way: hide all 5,000 meshes,
+    // then let playback bring them back. It worked, but nothing could undo it
+    // short of playing to the end, and it was a hard switch between "the whole
+    // graph" and "nothing".
+    //
+    // Same idea by degrees. Each material remembers the colour it was built
+    // with; an object whose moment has not arrived is drawn at that colour
+    // scaled towards black by the dimmer. At 0% the scene is exactly as it
+    // stands, at 100% the future is black and playback builds the graph out of
+    // the dark. Scaling the colour rather than the opacity means no material
+    // has to be made transparent, so nothing changes about draw order.
+
+    /// True while every material sits at full colour, so the common case --
+    /// the dimmer at 0, ticking through 1,747 moments -- costs one comparison.
+    let dimIsFlat = true;
+
+    function applyFutureDim() {
+      const flat = playerState.futureDim === 0;
+      if (flat && dimIsFlat) return;
+      dimIsFlat = flat;
+
+      const t = playerState.metaTime;
+      const dimmed = 1 - playerState.futureDim;
+      for (const [label, meshes] of meshesByLabel) {
+        const factor = (bornAt.get(label) ?? 1) <= t ? 1 : dimmed;
+        for (const mesh of meshes) {
+          const material = mesh.material;
+          // Materials are shared within a label but never across one, so the
+          // second mesh of a pair finds the colour already set.
+          if (material.userData.dimFactor !== factor) {
+            material.userData.dimFactor = factor;
+            material.color.copy(material.userData.baseColor).multiplyScalar(factor);
+          }
+          mesh.visible = factor > 0.004;
+        }
+      }
+    }
+
     function renderPlayerFocus(scrollBehavior = "instant") {
       const t = playerState.metaTime;
 
@@ -1855,19 +2030,7 @@
 
       scrollToMetaTime(t, scrollBehavior);
 
-      // "grow with time": an object is not in the scene until its moment.
-      // Off by default, because the first thing you want on load is the whole
-      // graph. It replaces the old ⏮, which hid all 5,000 meshes with nothing
-      // that could bring them back short of playing to the end.
-      if (playerState.growWithTime) {
-        for (const [label, meshes] of meshesByLabel) {
-          const visible = (bornAt.get(label) ?? 1) <= t;
-          for (const mesh of meshes) mesh.visible = visible;
-        }
-      } else if (!playerState.everythingVisible) {
-        for (const mesh of labelByMesh.keys()) mesh.visible = true;
-      }
-      playerState.everythingVisible = !playerState.growWithTime;
+      applyFutureDim();
 
       for (const label of labelsAtMetaTime.get(t) || []) {
         const meshes = meshesByLabel.get(label);
@@ -1927,6 +2090,7 @@
     for (const header of document.querySelectorAll(".panel-header[data-collapses]")) {
       header.addEventListener("click", () => header.parentElement.classList.toggle("collapsed"));
     }
+    $("toast").addEventListener("click", hush);
     $("closeAllDoorsBtn").addEventListener("click", (e) => {
       e.stopPropagation();          // not a collapse
       closeAllDoors();
@@ -1979,6 +2143,7 @@
       buildEdgeDoors();
       renderOutline();
       renderEvents();
+      indexAnchorsByPane();
       fitRendererToViewport();
       renderOpenDoorCount();
       seekTo(1, "instant");
