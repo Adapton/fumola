@@ -48,15 +48,23 @@ module {
 
     /// A value as a symbol, if it can be one.
     ///
-    ///    Needed because `` `x `` is not a symbol yet. It is a quoted AST, and
-    /// a quoted identifier carries the position it was written at, so two
+    ///    Needed because `` `x `` is not a symbol yet: it is a quoted AST, and
+    /// where a quoted identifier was written is part of what it is. So two
     /// occurrences of `` `x `` are different values and `` `x == `x `` is
-    /// false. Every operator that builds a compound symbol coerces first --
-    /// which is why `` `x-`y == `x-`y `` is true, and why the difference is
-    /// easy to miss until something compares two bare ones.
+    /// false -- which is the right answer to the question actually asked,
+    /// since `==` on quoted ASTs compares ASTs.
     ///
-    ///    So compare `intoSymbol(a)` with `intoSymbol(b)`, not `a` with `b`,
-    /// wherever either side might be written as a literal.
+    ///    Getting a symbol is a coercion, and a coercion is either written or
+    /// forced. Write it with this. Or let combining force it: `-` between two
+    /// quoted ASTs has no reading as an operation on ASTs, so the only thing
+    /// it can mean is symbol construction, and the operators that build
+    /// compound symbols convert their parts on the way in. That is why
+    /// `` `x-`y == `x-`y `` is true while `` `x == `x `` is not, and the
+    /// difference is not an inconsistency: `==` has a perfectly good reading
+    /// on ASTs, so nothing forces it to coerce, and it does not.
+    ///
+    ///    So compare `intoSymbol(a)` with `intoSymbol(b)` where either side
+    /// might be a literal and a symbol is what was meant.
     ///
     ///    Answers an option, since not every value is a symbol: a Nat, an
     /// Int, an adapton pointer, space or time, and any quoted AST all are, and
@@ -76,8 +84,9 @@ module {
       assert (not (intoSymbol(`(boulder)) == intoSymbol(`boulder)));
       // A value that is not a symbol at all.
       assert (intoSymbol({a = 1}) == null);
-      // And the bare comparison the coercion exists to replace, which is
-      // false for two occurrences of one literal.
+      // Two occurrences of one literal are two quoted ASTs written in
+      // different places, and compare unequal. Asserted rather than merely
+      // tolerated: it is what `==` on quoted ASTs is for.
       assert (not (`x == `x));
     };
 
