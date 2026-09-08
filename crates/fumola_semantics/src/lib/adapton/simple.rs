@@ -132,7 +132,13 @@ impl SimpleState {
         for (pointer, cell) in delayed_cells.iter() {
             let cell_value = cell.get_value()?;
             let mut dummy: Counts = Counts::new();
-            self.put_pointer(&mut dummy, pointer.clone(), cell_value, PutBeh::Undelay)?;
+            self.put_pointer(
+                &Settings::new(),
+                &mut dummy,
+                pointer.clone(),
+                cell_value,
+                PutBeh::Undelay,
+            )?;
         }
         Ok(())
     }
@@ -189,13 +195,20 @@ impl CacheState for SimpleState {
         }
     }
 
-    fn put_symbol(&mut self, counts: &mut Counts, symbol: Symbol_, value: Value_) -> Res<Pointer> {
+    fn put_symbol(
+        &mut self,
+        settings: &Settings,
+        counts: &mut Counts,
+        symbol: Symbol_,
+        value: Value_,
+    ) -> Res<Pointer> {
         let p: Pointer = self.space.apply(symbol);
-        self.put_pointer(counts, p.clone(), value, PutBeh::Put)?;
+        self.put_pointer(settings, counts, p.clone(), value, PutBeh::Put)?;
         Ok(p)
     }
     fn put_pointer(
         &mut self,
+        _settings: &Settings,
         counts: &mut Counts,
         pointer: Pointer,
         value: Value_,
@@ -281,6 +294,15 @@ impl CacheState for SimpleState {
         }
         let _fr = self.pop_stack()?;
         Ok(())
+    }
+
+    // The simple semantics keeps no graph, so nothing is ever signaled and its `force_begin`
+    // never answers `Repair`. Unreachable by construction.
+    fn repair_step(&mut self, _counts: &mut Counts) -> Res<crate::adapton::RepairStep> {
+        Err(Error::Unreachable)
+    }
+    fn repair_resume(&mut self, _counts: &mut Counts, _value: Value_) -> Res<()> {
+        Err(Error::Unreachable)
     }
 
     fn now(&self) -> Time {

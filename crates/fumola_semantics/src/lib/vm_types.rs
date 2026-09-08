@@ -256,6 +256,9 @@ pub mod stack {
         Force1,
         ForceAdaptonPointer,
         ForceThunk,
+        /// A force made by a repair to check one signaled edge. Its value goes back to the
+        /// repair frame (`AdaptonState::repair_resume`) rather than to the program.
+        RepairForced,
         /// A thunk being evaluated on a branch of the adapton state, with the
         /// state to put back when its value comes through.
         Scratch(Box<crate::adapton::state::State>),

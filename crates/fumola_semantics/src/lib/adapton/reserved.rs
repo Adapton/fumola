@@ -23,6 +23,7 @@ pub fn is_future_reserved_symbol(symbol: &Symbol) -> bool {
 // `adapton(`state)
 // `adapton(`settings)(`forceBeginAlwaysMisses).
 // `adapton(`settings)(`forceEndForgetsResult).
+// `adapton(`settings)(`putMatchesEqualValues).
 // `adapton(`counts)(`cells)
 //                  (`nonThunkCells)
 //                  (`thunkCells)
@@ -33,6 +34,12 @@ pub fn is_future_reserved_symbol(symbol: &Symbol) -> bool {
 //                  (`forceEnd)
 //                  (`forceBeginCacheHit)
 //                  (`forceBeginCacheMiss)
+//                  (`putMatched)
+//                  (`signalings)
+//                  (`edgesSignaled)
+//                  (`repairs)
+//                  (`edgesAligned)
+//                  (`reevaluations)
 //
 // Operations on these symbols have special meaning:
 //  - They are not part of the graphical representation of dependencies.
@@ -48,6 +55,7 @@ pub enum ReservedSymbol {
     Settings,
     SettingsForceBeginAlwaysMisses,
     SettingsForceEndForgetsResult,
+    SettingsPutMatchesEqualValues,
     Counts,
     CountsCells,
     CountsThunkCells,
@@ -59,6 +67,12 @@ pub enum ReservedSymbol {
     CountsForceEnd,
     CountsForceBeginCacheHit,
     CountsForceBeginCacheMiss,
+    CountsPutMatched,
+    CountsSignalings,
+    CountsEdgesSignaled,
+    CountsRepairs,
+    CountsEdgesAligned,
+    CountsReevaluations,
 }
 
 pub fn into_reserved_symbol(symbol: &Symbol) -> Option<ReservedSymbol> {
@@ -98,6 +112,12 @@ pub fn into_reserved_symbol(symbol: &Symbol) -> Option<ReservedSymbol> {
                             "forceBeginCacheMiss" => {
                                 Some(ReservedSymbol::CountsForceBeginCacheMiss)
                             }
+                            "putMatched" => Some(ReservedSymbol::CountsPutMatched),
+                            "signalings" => Some(ReservedSymbol::CountsSignalings),
+                            "edgesSignaled" => Some(ReservedSymbol::CountsEdgesSignaled),
+                            "repairs" => Some(ReservedSymbol::CountsRepairs),
+                            "edgesAligned" => Some(ReservedSymbol::CountsEdgesAligned),
+                            "reevaluations" => Some(ReservedSymbol::CountsReevaluations),
                             _ => None,
                         },
                         "settings" => match z.as_str() {
@@ -106,6 +126,9 @@ pub fn into_reserved_symbol(symbol: &Symbol) -> Option<ReservedSymbol> {
                             }
                             "forceEndForgetsResult" => {
                                 Some(ReservedSymbol::SettingsForceEndForgetsResult)
+                            }
+                            "putMatchesEqualValues" => {
+                                Some(ReservedSymbol::SettingsPutMatchesEqualValues)
                             }
                             _ => None,
                         },

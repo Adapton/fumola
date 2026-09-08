@@ -768,27 +768,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
         }
         Force1 => {
             if let Value::AdaptonPointer(ref p) = *v {
-                let force_begin_result = active.adapton().force_begin(p.clone())?;
-                match force_begin_result {
-                    ForceBeginResult::CacheHit(_, v) => {
-                        *active.cont() = Cont::Value_(v);
-                        Ok(Step {})
-                    }
-                    ForceBeginResult::CacheMiss(thunk_body) => {
-                        let env = active.env().fast_clone();
-                        let context = active.defs().active_ctx.clone();
-                        active.stack().push_front(Frame {
-                            context,
-                            env,
-                            cont: FrameCont::ForceAdaptonPointer,
-                            cont_prim_type: None,
-                            source: fumola_syntax::ast::Source::Evaluation,
-                        });
-                        *active.env() = thunk_body.env;
-                        *active.ctx_id() = thunk_body.ctx;
-                        exp_step(active, thunk_body.content)
-                    }
-                }
+                force_pointer(active, p.clone())
             } else if let Value::Thunk(ref thunk_body) = *v {
                 let env = active.env().fast_clone();
                 let context = active.defs().active_ctx.clone();
@@ -816,6 +796,13 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             active.adapton().restore(*saved);
             *active.cont() = Cont::Value_(v);
             Ok(Step {})
+        }
+        RepairForced => {
+            // A force made on behalf of a signaled edge has its value: hand it to the repair
+            // frame, which compares it with what the edge recorded (Algorithm 1 line 12), then
+            // take the next repair step.
+            active.adapton().repair_resume(v)?;
+            repair_loop(active)
         }
         ForceAdaptonPointer => {
             active.adapton().force_end(v.clone())?;
@@ -1025,5 +1012,75 @@ fn bang_null<A: Active>(active: &mut A) -> Result<Step, Interruption> {
         } else {
             return Err(Interruption::NoDoQuestBangNull);
         }
+    }
+}
+
+/// Force the thunk a pointer names, from the current frame: what `Force1` does for a pointer,
+/// and what a repair does on behalf of an edge it is checking.
+fn force_pointer<A: Active>(
+    active: &mut A,
+    p: crate::adapton::Pointer,
+) -> Result<Step, Interruption> {
+    match active.adapton().force_begin(p)? {
+        ForceBeginResult::CacheHit(_, v) => {
+            *active.cont() = Cont::Value_(v);
+            Ok(Step {})
+        }
+        ForceBeginResult::CacheMiss(thunk_body) => enter_thunk_body(active, thunk_body),
+        // The thunk has a cached result, and its trace holds a signaled edge: it is repaired
+        // before the result can be used (Nominal Adapton's `Eval-forceClean` needs
+        // `all-clean-out`; the recipe's `IE-cleanForce` cleans first). The graph decides each
+        // step; the VM runs it.
+        ForceBeginResult::Repair => repair_loop(active),
+    }
+}
+
+/// Evaluate a thunk's body as a force, under the frame that completes the force when the value
+/// comes through (`ForceAdaptonPointer`, whose arm calls `force_end`).
+fn enter_thunk_body<A: Active>(
+    active: &mut A,
+    thunk_body: crate::value::ThunkBody,
+) -> Result<Step, Interruption> {
+    let env = active.env().fast_clone();
+    let context = active.defs().active_ctx.clone();
+    active.stack().push_front(Frame {
+        context,
+        env,
+        cont: FrameCont::ForceAdaptonPointer,
+        cont_prim_type: None,
+        source: fumola_syntax::ast::Source::Evaluation,
+    });
+    *active.env() = thunk_body.env;
+    *active.ctx_id() = thunk_body.ctx;
+    exp_step(active, thunk_body.content)
+}
+
+/// One step of a repair, and whatever it asks of the VM.
+///
+/// Repair is Algorithm 1's `propagate` (PLDI 2014, section 5.2), but the graph cannot run it
+/// alone: checking a force edge means forcing its target (line 11), which may run Fumola code.
+/// So the graph walks the trace as far as it can (`repair_step`) and hands back one of three
+/// things: the node is aligned, here is its value; force this pointer and bring back its value,
+/// which `RepairForced` does; or the node is misaligned, evaluate this body as a cache miss.
+fn repair_loop<A: Active>(active: &mut A) -> Result<Step, Interruption> {
+    use crate::adapton::RepairStep;
+    match active.adapton().repair_step()? {
+        RepairStep::Aligned(_, v) => {
+            *active.cont() = Cont::Value_(v);
+            Ok(Step {})
+        }
+        RepairStep::Force(target) => {
+            let env = active.env().fast_clone();
+            let context = active.defs().active_ctx.clone();
+            active.stack().push_front(Frame {
+                context,
+                env,
+                cont: FrameCont::RepairForced,
+                cont_prim_type: None,
+                source: fumola_syntax::ast::Source::Evaluation,
+            });
+            force_pointer(active, target)
+        }
+        RepairStep::Reevaluate(thunk_body) => enter_thunk_body(active, thunk_body),
     }
 }
