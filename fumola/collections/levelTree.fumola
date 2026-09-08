@@ -1067,7 +1067,7 @@ module {
            mergeFromTreeRun(seed, size, ?removed))
   };
 
-  /// Where an edit lands, for the four pairs below.
+  /// Where an edit lands, for the removal pairs below.
   ///
   ///    A treap puts a symbol at a height drawn from its own hash, so which
   /// element you remove decides how much of the tree is rebuilt -- far more
@@ -1078,10 +1078,13 @@ module {
   ///
   ///    For seed 10 and size 16 these are the extremes of `Prim.symbolLevel`
   /// over the addressable positions: cell 3 is the highest at 1581569 and
-  /// cell 10 the lowest at 4. Both pairs of each kind use the same one, so
+  /// cell 10 the lowest at 4. Every pair of a kind writes the same one, so
   /// the only difference between a pair and its twin is the naming.
-  let rootRemoval = 3;
-  let leafRemoval = 10;
+  ///
+  ///    Written out in each one rather than shared between them. A body opened
+  /// from the library is lifted out of this module and stands alone, so a name
+  /// defined out here is not in scope there -- and the whole point of opening
+  /// a body is to edit the numbers in it.
 
   /// The same merge network named two ways, on the same unedited input.
   ///
@@ -1135,8 +1138,9 @@ module {
   public func examplePairInductiveRootRemoval() : W.ExamplePairOutput {
     let seed = 10;
     let size = 16;
+    let removed = 3;
     W.pair(mergeFromTreeRunWith(seed, size, null, #inductive),
-           mergeFromTreeRunWith(seed, size, ?rootRemoval, #inductive))
+           mergeFromTreeRunWith(seed, size, ?removed, #inductive))
   };
 
   /// The same removal at the highest node, named by the pair compared.
@@ -1154,8 +1158,9 @@ module {
   public func examplePairCartesianRootRemoval() : W.ExamplePairOutput {
     let seed = 10;
     let size = 16;
+    let removed = 3;
     W.pair(mergeFromTreeRunWith(seed, size, null, #cartesian),
-           mergeFromTreeRunWith(seed, size, ?rootRemoval, #cartesian))
+           mergeFromTreeRunWith(seed, size, ?removed, #cartesian))
   };
 
   /// One removal at the lowest node, named inductively.
@@ -1168,8 +1173,9 @@ module {
   public func examplePairInductiveLeafRemoval() : W.ExamplePairOutput {
     let seed = 10;
     let size = 16;
+    let removed = 10;
     W.pair(mergeFromTreeRunWith(seed, size, null, #inductive),
-           mergeFromTreeRunWith(seed, size, ?leafRemoval, #inductive))
+           mergeFromTreeRunWith(seed, size, ?removed, #inductive))
   };
 
   /// The same removal at the lowest node, named by the pair compared.
@@ -1177,8 +1183,9 @@ module {
   public func examplePairCartesianLeafRemoval() : W.ExamplePairOutput {
     let seed = 10;
     let size = 16;
+    let removed = 10;
     W.pair(mergeFromTreeRunWith(seed, size, null, #cartesian),
-           mergeFromTreeRunWith(seed, size, ?leafRemoval, #cartesian))
+           mergeFromTreeRunWith(seed, size, ?removed, #cartesian))
   };
 
   /// One removal at the highest node, named by where the merge sits.
@@ -1207,8 +1214,9 @@ module {
   public func examplePairPathwiseRootRemoval() : W.ExamplePairOutput {
     let seed = 10;
     let size = 16;
+    let removed = 3;
     W.pair(mergeFromTreeRunWith(seed, size, null, #pathwise),
-           mergeFromTreeRunWith(seed, size, ?rootRemoval, #pathwise))
+           mergeFromTreeRunWith(seed, size, ?removed, #pathwise))
   };
 
   /// The same removal at the lowest node, named by where the merge sits.
@@ -1220,8 +1228,9 @@ module {
   public func examplePairPathwiseLeafRemoval() : W.ExamplePairOutput {
     let seed = 10;
     let size = 16;
+    let removed = 10;
     W.pair(mergeFromTreeRunWith(seed, size, null, #pathwise),
-           mergeFromTreeRunWith(seed, size, ?leafRemoval, #pathwise))
+           mergeFromTreeRunWith(seed, size, ?removed, #pathwise))
   };
 
   /// The same list built into a tree twice, differing by one removed cell.
