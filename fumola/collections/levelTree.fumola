@@ -324,6 +324,257 @@ module {
     thunk { (s-n, genSymsFrom(s, n + 1))}
   };
 
+  /// The first element of a sequence, or null if it has none.
+  ///
+  ///    Walks the left spine. `split` needs it to learn the value a node
+  /// divides its sequence at: a break carries a symbol and a level but not a
+  /// value, and for a sorted sequence the value at a break is the first
+  /// element of the node's right side.
+  func firstElement<X>(t : LevelTree_<X>) : ?X {
+    switch (@ t) {
+      case (#empty) null;
+      case (#element(e)) ?e.element;
+      case (#binary(b)) {
+        switch (firstElement(b.left)) {
+          case (?x) ?x;
+          case null firstElement(b.right);
+        }
+      };
+    }
+  };
+
+  /// Divide a **sorted** sequence at a value: what is below `pivot`, and the
+  /// rest.
+  ///
+  ///    Strictly below, so an element equal to the pivot lands on the right.
+  /// Merging wants it that way: it splits one sequence at a value taken from
+  /// the other, and everything at or above that value belongs with it.
+  ///
+  /// PRECONDITION: `t` is sorted, and `splitSym` paired with the symbols in it
+  /// is unused. Sortedness is not checked and cannot be cheaply -- a break
+  /// carries no value, so learning what a node divides at means walking to a
+  /// leaf.
+  ///
+  ///    That walk is why this is O(log^2 n) rather than O(log n): one leftmost
+  /// walk per level descended. `append` avoided the same cost because the
+  /// value it needed never changed and could be carried; here it changes at
+  /// every step. Caching a first element on each node, which is what Pugh and
+  /// Teitelbaum do to keep their bound, would fix it and is a change to the
+  /// representation rather than to this function.
+  public func split<X>(splitSym : Symbol, t : ?LevelTree_<X>, pivot : X)
+    : (?LevelTree_<X>, ?LevelTree_<X>) {
+    switch t {
+      case null (null, null);
+      case (?p) {
+        switch (@ p) {
+          case (#empty) (null, null);
+          case (#element(e)) {
+            if (e.element < pivot) { (?p, null) } else { (null, ?p) }
+          };
+          case (#binary(b)) {
+            switch (firstElement(b.right)) {
+              case null (?p, null);
+              case (?v) {
+                if (pivot <= v) {
+                  // Everything on the right is at or above the pivot, so the
+                  // division is somewhere on the left.
+                  let (lo, hi) = split(splitSym, ?b.left, pivot);
+                  (lo, append_(`splitJoin(splitSym)(b.symbol), hi, ?b.right))
+                } else {
+                  let (lo, hi) = split(splitSym, ?b.right, pivot);
+                  (append_(`splitJoin(splitSym)(b.symbol), ?b.left, lo), hi)
+                }
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  /// Append two **sorted** sequences, giving one sorted sequence.
+  ///
+  ///    A different function from `append`, not a wrapper on it: `append`
+  /// concatenates whatever it is given, and this interleaves. What they share
+  /// is the shape of the problem -- two sequences in, one out, the levels
+  /// deciding the result's shape -- and the invariant is what differs. Hence
+  /// the name: append, for sequences that are sorted, keeping them so.
+  ///
+  ///    It is the union of two treaps, done in the order their own levels ask
+  /// for.
+  /// Whichever sequence has the higher break has the break that will root the
+  /// result, so that one is divided where it already divides, the other is
+  /// split at the same value, and the two halves are merged and appended. The
+  /// levels decide the shape, so the shape comes out canonical: the same
+  /// sorted sequence however it was arrived at.
+  ///
+  ///    A single element is inserted rather than recursed on. Treating it as a
+  /// sequence to divide would split the other at that element's own value,
+  /// leaving the same pair to merge again.
+  ///
+  /// PRECONDITION: both are sorted, and `mergeSym` paired with the symbols in
+  /// them is unused. `eagerMergeSort` passes the reduction node's own symbol,
+  /// which gives that: one node, one merge.
+  public func appendSorted<X>(mergeSym : Symbol, a : ?LevelTree_<X>, b : ?LevelTree_<X>)
+    : ?LevelTree_<X> {
+    switch (a, b) {
+      case (null, _) b;
+      case (_, null) a;
+      case (?pa, ?pb) {
+        switch (@ pa, @ pb) {
+          case (#empty, _) b;
+          case (_, #empty) a;
+          case (#element(e), _) {
+            let (lo, hi) = split(`mergeInsertA(mergeSym)(e.symbol), b, e.element);
+            append_(`mergeHiA(mergeSym)(e.symbol),
+                    append_(`mergeLoA(mergeSym)(e.symbol), lo, a),
+                    hi)
+          };
+          case (_, #element(e)) {
+            let (lo, hi) = split(`mergeInsertB(mergeSym)(e.symbol), a, e.element);
+            append_(`mergeHiB(mergeSym)(e.symbol),
+                    append_(`mergeLoB(mergeSym)(e.symbol), lo, b),
+                    hi)
+          };
+          case (#binary(ba), #binary(bb)) {
+            if (ba.level >= bb.level) {
+              switch (firstElement(ba.right)) {
+                case null a;
+                case (?v) {
+                  let (blo, bhi) = split(`mergeSplitA(mergeSym)(ba.symbol), b, v);
+                  append_(`mergeJoinA(mergeSym)(ba.symbol),
+                          appendSorted(`mergeLeftA(mergeSym)(ba.symbol), ?ba.left, blo),
+                          appendSorted(`mergeRightA(mergeSym)(ba.symbol), ?ba.right, bhi))
+                };
+              }
+            } else {
+              switch (firstElement(bb.right)) {
+                case null b;
+                case (?v) {
+                  let (alo, ahi) = split(`mergeSplitB(mergeSym)(bb.symbol), a, v);
+                  append_(`mergeJoinB(mergeSym)(bb.symbol),
+                          appendSorted(`mergeLeftB(mergeSym)(bb.symbol), alo, ?bb.left),
+                          appendSorted(`mergeRightB(mergeSym)(bb.symbol), ahi, ?bb.right))
+                };
+              }
+            }
+          };
+        }
+      };
+    }
+  };
+
+  /// Sort a sequence, merging eagerly, keeping a level tree throughout.
+  ///
+  ///    The counterpart of `lazyMergeSort`. That one builds a network of
+  /// streams and hands back a promise; this one merges as it goes and hands
+  /// back a sorted sequence in the same representation it was given, so the
+  /// result can be appended to, split, sorted again, or compared with a tree
+  /// built any other way.
+  ///
+  ///    Each merge is named by the reduction node it happens at, which is
+  /// `#inductive` naming for this path: the node's own symbol is the extra
+  /// symbol every `append` and `split` underneath it pairs with. One node, one
+  /// merge, so the pairings are unused, which is what those two require.
+  public func eagerMergeSort<X>(t : ?SeqTree_<X>) : ?SeqTree_<X> {
+    switch t {
+      case null null;
+      case (?p) {
+        reduce_(
+          p,
+          null,
+          func(symbol : Symbol, element : X) : ?SeqTree_<X> {
+            ?(symbol-`element := #element { symbol = symbol; element = element })
+          },
+          func(symbol : Symbol, l : ?SeqTree_<X>, r : ?SeqTree_<X>) : ?SeqTree_<X> {
+            appendSorted(symbol, l, r)
+          }
+        )
+      };
+    }
+  };
+
+  /// `eagerMergeSort` sorts, keeps every element, and leaves the result in
+  /// the canonical shape for the sequence it holds.
+  ///
+  ///    The third is the one worth having and the one that needs no oracle: a
+  /// level tree's shape is a function of its contents, so whatever route the
+  /// sorted sequence was arrived at by, the tree holding it must be the tree
+  /// `fromArray` would build for it. Sortedness alone would pass for a
+  /// correctly ordered but badly shaped tree, and a badly shaped one costs
+  /// every later reuse without ever being wrong.
+  ///
+  ///    Swept over sizes because `appendSorted` reaches different cases
+  /// depending on which side's break is higher, and small inputs reach the
+  /// single-element insert path that recursion would otherwise loop on.
+  #[test]
+  public func testEagerMergeSort() {
+    let valuesOf = func(a : [(Symbol, Nat)]) : Text {
+      var out = "";
+      for ((_, v) in a.vals()) { out #= (debug_show v) # "," };
+      out
+    };
+    let sumOf = func(a : [(Symbol, Nat)]) : Nat {
+      var n = 0;
+      for ((_, v) in a.vals()) { n += v };
+      n
+    };
+    let nonDecreasing = func(a : [(Symbol, Nat)]) : bool {
+      var ok = true;
+      var i = 1;
+      while (i < a.size()) {
+        if (a[i].1 < a[i - 1].1) { ok := false };
+        i += 1
+      };
+      ok
+    };
+    var size = 1;
+    while (size <= 12) {
+      let xs = R.generateRandomInput(10, size);
+      let t = fromArray(xs);
+      let sorted = eagerMergeSort(t);
+      let got = Pure.intoArray(erase(sorted));
+      // Sorted.
+      assert (nonDecreasing(got));
+      // Every element, once.
+      assert (got.size() == size);
+      assert (sumOf(got) == sumOf(xs));
+      // And in the shape this representation says that sequence has.
+      assert (Pure.equal(erase(sorted), erase(fromArray(got))));
+      size += 1
+    };
+  };
+
+  /// `split` divides a sorted sequence, loses nothing, and leaves both halves
+  /// canonical.
+  #[test]
+  public func testSplit() {
+    var size = 1;
+    while (size <= 10) {
+      let sorted = eagerMergeSort(fromArray(R.generateRandomInput(10, size)));
+      let all = Pure.intoArray(erase(sorted));
+      var i = 0;
+      while (i < all.size()) {
+        let pivot = all[i].1;
+        let (lo, hi) = split(`p(size)(i), sorted, pivot);
+        let loA = Pure.intoArray(erase(lo));
+        let hiA = Pure.intoArray(erase(hi));
+        // Nothing lost and nothing gained.
+        assert (loA.size() + hiA.size() == all.size());
+        // Strictly below on the left, so an equal element goes right.
+        var j = 0;
+        while (j < loA.size()) { assert (loA[j].1 < pivot); j += 1 };
+        var k = 0;
+        while (k < hiA.size()) { assert (not (hiA[k].1 < pivot)); k += 1 };
+        // Each half is the tree its own contents call for.
+        assert (Pure.equal(erase(lo), erase(fromArray(loA))));
+        assert (Pure.equal(erase(hi), erase(fromArray(hiA))));
+        i += 1
+      };
+      size += 1
+    };
+  };
+
   /// The same tree with the pointers taken out.
   ///
   ///    For comparing one tree against another for what it is rather than for
