@@ -46,6 +46,41 @@ module {
     /// The hash of a symbol.
     public func symbolHash(s) { prim "symbolHash" s };
 
+    /// A value as a symbol, if it can be one.
+    ///
+    ///    Needed because `` `x `` is not a symbol yet. It is a quoted AST, and
+    /// a quoted identifier carries the position it was written at, so two
+    /// occurrences of `` `x `` are different values and `` `x == `x `` is
+    /// false. Every operator that builds a compound symbol coerces first --
+    /// which is why `` `x-`y == `x-`y `` is true, and why the difference is
+    /// easy to miss until something compares two bare ones.
+    ///
+    ///    So compare `intoSymbol(a)` with `intoSymbol(b)`, not `a` with `b`,
+    /// wherever either side might be written as a literal.
+    ///
+    ///    Answers an option, since not every value is a symbol: a Nat, an
+    /// Int, an adapton pointer, space or time, and any quoted AST all are, and
+    /// a record is not. For a quoted AST it always succeeds.
+    ///
+    ///    It does not make everything that looks alike compare alike.
+    /// `` `(boulder) `` and `` `boulder `` are different symbols and stay
+    /// different after coercion -- the parentheses are part of what was
+    /// written, not punctuation around it.
+    public func intoSymbol(v) { prim "intoSymbol" v };
+
+    #[test]
+    public func testIntoSymbol() {
+      assert (intoSymbol(`x) == intoSymbol(`x));
+      assert (not (intoSymbol(`x) == intoSymbol(`y)));
+      // The distinction this cannot erase, and should not.
+      assert (not (intoSymbol(`(boulder)) == intoSymbol(`boulder)));
+      // A value that is not a symbol at all.
+      assert (intoSymbol({a = 1}) == null);
+      // And the bare comparison the coercion exists to replace, which is
+      // false for two occurrences of one literal.
+      assert (not (`x == `x));
+    };
+
     /// A Nat as text.
     public func natToText(n) { prim "natToText" n };
 

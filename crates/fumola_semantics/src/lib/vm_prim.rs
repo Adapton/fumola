@@ -88,6 +88,26 @@ pub fn call_prim_function<A: Active>(
                 type_mismatch!(file!(), line!())
             }
         }
+        // The coercion the symbol-building operators already do, made
+        // available on its own.
+        //
+        //    `` `x `` evaluates to a quoted AST, not to a symbol, and a quoted
+        // `Id_` carries the position it was written at -- so two occurrences of
+        // `` `x `` are different values, and `==` on them is false. Every
+        // operator that builds a compound symbol calls `into_sym_or`, which
+        // strips that position for exactly this reason, which is why
+        // `` `x-`y == `x-`y `` is true while `` `x == `x `` is not.
+        //
+        //    Answers an option because not every value is a symbol; for a
+        // quoted AST it always succeeds.
+        IntoSymbol => {
+            let v = match args.as_ref().into_sym_or(()) {
+                Ok(symbol) => Value::Option(Value::Symbol(symbol).into()),
+                Err(()) => Value::Null,
+            };
+            *active.cont() = cont_value(v);
+            Ok(Step {})
+        }
         SymbolHash => {
             if let Ok(symbol) = args.as_ref().into_sym_or(()) {
                 let mut hasher = hash_map::DefaultHasher::new();
