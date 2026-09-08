@@ -1,0 +1,127 @@
+import Prim "../system/prim";
+
+/// A level tree with no pointers in it.
+///
+///    An instrument, not a data structure to compute with. `levelTree` is the
+/// one that does the work; this is the same shape with the carrier taken out,
+/// so that two trees can be compared for what they are rather than for which
+/// cells hold them.
+///
+///    That comparison is otherwise awkward and the awkwardness is the point.
+/// A tree built by `append` lives in `append(...)` cells and the same
+/// sequence built by `fromArray` lives in `sym-`binary` cells; they are equal
+/// as sequences and equal as shapes while sharing no cell at all. Pointer
+/// equality answers "no" to a question nobody asked. Erasing both to this
+/// type asks the question that was meant --- see `docs/cache-naming.md`, of
+/// which this module is the small concrete corner.
+///
+///    Nothing here allocates or reads a cell, so an erased tree can be built,
+/// compared and printed without touching the graph, and without appearing in
+/// a history that some other measurement is reading.
+module {
+
+  #[listing(30)]
+  public type LevelTree<X> = {
+    #empty;
+    #element : Element<X>;
+    #binary : Binary<X>
+  };
+
+  #[listing(30)]
+  public type Binary<X> = {
+    symbol : Symbol;
+    level : Nat;
+    left : LevelTree<X>;
+    right : LevelTree<X>
+  };
+
+  #[listing(23)]
+  public type Element<X> = {
+    element : X;
+    symbol : Symbol
+  };
+
+  /// The elements, left to right.
+  public func intoArray<X>(t : LevelTree<X>) : [(Symbol, X)] {
+    switch t {
+      case (#empty) [];
+      case (#element(e)) [(e.symbol, e.element)];
+      case (#binary(b)) intoArray(b.left) # intoArray(b.right);
+    }
+  };
+
+  /// The shape, as text, in a form of this module's own choosing.
+  ///
+  ///    Written out rather than left to `debug_show` so that the rendering is
+  /// stable under changes to how the runtime prints things, since two of
+  /// these are compared against each other in tests.
+  public func render<X>(t : LevelTree<X>) : Text {
+    switch t {
+      case (#empty) "_";
+      case (#element(e)) (debug_show e.symbol);
+      case (#binary(b)) {
+        "(" # render(b.left) # " " # (debug_show b.symbol)
+            # "@" # (debug_show b.level) # " " # render(b.right) # ")"
+      };
+    }
+  };
+
+  /// Whether two trees are the same tree.
+  ///
+  ///    Through `render` rather than by comparing the trees directly, because
+  /// a symbol written as a literal is not a symbol yet -- it is a quoted AST,
+  /// and where it was written is part of it, so `` `x == `x `` is false and
+  /// should be. `Prim.intoSymbol` is how you ask for the symbol instead.
+  /// Going through text means not having to reach for it at every leaf.
+  public func equal<X>(a : LevelTree<X>, b : LevelTree<X>) : bool {
+    render(a) == render(b)
+  };
+
+  /// How many elements it holds.
+  public func size<X>(t : LevelTree<X>) : Nat {
+    switch t {
+      case (#empty) 0;
+      case (#element(_)) 1;
+      case (#binary(b)) size(b.left) + size(b.right);
+    }
+  };
+
+  /// The longest root-to-leaf path, counting nodes, so a leaf is 1.
+  ///
+  ///    The same convention `levelTree`'s own `metrics` uses, which reports
+  /// one more than the edge count.
+  public func depth<X>(t : LevelTree<X>) : Nat {
+    switch t {
+      case (#empty) 0;
+      case (#element(_)) 1;
+      case (#binary(b)) {
+        let l = depth(b.left);
+        let r = depth(b.right);
+        1 + (if (l > r) { l } else { r })
+      };
+    }
+  };
+
+  #[test]
+  public func testRenderAndEqual() {
+    let leaf = func(s : Symbol, x : Nat) : LevelTree<Nat> {
+      #element { symbol = s; element = x }
+    };
+    let t = #binary {
+      symbol = `b; level = 3;
+      left = leaf(`a, 1); right = leaf(`c, 2)
+    };
+    assert (size(t) == 2);
+    assert (depth(t) == 2);
+    assert (equal(t, t));
+    // Built twice from separate literals, which is where a structural
+    // comparison on symbols would have gone wrong.
+    let u = #binary {
+      symbol = `b; level = 3;
+      left = leaf(`a, 1); right = leaf(`c, 2)
+    };
+    assert (equal(t, u));
+    assert (not (equal(t, leaf(`a, 1))));
+    assert (debug_show (intoArray(t)) == debug_show ([(`a, 1), (`c, 2)]));
+  };
+}

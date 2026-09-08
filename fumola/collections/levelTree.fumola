@@ -6,6 +6,7 @@ import A "../system/adapton";
 import Map "hashMap";
 import W "../system/webPlay";
 import Prim "../system/prim";
+import Pure "pureLevelTree";
 import Files "../system/files";
 
 /// A sequence represented as a balanced binary tree, keyed by level.
@@ -323,25 +324,56 @@ module {
     thunk { (s-n, genSymsFrom(s, n + 1))}
   };
 
-  /// A tree's shape as text, ignoring which cells hold it.
+  /// The same tree with the pointers taken out.
   ///
-  ///    Plain recursion and no allocation, so it can be compared against a
-  /// tree built another way. Pointer equality cannot do that job here: an
-  /// appended tree's nodes live in `append(...)` cells and the same sequence
-  /// built by `fromArray` lives in `sym-`binary` cells, so the two are equal
-  /// as sequences and as shapes while sharing no cell at all -- which is
-  /// exactly the cost of pointer naming that `docs/cache-naming.md` is about.
-  func shapeOf<X>(t : ?LevelTree_<X>) : Text {
+  ///    For comparing one tree against another for what it is rather than for
+  /// which cells hold it. Pointer equality cannot do that: a tree built by
+  /// `append` lives in `append(...)` cells and the same sequence built by
+  /// `fromArray` lives in `sym-`binary` cells, so the two are equal as
+  /// sequences and as shapes while sharing no cell at all. That is the cost of
+  /// pointer naming, and `docs/cache-naming.md` is about it.
+  ///
+  ///    Reads cells and allocates none.
+  public func erase<X>(t : ?LevelTree_<X>) : Pure.LevelTree<X> {
     switch t {
-      case null "_";
-      case (?p) {
-        switch (@ p) {
-          case (#empty) "_";
-          case (#element(e)) debug_show e.symbol;
-          case (#binary(b)) {
-            "(" # shapeOf(?b.left) # " " # (debug_show b.symbol)
-                # "@" # (debug_show b.level) # " " # shapeOf(?b.right) # ")"
-          };
+      case null (#empty);
+      case (?p) eraseAt(p);
+    }
+  };
+
+  func eraseAt<X>(p : LevelTree_<X>) : Pure.LevelTree<X> {
+    switch (@ p) {
+      case (#empty) (#empty);
+      case (#element(e)) (#element { symbol = e.symbol; element = e.element });
+      case (#binary(b)) {
+        #binary {
+          symbol = b.symbol; level = b.level;
+          left = eraseAt(b.left); right = eraseAt(b.right)
+        }
+      };
+    }
+  };
+
+  /// The other direction: put a pure tree into cells.
+  ///
+  ///    Under the names `fromList` would have used -- `sym-`element` for a
+  /// leaf and `sym-`binary` for a gap -- so embedding is the canonical
+  /// placement rather than a fresh one. Which makes it the way to ask what a
+  /// tree would cost if it had been built canonically, whatever route it
+  /// actually arrived by.
+  public func embed<X>(t : Pure.LevelTree<X>) : ?LevelTree_<X> {
+    switch t {
+      case (#empty) null;
+      case (#element(e)) {
+        ?(e.symbol-`element := #element { symbol = e.symbol; element = e.element })
+      };
+      case (#binary(b)) {
+        do ? {
+          let l = embed(b.left)!;
+          let r = embed(b.right)!;
+          b.symbol-`binary := #binary {
+            symbol = b.symbol; level = b.level; left = l; right = r
+          }
         }
       };
     }
@@ -372,11 +404,25 @@ module {
         let out = append_(`a(l)(r), fromArray(xs), fromArray(ys));
         let whole = fromArray(xs # ys);
         assert (debug_show (intoArray(out)) == debug_show (intoArray(whole)));
-        assert (shapeOf(out) == shapeOf(whole));
+        assert (Pure.equal(erase(out), erase(whole)));
         r += 1
       };
       l += 1
     };
+  };
+
+  /// Erasing loses the cells and nothing else, and embedding puts a tree
+  /// back under the names it would have had if built canonically.
+  #[test]
+  public func testEraseEmbed() {
+    let xs = R.generateRandomInput(10, 8);
+    let t = fromArray(xs);
+    assert (debug_show (Pure.intoArray(erase(t))) == debug_show (intoArray(t)));
+    assert (Pure.size(erase(t)) == 8);
+    // Round trip. The cells differ -- `embed` places them canonically, which
+    // is where `fromArray` put them, so here they coincide -- but the point
+    // is that the tree does not.
+    assert (Pure.equal(erase(embed(erase(t))), erase(t)));
   };
 
   #[test]
