@@ -1687,7 +1687,20 @@
           equal: n("equal"), notEqual: n("notEqual"),
         };
         c.changed = c.onlyLeft + c.onlyRight + c.notEqual;
-        c.total = Math.max(c.left, c.right);
+        // Both runs' nodes together, not the larger run's.
+        //
+        //    `left` counts what the left run has and `right` what the right
+        // one has, and each includes the nodes they share -- so neither is the
+        // number of distinct nodes involved, and the larger of the two is not
+        // either. A node only one run has is counted by that run alone, so the
+        // total has to add both of those in beside the shared ones.
+        //
+        //    It reads the same in the ordinary case, where one run has almost
+        // everything the other does, and it stops reading as more than
+        // everything when they have little in common: naming the merge network
+        // two ways gives 61 shared, 25 changed, 77 in the left alone and 62 in
+        // the right, which is 164 of 225 rather than 164 of 163.
+        c.total = c.equal + c.notEqual + c.onlyLeft + c.onlyRight;
         c.fraction = c.total ? c.changed / c.total : 0;
         return c;
       };
