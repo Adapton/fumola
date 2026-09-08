@@ -31,9 +31,19 @@ fn force_thunk() {
     assert_("force (thunk {1 + 2})", "3")
 }
 
+/// A second force of a thunk whose inputs have not changed is a cache hit, under either
+/// strategy.
+///
+/// This used to force a thunk that *wrote the cell it had just read*, and expected the second
+/// force to hit anyway. Under the graphical strategy that is no longer so: the write signals
+/// the thunk's own read edge, and the next force repairs it. The two strategies now answer that
+/// program differently, so it lives in `test_adapton_realignment.rs`, once per strategy.
 #[test]
 fn force_simple_cache_hit() {
-    assert_("let count = 1 := 0; let myThunk = 2 := thunk { let orig = @ count; count := 1 + (@ count); orig }; force(myThunk); (@ count, force(myThunk))", "(1, 0)")
+    assert_(
+        "let count = 1 := 0; let myThunk = 2 := thunk { @ count }; force(myThunk); (@ count, force(myThunk), @(`adapton(`counts)(`forceBeginCacheHit)))",
+        "(0, 0, 1)",
+    )
 }
 
 #[test]
