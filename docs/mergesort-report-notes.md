@@ -15,7 +15,7 @@ and how to look at each one. It is a notebook, not a conclusion.
 |---|---|---|---|
 | `inductive` | `mergeSort(merge-3)(6)` | the reduction node's symbol, plus the winning element's | implemented, the default |
 | `cartesian` | `mergeSort(1(13))` | the pair of cells compared | implemented, PR #92 |
-| `pathwise` | `mergeSort(0(L)(R))` | the traversal path to the node | proposed, not built |
+| `pathwise` | `mergeSort(merge-`0(R))(4)` | the traversal path to the node | implemented, PR #92 |
 
 **`inductive`** opens a namespace for the reduction node the merge belongs to
 and names each continuation for the element that won the comparison. Both
@@ -30,8 +30,12 @@ namespace go, and the namespace was what carried the instability.
 **`pathwise`** keeps inductive's shape but replaces the tree node's symbol with
 an abstract path to it, `path ::= 0 | path(L) | path(R)`, built independently of
 anything in the input. It opens a space for the merge stream keyed by that
-path. `0` for the root rather than `R`, so the root is not confused with a
-right turn.
+path, and the cell within it is still named for the element that won -- so it
+is `inductive` with one substitution, an address where the node's own symbol
+used to be. `0` for the root rather than `R`, so the root is not confused with
+a right turn. `reducePathwise` is written out rather than added as a parameter
+to `reduce_`, because a parameter would sit in the environment of every thunk
+the other two strategies build.
 
 The three span a real distinction, which is probably the report's spine: what a
 name is derived from. Inductive and cartesian both name by *what* is being
@@ -60,24 +64,51 @@ repair could reuse if it existed.
 The 49/49 symmetry is the signature of an isomorphic graph with different
 names: every merge cell exists under one naming and not the other, one for one.
 The 114 that agree are the list, the tree and the reduction spine, none of
-which the strategy reaches. At size 100 the same check gives tree
-`371/24/4/0` and list `99/2/0/0` under *both* strategies -- identical to the
-node.
+which cartesian reaches. At size 100 the same check gives tree `371/24/4/0`
+and list `99/2/0/0` under *both* strategies -- identical to the node.
+
+All three verticals are symmetric, and the arithmetic closes:
+
+| | equal | notEqual | onlyLeft | onlyRight |
+|---|---|---|---|---|
+| inductive vs cartesian | 80 | 34 | 49 | 49 |
+| inductive vs pathwise | 80 | 4 | 79 | 79 |
+| cartesian vs pathwise | 80 | 4 | 79 | 79 |
+
+49 merge cells plus 30 reduction-spine cells is 79. Inductive and cartesian
+share the spine, so those 30 appear as `notEqual` -- same name, other contents.
+Pathwise keys the spine by path too, so they move to one-side-only and
+`notEqual` falls from 34 to 4. The 80 that stay equal are the list and the
+tree, which no naming reaches.
 
 ### Which element you remove matters more than which naming you use
 
 Size 16, the highest node in the input (`symbolLevel` 1581569, cell 3) and the
 lowest (4, cell 10):
 
-| pair | equal | notEqual | onlyLeft | onlyRight |
-|---|---|---|---|---|
-| root removal, inductive | 87 | 56 | 20 | 5 |
-| root removal, cartesian | 83 | 61 | 19 | 4 |
-| leaf removal, inductive | 134 | 20 | 9 | 0 |
-| leaf removal, cartesian | 134 | 20 | 9 | 0 |
+| pair | equal | notEqual | onlyLeft | onlyRight | unmatched |
+|---|---|---|---|---|---|
+| root removal, inductive | 87 | 56 | 20 | 5 | 25 |
+| root removal, cartesian | 83 | 61 | 19 | 4 | 23 |
+| root removal, pathwise | 61 | 25 | 77 | 62 | 139 |
+| leaf removal, inductive | 134 | 20 | 9 | 0 | 9 |
+| leaf removal, cartesian | 134 | 20 | 9 | 0 | 9 |
+| leaf removal, pathwise | 134 | 20 | 9 | 0 | 9 |
 
-The leaf rows are identical to the number. When the tree does not move, the
-naming cannot matter.
+The three leaf rows are identical to the number. When the tree does not move,
+no naming can matter.
+
+The pathwise root row is the surprise, and it went the opposite way to the
+prediction written down before it was measured. An address is stable only
+while the shape it addresses is stable; removing the highest node reshapes the
+tree from there down, so nearly every path changes and nearly every cell is
+renamed -- 139 unmatched against inductive's 25.
+
+So the three span the trade rather than ranking on it: cartesian caps
+inductive's worst case, pathwise multiplies it by five and a half, and all
+three agree exactly when the shape holds. Pathwise is a poor way to name a
+graph you mean to repair and a good instrument for the report, because it
+holds the data fixed and varies only the shape's influence.
 
 ### Cartesian caps the tail and raises the floor
 
