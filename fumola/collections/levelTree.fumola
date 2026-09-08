@@ -1742,6 +1742,81 @@ module {
            mergeFromTreeRunWith(seed, size, ?removed, #pathwise))
   };
 
+  /// One run of the eager sort: the tree it was given, and the tree it made.
+  ///
+  ///    The counterpart of `mergeFromTreeRun`, and the reason to have it is
+  /// the comparison. That one draws a network of merge streams, which is a
+  /// promise of a sorted sequence; this draws two level trees, the input and
+  /// the sorted output, because the eager sort answers in the representation
+  /// it was given. So the same edit can be priced against two ways of
+  /// spending it.
+  ///
+  ///    Both trees are drawn, the sorted one above the input, so the picture
+  /// shows what the sort did and not only what it produced.
+  public func eagerMergeRun(seed : Nat, size : Nat, remove : ?Symbol) : A.Scene.Scene {
+    A.reset();
+    let array = R.generateRandomInput(seed, size);
+    let list_ = `ListFromArray := thunk {
+      do within space `inputList { List.fromIter(array.vals()) }
+    };
+    let list = force list_;
+    do ? {
+      let editor = List.Edit.cursor(list!.next);
+      let editor = List.Edit.gotoSymbol(editor, remove!)!;
+      List.Edit.remove(editor);
+    };
+    let tree_ = `LevelTreeFromList := thunk {
+      do within space `inputTree { fromList(list) }
+    };
+    let tree = force tree_;
+    let sorted_ = `EagerSorted := thunk {
+      do within space `eagerMergeSort { eagerMergeSort(tree) }
+    };
+    let sorted = force sorted_;
+    W.withHistory(A.scratch(thunk {
+      let treeObjects = Scene.sceneObjects(tree!, A.Scene.zero);
+      let geom = Scene.geom2d(tree!);
+      let above = { x = 0.0; y = 1.618 * geom.height; z = 0.0 };
+      let sortedObjects = switch sorted {
+        case null [];
+        case (?s) Scene.sceneObjects(s, above);
+      };
+      W.scene(treeObjects # sortedObjects, [ A.Outline.outline(sorted_) ])
+    }))
+  };
+
+  /// One removal at the highest node, sorted eagerly.
+  ///
+  ///    Read against `examplePairInductiveRootRemoval`, which prices the same
+  /// removal through the lazy merge network. Same input, same removal, same
+  /// naming discipline -- the reduction node's own symbol -- and a different
+  /// way of spending the work, so what differs is the strategy of the sort
+  /// rather than anything about the edit.
+  #[examplePair]
+  public func examplePairEagerRootRemoval() : W.ExamplePairOutput {
+    let seed = 10;
+    let size = 16;
+    let removed = 3;
+    W.pair(eagerMergeRun(seed, size, null),
+           eagerMergeRun(seed, size, ?removed))
+  };
+
+  /// One removal at the lowest node, sorted eagerly.
+  ///
+  ///    The control, as for the other kinds: an edit that barely moves the
+  /// input tree. Whether it barely moves the *sorted* tree is a separate
+  /// question, and one this pair exists to answer -- the sorted sequence is a
+  /// permutation, so a removal near the input's leaves need not be near the
+  /// output's.
+  #[examplePair]
+  public func examplePairEagerLeafRemoval() : W.ExamplePairOutput {
+    let seed = 10;
+    let size = 16;
+    let removed = 10;
+    W.pair(eagerMergeRun(seed, size, null),
+           eagerMergeRun(seed, size, ?removed))
+  };
+
   /// The same list built into a tree twice, differing by one removed cell.
   ///
   ///    What a repair would cost, if repair were implemented. Neither run
