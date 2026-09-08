@@ -267,11 +267,16 @@
       .viewport .trail {
         position: absolute; left: 0.6rem; top: 50%;
         transform: translateY(-50%);
-        display: flex; flex-direction: column; align-items: center;
-        gap: 0.35rem;
+        display: flex; flex-direction: row; align-items: flex-start;
+        gap: 0.55rem;
         font: 400 0.62rem/1.3 var(--mono); color: var(--dim);
         background: rgba(8, 8, 11, 0.6); padding: 0.4rem 0.3rem;
         border: 1px solid var(--rule); border-radius: 3px;
+      }
+      /* One column per dial, so two can stand side by side. */
+      .viewport .trail .dial {
+        display: flex; flex-direction: column; align-items: center;
+        gap: 0.35rem;
       }
       .viewport .trail input[type="range"] {
         writing-mode: vertical-lr;
@@ -1682,7 +1687,20 @@
           equal: n("equal"), notEqual: n("notEqual"),
         };
         c.changed = c.onlyLeft + c.onlyRight + c.notEqual;
-        c.total = Math.max(c.left, c.right);
+        // Both runs' nodes together, not the larger run's.
+        //
+        //    `left` counts what the left run has and `right` what the right
+        // one has, and each includes the nodes they share -- so neither is the
+        // number of distinct nodes involved, and the larger of the two is not
+        // either. A node only one run has is counted by that run alone, so the
+        // total has to add both of those in beside the shared ones.
+        //
+        //    It reads the same in the ordinary case, where one run has almost
+        // everything the other does, and it stops reading as more than
+        // everything when they have little in common: naming the merge network
+        // two ways gives 61 shared, 25 changed, 77 in the left alone and 62 in
+        // the right, which is 164 of 225 rather than 164 of 163.
+        c.total = c.equal + c.notEqual + c.onlyLeft + c.onlyRight;
         c.fraction = c.total ? c.changed / c.total : 0;
         return c;
       };
@@ -2032,14 +2050,23 @@
         // `createOrb` gives it. These had been swapped, with the pointers
         // grey, which made every scene read as the negative of the same one
         // drawn there.
-        const boxMat = new THREE.MeshLambertMaterial({ color: 0x55aa44 });
-        const orbMat = new THREE.MeshLambertMaterial({ color: 0x4488aa });
-        const lineMat = new THREE.LineBasicMaterial({ color: 0x55aa44 });
+        // Transparent from the start, though at full opacity, because the
+        // `equal dim` control below has to be able to fade them and
+        // `transparent` is one of the flags that decides which shader a
+        // material compiles to -- changing it later would recompile some
+        // nine hundred of them under the viewer's hand.
+        const boxMat = new THREE.MeshLambertMaterial({
+          color: 0x55aa44, transparent: true });
+        const orbMat = new THREE.MeshLambertMaterial({
+          color: 0x4488aa, transparent: true });
+        const lineMat = new THREE.LineBasicMaterial({
+          color: 0x55aa44, transparent: true });
         sideMats.push(boxMat, orbMat, lineMat);
 
         const at = new Map();       // label -> the object's position
         const dots = new Map();     // "label:field" -> where a pointer leaves
-        const dotMat = new THREE.MeshLambertMaterial({ color: 0xbdbdc6 });
+        const dotMat = new THREE.MeshLambertMaterial({
+          color: 0xbdbdc6, transparent: true });
         sideMats.push(dotMat);
 
         for (const sh of shapes) {
@@ -2250,9 +2277,50 @@
         /// cost about a second a move on the mergeSort pair, which has some
         /// nine hundred materials. `transparent` does affect compilation, so
         /// it is set once when the material is made.
+        ///    How much of a node both runs agree about to keep. The scene is
+        /// mostly agreement -- at size 16 the mergeSort pair has 136 equal
+        /// nodes against 17 changed and 10 in one run only -- so the few
+        /// objects worth looking at are drawn among ten times their number of
+        /// objects that are not. Turning the agreement down is the only way
+        /// to see them without removing them, and removing them would take
+        /// away the structure the differences sit in.
+        let equalKeep = 1;
+
+        ///    How hot the objects that only one run has are, on the same
+        /// scale and the same decay as a glide indicator's segments.
+        ///
+        ///    They have no path to travel -- there is nothing on the other
+        /// side to travel to -- so they had only the fader's own position to
+        /// go on, and were brightest exactly at the halfway mark and dark at
+        /// both ends. Under a sweeping fader that is a flash, easy to miss
+        /// and no less important than the trails it flashes between. Lit and
+        /// cooled like a trail instead: the fader crossing the middle heats
+        /// them, and they fade at the rate the segments fade and at the
+        /// brightness the same control sets.
+        let editHeat = 0;
+
+        ///    A material shared by every object of its kind belongs to the
+        /// agreement; the clones made further down belong to one object each,
+        /// and those are the objects a viewer is looking for. `sharedUpTo`
+        /// records where one ends and the other begins.
+        ///
+        ///    `depthWrite` goes off with the dimming. A dimmed object that
+        /// still writes depth hides what is behind it while showing nothing
+        /// itself, which is the worst of both -- and the magenta is usually
+        /// behind something, in a scene this layered.
         const paintSide = (s) => {
           s.group.visible = s.opacity > 0.01;
-          for (const m of s.mats) m.opacity = s.opacity;
+          const shared = s.sharedUpTo === undefined ? s.mats.length : s.sharedUpTo;
+          const dimmed = equalKeep < 0.995;
+          for (let i = 0; i < s.mats.length; i += 1) {
+            const m = s.mats[i];
+            if (i < shared) {
+              m.opacity = s.opacity * equalKeep;
+              m.depthWrite = !dimmed;
+            } else {
+              m.opacity = s.opacity;
+            }
+          }
         };
 
         /// Where every matched object has to travel, and which objects are
@@ -2370,6 +2438,10 @@
           for (const p of paths) {
             if (p.at >= lo && p.at <= hi) p.heat = 1;
           }
+          // The lost and gained objects sit at the middle, where the edit
+          // reads, so crossing it lights them the way passing a segment
+          // lights that segment.
+          if (lo <= 0.5 && hi >= 0.5) editHeat = 1;
         };
 
         /// Move the left run's objects along their paths, and redraw the
@@ -2431,15 +2503,38 @@
         const lone = [];
         const loneEdges = [];
         const loneActs = [];
+        const changed = [];
+        // Everything built up to here is shared by every object of its kind.
+        for (const s of sideGroups) s.sharedUpTo = s.mats.length;
         if (shift.size) {
           for (const p of parts) {
             const isLone = !matched(p.key);
             if (!isLone) continue;
             p.obj.material = p.obj.material.clone();
             p.obj.material.transparent = true;
+            // Drawn after the agreement and without writing depth, so it
+            // shows through the layers rather than from behind them.
+            p.obj.material.depthWrite = false;
+            p.obj.renderOrder = 3;
             sideGroups[p.side].mats.push(p.obj.material);
             materials.push(p.obj.material);
             lone.push(p);
+          }
+          // A node both runs have and disagree about shares its side's
+          // material, so it would dim with the agreement it is not part of.
+          // Its own copy costs one material per changed node -- 17 on the
+          // mergeSort pair, against the 900 a per-object material everywhere
+          // would have cost.
+          for (const p of parts) {
+            if (p.side !== 0) continue;
+            if (!matched(p.key) || !disagreed.has(p.key)) continue;
+            p.obj.material = p.obj.material.clone();
+            p.obj.material.transparent = true;
+            p.obj.material.depthWrite = false;
+            p.obj.renderOrder = 3;
+            sideGroups[p.side].mats.push(p.obj.material);
+            materials.push(p.obj.material);
+            changed.push(p);
           }
           // Whether an edge survives is a question about the edge, not about
           // its ends. Removing a cell rewires the tree: for the tree pair, 25
@@ -2458,6 +2553,8 @@
             // Only in one run, so it has to arrive or leave.
             e.line.material = e.line.material.clone();
             e.line.material.transparent = true;
+            e.line.material.depthWrite = false;
+            e.line.renderOrder = 3;
             sideGroups[e.side].mats.push(e.line.material);
             materials.push(e.line.material);
             loneEdges.push(e);
@@ -2472,6 +2569,9 @@
             if (a.shared) continue;
             const own = a.shaft.material.clone();
             own.transparent = true;
+            own.depthWrite = false;
+            a.shaft.renderOrder = 3;
+            if (a.marker) a.marker.renderOrder = 3;
             a.shaft.material = own;
             if (a.marker) {
               a.marker.traverse
@@ -2483,6 +2583,54 @@
             loneActs.push(a);
           }
         }
+
+        /// Draw the objects one run has and the other does not.
+        ///
+        ///    Two things decide how one shows. Where the fader is: at its own
+        /// end it is an ordinary object of an ordinary colour, and at the far
+        /// end it is gone, because that is what it means for a run not to
+        /// have it. And how hot it is: the fader crossing the middle lights
+        /// it magenta, and it cools from there like a trail.
+        ///
+        ///    Held opaque while it is hot, so the brightest moment is not
+        /// also the most transparent one -- and so the glow has something to
+        /// glow on after the fader has moved past.
+        const paintLone = (t) => {
+          const peak = Math.max(0, 1 - Math.abs(t - 0.5) * 2);
+          if (peak > editHeat) editHeat = peak;
+          // The gain the glide indicators take, so one control governs both
+          // and they read as the same effect.
+          const glow = Math.min(2.2, editHeat * 2.2 * (trailGain / 2.5));
+          for (const a of loneActs) {
+            const near = a.side === 0 ? 1 - t : t;
+            const lit = Math.max(near, editHeat);
+            a.shaft.material.opacity = lit;
+            a.shaft.visible = lit > 0.02;
+            if (a.marker) a.marker.visible = lit > 0.02;
+          }
+          for (const e of loneEdges) {
+            const near = e.side === 0 ? 1 - t : t;
+            const m = e.line.material;
+            m.opacity = Math.max(near, editHeat);
+            e.line.visible = m.opacity > 0.02;
+          }
+          for (const p of lone) {
+            const near = p.side === 0 ? 1 - t : t;
+            const m = p.obj.material;
+            m.opacity = Math.max(near, editHeat);
+            m.visible = true;
+            p.obj.visible = m.opacity > 0.02;
+            if (m.emissive) {
+              // The same magenta a changed node's indicator uses. One colour
+              // for "the two runs do not agree about this", whether the
+              // disagreement is that a node changed or that only one run has
+              // it -- three shades for three flavours of one fact was harder
+              // to read than one.
+              m.emissive.setHex(PAIR_DISAGREE);
+              m.emissiveIntensity = glow;
+            }
+          }
+        };
 
         const setMix = (t) => {
           if (sideGroups.length < 2) return;
@@ -2516,56 +2664,13 @@
             // run's copy of it would land on top of the original.
             if (e.shared) { e.line.visible = e.side === 0; continue; }
           }
-          // Peaks at the halfway mark and falls away towards either end.
-          //
-          // Halfway is where a node only one run has is worth looking at: it
-          // is the moment the edit is happening rather than the moment before
-          // or after. At its own end it is an ordinary object of an ordinary
-          // colour, and at the far end it is gone.
-          //
-          // Held opaque through the peak, so the brightest moment is not also
-          // the most transparent one.
-          const peak = Math.max(0, 1 - Math.abs(t - 0.5) * 2);
           for (const a of acts) {
             if (a.shared) {
               a.shaft.visible = a.side === 0;
               if (a.marker) a.marker.visible = a.side === 0;
             }
           }
-          for (const a of loneActs) {
-            const near = a.side === 0 ? 1 - t : t;
-            const lit = Math.max(near, peak);
-            a.shaft.material.opacity = lit;
-            a.shaft.visible = lit > 0.02;
-            if (a.marker) a.marker.visible = lit > 0.02;
-          }
-          for (const e of loneEdges) {
-            const near = e.side === 0 ? 1 - t : t;
-            const m = e.line.material;
-            m.opacity = Math.max(near, peak);
-            e.line.visible = m.opacity > 0.02;
-          }
-          // An object about to be lost fades as the fader leaves it, and an
-          // object about to arrive fades in as the fader reaches it.
-          for (const p of lone) {
-            const near = p.side === 0 ? 1 - t : t;
-            const m = p.obj.material;
-            m.opacity = Math.max(near, peak);
-            m.visible = true;
-            p.obj.visible = m.opacity > 0.02;
-            if (m.emissive) {
-              // The same magenta a changed node's indicator uses. One
-              // colour for "the two runs do not agree about this", whether
-              // the disagreement is that a node changed or that it is only
-              // in one of them -- three shades for three flavours of the
-              // same fact was harder to read than one.
-              //
-              // Strongest as the object is lost or gained, which is the
-              // moment worth looking at.
-              m.emissive.setHex(PAIR_DISAGREE);
-              m.emissiveIntensity = peak * 2.2;
-            }
-          }
+          paintLone(t);
         };
 
         /// Light the side the fader is moving towards, and push the decay
@@ -2655,6 +2760,14 @@
               p.heat = Math.max(0, p.heat - shed);
               anyHeat = true;
             }
+          }
+          // The lost and gained objects cool at the same rate, and are
+          // redrawn while they are warm -- their brightness is now a function
+          // of time as well as of where the fader is, so a frame in which
+          // nothing was touched still has something to say about them.
+          if (editHeat > 0) {
+            editHeat = Math.max(0, editHeat - shed);
+            paintLone(mixNow);
           }
           if (movingUntil || anyHeat) {
             const left = movingUntil
@@ -2779,24 +2892,49 @@
         if (paths.length) {
           trail = document.createElement("div");
           trail.className = "trail";
-          const cap = document.createElement("span");
-          cap.textContent = "trail";
-          const dial = document.createElement("input");
-          dial.type = "range";
-          dial.min = "0";
-          dial.max = "6";
-          dial.step = "0.1";
-          dial.value = String(trailGain);
-          dial.setAttribute("aria-label", "How strongly glide indicators show");
-          dial.addEventListener("input", () => {
-            trailGain = Number(dial.value);
-            // Light the whole trail while it is being set, so the effect of
-            // the control is visible without also dragging the fader.
-            heatTrail(0, 1);
-            movingUntil = performance.now() + MOVING_MS;
-            showPaths(1);
-          });
-          trail.append(cap, dial);
+
+          // `data-dial` rather than the shared `dials` map, which is declared
+          // further down this function: reaching it from here would read a
+          // `let` before its line has run.
+          const column = (name, label, aria, min, max, step, value, onSet) => {
+            const col = document.createElement("div");
+            col.className = "dial";
+            const cap = document.createElement("span");
+            cap.textContent = label;
+            const dial = document.createElement("input");
+            dial.type = "range";
+            dial.min = min;
+            dial.max = max;
+            dial.step = step;
+            dial.value = String(value);
+            dial.dataset.dial = name;
+            dial.setAttribute("aria-label", aria);
+            dial.addEventListener("input", () => onSet(Number(dial.value)));
+            col.append(cap, dial);
+            trail.appendChild(col);
+            return dial;
+          };
+
+          column("trail", "trail", "How strongly glide indicators show",
+            "0", "6", "0.1", trailGain, (v) => {
+              trailGain = v;
+              // Light the whole trail while it is being set, so the effect of
+              // the control is visible without also dragging the fader.
+              heatTrail(0, 1);
+              movingUntil = performance.now() + MOVING_MS;
+              showPaths(1);
+              paintLone(mixNow);
+            });
+
+          // Held back from 0, because a scene with the agreement turned off
+          // entirely is a handful of magenta objects in the dark with nothing
+          // to place them against.
+          column("equal", "equal", "How much of the unchanged scene to keep",
+            "0.05", "1", "0.05", equalKeep, (v) => {
+              equalKeep = v;
+              sideGroups.forEach(paintSide);
+            });
+
           host.appendChild(trail);
         }
 
@@ -2997,6 +3135,7 @@
             out: round1(orbitReach),
             trail: round1(trailGain),
           };
+          if (equalKeep < 0.995) v.dim = Math.round(equalKeep * 100) / 100;
           if (orbiting !== null) { v.walk = orbiting; v.spin = Math.round(orbitRate); }
           if (sideGroups.length > 1) {
             v.mix = Math.round(mixNow * 100) / 100;
@@ -3009,9 +3148,14 @@
           if (!v) return;
           if (v.trail !== undefined) {
             trailGain = Number(v.trail);
-            if (dials.trail) dials.trail.value = String(trailGain);
-            const t = document.querySelector(".viewport .trail input");
+            const t = document.querySelector('.viewport .trail [data-dial="trail"]');
             if (t) t.value = String(trailGain);
+          }
+          if (v.dim !== undefined) {
+            equalKeep = Number(v.dim);
+            const d = document.querySelector('.viewport .trail [data-dial="equal"]');
+            if (d) d.value = String(equalKeep);
+            sideGroups.forEach(paintSide);
           }
           if (v.out !== undefined) {
             orbitReach = Number(v.out);
@@ -3720,7 +3864,7 @@
         const parts = [`${preset.kind}=${preset.key}`];
         if (mounted && mounted.getView) {
           const v = mounted.getView();
-          for (const k of ["cam", "walk", "spin", "out", "trail", "mix", "pong"])
+          for (const k of ["cam", "walk", "spin", "out", "trail", "dim", "mix", "pong"])
             if (v[k] !== undefined) parts.push(`${k}=${v[k]}`);
         }
         return location.origin + location.pathname + location.search +
