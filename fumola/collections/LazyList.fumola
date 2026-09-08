@@ -18,8 +18,17 @@ module {
   #[listing]
   public type LazyList_<X> = Pointer<Thunk<LazyList<X>>>;
 
+  /// Merge two sorted streams, naming each continuation for the element that
+  /// won the comparison which produced it.
+  ///
+  ///    The name is the winner's symbol alone, so the caller is expected to
+  /// have opened a namespace for the reduction node this merge belongs to --
+  /// see `lazyMergeSort_`. Both halves of that name move when the input is
+  /// edited: the tree reshapes, and the winner at a given position changes.
+  /// Very little of the network survives. `mergeCartesian` is the alternative
+  /// that does, and it is the same computation.
   #[listing(69)]
-  public func merge(xs : LazyList<X>, ys : LazyList<X>) : LazyList<X> {
+  public func mergeInductive(xs : LazyList<X>, ys : LazyList<X>) : LazyList<X> {
     switch (xs, ys) {
       case (_, null) xs;
       case (null, _) ys;
@@ -29,13 +38,63 @@ module {
           ?{ 
               element=xc.element;
               symbol=xc.symbol;
-              next = xc.symbol := thunk { merge(force(xc.next), ?yc) }
+              next = xc.symbol := thunk { mergeInductive(force(xc.next), ?yc) }
            }
         } else {
           ?{
               element=yc.element;
               symbol=yc.symbol;
-              next = yc.symbol := thunk { merge(?xc, force(yc.next)) }
+              next = yc.symbol := thunk { mergeInductive(?xc, force(yc.next)) }
+            }
+        }
+      };
+    }
+  };
+
+  /// The same merge, naming each continuation for the pair of symbols whose
+  /// comparison produced it.
+  ///
+  ///    A merge network never compares the same two symbols twice, so the pair
+  /// is a name no other cell can claim. That is the property any naming
+  /// strategy for a dataflow graph has to have, and having it here is what
+  /// lets this one do without a namespace per reduction node -- the namespace
+  /// was what kept names apart before, and it is also what made them move
+  /// under an edit.
+  ///
+  ///    The pair is ordered `xs` before `ys`, which is already canonical:
+  /// `xs` is the left subtree and `ys` the right, so the `xs` side is always
+  /// earlier in the input list. Removing some other element reshapes the tree
+  /// but does not reorder what remains, so two elements are compared under the
+  /// same name in both runs. That is the whole point -- the name of a
+  /// comparison outlives an edit that does not touch its operands.
+  #[listing(69)]
+  public func mergeCartesian(xs : LazyList<X>, ys : LazyList<X>) : LazyList<X> {
+    switch (xs, ys) {
+      case (_, null) xs;
+      case (null, _) ys;
+      case (?xc, ?yc) {
+        Counters.inc `merge;
+        // Named before the branch: the pair is the same comparison whichever
+        // of the two wins it.
+        //
+        //    Application, not `-`. `-` is overloaded and these symbols are
+        // usually numbers, so `(xc.symbol)-(yc.symbol)` is arithmetic: every
+        // comparison of adjacent elements comes out as -1, the network
+        // collapses onto a handful of names, and the list it builds is cyclic.
+        // Application cannot be read that way, and it is structural, so
+        // 1(13) and 11(3) stay apart.
+        let compared = (xc.symbol)(yc.symbol);
+        if (xc.element <= yc.element) {
+          ?{ 
+              element=xc.element;
+              symbol=xc.symbol;
+              next = compared := thunk { mergeCartesian(force(xc.next), ?yc) }
+           }
+        } else {
+          ?{
+              element=yc.element;
+              symbol=yc.symbol;
+              next = compared := thunk { mergeCartesian(?xc, force(yc.next)) }
             }
         }
       };
