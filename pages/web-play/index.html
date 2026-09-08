@@ -2413,15 +2413,23 @@
         /// about the gesture, not about the picture at rest.
         /// Paint the indicators from each segment's own heat, plus a faint
         /// baseline while the fader is in motion at all.
+        ///    An indicator for a node both runs agree about is dimmed by the
+        /// `equal` dial, the same as the object it belongs to. Turning the
+        /// agreement down and leaving its trails at full brightness undid the
+        /// dial: the objects fell back and the scene stayed full of bright
+        /// blue and green segments, which are the most eye-catching thing in
+        /// it. An indicator for a node they disagree about is not dimmed --
+        /// that is the one the dial exists to leave standing.
         const showPaths = (strength) => {
           for (const p of paths) {
+            const keep = p.differs ? 1 : equalKeep;
             const base = p.differs ? PATH_OPACITY_DISAGREE : PATH_OPACITY_AGREE;
             const lit = Math.max(p.heat, TRAIL_FLOOR * strength);
-            p.mat.opacity = Math.min(1, base * lit * trailGain);
+            p.mat.opacity = Math.min(1, base * lit * trailGain * keep);
             p.mat.visible = p.mat.opacity > 0.005;
             if (p.mat.emissive) {
               p.mat.emissive.setHex(p.hue);
-              p.mat.emissiveIntensity = Math.min(2, p.heat * 0.9 * trailGain);
+              p.mat.emissiveIntensity = Math.min(2, p.heat * 0.9 * trailGain * keep);
             }
           }
         };
@@ -2933,6 +2941,11 @@
             "0.05", "1", "0.05", equalKeep, (v) => {
               equalKeep = v;
               sideGroups.forEach(paintSide);
+              // The indicators answer to this dial too, and showing them at
+              // their baseline while it is being moved is what makes that
+              // visible without also dragging the fader.
+              movingUntil = performance.now() + MOVING_MS;
+              showPaths(1);
             });
 
           host.appendChild(trail);
