@@ -742,13 +742,32 @@
       force:      " ═══▷ ",
       forceBegin: " ═══▷ ",
     };
-    /// `inert` for an arrow that is only saying what happened -- inside the
-    /// door of the very edge it describes there is nothing left to open, and
-    /// an arrow that looks clickable and is not is worse than a plain one.
-    const actionArrow = (action, { inert = false } = {}) => {
+    /// One rule, everywhere an edge is printed: **an arrow flies, a chip opens
+    /// a door.** The arrow is to an edge what the ◉ / ▣ shape is to a node --
+    /// the way to find it in the 3D scene -- and the `#edgeId(...)` beside it
+    /// is the way to read what the scene data knows about it.
+    ///
+    /// Without an `edgeId` there is no edge to fly to, so the arrow is plain:
+    /// an arrow that looks clickable and is not is worse than one that does not.
+    const actionArrow = (action, edgeId) => {
       const e = span("action-arrow action-" + action, ARROWS[action] || " " + action + " ");
-      if (inert) e.style.cursor = "default";
+      // Every chip is built after the scene is, so "is this edge drawn?" has an
+      // answer here. 134 of the outline's 959 edges are not, and an arrow with
+      // nowhere to fly should not offer to.
+      if (edgeId === undefined || !meshesByLabel.has(edgeId)) {
+        e.style.cursor = "default";
+        if (edgeId !== undefined) e.title = edgeId + " has no object in the 3D view";
+        return e;
+      }
+      e.title = "Fly to " + edgeId;
+      e.onclick = flyToEdge(edgeId);
       return e;
+    };
+
+    /// The click handler behind every arrow.
+    const flyToEdge = (edgeId) => (event) => {
+      event.stopPropagation();
+      lookAtEdge(edgeId);
     };
 
     /// A nodeId is [space, "@now", seq]. Its first component is the space,
@@ -925,7 +944,14 @@
       if (!thunk && shape !== "#nonThunk") console.error("unrecognized outline node shape", shape);
       const e = span(thunk ? "outline-node-thunk-shape" : "outline-node-nonthunk-shape",
                      thunk ? "◉" : "▣");
-      e.title = "Show " + label + " in the scene";
+      // The forest root ("scene") is the run itself and was never placed, so
+      // its glyph has nowhere to go either.
+      if (!meshesByLabel.has(label)) {
+        e.style.cursor = "default";
+        e.title = label + " has no object in the 3D view";
+        return e;
+      }
+      e.title = "Fly to " + label;
       e.onclick = doorClick("objectShape", label);
       return e;
     }
@@ -1060,7 +1086,7 @@
       const wires = el("div", "door-row");
       wires.appendChild(span("door-label", "from"));
       wires.appendChild(nodeIdChip(edge.source));
-      wires.appendChild(actionArrow(action.type, { inert: true }));
+      wires.appendChild(actionArrow(action.type, rev.edgeId));
       wires.appendChild(span("door-label", "to"));
       wires.appendChild(nodeIdChip(edge.target));
       into.appendChild(wires);
@@ -1203,12 +1229,7 @@
           }
           row.appendChild(document.createTextNode(" (" + (i + 1) + "/" + edges.length + ")"));
 
-          // The arrow says what the action was, and opens that edge's door --
-          // it has always looked clickable and never was.
-          const arrow = actionArrow(e.action);
-          arrow.onclick = doorClick("edgeId", e.edgeId);
-          arrow.title = e.action;
-          row.appendChild(arrow);
+          row.appendChild(actionArrow(e.action, e.edgeId));
 
           row.appendChild(shapeChip(e.outline.shape, e.actionTarget));
           row.appendChild(pointerChip(e.actionTarget, e.outline.shape));
@@ -1228,7 +1249,12 @@
 
             const result = el("div", "outline-internal-result");
             const resultArrow = span("action-arrow result-arrow", "╰〜〜>");
-            resultArrow.onclick = doorClick("edgeId", e.edgeId);
+            if (meshesByLabel.has(e.edgeId)) {
+              resultArrow.title = "Fly to " + e.edgeId;
+              resultArrow.onclick = flyToEdge(e.edgeId);
+            } else {
+              resultArrow.style.cursor = "default";
+            }
             result.appendChild(resultArrow);
             result.appendChild(longText("outline-value-text", e.value));
             nodeEl.appendChild(result);
@@ -1239,6 +1265,8 @@
         // What the whole tree came back with, which nothing was showing.
         if (depth === 0 && node.value !== undefined) {
           const result = el("div", "outline-internal-result");
+          // The forest root's value is not any one edge's, so this arrow has
+          // nowhere to fly and says so.
           const rootArrow = span("action-arrow result-arrow", "╰〜〜>");
           rootArrow.style.cursor = "default";
           result.appendChild(rootArrow);
@@ -1751,6 +1779,22 @@
       const meshes = meshesByLabel.get(label);
       if (!meshes) { console.warn("nothing in the scene is labelled", label); return; }
       lookAtMesh(meshes[0]);
+    }
+
+    /// Frame an edge's action arrow. Its first mesh is the shaft, and a shaft's
+    /// position is the arrow's midpoint, so this lands in the middle of the
+    /// action; the distance comes from the shaft's own length, because a long
+    /// force arrow framed from the node distance is framed from inside itself.
+    ///
+    /// Not every edge is drawn -- an edge whose action produced no object has a
+    /// door but nowhere to fly to, and saying nothing is the right answer.
+    function lookAtEdge(edgeId) {
+      const meshes = meshesByLabel.get(edgeId);
+      if (!meshes) { log("edge has a door but no geometry:", edgeId); return; }
+      const shaft = meshes[0];
+      shaft.geometry.computeBoundingSphere();
+      const radius = shaft.geometry.boundingSphere ? shaft.geometry.boundingSphere.radius : 0;
+      lookAtMesh(shaft, Math.max(3.0, radius * 2.2));
     }
 
     // ---- pointer on the canvas ---------------------------------------------
