@@ -181,23 +181,127 @@ module {
     Prim.print out;
   };
 
+  /// Which naming the merge network uses, if a program has asked for one.
+  ///
+  ///    Peeked rather than got, and nothing is bound from it. A `get` would
+  /// make every merge cell depend on the choice, and binding the answer would
+  /// put it in the environment of every thunk built below -- either way the
+  /// two strategies would differ everywhere, for a reason that has nothing to
+  /// do with naming, and the comparison they exist for would be buried under
+  /// the mechanism used to make it.
+  ///
+  ///    Absent means inductive, so a program that never writes the cell sorts
+  /// exactly as it always did.
+  func mergeStrategy() : {#inductive; #cartesian; #pathwise} {
+    switch (A.peek(`lazyMergeSort(`strategy))) {
+      case (?#cartesian) #cartesian;
+      case (?#pathwise) #pathwise;
+      case _ #inductive;
+    }
+  };
+
+  /// `reduce_`, carrying an address of where it is rather than reading one off
+  /// the tree.
+  ///
+  ///    A path is built as the recursion descends -- `0 at the root, then
+  /// `0(L) and `0(R) and so on -- so it says where a node sits and nothing
+  /// about what the node holds. That is the whole difference from `reduce_`,
+  /// which names its cells for the tree node's own symbol and so renames them
+  /// whenever the input moves.
+  ///
+  ///    Written out rather than added as a parameter to `reduce_`, because a
+  /// parameter would sit in the environment of every thunk the other two
+  /// strategies build, and then all three would differ everywhere for a reason
+  /// that has nothing to do with naming.
+  func reducePathwise<X,Y>(
+        t : LevelTree_<X>,
+        path : Symbol,
+        empty : Y,
+        element : (Symbol, X) -> Y,
+        binary : (Symbol, Y, Y) -> Y) : Y
+  {
+    switch (@ t) {
+      case (#empty) empty;
+      case (#element(e)) element(e.symbol, e.element);
+      case (#binary(b)) {
+        let recLeft = force(`recLeft(path) := thunk {
+          reducePathwise(b.left, path(`L), empty, element, binary)
+        });
+        let recRight = force(`recRight(path) := thunk {
+          reducePathwise(b.right, path(`R), empty, element, binary)
+        });
+        binary(path, recLeft, recRight)
+      };
+    }
+  };
+
+  /// `reduceUp` with the same substitution, for the eager traversal.
+  func reduceUpPathwise<X,Y>(
+        t : LevelTree<X>,
+        path : Symbol,
+        empty : Y,
+        element : (Symbol, X) -> Y,
+        binary : (Symbol, Y, Y) -> Y) : Y
+  {
+    switch t {
+      case (#empty) empty;
+      case (#element(e)) element(e.symbol, e.element);
+      case (#binary(b)) {
+        force (path := thunk {
+          binary(path,
+            reduceUpPathwise(@(b.left),  path(`L), empty, element, binary),
+            reduceUpPathwise(@(b.right), path(`R), empty, element, binary))
+        })
+      };
+    }
+  };
+
   #[listing(62)]
   public func lazyMergeSort<X>(t : ?SeqTree_<X>) : LazyList_<X> {
     let nilList = `(nilList) := thunk { null };
     if (t == null) { return nilList };
-    `result := thunk {
-      reduceUp(
-        @(t!),
-        null,
-        func(symbol:Symbol, element:X) : LazyList<X> {
-         ?{ symbol; element; next = nilList }
-        },
-        func(symbol:Symbol, xs:LazyList<X>, ys:LazyList<X>) : LazyList<X> {
-         do within space (`merge-symbol) {
-           LazyList.merge(xs, ys)
-         }
-      },
-     )
+    let leaf = func(symbol:Symbol, element:X) : LazyList<X> {
+      ?{ symbol; element; next = nilList }
+    };
+    switch (mergeStrategy()) {
+      case (#cartesian)
+        `result := thunk {
+          reduceUp(
+            @(t!),
+            null,
+            leaf,
+            func(symbol:Symbol, xs:LazyList<X>, ys:LazyList<X>) : LazyList<X> {
+              LazyList.mergeCartesian(xs, ys)
+            }
+          )
+        };
+      case (#pathwise)
+        `result := thunk {
+          reduceUpPathwise(
+            @(t!),
+            `0,
+            null,
+            leaf,
+            func(symbol:Symbol, xs:LazyList<X>, ys:LazyList<X>) : LazyList<X> {
+              do within space (`merge-symbol) {
+                LazyList.mergeInductive(xs, ys)
+              }
+            }
+          )
+        };
+      case (#inductive)
+        `result := thunk {
+          reduceUp(
+            @(t!),
+            null,
+            leaf,
+            func(symbol:Symbol, xs:LazyList<X>, ys:LazyList<X>) : LazyList<X> {
+              do within space (`merge-symbol) {
+                LazyList.mergeInductive(xs, ys)
+              }
+            }
+          )
+        };
     }
   };
 
@@ -205,19 +309,53 @@ module {
   public func lazyMergeSort_<X>(t : ?SeqTree_<X>) : LazyList_<X> {
     let nilList = `(nilList) := thunk { null };
     if (t == null) { return nilList };
-    `result := thunk {
-      reduce_(
-        t!,
-        null,
-        func(symbol:Symbol, element:X) : LazyList<X> {
-         ?{ symbol; element; next = nilList }
-        },
-        func(symbol:Symbol, xs:LazyList<X>, ys:LazyList<X>) : LazyList<X> {
-         do within space (`merge-symbol) {
-           LazyList.merge(xs, ys)
-         }
-      },
-     )
+    let leaf = func(symbol:Symbol, element:X) : LazyList<X> {
+      ?{ symbol; element; next = nilList }
+    };
+    // One program written three times rather than one program parameterised,
+    // so that no thunk closes over the choice.
+    //
+    //    `pathwise` differs from `inductive` only in what the space is keyed
+    // by: the merge cells are named the same way, for the element that won.
+    switch (mergeStrategy()) {
+      case (#cartesian)
+        `result := thunk {
+          reduce_(
+            t!,
+            null,
+            leaf,
+            func(symbol:Symbol, xs:LazyList<X>, ys:LazyList<X>) : LazyList<X> {
+              LazyList.mergeCartesian(xs, ys)
+            }
+          )
+        };
+      case (#pathwise)
+        `result := thunk {
+          reducePathwise(
+            t!,
+            `0,
+            null,
+            leaf,
+            func(symbol:Symbol, xs:LazyList<X>, ys:LazyList<X>) : LazyList<X> {
+              do within space (`merge-symbol) {
+                LazyList.mergeInductive(xs, ys)
+              }
+            }
+          )
+        };
+      case (#inductive)
+        `result := thunk {
+          reduce_(
+            t!,
+            null,
+            leaf,
+            func(symbol:Symbol, xs:LazyList<X>, ys:LazyList<X>) : LazyList<X> {
+              do within space (`merge-symbol) {
+                LazyList.mergeInductive(xs, ys)
+              }
+            }
+          )
+        };
     }
   };
 
@@ -858,7 +996,19 @@ module {
   /// The list and the tree are still built -- the merge has to have
   /// something to merge -- but only the merge network is drawn.
   public func mergeFromTreeRun(seed : Nat, size : Nat, remove : ?Symbol) : A.Scene.Scene {
+    mergeFromTreeRunWith(seed, size, remove, #inductive)
+  };
+
+  /// The same run, with the merge network's naming named.
+  ///
+  ///    The strategy has to be written here rather than by the caller: every
+  /// run opens with `A.reset()`, which takes the cell with it, so a flag set
+  /// outside would be gone by the time the merge asks for it.
+  public func mergeFromTreeRunWith(seed : Nat, size : Nat, remove : ?Symbol,
+                                   strategy : {#inductive; #cartesian; #pathwise})
+    : A.Scene.Scene {
     A.reset();
+    let _ = `lazyMergeSort(`strategy) := strategy;
     let array = R.generateRandomInput(seed, size);
     let list_ = `ListFromArray := thunk {
       do within space `inputList { List.fromIter(array.vals()) }
@@ -915,6 +1065,163 @@ module {
     let removed = 3;
     W.pair(mergeFromTreeRun(seed, size, null),
            mergeFromTreeRun(seed, size, ?removed))
+  };
+
+  /// Where an edit lands, for the four pairs below.
+  ///
+  ///    A treap puts a symbol at a height drawn from its own hash, so which
+  /// element you remove decides how much of the tree is rebuilt -- far more
+  /// than the naming strategy decides. Removing the highest node in the input
+  /// disturbs the shape everywhere; removing the lowest disturbs almost
+  /// nothing. Comparing strategies without holding that fixed compares the
+  /// draw, not the strategy.
+  ///
+  ///    For seed 10 and size 16 these are the extremes of `Prim.symbolLevel`
+  /// over the addressable positions: cell 3 is the highest at 1581569 and
+  /// cell 10 the lowest at 4. Both pairs of each kind use the same one, so
+  /// the only difference between a pair and its twin is the naming.
+  let rootRemoval = 3;
+  let leafRemoval = 10;
+
+  /// The same merge network named two ways, on the same unedited input.
+  ///
+  ///    The vertical comparison, and the one to read first. Nothing about the
+  /// computation differs -- the same comparisons happen in the same order and
+  /// the graph is isomorphic -- so the objects sit one on top of the other in
+  /// space and every node that disagrees disagrees only because it was named
+  /// differently. The list and the tree are outside what the strategy reaches
+  /// and come out equal, which is what draws the boundary.
+  #[examplePair]
+  public func examplePairInductiveVsCartesian() : W.ExamplePairOutput {
+    let seed = 10;
+    let size = 16;
+    W.pair(mergeFromTreeRunWith(seed, size, null, #inductive),
+           mergeFromTreeRunWith(seed, size, null, #cartesian))
+  };
+
+  /// The same network, named inductively and named by path.
+  ///
+  ///    The second of the three vertical comparisons. Both of these name a
+  /// merge cell for the element that won, so what differs is only what the
+  /// space is keyed by -- a tree node's symbol against an address. Expect the
+  /// same one-for-one symmetry, and expect it to be larger than the
+  /// inductive-against-cartesian one: `reducePathwise` keys the reduction
+  /// spine by path as well, so `recLeft` and `recRight` are renamed here
+  /// where they were shared there.
+  #[examplePair]
+  public func examplePairInductiveVsPathwise() : W.ExamplePairOutput {
+    let seed = 10;
+    let size = 16;
+    W.pair(mergeFromTreeRunWith(seed, size, null, #inductive),
+           mergeFromTreeRunWith(seed, size, null, #pathwise))
+  };
+
+  /// The same network, named by pair compared and named by path.
+  ///
+  ///    The third, and the one where the two namings have least in common:
+  /// one is derived entirely from the data being merged and the other not at
+  /// all. The computation is still the same, and the objects still sit one on
+  /// top of the other, which is the point of drawing it.
+  #[examplePair]
+  public func examplePairCartesianVsPathwise() : W.ExamplePairOutput {
+    let seed = 10;
+    let size = 16;
+    W.pair(mergeFromTreeRunWith(seed, size, null, #cartesian),
+           mergeFromTreeRunWith(seed, size, null, #pathwise))
+  };
+
+  /// One removal at the highest node, named inductively.
+  #[examplePair]
+  public func examplePairInductiveRootRemoval() : W.ExamplePairOutput {
+    let seed = 10;
+    let size = 16;
+    W.pair(mergeFromTreeRunWith(seed, size, null, #inductive),
+           mergeFromTreeRunWith(seed, size, ?rootRemoval, #inductive))
+  };
+
+  /// The same removal at the highest node, named by the pair compared.
+  ///
+  ///    Read beside `examplePairInductiveRootRemoval`. What moves is the kind
+  /// of disagreement, not only the amount of it: cells leave `onlyLeft` and
+  /// `onlyRight` and arrive in `notEqual`. Fewer cells with no counterpart in
+  /// the other run, more cells that have one and hold something else.
+  ///
+  ///    That is the distinction repair cares about. A cell in `notEqual` is
+  /// known to both runs, so it can be dirtied and recomputed where it stands.
+  /// A cell in `onlyLeft` has nothing to correspond to, so there is nothing to
+  /// repair: it and everything built on it begin again.
+  #[examplePair]
+  public func examplePairCartesianRootRemoval() : W.ExamplePairOutput {
+    let seed = 10;
+    let size = 16;
+    W.pair(mergeFromTreeRunWith(seed, size, null, #cartesian),
+           mergeFromTreeRunWith(seed, size, ?rootRemoval, #cartesian))
+  };
+
+  /// One removal at the lowest node, named inductively.
+  ///
+  ///    The control for the two above. A leaf removal is cheap under either
+  /// naming, and the two strategies have almost nothing to distinguish them
+  /// here -- which is the point of drawing it: the strategy only matters
+  /// where the tree moves.
+  #[examplePair]
+  public func examplePairInductiveLeafRemoval() : W.ExamplePairOutput {
+    let seed = 10;
+    let size = 16;
+    W.pair(mergeFromTreeRunWith(seed, size, null, #inductive),
+           mergeFromTreeRunWith(seed, size, ?leafRemoval, #inductive))
+  };
+
+  /// The same removal at the lowest node, named by the pair compared.
+  #[examplePair]
+  public func examplePairCartesianLeafRemoval() : W.ExamplePairOutput {
+    let seed = 10;
+    let size = 16;
+    W.pair(mergeFromTreeRunWith(seed, size, null, #cartesian),
+           mergeFromTreeRunWith(seed, size, ?leafRemoval, #cartesian))
+  };
+
+  /// One removal at the highest node, named by where the merge sits.
+  ///
+  ///    The third naming, and the only one whose names say nothing about the
+  /// data. A merge cell is `mergeSort(merge-`0(R))(4)`: the space is the path
+  /// taken to reach this node of the reduction, and the cell within it is
+  /// still the element that won, exactly as under `#inductive`. So this is
+  /// `#inductive` with the one substitution that matters -- an address where
+  /// the tree node's own symbol used to be.
+  ///
+  ///    This is the pair that shows what that costs, and it is the opposite
+  /// of what the idea promises at first hearing. An address is stable only
+  /// while the shape it addresses is stable, and removing the highest node in
+  /// the input reshapes the tree from there down -- so nearly every path
+  /// below it changes and nearly every cell is renamed. Measured at 77 and 62
+  /// cells with no counterpart, against inductive's 20 and 5. Where
+  /// `#cartesian` caps inductive's worst case, this multiplies it.
+  ///
+  ///    Read it with the leaf pair, which comes out identical to the other
+  /// two to the number. Pathwise is exactly as stable as the tree's shape and
+  /// no more, which is what makes it a useful instrument even though it is a
+  /// poor way to name a graph you mean to repair: it holds the data fixed and
+  /// varies only the shape's influence.
+  #[examplePair]
+  public func examplePairPathwiseRootRemoval() : W.ExamplePairOutput {
+    let seed = 10;
+    let size = 16;
+    W.pair(mergeFromTreeRunWith(seed, size, null, #pathwise),
+           mergeFromTreeRunWith(seed, size, ?rootRemoval, #pathwise))
+  };
+
+  /// The same removal at the lowest node, named by where the merge sits.
+  ///
+  ///    The third row of the control. Read across all three leaf pairs: if a
+  /// naming makes a difference here, where the tree barely moves, it is
+  /// making it for a reason other than the edit.
+  #[examplePair]
+  public func examplePairPathwiseLeafRemoval() : W.ExamplePairOutput {
+    let seed = 10;
+    let size = 16;
+    W.pair(mergeFromTreeRunWith(seed, size, null, #pathwise),
+           mergeFromTreeRunWith(seed, size, ?leafRemoval, #pathwise))
   };
 
   /// The same list built into a tree twice, differing by one removed cell.
