@@ -46,6 +46,50 @@ module {
     /// The hash of a symbol.
     public func symbolHash(s) { prim "symbolHash" s };
 
+    /// A value as a symbol, if it can be one.
+    ///
+    ///    Needed because `` `x `` is not a symbol yet: it is a quoted AST, and
+    /// where a quoted identifier was written is part of what it is. So two
+    /// occurrences of `` `x `` are different values and `` `x == `x `` is
+    /// false -- which is the right answer to the question actually asked,
+    /// since `==` on quoted ASTs compares ASTs.
+    ///
+    ///    Getting a symbol is a coercion, and a coercion is either written or
+    /// forced. Write it with this. Or let combining force it: `-` between two
+    /// quoted ASTs has no reading as an operation on ASTs, so the only thing
+    /// it can mean is symbol construction, and the operators that build
+    /// compound symbols convert their parts on the way in. That is why
+    /// `` `x-`y == `x-`y `` is true while `` `x == `x `` is not, and the
+    /// difference is not an inconsistency: `==` has a perfectly good reading
+    /// on ASTs, so nothing forces it to coerce, and it does not.
+    ///
+    ///    So compare `intoSymbol(a)` with `intoSymbol(b)` where either side
+    /// might be a literal and a symbol is what was meant.
+    ///
+    ///    Answers an option, since not every value is a symbol: a Nat, an
+    /// Int, an adapton pointer, space or time, and any quoted AST all are, and
+    /// a record is not. For a quoted AST it always succeeds.
+    ///
+    ///    It does not make everything that looks alike compare alike.
+    /// `` `(boulder) `` and `` `boulder `` are different symbols and stay
+    /// different after coercion -- the parentheses are part of what was
+    /// written, not punctuation around it.
+    public func intoSymbol(v) { prim "intoSymbol" v };
+
+    #[test]
+    public func testIntoSymbol() {
+      assert (intoSymbol(`x) == intoSymbol(`x));
+      assert (not (intoSymbol(`x) == intoSymbol(`y)));
+      // The distinction this cannot erase, and should not.
+      assert (not (intoSymbol(`(boulder)) == intoSymbol(`boulder)));
+      // A value that is not a symbol at all.
+      assert (intoSymbol({a = 1}) == null);
+      // Two occurrences of one literal are two quoted ASTs written in
+      // different places, and compare unequal. Asserted rather than merely
+      // tolerated: it is what `==` on quoted ASTs is for.
+      assert (not (`x == `x));
+    };
+
     /// A Nat as text.
     public func natToText(n) { prim "natToText" n };
 
