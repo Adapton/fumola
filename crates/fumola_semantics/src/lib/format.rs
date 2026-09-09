@@ -311,6 +311,10 @@ impl ToDoc for PrimFunction {
             PrimFunction::AdaptonPeek => str("\"adaptonPeek\""),
             PrimFunction::AdaptonPeekCell => str("\"adaptonPeekCell\""),
             PrimFunction::AdaptonPeekHistory => str("\"adaptonPeekHistory\""),
+            PrimFunction::AdaptonHistory => str("\"adaptonHistory\""),
+            PrimFunction::AdaptonHistoryNodeVals => str("\"adaptonHistoryNodeVals\""),
+            PrimFunction::AdaptonNodeValsDiff => str("\"adaptonNodeValsDiff\""),
+            PrimFunction::AdaptonNodeValsSize => str("\"adaptonNodeValsSize\""),
             PrimFunction::AdaptonPoke => str("\"adaptonPoke\""),
             PrimFunction::ReifyCore => todo!(),
             PrimFunction::ReflectCore => todo!(),
@@ -392,6 +396,23 @@ impl ToDoc for Value {
             Value::ActorMethod(_) => todo!(),
             Value::QuotedAst(q) => q.doc(),
             Value::AdaptonTime(time) => kwd("@adaptonTime").append(enclose("(", time.doc(), ")")),
+            // Opaque on purpose: the point of these forms is not to be spelled out. What is
+            // worth seeing is how much they hold.
+            Value::AdaptonHistory(h) => kwd("@adaptonHistory").append(enclose(
+                "(",
+                RcDoc::text(format!(
+                    "{} events, {} nodes, {} edges",
+                    h.events.len(),
+                    h.nodes.len(),
+                    h.edges.len()
+                )),
+                ")",
+            )),
+            Value::AdaptonNodeVals(nv) => kwd("@adaptonNodeVals").append(enclose(
+                "(",
+                RcDoc::text(format!("{} pointers", nv.size())),
+                ")",
+            )),
             Value::AdaptonSpace(space) => {
                 kwd("@adaptonSpace").append(enclose("(", space.doc(), ")"))
             }

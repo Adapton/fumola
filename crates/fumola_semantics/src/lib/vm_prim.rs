@@ -6,8 +6,8 @@ use fumola_syntax::ast::{CollectionFunction, FastRandIterFunction, HashMapFuncti
 use fumola_syntax::ast::{Inst, Literal, Pat};
 
 use crate::type_mismatch;
-use fumola_syntax::shared::FastClone;
 use crate::vm_step::{cont_value, cont_value_, unit_step};
+use fumola_syntax::shared::FastClone;
 use im_rc::HashMap;
 use std::collections::hash_map;
 use std::hash::{Hash, Hasher};
@@ -292,6 +292,61 @@ pub fn call_prim_function<A: Active>(
         AdaptonPeekHistory => {
             let events_value = active.adapton().peek_events()?;
             *active.cont() = cont_value_(events_value);
+            Ok(Step {})
+        }
+        // ---- the history, and the diff, without leaving Rust ----------------------------
+        //
+        // `adaptonPeekHistory` above converts the whole history into Fumola values, which is
+        // what a scene wants; these four are the other door, for measurement. See
+        // `crate::adapton::diff` for what the difference costs.
+        AdaptonHistory => {
+            let history = active.adapton().history()?;
+            *active.cont() = cont_value(Value::AdaptonHistory(crate::Shared::new(history)));
+            Ok(Step {})
+        }
+        AdaptonHistoryNodeVals => {
+            let history = args
+                .as_ref()
+                .into_adapton_history_or(type_mismatch_!(file!(), line!()))?;
+            let node_vals = crate::adapton::diff::NodeVals::of_history(&history);
+            *active.cont() = cont_value(Value::AdaptonNodeVals(crate::Shared::new(node_vals)));
+            Ok(Step {})
+        }
+        AdaptonNodeValsSize => {
+            let node_vals = args
+                .as_ref()
+                .into_adapton_node_vals_or(type_mismatch_!(file!(), line!()))?;
+            *active.cont() = cont_value(Value::Nat(node_vals.size().into()));
+            Ok(Step {})
+        }
+        AdaptonNodeValsDiff => {
+            let pair = args.into_tuple_or(type_mismatch_!(file!(), line!()))?;
+            if pair.len() != 2 {
+                type_mismatch!(file!(), line!())
+            }
+            let left = pair[0]
+                .as_ref()
+                .into_adapton_node_vals_or(type_mismatch_!(file!(), line!()))?;
+            let right = pair[1]
+                .as_ref()
+                .into_adapton_node_vals_or(type_mismatch_!(file!(), line!()))?;
+            let c = crate::adapton::diff::diff(&left, &right);
+            let nat = |n: usize| -> Value_ { crate::Shared::new(Value::Nat(n.into())) };
+            let record = Value::object_from(
+                [
+                    ("left", nat(c.left)),
+                    ("right", nat(c.right)),
+                    ("onlyLeft", nat(c.only_left)),
+                    ("onlyRight", nat(c.only_right)),
+                    ("equal", nat(c.equal)),
+                    ("notEqual", nat(c.not_equal)),
+                    ("notEqualNewBody", nat(c.not_equal_new_body)),
+                    ("notEqualSameBody", nat(c.not_equal_same_body)),
+                    ("notEqualNonThunk", nat(c.not_equal_non_thunk)),
+                ]
+                .iter(),
+            );
+            *active.cont() = cont_value(record);
             Ok(Step {})
         }
         AdaptonPoke => {

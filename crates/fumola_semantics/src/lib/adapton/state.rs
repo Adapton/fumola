@@ -150,6 +150,10 @@ pub trait CacheState {
     fn peek(&mut self, pointer: Pointer) -> Res<Option<Value_>>;
     fn peek_cell(&mut self, pointer: Pointer) -> Res<Value_>;
     fn peek_events(&mut self) -> Res<Value_>;
+    /// The history itself, unconverted, for `Value::AdaptonHistory`. The simple strategy keeps
+    /// no graph, so it answers with an empty one rather than failing: a program that asks how
+    /// many nodes differ between two runs of a memo table gets the true answer, zero of each.
+    fn history(&self) -> Res<crate::adapton::graphical::History>;
 }
 
 impl State {
@@ -435,6 +439,13 @@ impl AdaptonState for State {
         match &mut self.inner {
             InnerState::Simple(s) => s.peek_events(),
             InnerState::Graphical(g) => g.peek_events(),
+        }
+    }
+
+    fn history(&self) -> Res<crate::adapton::graphical::History> {
+        match &self.inner {
+            InnerState::Simple(s) => s.history(),
+            InnerState::Graphical(g) => g.history(),
         }
     }
 

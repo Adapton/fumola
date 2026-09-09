@@ -349,4 +349,8 @@ impl CacheState for SimpleState {
         let empty: Vector<Value_> = vector!();
         Ok(empty.into_value_())
     }
+
+    fn history(&self) -> Res<crate::adapton::graphical::History> {
+        Ok(crate::adapton::graphical::History::new())
+    }
 }
