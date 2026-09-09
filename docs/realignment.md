@@ -189,16 +189,21 @@ to agree with it. Lining the two up found these, each a note for the recipe:
 3. `actionMatches` / `actionDoesNotMatch` (`~~`, `~/~`) have no rules. The
    reading implemented: `misaligned(Space, v)` matches a `Get` whose recorded
    value differs from `v` and any force; `forces` matches any force.
-4. Typos: `IE-emptyForce` and `IE-cleanForce` conclude `v` where the premises
-   bind `v3`; `CT-binL`'s premise starts from `Graph2`; `CN-misaligned`
-   inserts `Thunk(Space, ...)` where the node was `Thunk(Space0, ...)`.
+4. Typos: `IE-emptyForce` and `IE-cleanForce` concluded `v` where the
+   premises bind `v3`; `CT-binL`'s premise started from `Graph2`;
+   `CN-misaligned` inserted `Thunk(Space, ...)` where the node was
+   `Thunk(Space0, ...)`. *Fixed in matthewhammer/adapton-recipe#1
+   ("Signaling, repair, alignment: the recipe in Fumola's words").*
 5. `Graph2(ppp)` with the current meta-moment `m` looks a node up at the
    wrong version; "latest version" is meant.
 6. `E-getThunk` yields `(sp Space0, thunk e0)`; `get` of a thunk pointer here
    yields the thunk alone.
 7. The graphical `put`, `get` and `undelay` rules are prose placeholders;
    `undelay` "uses dirtying" there and does not signal here.
-8. The rule names still say dirty and clean.
+8. The rule names said dirty and clean. *Done in adapton-recipe#1:* the
+   status bit is `aligned | signaled`, the judgements are `signal` and
+   `repair`, and the rule families are `ST-`, `RN-` and `RT-`, with
+   `IE-repairForce`; Ott parses 48 rules and the PDF builds clean.
 
 ## What is left
 
@@ -225,12 +230,17 @@ to agree with it. Lining the two up found these, each a note for the recipe:
 - A realignment-mode pair for the playground -- issue #67, "no scene is
   built incrementally, so the tool cannot yet show incremental repair". One
   graph, one edit, and the trails are the signaling and repair walk rather
-  than the diff of two runs. The events exist for it now; what is missing is
-  a scene built from a run edited in place, and an `examplePair` re-thought
-  from a pair of runs into a run and an edit. Editing the parameters while
-  keeping the view (PR #89) is already the UX of it.
-- The replayground and the playground draw nothing for the six new events;
-  both compare event types against the old names and pass over the rest.
+  than the diff of two runs. *The run exists now:* PR #109 ("One graph, one
+  edit, one repair") has `Scene.realignMergeFromTree` and six `#[example]`s
+  for the playground, whose events tab shows the signaling and the repair.
+  What is still missing is the *drawing* of it there: a time cursor (#63),
+  and trails from the realignment rather than from a diff. Editing the
+  parameters while keeping the view (PR #89) is already the UX of it.
+- *The replayground draws the six events* since PR #110 ("draw a
+  realignment"): signaled edges in magenta, a held glow on a node under
+  repair, removed edges as ghosts, as a state at the cursor's moment; the
+  first scene is `replayground-www/scenes/realign-inductive-root-16.json`.
+  The playground still draws nothing for them.
 - `fumola test` counts failures but exits 0, so the `./fumola-test.sh` step
   of CI cannot go red. One line.
 
@@ -242,8 +252,12 @@ to agree with it. Lining the two up found these, each a note for the recipe:
   `A.scratch(thunk { A.reset(); ... })`, whose graph is discarded on exit.
   Assert that the values agree on every name, and that `reevaluations`
   equals new body + same body + onlyRight from the diff; the excess of
-  `repairs` over that is the cost the diff never saw. The nine size-16
-  `#[examplePair]`s have exact numbers and are the place to start.
+  `repairs` over that is the cost the diff never saw. *First rung done* in
+  PR #109: `testRealignIsFromScratchConsistent` checks the output after the
+  repair against a from-scratch run under every naming, at the root and at
+  a leaf, and `RealignRun.realignment` carries the counters across the
+  realignment. The name-by-name comparison and the count equation are the
+  next rungs.
 - Split `notEqual` into new body and same body in `A.Diff` and
   `webPlay.DiffSizes`, so the pairs report it.
 - Exhaustive sweeps: every position at each size up to 4096, each edit
@@ -262,7 +276,8 @@ to agree with it. Lining the two up found these, each a note for the recipe:
   persist only the canonical output; the intermediates are O(n) different
   after any edit and nothing can be reused from them.
 
-**In the recipe.** The eight notes above, and the terminology.
+**In the recipe.** Notes 1--3 and 5--7 above. The terminology and the
+typos landed in adapton-recipe#1 on 2026-09-09.
 
 **In the docs.** `docs/cache-naming.md` (PR #95) gets the re-allocation
 versus repair distinction; `docs/fumola-for-haskell-folks.md` (PR #96) gets
