@@ -328,12 +328,35 @@
     
       /* ---- the formal view: rules typeset with KaTeX, statically ---------- */
 
-      .rules { display: grid; gap: 1.2rem 0; margin: 1rem 0 1.8rem; }
-      .rule { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0 1.4rem; overflow-x: auto; padding: 0.15rem 0; }
+      /*    A rule is wider than a line of prose. The widest one here wants a
+         third more room than this page's measure gives it, and the name sits
+         to its right, so at the measure the two collided: the rule printed
+         itself over its own name, and the scroll box that was meant to catch
+         that sat on the wrong element to catch anything.
+
+            So the rule blocks bleed out of the measure, the way a paper sets
+         a wide figure across the column, taking whatever the window offers up
+         to the width the widest rule needs. The math then sits in a scroll box
+         of its own, which is what makes the collision impossible rather than
+         merely unlikely: when the window offers too little, the rule scrolls
+         within its column and the name keeps its own.
+
+            One grid per block, not one per rule, so the names line up down a
+         single edge instead of ending wherever each rule happens to. */
+      .rules {
+        --bleed: clamp(0px, calc((100vw - 4rem - 100%) / 2), 7.5rem);
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 1.2rem 1.4rem;
+        margin: 1rem calc(-1 * var(--bleed)) 1.8rem;
+      }
+      .rule { display: contents; }
+      .rule .tex { min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; padding: 0.4rem 0; }
       .rule .katex-display { margin: 0; text-align: left; }
       .rule .katex-display > .katex { text-align: left; }
       .rule .katex { font-size: 1.04em; }
-      .rule .name { font-family: KaTeX_Main, "Times New Roman", Times, serif; font-variant: small-caps; font-size: 0.92rem; color: var(--pink); white-space: nowrap; }
+      .rule .name { justify-self: end; font-family: KaTeX_Main, "Times New Roman", Times, serif; font-variant: small-caps; font-size: 0.92rem; color: var(--pink); white-space: nowrap; }
       .tex .katex { font-size: 1.02em; }
       .legend { font-size: 0.9rem; color: var(--dim); line-height: 1.9; }
       .legend .tex .katex { color: var(--fg); }
