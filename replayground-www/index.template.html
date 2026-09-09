@@ -1,2244 +1,2187 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 
 <head>
-    <meta charset="utf-8" />
-    <title>DCG Viewer</title>
-    <style>
-        :root {
-
-            /* --- BASE --- */
-
-            --bg: #111318;
-            --bg-elev: #171a20;
-            --bg-panel: #1b1f27;
-            --bg-outline-vert: #64727c;
-            --bg-outline-edge: #2a1e2d;
-            --bg-outline-edge-hover: #422b48;
-            --bg-outline-internal-result: #1e1f2d;
-            --bg-outline-internal-result-hover: #2b2c48;
-            --bg-outline-result: var(--bg-outline-edge);
-            --border: #2a2f3a;
-            --border-soft: #222733;
-
-            --text: #a1aabb;
-            --text-dim: #97a2b3;
-            --text-faint: #6f7b8d;
-
-            /* --- ACCENTS --- */
-
-            --purple: #c6a0f6;
-            --blue: #8bd5ff;
-            --green: #a6da95;
-            --brown: #e6b775;
-
-            --blue-hover: #c1e5fa;
-            --green-hover: #c4dbbc;
-
-
-            --purple-dark: #8c6fd1;
-            --blue-dark: #5ca7d9;
-            --green-dark: #7fba72;
-            --brown-dark: #875b1d;
-
-            /* --- INTERACTION --- */
-
-            --hover: #252b36;
-            --active: #303848;
-
-            --shadow:
-                0 0 0 1px rgba(255, 255, 255, 0.02),
-                0 6px 18px rgba(0, 0, 0, 0.35);
-
-            font-family:
-                Inter,
-                system-ui,
-                sans-serif;
-        }
-    </style>
-    <style>
-        html,
-        body {
-            margin: 0;
-            height: 100%;
-            overflow: hidden;
-            font-family: monospace;
-            background: #0f0f0f;
-            color: #cfd8ff;
-        }
-
-        #app {
-            display: flex;
-            height: 100vh;
-            width: 100vw;
-        }
-
-        #sidebar {
-            width: 50%;
-            min-width: 220px;
-            max-width: 99%;
-            flex-direction: column;
-            height: 100vh;
-            background: #000;
-        }
-
-        .focus-detail {
-            display: none;
-        }
-
-        .focus-detail.focused {
-            margin: 2px;
-            border: 2px;
-            background-color: var(--bg-panel);
-            border-radius: 3px;
-            border-color: var(--border-soft);
-            border-style: solid;
-        }
-
-        .focus-detail.focused.inner {
-            border-style: none;
-        }
-
-        .outline-edge {
-            border-style: solid;
-            margin-top: 0px;
-            margin-bottom: 0px;
-            margin-left: 8px;
-            border: 1px;
-            border-color: white;
-            background-color: var(--bg-outline-edge);
-        }
-
-        .outline-edge:hover {
-            background-color: var(--bg-outline-edge-hover);
-        }
-
-        .outline-internal-result {
-            margin-left: 8px;
-            border: 0px;
-            border-left: 2px;
-            border-style: solid;
-            border-color: var(--bg-outline-vert);
-            background-color: var(--bg-outline-internal-result);
-        }
-
-        .outline-internal-result:hover {
-            background-color: var(--bg-outline-internal-result-hover);
-        }
-
-        .outline-node {
-            margin-left: 8px;
-            padding-left: 2px;
-            border: 0px;
-            border-left: 2px;
-            border-style: solid;
-            border-color: var(--bg-outline-vert);
-            background-color: var(--bg-outline-internal-result);
-        }
-
-        .outline-node:hover {
-            background-color: var(--bg-outline-internal-result-hover);
-        }
-
-        .outline-node-thunk-shape {
-            cursor: pointer;
-            font-size: large;
-            border-radius: 50%;
-            border-style: solid;
-            border-width: 2px;
-            margin: 2px;
-            color: var(--blue-dark);
-            border-color: transparent;
-            background-color: var(--blue-dark);
-            user-select: none;
-            padding: 2px;
-            padding-left: 6px;
-            padding-right: 6px;
-        }
-
-        .outline-node-thunk-shape:active {
-            background-color: black;
-            color: white;
-            border-color: white;
-        }
-
-        .outline-node-thunk-shape:hover {
-            border-color: white;
-        }
-
-        .outline-node-nonthunk-shape {
-            cursor: pointer;
-            font-size: large;
-            padding-left: 4px;
-            padding-right: 4px;
-            border-radius: 0px;
-            border-style: solid;
-            border-width: 2px;
-            margin: 2px;
-            color: var(--green-dark);
-            border-color: transparent;
-            background-color: var(--green-dark);
-            user-select: none;
-        }
-
-        .outline-node-nonthunk-shape:active {
-            background-color: black;
-            color: white;
-            border-color: white;
-        }
-
-        .outline-node-nonthunk-shape:hover {
-            border-color: white;
-        }
-
-
-        .thunk-body-text {
-            cursor: pointer;
-            display: flex;
-            margin: 1px;
-            border: 1px;
-            border-radius: 4px;
-            /*font-size: larger; */
-            border-style: solid;
-            border-color: transparent;
-            background-color: black;
-            color: var(--blue-dark);
-        }
-
-        .outline-forced-thunk-text {
-            cursor: pointer;
-            display: flex;
-            margin-left: 6px;
-            border: 1px;
-            border-radius: 4px;
-            padding: 4px;
-            /*font-size: larger; */
-            border-style: solid;
-            border-color: transparent;
-            background-color: black;
-            color: var(--blue-dark);
-        }
-
-        .outline-forced-thunk-text:hover {
-            /* font-size: larger; */
-            color: var(--blue-hover);
-            /* background-color: var(--hover); */
-        }
-
-        .outline-value-text {
-            cursor: pointer;
-            color: var(--green-dark);
-            display: inline-block;
-            border-radius: 2px;
-            border-width: 1px;
-            border-color: transparent;
-            border-style: solid;
-            background-color: black;
-            padding: 2px;
-            margin: 2px;
-            margin-left: 8px;
-            /* font-size: smaller; */
-        }
-
-        .outline-value-text:hover {
-            /* font-size: larger; */
-            color: var(--green-hover);
-            border-color: var(--green-hover);
-        }
-
-        .panel {
-            display: flex;
-            flex-direction: column;
-            flex: 1;
-            min-height: 0;
-            /* CRITICAL for scrolling in flex layouts */
-            border-bottom: 3px solid var(--border);
-        }
-
-        #outlinePanel {
-            flex: 4;
-        }
-
-        .panel-header#titlePanel {
-            flex-shrink: 0;
-            height: auto;
-            flex: 0 0 auto;
-        }
-
-
-        .splitter {
-            height: 5px;
-            background: #111;
-            cursor: row-resize;
-        }
-
-        .panel-body {
-            flex: 1;
-            min-height: 0;
-            /* CRITICAL */
-            overflow-y: auto;
-            padding: 6px;
-        }
-
-
-        /* DIVIDER */
-        #divider {
-            width: 5px;
-            cursor: col-resize;
-            background: #111;
-        }
-
-        /* VIEWPORT */
-        #viewport {
-            flex: 1;
-            background: #000;
-        }
-
-        .panel-header {
-            background: #050505;
-            color: #a8b4ff;
-            padding: 6px;
-            cursor: pointer;
-        }
-
-        .panel-header#titlePanelHeader {
-            background: #29082d;
-            color: #e2a8ff;
-            padding: 6px;
-            cursor: pointer;
-            font-size: larger;
-            flex-shrink: 0;
-            height: auto;
-            flex: 0 0 auto;
-        }
-
-        .metaTime {
-            user-select: none;
-            color: var(--blue);
-            cursor: pointer;
-            border-color: transparent;
-            border-style: solid;
-            border-radius: 33%;
-            padding: 2px;
-            margin: 2px;
-            border-width: 2px;
-            display: inline-block;
-        }
-
-        .metaTime.focused {
-            background: var(--blue-hover);
-            color: #111;
-            font-weight: bold;
-        }
-
-        .metaTime:hover {
-            color: #ffffff;
-            border-color: white;
-        }
-
-        .metaTime:hover.focused {
-            color: black;
-            background-color: white;
-        }
-
-        .metaTime.player-focused {
-            color: yellowgreen;
-            border-color: yellow;
-            background-color: black;
-        }
-
-        .metaTime.focused.player-focused {
-            background-color: yellowgreen;
-            border-color: white;
-            color: black;
-        }
-
-        .edgeId {
-            user-select: none;
-            color: var(--purple);
-            cursor: pointer;
-            border-color: var(--border-soft);
-            border-style: solid;
-            padding: 3px;
-            margin: 2px;
-            border-width: 1px;
-            border-radius: 1px;
-            display: inline-block;
-            background-color: black;
-        }
-
-        .edgeId.focused {
-            background: var(--purple-dark);
-            color: #111;
-            font-weight: bold;
-        }
-
-        .edgeId:hover {
-            color: #ffffff;
-            border-color: white;
-        }
-
-        .pointer {
-            user-select: none;
-        }
-
-        .pointerThunk {
-            color: #b5b7d7;
-            cursor: pointer;
-            border-color: var(--bg-panel);
-            border-style: solid;
-            padding: 3px;
-            margin: 2px;
-            border-width: 2px;
-            border-radius: 2px;
-            display: inline-block;
-            background-color: black;
-        }
-
-        .pointerThunk.focused {
-            background-color: var(--blue-dark);
-            color: var(--bg-panel);
-            font-weight: bold;
-        }
-
-        .pointerThunk.focused:hover {
-            color: white;
-            border-color: white;
-        }
-
-        .pointerNonThunk {
-            color: #c0d7b5;
-            cursor: pointer;
-            border-color: #899882;
-            border-style: solid;
-            padding: 3px;
-            margin: 2px;
-            border-width: 1px;
-            border-radius: 1px;
-            display: inline-block;
-            background-color: black;
-        }
-
-        .pointerNonThunk.focused {
-            background-color: var(--green-dark);
-            color: var(--bg-panel);
-            font-weight: bold;
-        }
-
-        .pointerNonThunk.focused:hover {
-            color: white;
-            border-color: white;
-        }
-
-
-        .pointerThunk:hover {
-            color: #ffffff;
-            border-color: white;
-        }
-
-        .pointerNonThunk:hover {
-            color: #ffffff;
-            border-color: white;
-        }
-
-        .action-arrow {
-            margin: 3px;
-            padding: 3px;
-            cursor: pointer;
-            font-size: large;
-            border-width: 2px;
-            border-radius: 4px;
-            border-style: solid;
-            border-color: transparent;
-            user-select: none;
-        }
-
-        .action-arrow:active {
-            background-color: black;
-            color: white;
-            border-color: white;
-        }
-
-        .action-arrow:hover {
-            border-color: white;
-            border-style: solid;
-        }
-
-
-        .result-arrow {
-            color: var(--blue-dark);
-        }
-
-        .action-put {
-            color: var(--purple-dark);
-        }
-
-        .action-putForce {
-            color: var(--purple)
-        }
-
-        .action-force {
-            color: var(--purple)
-        }
-
-        .action-get {
-            color: var(--blue-dark);
-        }
-
-
-        .nodeId {
-            color: var(--brown);
-            cursor: pointer;
-            border-color: var(--brown-dark);
-            border-style: solid;
-            border-radius: 5%;
-            padding: 3px;
-            margin: 2px;
-            border-width: 1px;
-            display: inline-block;
-            background-color: black;
-        }
-
-        .nodeId.focused {
-            background: var(--brown-dark);
-            color: #111;
-            font-weight: bold;
-        }
-
-        .nodeId:hover {
-            color: #ffffff;
-        }
-
-
-        #sidebar {
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .panel {
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-        }
-
-        .panel-body {
-            overflow: auto;
-            min-height: 0;
-        }
-
-        /*----------*/
-
-        html,
-        body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-
-            background: var(--bg);
-            color: var(--text);
-
-            overflow: hidden;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        #app {
-            width: 100%;
-            height: 100%;
-
-            display: flex;
-
-            background: var(--bg);
-        }
-
-        /* --- PLAYER PANEL --- */
-
-        #playerPanel {
-            flex: 0 0 auto;
-        }
-
-        .player-body {
-            padding: 8px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            background-color: var(--bg-panel)
-        }
-
-        .player-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background-color: var(--bg-panel)
-        }
-
-
-        .player-slider-row {
-            width: 100%;
-        }
-
-        #metaSlider {
-            width: 100%;
-        }
-
-        .player-field {
-            padding-left: 16px;
-            padding-right: 16px;
-            padding-top: 1px;
-            padding-bottom: 1px;
-            font-size: 22px;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            background: var(--bg);
-            color: var(--text);
-            background-color: var(--bg-panel);
-            border-radius: 3px;
-            border-color: var(--active);
-        }
-
-
-        .bpm-field {
-            font-size: 22px;
-            background: var(--bg);
-            color: var(--text);
-            background-color: var(--bg-panel);
-            border-radius: 3px;
-            border-color: var(--active);
-            min-width: 100px;
-        }
-
-        .player-button {
-            padding-left: 16px;
-            padding-right: 16px;
-            padding-top: 6px;
-            padding-bottom: 6px;
-            font-size: 24px;
-            background-color: var(--bg-elev);
-            border-radius: 3px;
-            border-color: var(--active);
-            color: var(--text);
-        }
-
-        .player-button-small {
-            font-size: 16px;
-            color: var(--text-faint);
-        }
-
-        .player-field label {
-            font-size: 23px;
-            opacity: 0.7;
-            text-align: center;
-        }
-
-        .player-field input {
-            width: 160px;
-        }
-
-        .bpm-controls {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        #infoPanel {
-            display: block;
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fumola — replayground</title>
+  <meta name="description" content="Replay a Fumola demanded-computation graph: the outline, the event log, and the objects in space, all sharing one time cursor.">
+
+  <!--
+    ===================================================================
+    The replayground
+    ===================================================================
+
+    One scene, four ways of looking at it, all sharing a single time
+    cursor called the *metaTime*.
+
+      * the OUTLINE  -- the forced-thunk tree, nested the way it ran
+      * the EVENTS   -- the same run as a flat log
+      * the OBJECTS  -- boxes, orbs and arrows in 3D, on the right
+      * the DOORS    -- see below
+
+    A DOOR is the central idea. Every unique thing the scene data names
+    is a door you can open:
+
+        pointer    a space; the identity a node keeps across revisions
+        nodeId     [space, "@now", seq] -- one revision of a pointer.
+                   Clicking one opens its pointer's door.
+        edgeId     "#edgeId(1234)" -- one action from a source node to a
+                   target node, possibly revised later
+        metaTime   a moment
+
+    Opening a door reveals every `.focus-detail` element tagged with that
+    door's (type, id) -- they are built up front and sit at display:none
+    until then. Doors nest: a pointer's door holds one metaTime door per
+    revision, so opening the pointer shows *which* moments it changed and
+    opening one of those moments unfolds what it changed into.
+
+    metaTime doors are the odd one out on purpose: there is no top-level
+    metaTime panel. Opening one shifts the highlight in the outline and
+    the event log and unfolds whatever nested detail exists for that
+    moment.
+
+    Shift-click closes a door. `closeAllDoors()` (the ✕ in the info
+    panel header) closes all of them.
+
+    ===================================================================
+    Where to change what
+    ===================================================================
+
+      scene data ......... `data`, injected by build.py
+      doors .............. openDoor / closeDoor / DOOR_KINDS
+      chips .............. the make*Chip helpers -- one per door kind
+      info panel ......... buildPointerDoors / buildEdgeDoors
+      outline ............ renderOutline
+      events ............. renderEvents
+      time cursor ........ playerState + renderPlayerFocus
+      3D build ........... createBoxMesh / createOrbMesh / createPointerMesh
+                           / createActionMesh, then buildSceneObjects
+      3D sizing & picking  fitRendererToViewport / pointerToNDC / pickAt
+  -->
+
+  <style>
+    /* ---- palette ------------------------------------------------------
+       Unchanged from the hand-tuned original; the colours that used to be
+       written inline are named here too, so nothing in the rules below is
+       a bare hex any more. */
+    :root {
+      /* surfaces */
+      --bg:        #111318;
+      --bg-elev:   #171a20;
+      --bg-panel:  #1b1f27;
+      --void:      #000000;   /* behind the 3D scene, and behind chips */
+      --gutter:    #111111;   /* the drag handles between panes */
+      --header-bg: #050505;
+      --title-bg:  #29082d;
+
+      /* outline rows */
+      --bg-outline-vert:                    #64727c;
+      --bg-outline-edge:                    #2a1e2d;
+      --bg-outline-edge-hover:              #422b48;
+      --bg-outline-internal-result:         #1e1f2d;
+      --bg-outline-internal-result-hover:   #2b2c48;
+      --bg-outline-result: var(--bg-outline-edge);
+
+      --border:      #2a2f3a;
+      --border-soft: #222733;
+
+      /* text */
+      --text:       #a1aabb;
+      --text-dim:   #97a2b3;
+      --text-faint: #6f7b8d;
+      --header-fg:  #a8b4ff;
+      --title-fg:   #e2a8ff;
+
+      /* accents -- one per door kind, so a colour tells you what you can
+         click: purple = edgeId, blue = metaTime, green = value,
+         brown = nodeId. */
+      --purple: #c6a0f6;
+      --blue:   #8bd5ff;
+      --green:  #a6da95;
+      --brown:  #e6b775;
+
+      --blue-hover:  #c1e5fa;
+      --green-hover: #c4dbbc;
+
+      --purple-dark: #8c6fd1;
+      --blue-dark:   #5ca7d9;
+      --green-dark:  #7fba72;
+      --brown-dark:  #875b1d;
+
+      --ptr-thunk:            #b5b7d7;
+      --ptr-nonthunk:         #c0d7b5;
+      --ptr-nonthunk-border:  #899882;
+
+      /* the moment the player is parked on */
+      --now:      yellowgreen;
+      --now-edge: yellow;
+
+      /* something the sidebar names that the scene has no object for. Magenta
+         because it is the one hue no door kind already owns. */
+      --absent:     #f06ecb;
+      --absent-dim: #8d3f78;
+
+      /* interaction */
+      --hover:  #252b36;
+      --active: #303848;
+      --focus-ring: #ffffff;
+
+      --shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.02),
+        0 6px 18px rgba(0, 0, 0, 0.35);
+
+      --ui:   Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+              "Liberation Mono", "DejaVu Sans Mono", monospace;
+
+      /* the sidebar's width, so the divider and the CSS set one thing */
+      --sidebar-w: 50%;
+      --radius: 4px;
+    }
+
+    * { box-sizing: border-box; }
+
+    /* One knob. Everything below is in rem, so the whole app grows on a
+       large screen rather than sitting small in a corner -- the same
+       arrangement the web-play page uses. */
+    html {
+      height: 100%;
+      font-size: clamp(13px, 10px + 0.35vw, 17px);
+    }
+
+    body {
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 400 0.85rem/1.45 var(--mono);
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;          /* each pane scrolls on its own */
+    }
+
+    /* ---- frame --------------------------------------------------------- */
+
+    #app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    #sidebar {
+      flex: 0 0 var(--sidebar-w);
+      display: flex;
+      flex-direction: column;
+      background: var(--void);
+      overflow: hidden;
+      /* A flex item's min-width defaults to its content. Without this the
+         sidebar refuses to shrink past its widest outline row. */
+      min-width: 0;
+    }
+
+    #divider {
+      flex: 0 0 5px;
+      cursor: col-resize;
+      background: var(--gutter);
+      touch-action: none;
+    }
+    #divider:hover, #divider.dragging { background: var(--active); }
+
+    #viewport {
+      flex: 1;
+      position: relative;        /* the player bar is positioned against this */
+      background: var(--void);
+      overflow: hidden;
+      /* The one that was missing, and the whole reason 3D picking drifted:
+         the canvas is this element's content, so with min-width:auto the
+         viewport could never shrink below whatever size the canvas last
+         had. The app overflowed the window, two thirds of the canvas hung
+         off-screen, and every ray was cast through the wrong pixel. */
+      min-width: 0;
+      min-height: 0;
+    }
+
+    /* The canvas is sized by CSS and only by CSS; three.js is told to set
+       the drawing buffer and leave the style alone. That keeps the canvas
+       out of the layout's min-content calculation. */
+    #viewport canvas {
+      display: block;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ---- sidebar panels ------------------------------------------------ */
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    #outlinePanel { flex: 4 1 0; }
+    #eventsPanel  { flex: 1 1 0; }
+    #infoPanel    { flex: 0 1 auto; max-height: 40%; }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      flex: 0 0 auto;
+      padding: 0.3rem 0.5rem;
+      background: var(--header-bg);
+      color: var(--header-fg);
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .panel-header:hover { background: var(--hover); }
+    /* The little triangle is the whole promise the header makes: click to
+       collapse. It used to say cursor:pointer and do nothing. */
+    .panel-header::before {
+      content: "▾";
+      font-size: 0.7em;
+      opacity: 0.7;
+      transition: transform 120ms ease;
+    }
+    .panel.collapsed > .panel-header::before { transform: rotate(-90deg); }
+    .panel.collapsed > .panel-body { display: none; }
+    .panel.collapsed { flex: 0 0 auto; }
+
+    .panel-header .spacer { flex: 1; }
+    .panel-header .count { color: var(--text-faint); font-size: 0.9em; letter-spacing: 0; }
+
+    .header-btn {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-faint);
+      font: inherit;
+      font-size: 0.9em;
+      line-height: 1;
+      padding: 0.15rem 0.35rem;
+      border-radius: var(--radius);
+      cursor: pointer;
+    }
+    .header-btn:hover { color: var(--focus-ring); border-color: var(--border); background: var(--void); }
+
+    #titlePanelHeader {
+      background: var(--title-bg);
+      color: var(--title-fg);
+      font-size: 0.9rem;
+      cursor: default;
+      text-transform: none;
+      letter-spacing: 0.02em;
+    }
+    #titlePanelHeader::before { content: none; }
+
+    .panel-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      padding: 0.35rem;
+    }
+
+    .splitter {
+      flex: 0 0 5px;
+      background: var(--gutter);
+      cursor: row-resize;
+      touch-action: none;
+    }
+    .splitter:hover, .splitter.dragging { background: var(--active); }
+
+    /* ---- doors --------------------------------------------------------- */
+
+    /* Built up front, hidden until their door opens. `displayTrue` /
+       `displayFalse` ride on the element because a door nested inside
+       another one wants `inline-block` when shut, not `none`. */
+    .focus-detail { display: none; }
+
+    .focus-detail.focused {
+      margin: 2px;
+      padding: 2px;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius);
+    }
+    .focus-detail.focused.inner { border-style: none; }
+
+    .door-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 2px;
+      padding: 1px 0;
+    }
+    .door-label {
+      color: var(--text-faint);
+      font-size: 0.85em;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding-right: 2px;
+    }
+
+    /* ---- chips, one per door kind -------------------------------------- */
+
+    .metaTime {
+      user-select: none;
+      color: var(--blue);
+      cursor: pointer;
+      border: 2px solid transparent;
+      border-radius: 33%;
+      padding: 2px;
+      margin: 2px;
+      display: inline-block;
+    }
+    .metaTime.focused { background: var(--blue-hover); color: var(--bg); font-weight: bold; }
+    .metaTime:hover { color: var(--focus-ring); border-color: var(--focus-ring); }
+    .metaTime:hover.focused { color: var(--void); background-color: var(--focus-ring); }
+    .metaTime.player-focused { color: var(--now); border-color: var(--now-edge); background-color: var(--void); }
+    .metaTime.focused.player-focused { background-color: var(--now); border-color: var(--focus-ring); color: var(--void); }
+
+    .edgeId {
+      user-select: none;
+      color: var(--purple);
+      cursor: pointer;
+      border: 1px solid var(--border-soft);
+      border-radius: 1px;
+      padding: 3px;
+      margin: 2px;
+      display: inline-block;
+      background-color: var(--void);
+    }
+    .edgeId.focused { background: var(--purple-dark); color: var(--bg); font-weight: bold; }
+    .edgeId:hover { color: var(--focus-ring); border-color: var(--focus-ring); }
+
+    .nodeId {
+      color: var(--brown);
+      cursor: pointer;
+      border: 1px solid var(--brown-dark);
+      border-radius: 5%;
+      padding: 3px;
+      margin: 2px;
+      display: inline-block;
+      background-color: var(--void);
+    }
+    .nodeId.focused { background: var(--brown-dark); color: var(--bg); font-weight: bold; }
+    .nodeId:hover { color: var(--focus-ring); }
+
+    .pointer { user-select: none; }
+
+    .pointerThunk {
+      color: var(--ptr-thunk);
+      cursor: pointer;
+      border: 2px solid var(--bg-panel);
+      border-radius: 2px;
+      padding: 3px;
+      margin: 2px;
+      display: inline-block;
+      background-color: var(--void);
+    }
+    .pointerThunk.focused { background-color: var(--blue-dark); color: var(--bg-panel); font-weight: bold; }
+
+    .pointerNonThunk {
+      color: var(--ptr-nonthunk);
+      cursor: pointer;
+      border: 1px solid var(--ptr-nonthunk-border);
+      border-radius: 1px;
+      padding: 3px;
+      margin: 2px;
+      display: inline-block;
+      background-color: var(--void);
+    }
+    .pointerNonThunk.focused { background-color: var(--green-dark); color: var(--bg-panel); font-weight: bold; }
+
+    .pointerThunk:hover,
+    .pointerNonThunk:hover { color: var(--focus-ring); border-color: var(--focus-ring); }
+    .pointerThunk.focused:hover,
+    .pointerNonThunk.focused:hover { color: var(--focus-ring); border-color: var(--focus-ring); }
+
+    /* ---- outline rows -------------------------------------------------- */
+
+    /* The indentation is the DOM nesting: each of these steps 8px in, and
+       the steps only accumulate because a child row is appended inside its
+       parent's element rather than beside it. */
+    .outline-edge {
+      margin: 0 0 0 8px;
+      border: 1px solid var(--focus-ring);
+      background-color: var(--bg-outline-edge);
+    }
+    .outline-edge:hover { background-color: var(--bg-outline-edge-hover); }
+
+    .outline-internal-result,
+    .outline-node {
+      margin-left: 8px;
+      border: 0;
+      border-left: 2px solid var(--bg-outline-vert);
+      background-color: var(--bg-outline-internal-result);
+    }
+    .outline-node { padding-left: 2px; }
+    .outline-internal-result:hover,
+    .outline-node:hover { background-color: var(--bg-outline-internal-result-hover); }
+
+    .outline-node-thunk-shape,
+    .outline-node-nonthunk-shape {
+      cursor: pointer;
+      font-size: 1.15em;
+      border: 2px solid transparent;
+      margin: 2px;
+      user-select: none;
+    }
+    .outline-node-thunk-shape {
+      border-radius: 50%;
+      color: var(--blue-dark);
+      background-color: var(--blue-dark);
+      padding: 2px 6px;
+    }
+    .outline-node-nonthunk-shape {
+      border-radius: 0;
+      color: var(--green-dark);
+      background-color: var(--green-dark);
+      padding: 0 4px;
+    }
+    .outline-node-thunk-shape:hover,
+    .outline-node-nonthunk-shape:hover { border-color: var(--focus-ring); }
+    .outline-node-thunk-shape:active,
+    .outline-node-nonthunk-shape:active {
+      background-color: var(--void);
+      color: var(--focus-ring);
+      border-color: var(--focus-ring);
+    }
+
+    .action-arrow {
+      margin: 3px;
+      padding: 3px;
+      cursor: pointer;
+      font-size: 1.1em;
+      border: 2px solid transparent;
+      border-radius: var(--radius);
+      user-select: none;
+    }
+    .action-arrow:hover  { border-color: var(--focus-ring); }
+    .action-arrow:active { background-color: var(--void); color: var(--focus-ring); border-color: var(--focus-ring); }
+
+    /* Named here, drawn nowhere. Looks like its neighbours until you reach
+       for it: `help` rather than `pointer` because the click explains itself
+       instead of doing the thing, and magenta on the way down.
+
+       These come after the shape and arrow rules on purpose -- all of them are
+       two-class selectors, so source order is what breaks the tie. */
+    .absent { cursor: help; }
+    .absent:hover  { border-color: var(--absent-dim); color: var(--absent); }
+    .absent:active {
+      background-color: var(--void);
+      color: var(--absent);
+      border-color: var(--absent);
+    }
+
+    .result-arrow    { color: var(--blue-dark); }
+    .action-put      { color: var(--purple-dark); }
+    .action-putForce { color: var(--purple); }
+    .action-force    { color: var(--purple); }
+    .action-get      { color: var(--blue-dark); }
+
+    /* ---- long text, clamped until asked ---------------------------------
+       Thunk bodies and values run to hundreds of characters. Left to run
+       they made a single outline row taller than the pane. Two lines by
+       default; click for the rest. */
+    .clamped {
+      cursor: pointer;
+      /* -webkit-box is what -webkit-line-clamp needs; the *inline* variant so
+         a value still sits on its outline row instead of taking a line of its
+         own. */
+      display: -webkit-inline-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      max-width: 100%;
+      vertical-align: top;
+      word-break: break-word;
+    }
+    .clamped.expanded {
+      display: inline-block;
+      -webkit-line-clamp: unset;
+      line-clamp: unset;
+      overflow: visible;
+    }
+
+    .thunk-body-text,
+    .outline-forced-thunk-text {
+      margin: 1px 1px 1px 6px;
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      padding: 4px;
+      background-color: var(--void);
+      color: var(--blue-dark);
+    }
+    .outline-forced-thunk-text:hover { color: var(--blue-hover); }
+
+    .outline-value-text,
+    .thunk-result-value {
+      color: var(--green-dark);
+      border: 1px solid transparent;
+      border-radius: 2px;
+      background-color: var(--void);
+      padding: 2px;
+      margin: 2px 2px 2px 8px;
+    }
+    .outline-value-text:hover { color: var(--green-hover); border-color: var(--green-hover); }
+
+    .thunk-trace, .thunk-result { padding: 1px 0; }
+
+    /* ---- the player, floating over the 3D view -------------------------
+       It used to be a panel at the bottom of the sidebar, ~110px of chrome
+       taken out of the outline. Over the viewport it costs nothing that
+       was showing anything. */
+    #playerBar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      padding: 0.3rem 0.45rem;
+      font-family: var(--ui);
+      color: var(--text);
+      background: color-mix(in srgb, var(--bg-panel) 84%, transparent);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+
+    .player-group {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 2px;
+      background: color-mix(in srgb, var(--bg-elev) 70%, transparent);
+      border: 1px solid var(--border-soft);
+      border-radius: 7px;
+    }
+
+    .player-button {
+      width: 1.9rem;
+      height: 1.6rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font: inherit;
+      font-size: 0.85rem;
+      line-height: 1;
+      color: var(--text);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 90ms ease, color 90ms ease;
+    }
+    .player-button:hover  { background: var(--hover); color: var(--focus-ring); }
+    .player-button:active { background: var(--active); }
+    .player-button.on     { background: var(--blue-dark); color: var(--bg); }
+    .player-button-small  { font-size: 0.7rem; width: 1.6rem; color: var(--text-faint); }
+    .player-button-wide   { width: auto; padding: 0 0.5rem; font-size: 0.72rem; letter-spacing: 0.03em; }
+
+    /* The readout is the only thing here that must not jiggle as digits
+       change, hence mono and a reserved width. */
+    .player-readout {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      padding: 0 0.4rem;
+      min-width: 6.5rem;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .player-readout b { color: var(--blue); font-weight: 600; }
+
+    .player-caption {
+      font-size: 0.6rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      padding-left: 0.2rem;
+    }
+
+    #metaSlider {
+      flex: 1 1 8rem;
+      min-width: 5rem;
+      accent-color: var(--blue);
+      background: transparent;
+      cursor: pointer;
+    }
+
+    /* Narrow and fixed, so it never competes with the time cursor above for
+       the row's spare width. */
+    .dim-slider {
+      flex: 0 0 4.5rem;
+      width: 4.5rem;
+      margin: 0;
+      accent-color: var(--text-faint);
+      background: transparent;
+      cursor: pointer;
+    }
+    .dim-readout { min-width: 2.2rem; text-align: right; }
+
+    #bpmDisplay {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      min-width: 2.8rem;
+      text-align: center;
+    }
+
+    /* ---- the report in the corner --------------------------------------
+       Pressing something the scene cannot show says so here, rather than
+       leaving the reader to discover the tooltip. */
+    #toast {
+      position: absolute;
+      right: 0.6rem;
+      bottom: 0.6rem;
+      z-index: 4;
+      max-width: min(26rem, calc(100% - 1.2rem));
+      padding: 0.45rem 0.6rem;
+      border: 1px solid var(--absent-dim);
+      border-left: 3px solid var(--absent);
+      border-radius: 6px;
+      background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+      font-family: var(--ui);
+      font-size: 0.78rem;
+      cursor: pointer;
+      opacity: 0;
+      transform: translateY(6px);
+      pointer-events: none;
+      transition: opacity 140ms ease, transform 140ms ease;
+    }
+    #toast.showing { opacity: 1; transform: none; pointer-events: auto; }
+    #toast .headline { color: var(--absent); font-family: var(--mono); overflow-wrap: anywhere; }
+    #toast .detail   { color: var(--text-faint); padding-top: 0.15rem; }
+
+    /* A scene this size takes a moment to build; say so rather than show
+       an empty black rectangle. */
+    #boot {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--void);
+      color: var(--text-faint);
+      font-family: var(--ui);
+      font-size: 0.85rem;
+      letter-spacing: 0.06em;
+    }
+    #boot[hidden] { display: none; }
+  </style>
 </head>
 
 <body>
-    <div id="app">
+  <div id="app">
 
-        <div id="sidebar">
+    <div id="sidebar">
 
-            <div class="panel-header" id="titlePanelHeader">DCG Scene Player</div>
+      <div class="panel-header" id="titlePanelHeader">DCG Scene Player</div>
 
-            <div class="panel-body" id="infoPanel">
-                <!-- <div class="panel-header">Meta Times</div> -->
-                <div class="panel-focus" id="metaTimes"></div>
-
-                <!-- <div class="panel-header">Pointers / Object Labels</div> -->
-                <div class="panel-focus" id="pointers"></div>
-
-                <!-- <div class="panel-header">Edges</div> -->
-                <div class="panel-focus" id="edgeIds"></div>
-
-
-            </div>
-
-            <div class="splitter"></div>
-
-            <div class="panel" id="outlinePanel">
-                <div class="panel-header">Outline</div>
-                <div class="panel-body" id="outline">
-                </div>
-            </div>
-
-            <div class="splitter"></div>
-
-            <div class="panel" id="eventsPanel">
-                <div class="panel-header">Events</div>
-                <div class="panel-body" id="events">
-                </div>
-            </div>
-
-            <!-- NEW PLAYER PANEL -->
-
-            <div class="panel" id="playerPanel">
-
-                <div class="panel-header">Player</div>
-
-                <div class="panel-body player-body">
-
-                    <div class="player-row">
-                        <button id="gotoStartBtn" class="player-button">⏮</button>
-                        <button id="tickBackBtn" class="player-button player-button-small">▌◀</button>
-                        <button id="playPauseBtn" class="player-button">▶</button>
-                        <button id="tickForwardBtn" class="player-button player-button-small">▶ ▌</button>
-                        <button id="stopBtn" class="player-button">■</button>
-
-                        <div class="player-field">
-                            <label>MetaTime</label>
-                            <input id="metaTimeDisplay" class="player-field" type="text" readonly value="1" />
-                        </div>
-
-                        <div class="player-field bpm-field">
-                            <label>BPM</label>
-
-                            <div class="bpm-controls">
-
-                                <button id="bpmDownBtn" class="player-button">-</button>
-
-                                <input id="bpmDisplay" type="text" class="bpm-field" readonly value="1337" />
-
-                                <button id="bpmUpBtn" class="player-button">+</button>
-
-                            </div>
-                        </div>
-
-                    </div>
-
-                    <div class="player-slider-row">
-
-                        <input id="metaSlider" class="player-field" type="range" min="1" max="1" value="1" step="1" />
-
-                    </div>
-
-                </div>
-
-            </div>
-
+      <!-- The info panel is where doors put what they know. metaTime doors
+           deliberately have nothing here: they act on the outline, the
+           events and the nested detail inside the other doors. -->
+      <div class="panel" id="infoPanel">
+        <div class="panel-header" data-collapses>
+          Open doors
+          <span class="spacer"></span>
+          <span class="count" id="openDoorCount">none</span>
+          <button class="header-btn" id="closeAllDoorsBtn" title="Close every open door">✕ all</button>
         </div>
-        <div id="divider"></div>
-        <div id="viewport"></div>
+        <div class="panel-body">
+          <div id="pointers"></div>
+          <div id="edgeIds"></div>
+        </div>
+      </div>
+
+      <div class="splitter"></div>
+
+      <div class="panel" id="outlinePanel">
+        <div class="panel-header" data-collapses>Outline</div>
+        <div class="panel-body" id="outline"></div>
+      </div>
+
+      <div class="splitter"></div>
+
+      <div class="panel" id="eventsPanel">
+        <div class="panel-header" data-collapses>Events</div>
+        <div class="panel-body" id="events"></div>
+      </div>
 
     </div>
 
-    <script>
-        let activeSplitter = null;
-        let startY = 0;
-        let startHeight = 0;
+    <div id="divider"></div>
 
-        document.querySelectorAll(".splitter").forEach(splitter => {
-            splitter.addEventListener("mousedown", (e) => {
-                activeSplitter = splitter;
-                startY = e.clientY;
+    <div id="viewport">
 
-                const panel = splitter.previousElementSibling;
-                startHeight = panel.getBoundingClientRect().height;
+      <div id="playerBar">
+        <div class="player-group">
+          <button id="tickBackBtn"     class="player-button player-button-small" title="One moment back">◀▌</button>
+          <button id="playPauseBtn"    class="player-button" title="Play / pause">▶</button>
+          <button id="tickForwardBtn"  class="player-button player-button-small" title="One moment on">▐▶</button>
+          <button id="stopBtn"         class="player-button" title="Stop">■</button>
+        </div>
 
-                document.body.style.cursor = "row-resize";
-            });
-        });
+        <div class="player-readout"><b id="metaTimeNow">1</b> / <span id="metaTimeMax">1</span></div>
 
-        window.addEventListener("mousemove", (e) => {
-            if (!activeSplitter) return;
+        <input id="metaSlider" type="range" min="1" max="1" value="1" step="1" aria-label="metaTime">
 
-            const dy = e.clientY - startY;
-            const panel = activeSplitter.previousElementSibling;
+        <div class="player-group">
+          <span class="player-caption">bpm</span>
+          <button id="bpmDownBtn" class="player-button player-button-small" title="Slower">−</button>
+          <span id="bpmDisplay">1337</span>
+          <button id="bpmUpBtn"   class="player-button player-button-small" title="Faster">+</button>
+        </div>
 
-            const newHeight = Math.max(50, startHeight + dy);
-            panel.style.flex = "none";
-            panel.style.height = newHeight + "px";
-        });
+        <div class="player-group" title="Take the colour out of objects whose moment has not arrived yet. All the way up, playback builds the graph out of the dark.">
+          <span class="player-caption">future</span>
+          <input id="futureDim" class="dim-slider" type="range" min="0" max="100" value="0" step="5"
+                 aria-label="dim objects whose moment is still ahead">
+          <span id="futureDimReadout" class="player-caption dim-readout">0%</span>
+        </div>
+      </div>
 
-        window.addEventListener("mouseup", () => {
-            activeSplitter = null;
-            document.body.style.cursor = "default";
-        });
+      <div id="toast" role="status" aria-live="polite"></div>
 
-        /* sidebar resize */
-        const divider = document.getElementById("divider");
-        const sidebar = document.getElementById("sidebar");
+      <div id="boot">building the scene…</div>
 
-        let dragging = false;
+    </div>
 
-        divider.addEventListener("mousedown", () => dragging = true);
-        window.addEventListener("mouseup", () => dragging = false);
+  </div>
 
-        window.addEventListener("mousemove", (e) => {
-            if (!dragging) return;
-            const newWidth = e.clientX;
-            sidebar.style.width = newWidth + "px";
-        });
-    </script>
+  <script type="module">
+    import * as THREE from 'https://esm.sh/three@0.160.0';
+    import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
-    <script type="module">
-        import * as THREE from 'https://esm.sh/three@0.160.0';
-        import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+    // ---- the scene, and a few small helpers -----------------------------
 
-        // import { Map as IMap } from "immutable";
-        import { Map as IMap } from "https://unpkg.com/immutable@5/dist/immutable.es.js";
+    // build.py substitutes the contents of scene.json for the number below.
+    // Do not reformat this line; the replacement is textual.
+    const data = 103070301 /* SCENE_JSON */;
 
-        const inFocus = {
-            metaTime: new Set(),
-            edgeId: new Set(),
-            pointer: new Set(),
-        };
+    // Every console.log in here is gated. This scene has ~5000 meshes and
+    // ~2900 events; logging per mesh once flooded the console badly enough
+    // to drop earlier messages, and slowed playback noticeably.
+    // Flip from the console with `app.debug.on = true`.
+    const debug = { on: false };
+    const log  = (...a) => { if (debug.on) console.log(...a); };
 
+    const $ = (id) => document.getElementById(id);
 
-        const color = {
-            _box: 0xaa8844,
-            _pointer: 0xaa8844,
-            box: 0x55aa44,
-            pointer: 0x55aa44,
-        };
-        const emissiveIntensity = {
-            noHoverNode: 0,
-            hoverNode: 1.0,
-        };
+    /// Say something in the corner of the 3D view, for a few seconds.
+    ///
+    /// This exists for one situation: a chip that names something the scene has
+    /// no object for. Hovering would tell you, but only if you already suspected
+    /// there was something to hover for -- pressing it should say so outright.
+    const TOAST_MS = 4000;
+    let toastTimer = null;
 
-        const data = 103070301 /* SCENE_JSON */;
-        // const data = await fetch('./scene.json').then(r => r.json());
+    function say(headline, detail) {
+      const toast = $("toast");
+      toast.replaceChildren(el("div", "headline", headline), el("div", "detail", detail));
+      toast.classList.add("showing");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(hush, TOAST_MS);
+    }
+    const hush = () => { clearTimeout(toastTimer); $("toast").classList.remove("showing"); };
 
-        function openDoor(type, id) {
-            console.log("openDoor", type, id);
-            if (type == "metaTime") {
-                inFocus.metaTime.add(id);
-                document.querySelectorAll(".focus-detail")
-                    .forEach(el => {
-                        if (el.dataset.type == "metaTime" && el.dataset.id == id) {
-                            el.style.display = el.dataset.displayTrue;
-                            el.classList.add("focused")
+    /// What every chip that names something undrawn does when pressed.
+    const NOT_DRAWN = "No object in the scene data carries this label, so there is nowhere to fly.";
+    const reportAbsent = (label, detail = NOT_DRAWN) => (event) => {
+      event.stopPropagation();
+      say(label, detail);
+    };
 
-                        }
-                    });
-                document.querySelectorAll(".metaTime")
-                    .forEach(el => {
-                        if (el.metaTime == id) {
-                            el.classList.add("focused-history");
-                            el.classList.add("focused")
-                        }
-                    });
-            } else if (type == "edgeId") {
-                inFocus.edgeId.add(id);
-                document.querySelectorAll(".focus-detail")
-                    .forEach(el => {
-                        if (el.dataset.type == "edgeId" && el.dataset.id == id) {
-                            el.style.display = "inline-block";
-                            el.classList.add("focused")
+    /// Append to a Map<key, array>, creating the array on first use. Used for
+    /// every index in this file.
+    const pushInto = (map, key, value) => {
+      const seen = map.get(key);
+      if (seen) seen.push(value); else map.set(key, [value]);
+    };
 
-                        }
-                    });
-                document.querySelectorAll(".edgeId")
-                    .forEach(el => {
-                        if (el.edgeId == id) {
-                            el.classList.add("focused-history");
-                            el.classList.add("focused")
-                        }
-                    });
-            } else if (type == "pointer") {
-                inFocus.pointer.add(id);
-                document.querySelectorAll(".focus-detail")
-                    .forEach(el => {
-                        if (el.dataset.type == "pointer" && el.dataset.id == id) {
-                            el.style.display = "inline-block";
-                            el.classList.add("focused")
-                        }
-                    });
-                document.querySelectorAll(".pointer")
-                    .forEach(el => {
-                        if (el.pointer == id) {
-                            el.classList.add("focused-history");
-                            el.classList.add("focused")
-                        }
-                    });
-            } else {
-                console.error("openDoor: unrecognized type", type)
-            }
-        }
+    const el = (tag, className, text) => {
+      const e = document.createElement(tag);
+      if (className) e.className = className;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    };
+    const span = (className, text) => el("span", className, text);
 
-        function closeDoor(type, id) {
-            console.log("closeDoor", type, id);
-            if (type == "metaTime") {
-                inFocus.metaTime.delete(id);
-                document.querySelectorAll(".focus-detail")
-                    .forEach(el => {
-                        if (el.dataset.type == "metaTime" && el.dataset.id == id) {
-                            el.style.display = el.dataset.displayFalse;
-                            el.classList.remove("focused")
-                        }
-                    });
-                document.querySelectorAll(".metaTime")
-                    .forEach(el => {
-                        if (el.metaTime == id) {
-                            el.classList.remove("focused")
-                        }
-                    });
-            } else if (type == "edgeId") {
-                inFocus.edgeId.delete(id);
-                document.querySelectorAll(".focus-detail")
-                    .forEach(el => {
-                        if (el.dataset.type == "edgeId" && el.dataset.id == id) {
-                            el.style.display = "none";
-                            el.classList.remove("focused")
-                        }
-                    });
-                document.querySelectorAll(".edgeId")
-                    .forEach(el => {
-                        if (el.edgeId == id) {
-                            el.classList.remove("focused")
-                        }
-                    });
-            } else if (type == "pointer") {
-                inFocus.pointer.delete(id);
-                document.querySelectorAll(".focus-detail")
-                    .forEach(el => {
-                        if (el.dataset.type == "pointer" && el.dataset.id == id) {
-                            el.style.display = "none";
-                            el.classList.remove("focused");
-                        }
-                    });
-                document.querySelectorAll(".pointer")
-                    .forEach(el => {
-                        if (el.pointer == id) {
-                            el.classList.remove("focused")
-                        }
-                    });
-            } else {
-                console.error("closeDoor: unrecognized type", type)
-            }
-        }
+    /// The arrow glyphs are the outline's whole vocabulary for what an edge
+    /// did, and the edge doors reuse them so the two views agree.
+    const ARROWS = {
+      put:        " ───» ",
+      get:        " ───> ",
+      putForce:   " ══▷» ",
+      force:      " ═══▷ ",
+      forceBegin: " ═══▷ ",
+    };
+    /// One rule, everywhere an edge is printed: **an arrow flies, a chip opens
+    /// a door.** The arrow is to an edge what the ◉ / ▣ shape is to a node --
+    /// the way to find it in the 3D scene -- and the `#edgeId(...)` beside it
+    /// is the way to read what the scene data knows about it.
+    ///
+    /// An arrow for an edge the scene never drew says so when pressed rather
+    /// than going quiet -- see `markAbsent`.
+    const actionArrow = (action, edgeId) => {
+      const e = span("action-arrow action-" + action, ARROWS[action] || " " + action + " ");
+      // Every chip is built after the scene is, so "is this edge drawn?" has an
+      // answer right here. 134 of the outline's 959 edges are not.
+      if (!meshesByLabel.has(edgeId)) return markAbsent(e, edgeId);
+      e.title = "Fly to " + edgeId;
+      e.onclick = flyToEdge(edgeId);
+      return e;
+    };
 
-        function clearFocus() {
-            document.querySelectorAll(".focused")
-                .forEach(el => el.classList.remove("focused"));
-        }
-        function setFocus(t) {
-            console.log("setFocus", t);
-            if (inFocus.metaTime.has(t)) {
-                closeDoor("metaTime", t)
-            } else {
-                openDoor("metaTime", t)
-            }
-        }
+    /// Turn a chip into one that reports instead of acting: magenta on the way
+    /// down, a `help` cursor, the reason on hover, and the reason again in the
+    /// corner of the 3D view when pressed.
+    function markAbsent(e, label, detail) {
+      e.classList.add("absent");
+      e.title = detail || (label + " has no object in the 3D view");
+      e.onclick = reportAbsent(label, detail);
+      return e;
+    }
 
-        function scrollToMetaTime(t, behavior) {
-            document.querySelectorAll(".metaTimeAnchor")
-                .forEach(el => {
-                    if (el.metaTime == t) {
-                        el.scrollIntoView({
-                            behavior,
-                            block: "nearest",
-                            inline: "nearest",
-                        });
-                    }
-                });
-        }
-        const playerState = {
-            isPlaying: false,
-            metaTime: 1,
-            maxMetaTime: data.events[data.events.length - 1].metaTime,
-            stopResetsTo: 1,
-            bpm: 1337,
-            timer: null,
-        };
+    /// The click handler behind every arrow.
+    const flyToEdge = (edgeId) => (event) => {
+      event.stopPropagation();
+      lookAtEdge(edgeId);
+    };
 
-        const slider = document.getElementById("metaSlider");
+    /// A nodeId is [space, "@now", seq]. Its first component is the space,
+    /// which is what the rest of the app calls a *pointer*.
+    const spaceOf = (nodeId) => nodeId[0];
+    const showNodeId = (nodeId) => String(nodeId);
 
-        slider.min = 1;
-        slider.max = playerState.maxMetaTime;
-        slider.value = playerState.metaTime;
+    // ---- doors -----------------------------------------------------------
+    //
+    // A door is (kind, id). Opening it reveals every `.focus-detail` built
+    // for that pair and marks every chip that names it. The three kinds
+    // differ only in which chip class carries them.
 
-        function renderPlayerUI() {
+    const DOOR_KINDS = ["metaTime", "edgeId", "pointer"];
 
-            document.getElementById("metaTimeDisplay").value =
-                playerState.metaTime + " of " + playerState.maxMetaTime;
+    const emptyIndex = () => Object.fromEntries(DOOR_KINDS.map((k) => [k, new Map()]));
 
-            document.getElementById("bpmDisplay").value =
-                playerState.bpm;
+    // Both sides of a door, indexed by (kind, id) as they are built. The
+    // original found them with `document.querySelectorAll(".metaTime")` and
+    // filtered -- that is 5,600 elements walked on every click and, worse,
+    // twice per beat during playback, which is what made fast BPMs stutter.
+    const chipIndex   = emptyIndex();   // (kind, id) -> [chip, ...]
+    const detailIndex = emptyIndex();   // (kind, id) -> [.focus-detail, ...]
+    const anchorIndex = new Map();      // metaTime -> [scroll target, ...]
 
-            slider.value = playerState.metaTime;
-            slider.max = playerState.maxMetaTime;
+    const openDoors = {
+      metaTime: new Set(),
+      edgeId: new Set(),
+      pointer: new Set(),
+    };
 
-            document.getElementById("playPauseBtn").textContent =
-                playerState.isPlaying ? "⏸" : "▶";
-        }
-        renderPlayerUI();
+    const indexed = (index, kind, id) => index[kind].get(String(id)) || [];
+    const detailsFor = (kind, id) => indexed(detailIndex, kind, id);
+    const chipsFor   = (kind, id) => indexed(chipIndex, kind, id);
 
-        function beatDurationMs() {
-            return (60 * 1000) / playerState.bpm;
-        }
+    function openDoor(kind, id) {
+      if (!chipIndex[kind]) { console.error("openDoor: unknown door kind", kind); return; }
+      log("openDoor", kind, id);
+      openDoors[kind].add(String(id));
+      // `displayTrue` rather than a hard-coded "inline-block": a door nested
+      // inside another wants "block" when open, and the element knows which.
+      detailsFor(kind, id).forEach((e) => {
+        e.style.display = e.dataset.displayTrue;
+        e.classList.add("focused");
+      });
+      chipsFor(kind, id).forEach((e) => e.classList.add("focused"));
+      renderOpenDoorCount();
+    }
 
-        function tickPlayback() {
-            if (!playerState.isPlaying) {
-                return;
-            }
-            playerState.metaTime++;
-            if (playerState.metaTime > playerState.maxMetaTime) {
-                playerState.metaTime = playerState.maxMetaTime;
-                stopPlayback();
-                return;
-            }
-            renderPlayerFocusAtMetaTime();
-            renderPlayerUI();
-            playerState.timer = setTimeout(
-                tickPlayback,
-                beatDurationMs()
-            );
-        }
+    function closeDoor(kind, id) {
+      if (!chipIndex[kind]) { console.error("closeDoor: unknown door kind", kind); return; }
+      log("closeDoor", kind, id);
+      openDoors[kind].delete(String(id));
+      detailsFor(kind, id).forEach((e) => {
+        e.style.display = e.dataset.displayFalse;
+        e.classList.remove("focused");
+      });
+      chipsFor(kind, id).forEach((e) => e.classList.remove("focused"));
+      renderOpenDoorCount();
+    }
 
-        function startPlayback() {
-            if (playerState.isPlaying) {
-                return;
-            }
-            playerState.isPlaying = true;
-            renderPlayerUI();
-            tickPlayback();
-        }
+    function closeAllDoors() {
+      for (const kind of DOOR_KINDS) {
+        for (const id of [...openDoors[kind]]) closeDoor(kind, id);
+      }
+    }
 
-        function pausePlayback() {
-            playerState.isPlaying = false;
-            clearTimeout(playerState.timer);
-            renderPlayerUI();
-        }
+    function renderOpenDoorCount() {
+      const count = (n, one, many = one + "s") => n + " " + (n === 1 ? one : many);
+      const total = Object.values(openDoors).reduce((a, s) => a + s.size, 0);
+      $("openDoorCount").textContent = total === 0 ? "none"
+        : [count(openDoors.pointer.size, "node"),
+           count(openDoors.edgeId.size, "edge"),
+           count(openDoors.metaTime.size, "moment")].join(" · ");
+    }
 
-        function stopPlayback() {
-            pausePlayback();
-            playerState.metaTime = playerState.stopResetsTo;
-            renderPlayerFocusAtMetaTime("smooth");
-            renderPlayerUI();
-            // clearFocus();
-        }
-        document.getElementById("tickBackBtn").onclick = () => {
-            pausePlayback();
-            if (playerState.metaTime > 1) {
-                playerState.metaTime = playerState.metaTime - 1;
-                playerState.stopResetsTo = playerState.metaTime;
-            }
-            renderPlayerUI();
-            renderPlayerFocusAtMetaTime("smooth");
-        }
-        document.getElementById("tickForwardBtn").onclick = () => {
-            pausePlayback();
-            if (playerState.metaTime < playerState.maxMetaTime) {
-                playerState.metaTime = playerState.metaTime + 1;
-                playerState.stopResetsTo = playerState.metaTime;
-            }
-            renderPlayerUI();
-            renderPlayerFocusAtMetaTime("smooth");
-        }
-        function setAllMeshesVisible(visible = true) {
-            sceneMeshes.forEach(mesh => {
-                mesh.visible = visible;
-            })
-        }
-        document.getElementById("gotoStartBtn").onclick = () => {
-            let isPlaying = playerState.isPlaying;
-            playerState.metaTime = 1;
-            playerState.stopResetsTo = 1;
-            playerState.isPlaying = isPlaying;
-            setAllMeshesVisible(false);
-            renderPlayerUI();
-            renderPlayerFocusAtMetaTime("smooth");
-        }
+    /// The container a door's details live in. `displayFalse` is "none" at
+    /// the top level, but "inline-block" for the metaTime doors nested in a
+    /// pointer's door: those keep their chip visible while shut.
+    function createDoorDetail(kind, id, displayTrue = "inline-block", displayFalse = "none") {
+      const e = el("div", "focus-detail");
+      e.style.display = displayFalse;
+      e.dataset.type = kind;
+      e.dataset.id = id;
+      e.dataset.displayTrue = displayTrue;
+      e.dataset.displayFalse = displayFalse;
+      pushInto(detailIndex[kind], String(id), e);
+      return e;
+    }
 
-        document.getElementById("playPauseBtn")
-            .onclick = () => {
-                if (playerState.isPlaying) {
-                    pausePlayback();
-                } else {
-                    startPlayback();
-                }
-            };
+    /// The one click handler behind every chip.
+    ///
+    ///   plain click  -- open the door (and, for a moment, park the player
+    ///                   there); "objectShape" instead flies the camera
+    ///   shift-click  -- close it
+    function doorClick(kind, id) {
+      return (event) => {
+        event.stopPropagation();
+        // Not a door: the ◉ / ▣ shapes fly the camera instead of revealing
+        // anything, so they have nothing to shift-click shut.
+        if (kind === "objectShape") { lookAtLabel(id); return; }
+        if (event.shiftKey) { closeDoor(kind, id); return; }
+        openDoor(kind, id);
+        if (kind === "metaTime") seekTo(Number(id));
+      };
+    }
 
-        document.getElementById("stopBtn")
-            .onclick = stopPlayback;
+    // ---- chips ------------------------------------------------------------
+    // One maker per door kind. Each stashes its id on the element, which is
+    // how `chipsFor` finds it again without re-reading the text.
 
-        document.getElementById("bpmUpBtn")
-            .onclick = () => {
+    function metaTimeChip(metaTime, isAnchor = false) {
+      const e = span("metaTime" + (isAnchor ? " metaTimeAnchor" : ""), String(metaTime));
+      e.metaTime = metaTime;
+      e.onclick = doorClick("metaTime", metaTime);
+      pushInto(chipIndex.metaTime, String(metaTime), e);
+      if (isAnchor) pushInto(anchorIndex, String(metaTime), e);
+      return e;
+    }
 
-                playerState.bpm += 60;
+    /// An invisible chip that only exists so `scrollToMetaTime` has
+    /// something to scroll to for a moment nothing else printed.
+    function metaTimeAnchor(metaTime) {
+      const e = span("metaTimeAnchor", "");
+      e.metaTime = metaTime;
+      pushInto(anchorIndex, String(metaTime), e);
+      return e;
+    }
 
-                renderPlayerUI();
-            };
+    /// A nodeId names one revision; its door is its space's door, because
+    /// that is where all the revisions are listed.
+    function nodeIdChip(nodeId) {
+      const space = spaceOf(nodeId);
+      const e = span("nodeId", showNodeId(nodeId));
+      e.nodeId = nodeId;
+      // Edge endpoints reach outside the graph -- "@here" is the ambient root
+      // and has no revisions of its own. Naming it is right; offering a door
+      // that opens on nothing is not.
+      if (!nodeRevisions.has(space)) {
+        return markAbsent(e, space,
+          "No revisions of this space were recorded, so it has no door to open.");
+      }
+      e.classList.add("pointer");
+      e.pointer = space;
+      e.onclick = doorClick("pointer", space);
+      pushInto(chipIndex.pointer, space, e);
+      return e;
+    }
 
-        document.getElementById("bpmDownBtn")
-            .onclick = () => {
+    function edgeIdChip(edgeId) {
+      const e = span("edgeId", edgeId);
+      e.edgeId = edgeId;
+      e.onclick = doorClick("edgeId", edgeId);
+      pushInto(chipIndex.edgeId, edgeId, e);
+      return e;
+    }
 
-                playerState.bpm =
-                    Math.max(17, playerState.bpm - 60);
+    function pointerChip(ptr, shape) {
+      const cls = shape === "#thunk_"   ? "pointer pointerThunk"
+                : shape === "#nonThunk" ? "pointer pointerNonThunk"
+                : null;
+      if (!cls) console.error("unrecognized pointer shape", shape);
+      const e = span(cls || "pointer", ptr);
+      e.pointer = ptr;
+      e.onclick = doorClick("pointer", ptr);
+      pushInto(chipIndex.pointer, ptr, e);
+      return e;
+    }
 
-                renderPlayerUI();
-            };
+    /// ◉ / ▣ -- not a door. Clicking one flies the camera to that object.
+    function shapeChip(shape = "#thunk_", label = "scene") {
+      const thunk = shape === "#thunk_";
+      if (!thunk && shape !== "#nonThunk") console.error("unrecognized outline node shape", shape);
+      const e = span(thunk ? "outline-node-thunk-shape" : "outline-node-nonthunk-shape",
+                     thunk ? "◉" : "▣");
+      // The forest root ("scene") is the run itself and was never placed, so
+      // its glyph has nowhere to go either.
+      if (!meshesByLabel.has(label)) return markAbsent(e, label);
+      e.title = "Fly to " + label;
+      e.onclick = doorClick("objectShape", label);
+      return e;
+    }
 
-        document.getElementById("metaSlider")
-            .oninput = (e) => {
+    /// Bodies, thunks and values run long. Two lines, click for the rest --
+    /// these used to say cursor:pointer and do nothing at all.
+    function longText(className, text) {
+      const e = span(className + " clamped", text == null ? "" : String(text));
+      e.title = "Click to expand";
+      e.onclick = (event) => { event.stopPropagation(); e.classList.toggle("expanded"); };
+      return e;
+    }
 
-                playerState.metaTime =
-                    Number(e.target.value);
-                playerState.stopResetsTo = playerState.metaTime;
-                renderPlayerFocusAtMetaTime("smooth");
+    // ---- indexing the scene ----------------------------------------------
+    //
+    // Three indices, all built once:
+    //
+    //   nodeRevisions   space   -> [{metaTime, nodeId, node}, ...] in order
+    //   edgeRevisions   edgeId  -> [{metaTime, edge}, ...] in order
+    //   labelsAtMetaTime  metaTime -> [label, ...] -- what the moment touched,
+    //                     where a label is a space or an edgeId, the same
+    //                     strings the 3D meshes are filed under.
+    //
+    // The original kept two persistent (immutable.js) maps so it could ask
+    // for a snapshot of every space at a given moment. Nothing ever asked;
+    // every lookup was "this space, at this moment", which is a plain index.
+    // Dropping it also drops a CDN dependency.
 
-                renderPlayerUI();
-            };
+    const nodeRevisions = new Map();
+    const edgeRevisions = new Map();
+    const labelsAtMetaTime = new Map();
 
-        // --------------------------------------------------------
-        const BoxDim = 0.33;
+    const touchedAt = (metaTime, label) => {
+      const seen = labelsAtMetaTime.get(metaTime);
+      if (seen) seen.push(label); else labelsAtMetaTime.set(metaTime, [label]);
+    };
 
-        const scene = new THREE.Scene();
-        const lightMode = false;
+    for (const rev of data.nodes) {
+      const space = spaceOf(rev.nodeId);
+      pushInto(nodeRevisions, space, rev);
+      touchedAt(rev.metaTime, space);
+    }
+    for (const rev of data.edges) {
+      pushInto(edgeRevisions, rev.edgeId, rev);
+      touchedAt(rev.metaTime, rev.edgeId);
+    }
 
-        if (lightMode) {
-            scene.background = new THREE.Color(0xffffff);
+    const maxMetaTime = data.events.reduce((m, e) => Math.max(m, e.metaTime), 1);
+
+    /// The moment a label first appears, so "grow with time" knows when to
+    /// let each object into the scene.
+    const bornAt = new Map();
+    for (const [metaTime, labels] of labelsAtMetaTime) {
+      for (const label of labels) {
+        const seen = bornAt.get(label);
+        if (seen === undefined || metaTime < seen) bornAt.set(label, metaTime);
+      }
+    }
+
+    // ---- the pointer doors -------------------------------------------------
+    //
+    // One door per space, holding one nested metaTime door per revision. Shut,
+    // a revision is just its moment; open, it is what the node became then.
+
+    function nodeRevisionDetail(into, rev) {
+      const node = rev.node;
+      if (node.type === "thunk") {
+        into.appendChild(longText("thunk-body-text", node.body));
+
+        const trace = el("div", "thunk-trace");
+        node.trace.forEach((edgeId) => trace.appendChild(edgeIdChip(edgeId)));
+        into.appendChild(trace);
+
+        const result = el("div", "thunk-result");
+        if (!node.result) {
+          result.appendChild(document.createTextNode("result undefined"));
         } else {
-            scene.background = new THREE.Color(0x00000000);
+          result.appendChild(longText("thunk-result-value", node.result[1]));
         }
-        // const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
+        into.appendChild(result);
+      } else if (node.type === "nonThunk") {
+        into.appendChild(longText("outline-value-text", node.value));
+      } else {
+        console.error("invalid node revision type", node.type, rev);
+      }
+    }
 
-        const camera = new THREE.PerspectiveCamera(
-            60,
-            1,
-            0.1,
-            1000
-        );
+    function buildPointerDoors() {
+      const into = $("pointers");
+      for (const [space, revisions] of nodeRevisions) {
+        const first = revisions[0];
+        const shape = first.node.type === "thunk" ? "#thunk_"
+                    : first.node.type === "nonThunk" ? "#nonThunk"
+                    : null;
+        if (!shape) { console.error("pointer with no usable first revision", space, first); continue; }
 
-        camera.position.set(6, 4, 8);
+        const door = createDoorDetail("pointer", space);
+        door.appendChild(shapeChip(shape, space));
+        door.appendChild(pointerChip(space, shape));
 
-        const viewport = document.getElementById("viewport");
+        for (const rev of revisions) {
+          // Two nested doors on the same moment: the outer one turns the
+          // chip into a block so the detail gets its own line, the inner one
+          // holds the detail itself.
+          const outer = createDoorDetail("metaTime", rev.metaTime, "block", "inline-block");
+          const inner = createDoorDetail("metaTime", rev.metaTime, "inline-block", "none");
+          inner.classList.add("inner");
+          outer.appendChild(metaTimeChip(rev.metaTime));
+          outer.appendChild(inner);
+          door.appendChild(outer);
+          nodeRevisionDetail(inner, rev);
+        }
+        into.appendChild(door);
+      }
+    }
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+    // ---- the edge doors ----------------------------------------------------
+    //
+    // Built the same way as the pointer doors, and until now the missing half
+    // of the pair: an edge door used to hold nothing but its own name. An
+    // edge is an action from a source node to a target node; it can be
+    // revised once (a `forceBegin` that later lands as a `force`), so the
+    // door lists revisions the way a pointer's does.
+    //
+    // `edge.metaTimes` is one moment for an action that happened at an
+    // instant, and a [begin, end] pair for one that spans a force.
 
-        renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+    function edgeRevisionDetail(into, rev) {
+      const edge = rev.edge;
+      const action = edge.action;
 
-        viewport.appendChild(renderer.domElement);
+      const wires = el("div", "door-row");
+      wires.appendChild(span("door-label", "from"));
+      wires.appendChild(nodeIdChip(edge.source));
+      wires.appendChild(actionArrow(action.type, rev.edgeId));
+      wires.appendChild(span("door-label", "to"));
+      wires.appendChild(nodeIdChip(edge.target));
+      into.appendChild(wires);
 
-        const controls = new OrbitControls(camera, renderer.domElement);
+      const spans = el("div", "door-row");
+      spans.appendChild(span("door-label", Array.isArray(edge.metaTimes) ? "spans" : "at"));
+      if (Array.isArray(edge.metaTimes)) {
+        spans.appendChild(metaTimeChip(edge.metaTimes[0]));
+        spans.appendChild(document.createTextNode("→"));
+        spans.appendChild(metaTimeChip(edge.metaTimes[1]));
+      } else {
+        spans.appendChild(metaTimeChip(edge.metaTimes));
+      }
+      into.appendChild(spans);
 
-        scene.add(new THREE.AmbientLight(0xffffff));
-        const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(5, 5, 5);
-        scene.add(light);
+      if (action.thunk !== undefined) {
+        const row = el("div", "door-row");
+        row.appendChild(span("door-label", "thunk"));
+        row.appendChild(longText("outline-forced-thunk-text", action.thunk));
+        into.appendChild(row);
+      }
+      if (action.value !== undefined) {
+        const row = el("div", "door-row");
+        row.appendChild(span("door-label", "value"));
+        row.appendChild(longText("outline-value-text", action.value));
+        into.appendChild(row);
+      }
+    }
 
-        const sceneMeshes = new Set();
-        const meshByLabel = new Map();
-        const labelByMesh = new Map();
-        const pointerDotsByKey = new Map();
-        const labelByPointerSource = new Map();
-        const objectMaterials = new Map();
+    function buildEdgeDoors() {
+      const into = $("edgeIds");
+      for (const [edgeId, revisions] of edgeRevisions) {
+        const door = createDoorDetail("edgeId", edgeId);
+        door.appendChild(edgeIdChip(edgeId));
 
-        function addMesh(label, mesh) {
-            sceneMeshes.add(mesh);
-            scene.add(mesh);
-            labelByMesh.set(mesh, label);
-            if (!meshByLabel.get(label)) {
-                meshByLabel.set(label, [mesh])
+        for (const rev of revisions) {
+          const outer = createDoorDetail("metaTime", rev.metaTime, "block", "inline-block");
+          const inner = createDoorDetail("metaTime", rev.metaTime, "inline-block", "none");
+          inner.classList.add("inner");
+          outer.appendChild(metaTimeChip(rev.metaTime));
+          outer.appendChild(inner);
+          door.appendChild(outer);
+          edgeRevisionDetail(inner, rev);
+        }
+        into.appendChild(door);
+      }
+    }
+
+    // ---- the event log ------------------------------------------------------
+
+    const EVENT_SUBJECT = {
+      addNode:    (ev) => nodeIdChip(ev.nodeId),
+      addEdge:    (ev) => edgeIdChip(ev.edgeId),
+      forceBegin: (ev) => edgeIdChip(ev.edgeId),
+      forceEnd:   (ev) => edgeIdChip(ev.edgeId),
+      updateEdge: (ev) => edgeIdChip(ev.edgeId),
+    };
+
+    function renderEvents() {
+      const into = $("events");
+      into.innerHTML = "";
+      let lastMetaTime = null;
+      for (const ev of data.events) {
+        const row = el("div");
+        // Only the first event of a moment is an anchor, so scrolling to a
+        // moment lands on where it starts rather than where it ends.
+        row.appendChild(metaTimeChip(ev.metaTime, ev.metaTime !== lastMetaTime));
+        lastMetaTime = ev.metaTime;
+        row.appendChild(document.createTextNode(" " + ev.type + " "));
+        const subject = EVENT_SUBJECT[ev.type];
+        if (subject) row.appendChild(subject(ev));
+        else console.error("unknown event type", ev);
+        if (ev.cacheHit)  row.appendChild(span("door-label", "cache hit"));
+        if (ev.cacheMiss) row.appendChild(span("door-label", "cache miss"));
+        into.appendChild(row);
+      }
+    }
+
+    // ---- the outline ---------------------------------------------------------
+    //
+    // The forced-thunk tree, nested the way it ran. Each edge is one action;
+    // an edge whose `metaTimes` is a [begin, end] pair forced a thunk, so its
+    // sub-outline is drawn underneath it and the value it came back with hangs
+    // below that on a result row. An edge with a single moment just did its
+    // action and its value sits on the same line.
+    //
+    // The indentation is the DOM nesting -- see `.outline-node` in the CSS --
+    // so a child row is appended *inside* its parent's element.
+
+    function renderOutline() {
+      // A scene's outline is a forest: zero or more trees, in the order
+      // whoever produced it chose. It used to be a single tree, and an older
+      // scene.json will still hold one, so both are accepted.
+      const forest = Array.isArray(data.outline) ? data.outline
+                   : data.outline ? [data.outline]
+                   : [];
+      const panel = $("outline");
+      let placedFirstAnchor = false;
+
+      /// The [begin, end] pair under a result row. The begin chip used to be
+      /// wired to the *end* moment: clicking "3," parked the player on 49.
+      function metaTimeRange(into, begin, end) {
+        const row = el("div");
+        row.style.marginLeft = "9px";
+        const beginChip = metaTimeChip(begin);
+        beginChip.textContent = begin + ", ";
+        row.appendChild(beginChip);
+        row.appendChild(metaTimeChip(end, true));
+        into.appendChild(row);
+      }
+
+      function walk(into, node, depth) {
+        if (!node) return;
+
+        const nodeEl = el("div", "outline-node");
+        if (depth === 0) {
+          // Nothing above the root printed its name, so the root prints its own.
+          nodeEl.appendChild(shapeChip(node.shape, spaceOf(node.nodeId)));
+          nodeEl.appendChild(nodeIdChip(node.nodeId));
+        }
+        into.appendChild(nodeEl);
+
+        const edges = node.edges || [];
+        edges.forEach((e, i) => {
+          const row = el("div", "outline-edge");
+          const spans = Array.isArray(e.metaTimes);
+          const begin = spans ? e.metaTimes[0] : e.metaTimes;
+          const end   = spans ? e.metaTimes[1] : e.metaTimes;
+
+          // Somewhere to scroll to for moment 1, if the first edge starts later.
+          if (!placedFirstAnchor && begin > 1) {
+            row.appendChild(metaTimeAnchor(1));
+            placedFirstAnchor = true;
+          }
+
+          row.appendChild(metaTimeChip(begin, true));
+          if (spans) {
+            row.appendChild(document.createTextNode(", "));
+            row.appendChild(metaTimeChip(end));
+          }
+          row.appendChild(document.createTextNode(" (" + (i + 1) + "/" + edges.length + ")"));
+
+          row.appendChild(actionArrow(e.action, e.edgeId));
+
+          row.appendChild(shapeChip(e.outline.shape, e.actionTarget));
+          row.appendChild(pointerChip(e.actionTarget, e.outline.shape));
+          nodeEl.appendChild(row);
+
+          // A forced edge draws its callees between itself and its result.
+          walk(nodeEl, e.outline, depth + 1);
+
+          row.appendChild(document.createTextNode(" " + e.action + " "));
+
+          if (!spans) {
+            row.appendChild(longText("outline-value-text", e.value));
+            row.appendChild(edgeIdChip(e.edgeId));
+          } else {
+            row.appendChild(edgeIdChip(e.edgeId));
+            row.appendChild(longText("outline-forced-thunk-text", e.forcedThunk));
+
+            const result = el("div", "outline-internal-result");
+            const resultArrow = span("action-arrow result-arrow", "╰〜〜>");
+            if (meshesByLabel.has(e.edgeId)) {
+              resultArrow.title = "Fly to " + e.edgeId;
+              resultArrow.onclick = flyToEdge(e.edgeId);
             } else {
-                let meshes = meshByLabel.get(label);
-                meshByLabel.set(label, [...meshes, mesh])
+              markAbsent(resultArrow, e.edgeId);
             }
-        }
-
-        function makeTextTexture(text, type = "textLines", isSprite = false) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-
-            const fontSize = 48;
-            const lineHeight = fontSize * 1.2;
-            const padding = 20;
-
-            ctx.font = `${fontSize}px monospace`;
-
-            const lines = text.split('\n');
-            const maxWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
-
-            canvas.width = maxWidth + padding * 2;
-            canvas.height = lineHeight * lines.length + padding * 2;
-
-            ctx.font = `${fontSize}px monospace`;
-
-            if (false && type === "pointerSymbol") {
-                if (lightMode) {
-                    ctx.fillStyle = '#123';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.strokeStyle = '#888';
-                    ctx.strokeRect(0, 0, canvas.width, canvas.height);
-                    ctx.fillStyle = 'white';
-                } else {
-                    //ctx.fillStyle = 'rgba(0,0,0,1)';
-                    //ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    //ctx.strokeStyle = '#0a0';
-                    //ctx.strokeRect(0, 0, canvas.width, canvas.height);
-                    ctx.fillStyle = 'white';
-                }
-            } else {
-                if (lightMode) {
-                    ctx.fillStyle = 'rgba(0,0,0,1)';
-                } else {
-                    ctx.fillStyle = 'white';
-                }
-            }
-            lines.forEach((line, i) => {
-                ctx.fillText(line, padding, padding + (i + 1) * lineHeight - (lineHeight - fontSize));
-            });
-
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.needsUpdate = true;
-            texture.minFilter = THREE.LinearFilter;
-
-            const aspect = canvas.height / canvas.width;
-
-            //var result = texture;
-            //if (isSprite) {
-            //    let material = new THREE.SpriteMaterial({ map: texture });
-            //    result = new THREE.Sprite(material);
-            // }
-            return { texture, aspect };
-        }
-        function createBoxMesh(obj) {
-            let material = new THREE.MeshStandardMaterial({
-                color: color.box, transparent: true, opacity: 0.618,
-                emissive: "white", emissiveIntensity: emissiveIntensity.noHoverNode,
-                visible: true
-            });
-            objectMaterials.set(obj.label, material);
-            const mesh = new THREE.Mesh(
-                new THREE.BoxGeometry(BoxDim, BoxDim, BoxDim),
-                material
-            );
-            mesh.position.set(...obj.position);
-            // scene.add(mesh);
-            // sceneMeshes.add(mesh);
-            addMesh(obj.label, mesh);
-
-            const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim));
-            const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
-            const labelMesh = new THREE.Mesh(
-                new THREE.PlaneGeometry(0.7, 0.7 * aspect),
-                new THREE.MeshStandardMaterial({
-                    map: texture, transparent: false,
-                    emissive: "white",
-                    emissiveIntensity: 0.0,
-                })
-            );
-            labelMesh.position.copy(labelAnchor);
-            // scene.add(labelMesh);
-            // sceneMeshes.add(labelMesh);
-            addMesh(obj.label, labelMesh);
-
-            const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim));
-            const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.textLines || "", "textLines");
-            const fieldMesh = new THREE.Mesh(
-                new THREE.PlaneGeometry(0.5, 0.5 * fieldAspect),
-                new THREE.MeshStandardMaterial({
-                    map: fieldTexture, transparent: true, alphaTest: 0.1,
-                    emissive: "white",
-                    emissiveIntensity: 0.0,
-                })
-            );
-            fieldMesh.position.copy(fieldsAnchor);
-            // scene.add(fieldMesh);
-            // sceneMeshes.add(fieldMesh);
-            addMesh(obj.label, fieldMesh);
-
-            const dots = [];
-            if (obj.pointerFields) {
-                const spacing = 0.1;
-                const startX = mesh.position.x - (obj.pointerFields.length - 1) * spacing / 2;
-                const y = mesh.position.y - 0.17;
-                const z = mesh.position.z;
-                obj.pointerFields.forEach((fname, i) => {
-                    const dot = new THREE.Mesh(
-                        new THREE.SphereGeometry(0.03, 12, 12),
-                        new THREE.MeshStandardMaterial({
-                            color: 0x000000, emissive: "white",
-                            emissiveIntensity: 0.0,
-                        })
-                    );
-                    dot.position.set(startX + i * spacing, y, z);
-                    scene.add(dot);
-                    sceneMeshes.add(dot);
-                    dots.push(dot);
-                    pointerDotsByKey.set(obj.label + ":" + fname, dot.position);
-                    labelByPointerSource.set(obj.label + ":" + fname, obj.label);
-                });
-            }
-
-            return mesh;
-        }
-
-        function createOrb(obj) {
-            let material = new THREE.MeshStandardMaterial({
-                color: 0x4488aa, transparent: true, opacity: 0.9, emissive: "white",
-                emissiveIntensity: 0.0,
-            });
-            objectMaterials.set(obj.label, material);
-            const mesh = new THREE.Mesh(
-                new THREE.SphereGeometry(BoxDim * 0.618),
-                material
-            );
-            mesh.position.set(...obj.position);
-            // scene.add(mesh);
-            // sceneMeshes.add(mesh);
-            addMesh(obj.label, mesh);
-
-            const labelAnchor = mesh.position.clone().add(new THREE.Vector3(-0.17, 0.17, BoxDim));
-            const { texture, aspect } = makeTextTexture(obj.label, "pointerSymbol", true);
-            const labelMesh = new THREE.Mesh(
-                new THREE.PlaneGeometry(0.7, 0.7 * aspect),
-                new THREE.MeshBasicMaterial({
-                    map: texture, transparent: false, emissive: "white",
-                    emissiveIntensity: 0.0,
-                })
-            );
-            labelMesh.position.copy(labelAnchor);
-            // scene.add(labelMesh);
-            // sceneMeshes.add(labelMesh);
-            addMesh(obj.label, labelMesh);
-
-            const fieldsAnchor = mesh.position.clone().add(new THREE.Vector3(0.37, 0, BoxDim));
-            const { texture: fieldTexture, aspect: fieldAspect } = makeTextTexture(obj.fields || "", "textLines");
-            const fieldMesh = new THREE.Mesh(
-                new THREE.PlaneGeometry(0.5, 0.5 * fieldAspect),
-                new THREE.MeshBasicMaterial({
-                    map: fieldTexture, transparent: true, alphaTest: 0.1, emissive: "white",
-                    emissiveIntensity: 0.0,
-                })
-            );
-            fieldMesh.position.copy(fieldsAnchor);
-            // scene.add(fieldMesh);
-            // sceneMeshes.add(fieldMesh);
-            addMesh(obj.label, fieldMesh);
-
-            const dots = [];
-            if (obj.pointerFields) {
-                const spacing = 0.1;
-                const startX = mesh.position.x - (obj.pointerFields.length - 1) * spacing / 2;
-                const y = mesh.position.y - 0.17;
-                const z = mesh.position.z;
-                obj.pointerFields.forEach((fname, i) => {
-                    const dot = new THREE.Mesh(
-                        new THREE.SphereGeometry(0.03, 12, 12),
-                        material
-                    );
-                    dot.position.set(startX + i * spacing, y, z);
-                    scene.add(dot);
-                    sceneMeshes.add(dot);
-                    dots.push(dot);
-                    pointerDotsByKey.set(obj.label + ":" + fname, dot.position);
-                    labelByPointerSource.set(obj.label + ":" + fname, obj.label);
-                });
-            }
-
-            return mesh;
-        }
-
-
-        function computeEdgeFrame(a, b) {
-            const dir = new THREE.Vector3().subVectors(b, a);
-            const len = dir.length();
-            const n = dir.clone().normalize();
-            const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
-            return { dirNorm: n, length: len, quat };
-        }
-
-        function createPointerMesh(fromLabel, from, to) {
-            const start = from.clone();
-            const end = to.clone();
-            const material = new THREE.MeshStandardMaterial({
-                color: color.pointer, emissive: "white",
-                transparent: true,
-                opacity: 1,
-                emissiveIntensity: 0.0
-            });
-            const { dirNorm, length, quat } = computeEdgeFrame(start, end);
-
-            //const group = new THREE.Group();
-
-            const dot = new THREE.Mesh(
-                new THREE.SphereGeometry(0.05, 12, 12),
-                material
-            );
-            dot.position.copy(start);
-            //group.add(dot);
-            addMesh(fromLabel, dot);
-
-            const shaftLen = Math.max(0.001, length - 0.08);
-            const shaft = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.023, 0.035, shaftLen, 8),
-                material
-            );
-            const mid = start.clone().addScaledVector(dirNorm, shaftLen / 2);
-            shaft.position.copy(mid);
-            shaft.quaternion.copy(quat);
-            addMesh(fromLabel, shaft);
-            // group.add(shaft);
-
-            const cone = new THREE.Mesh(
-                new THREE.ConeGeometry(0.04, 0.08, 8),
-                material
-            );
-            const center = end.clone().addScaledVector(dirNorm, -0.04);
-            cone.position.copy(center);
-            cone.quaternion.copy(quat);
-            // group.add(cone);
-            addMesh(fromLabel, cone);
-            false && console.log("createPointerMesh addMesh", fromLabel, cone);
-            //return group;
-        }
-
-        function createActionMesh(type, source, target, label, color = 0x0088aa, hoverOffset = -BoxDim) {
-            //const group = new THREE.Group();
-            console.log("createActionMesh", type, label);
-
-            //color = 0x0088ff;
-            if (type === "put") color = 0x008877;
-            if (type == "putForce") color = 0xaaaaaa;
-
-            // Compute vector from source → target
-            const dir = new THREE.Vector3().subVectors(target, source);
-            const length = dir.length();
-            dir.normalize();
-
-            // Shaft parameters
-            let shaftRadius = 0.03;
-            if (type === "force" || type === "putForce") shaftRadius = 0.10;
-
-            const shaftLength = length + (hoverOffset * 1.6); // shorten shaft slightly so head hovers
-
-            // Place arrowhead with hoverOffset
-            const headPos = new THREE.Vector3().copy(target).addScaledVector(dir, hoverOffset);
-
-            // Shaft geometry
-            const shaftGeo = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength, 12);
-            const shaftMat = new THREE.MeshStandardMaterial({
-                color: color,
-                transparent: true || (type === "force" || type === "putForce"),
-                opacity: (type === "force" || type === "putForce") ? 0.6 : 0.8,
-                emissive: "white",
-                emissiveIntensity: 0.0,
-            });
-            const shaftMesh = new THREE.Mesh(shaftGeo, shaftMat);
-
-            // Shaft midpoint
-            const mid = new THREE.Vector3().addVectors(source, headPos).multiplyScalar(0.5);
-            shaftMesh.position.copy(mid);
-            shaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-            //group.add(shaftMesh);
-            addMesh(label, shaftMesh);
-
-            // Helper functions
-            function makeCone(radius = 0.12, height = 0.12) {
-                const coneGeo = new THREE.ConeGeometry(radius, height, 12);
-                const coneMat = new THREE.MeshStandardMaterial({
-                    color: color, emissive: "white",
-                    emissiveIntensity: 0.0,
-                });
-                const coneMesh = new THREE.Mesh(coneGeo, coneMat);
-                addMesh(label, coneMesh);
-                return coneMesh;
-            }
-            function makeDoublePyramid(radius = 0.12, height = 0.12) {
-                const cone1 = makeCone(radius, height);
-                const cone2 = makeCone(radius, height);
-                cone2.rotateX(Math.PI);
-                const g = new THREE.Group();
-                cone1.position.y = height / 2;
-                cone2.position.y = -height / 2;
-                g.add(cone1);
-                g.add(cone2);
-                //addMesh(label, cone1);
-                //addMesh(label, cone2);
-                return g;
-            }
-
-            if (type === "get") {
-                const cone = makeCone();
-                cone.position.copy(headPos);
-                cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-            } else if (type === "put") {
-                const dp = makeDoublePyramid();
-                dp.position.copy(headPos);
-                dp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-            } else if (type === "force") {
-                const cone = makeCone();
-                cone.position.copy(headPos);
-                cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-
-                const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12);
-                const innerShaftMat = new THREE.MeshStandardMaterial({
-                    color: color, emissive: "white",
-                    emissiveIntensity: 0.0,
-                });
-                const innerShaftMesh = new THREE.Mesh(innerShaftGeo, innerShaftMat);
-                innerShaftMesh.position.copy(mid);
-                innerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-                addMesh(label, innerShaftMesh);
-            } else if (type === "putForce") {
-                console.log("createActionMesh* ", type, label);
-                const coneforce = makeCone();
-                const coneput = makeDoublePyramid();
-                coneforce.position.copy(headPos);
-                coneput.position.copy(headPos);
-                coneforce.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-                coneput.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-                //scene.add(coneforce);
-                //scene.add(coneput);
-                const innerShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12);
-                const innerShaftMat = new THREE.MeshStandardMaterial({
-                    color: 0x008877, emissive: "white",
-                    emissiveIntensity: 0.0,
-                });
-                const innerShaftMesh = new THREE.Mesh(innerShaftGeo, innerShaftMat);
-                innerShaftMesh.position.copy(mid);
-                innerShaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-                addMesh(label, innerShaftMesh);
-            }
-        }
-
-        for (const obj of data.objects) {
-            if (obj.type === "box") createBoxMesh(obj);
-            if (obj.type === "orb") createOrb(obj);
-        }
-
-        false && console.log(labelByPointerSource);
-
-        for (const obj of data.objects) {
-            if (obj.type === "pointer") {
-                const from = pointerDotsByKey.get(obj.from);
-                const target = meshByLabel.get(obj.to);
-                if (!from || !target) continue;
-                const adjustedTarget = target[0].position.clone().add(new THREE.Vector3(0, BoxDim / 2, 0));
-                const fromLabel = labelByPointerSource.get(obj.from);
-                false && console.log("pointer ", obj.from, fromLabel);
-                createPointerMesh(fromLabel, from, adjustedTarget);
-                // scene.add(mesh);
-                // sceneMeshes.add(mesh);
-                // addMesh(fromLabel, mesh);
-            }
-            else if (obj.type == "get" || obj.type == "put" || obj.type == "force" || obj.type == "putForce") {
-                const from = pointerDotsByKey.get(obj.from);
-                const target = meshByLabel.get(obj.to);
-                if (!from || !target) { console.error("error connecting to action's target object: ", obj); continue };
-                createActionMesh(obj.type, from, target[0].position, obj.edgeId);
-                // scene.add(mesh)
-                // sceneMeshes.add(mesh);
-                // addMesh(obj.edgeId, mesh)
-            }
-            else if (obj.type === "box" || obj.type === "orb") { /* already handled */ }
-            else {
-                console.error("do not recognize this object type: " + obj.type);
-            }
-        }
-
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
-        let camTargetPos = null;
-        let camTargetLook = null;
-        let transitionDuration = 2.3;
-        let transitionStart = 0;
-
-        function getMouseNDC(event) {
-            const rect = viewport.getBoundingClientRect();
-
-            return {
-                x: ((event.clientX - rect.left) / rect.width) * 2 - 1,
-                y: -((event.clientY - rect.top) / rect.height) * 2 + 1
-            };
-        }
-
-        function lookAtMesh(m, distance = 3.0) {
-            console.log("lookAtMesh", m);
-            if (!m) { return };
-            camTargetPos = m.position.clone().add(new THREE.Vector3(0.0, 0.0, distance));
-            camTargetLook = m.position.clone();
-            transitionStart = performance.now() / 1000;
-        }
-
-        window.addEventListener('click', e => {
-            const pos = getMouseNDC(e);
-            mouse.x = pos.x;
-            mouse.y = pos.y;
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects([...sceneMeshes]);
-            if (intersects.length) {
-                const m = intersects[0].object;
-                let label = labelByMesh.get(m);
-                console.log("calling lookAtMesh() for ", label)
-                lookAtMesh(m);
-            }
+            result.appendChild(resultArrow);
+            result.appendChild(longText("outline-value-text", e.value));
+            nodeEl.appendChild(result);
+            metaTimeRange(result, begin, end);
+          }
         });
 
-
-        var hoverNode = null;
-
-        // an object to expose state to the console, set whenever hoverNode is set or reset, but never cleared after the hovering is gone, between hovers.
-        var lastHoverNode = { lastHoverNode: null };
-
-        var frames = 0;
-
-        window.addEventListener('mousemove', e => {
-            const pos = getMouseNDC(e);
-            mouse.x = pos.x;
-            mouse.y = pos.y;
-        });
-
-
-
-        function onResize() {
-            const width = viewport.clientWidth;
-            const height = viewport.clientHeight;
-
-            renderer.setSize(width, height);
-            camera.aspect = width / height;
-            camera.updateProjectionMatrix();
+        // What the whole tree came back with, which nothing was showing.
+        if (depth === 0 && node.value !== undefined) {
+          const result = el("div", "outline-internal-result");
+          // The forest root's value is not any one edge's, so this arrow has
+          // nowhere to fly and says so.
+          const rootArrow = span("action-arrow result-arrow", "╰〜〜>");
+          markAbsent(rootArrow, "the run's value",
+            "What the outline as a whole came back with, which is not any one edge's result.");
+          result.appendChild(rootArrow);
+          result.appendChild(longText("outline-value-text", node.value));
+          if (node.valueMetaTime !== undefined) {
+            result.appendChild(metaTimeChip(Number(node.valueMetaTime)));
+          }
+          nodeEl.appendChild(result);
         }
+      }
 
+      forest.forEach((tree) => walk(panel, tree, 0));
+    }
 
-        window.addEventListener("resize", onResize);
+    /// Anchors, grouped by the pane they live in and ordered, so each pane can
+    /// scroll to the last anchor *it* has at or before the cursor.
+    ///
+    /// The panes do not print the same moments. 217 of the 1,747 carry only a
+    /// node revision -- no event row, no outline row -- and the outline runs
+    /// out of rows some way before the run ends. Scrolling only on an exact
+    /// match left a pane frozen across those; falling back to the nearest
+    /// moment *anywhere* moved the pane that had it and left the other behind.
+    const anchoredPanes = [];   // [{ moments: [n, ...], first: Map<"n", el> }]
 
-        renderer.setPixelRatio(window.devicePixelRatio);
-        viewport.appendChild(renderer.domElement);
-
-
-        function resizeRendererToViewport() {
-            const width = viewport.clientWidth;
-            const height = viewport.clientHeight;
-
-            renderer.setSize(width, height, false);
-            camera.aspect = width / height;
-            camera.updateProjectionMatrix();
+    function indexAnchorsByPane() {
+      const byPane = new Map();
+      for (const [moment, anchors] of anchorIndex) {
+        for (const anchor of anchors) {
+          const pane = anchor.closest(".panel-body");
+          if (!pane) continue;
+          let entry = byPane.get(pane);
+          if (!entry) byPane.set(pane, entry = { moments: [], first: new Map() });
+          if (entry.first.has(moment)) continue;   // one anchor per moment per pane
+          entry.first.set(moment, anchor);
+          entry.moments.push(Number(moment));
         }
+      }
+      anchoredPanes.length = 0;
+      for (const entry of byPane.values()) {
+        entry.moments.sort((a, b) => a - b);
+        anchoredPanes.push(entry);
+      }
+    }
 
-        // React to ANY layout change (sidebar drag, panel collapse, etc.)
-        const ro = new ResizeObserver(() => {
-            resizeRendererToViewport();
-        });
+    /// The last value at or before `t`, by binary search; the first if none is.
+    function lastAtOrBefore(sorted, t) {
+      let lo = 0, hi = sorted.length - 1, best = sorted[0];
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (sorted[mid] <= t) { best = sorted[mid]; lo = mid + 1; }
+        else hi = mid - 1;
+      }
+      return best;
+    }
 
-        ro.observe(viewport);
+    /// Bring a moment into view in every pane that prints one.
+    function scrollToMetaTime(metaTime, behavior) {
+      for (const { moments, first } of anchoredPanes) {
+        const anchor = first.get(String(lastAtOrBefore(moments, metaTime)));
+        if (anchor) anchor.scrollIntoView({ behavior, block: "nearest", inline: "nearest" });
+      }
+    }
 
-        // initial size
-        resizeRendererToViewport();
+    // ---- the player ------------------------------------------------------
+    //
+    // One cursor over the metaTimes, shared by every pane: it moves the
+    // highlight in the outline and the event log, and it is what the 3D view's
+    // glow and its future-dimmer (see `applyFutureDim`) are measured against.
 
+    const playerState = {
+      isPlaying: false,
+      metaTime: 1,
+      maxMetaTime,
+      stopResetsTo: 1,
+      bpm: 1337,
+      // 0 leaves the scene exactly as it stands; 1 takes objects whose moment
+      // is still ahead all the way to black.
+      futureDim: 0,
+      timer: null,
+    };
 
+    const BPM_STEP = 60, BPM_MIN = 17, BPM_MAX = 6000;
 
+    const slider = $("metaSlider");
+    slider.min = 1;
+    slider.max = playerState.maxMetaTime;
+    slider.value = playerState.metaTime;
+    $("metaTimeMax").textContent = playerState.maxMetaTime;
 
-        function createFocusDetailDiv(type, id, displayTrue = "inline-block", displayFalse = "none") {
-            const focusEl = document.createElement("div");
-            focusEl.className = "focus-detail";
-            focusEl.style.display = displayFalse;
-            focusEl.dataset.type = type;
-            focusEl.dataset.id = id;
-            focusEl.dataset.displayTrue = displayTrue;
-            focusEl.dataset.displayFalse = displayFalse;
-            return focusEl;
+    function renderPlayerUI() {
+      $("metaTimeNow").textContent = playerState.metaTime;
+      $("bpmDisplay").textContent = playerState.bpm;
+      slider.value = playerState.metaTime;
+      slider.max = playerState.maxMetaTime;
+      $("playPauseBtn").textContent = playerState.isPlaying ? "⏸" : "▶";
+      $("futureDimReadout").textContent = Math.round(playerState.futureDim * 100) + "%";
+    }
+
+    /// Park on a moment. Everything that moves the cursor goes through here,
+    /// so there is one place that keeps the panes and the scene in step.
+    function seekTo(metaTime, scrollBehavior = "smooth") {
+      playerState.metaTime = Math.min(Math.max(1, metaTime), playerState.maxMetaTime);
+      playerState.stopResetsTo = playerState.metaTime;
+      renderPlayerFocus(scrollBehavior);
+      renderPlayerUI();
+    }
+
+    const beatDurationMs = () => (60 * 1000) / playerState.bpm;
+
+    function tickPlayback() {
+      if (!playerState.isPlaying) return;
+      if (playerState.metaTime >= playerState.maxMetaTime) {
+        playerState.metaTime = playerState.maxMetaTime;
+        stopPlayback();
+        return;
+      }
+      playerState.metaTime++;
+      renderPlayerFocus("instant");
+      renderPlayerUI();
+      playerState.timer = setTimeout(tickPlayback, beatDurationMs());
+    }
+
+    function startPlayback() {
+      if (playerState.isPlaying) return;
+      playerState.isPlaying = true;
+      renderPlayerUI();
+      tickPlayback();
+    }
+
+    function pausePlayback() {
+      playerState.isPlaying = false;
+      clearTimeout(playerState.timer);
+      renderPlayerUI();
+    }
+
+    /// Stop rewinds to wherever the last deliberate seek left the cursor,
+    /// which is not necessarily the start.
+    function stopPlayback() {
+      pausePlayback();
+      seekTo(playerState.stopResetsTo);
+    }
+
+    $("playPauseBtn").onclick   = () => playerState.isPlaying ? pausePlayback() : startPlayback();
+    $("stopBtn").onclick        = stopPlayback;
+    $("tickBackBtn").onclick    = () => { pausePlayback(); seekTo(playerState.metaTime - 1); };
+    $("tickForwardBtn").onclick = () => { pausePlayback(); seekTo(playerState.metaTime + 1); };
+
+    $("bpmUpBtn").onclick   = () => { playerState.bpm = Math.min(BPM_MAX, playerState.bpm + BPM_STEP); renderPlayerUI(); };
+    $("bpmDownBtn").onclick = () => { playerState.bpm = Math.max(BPM_MIN, playerState.bpm - BPM_STEP); renderPlayerUI(); };
+
+    slider.oninput = (e) => {
+      // Read the handle before pausing: pausing re-renders the player UI,
+      // which writes playerState.metaTime back into the slider and would
+      // otherwise overwrite the value the drag just produced.
+      const to = Number(e.target.value);
+      pausePlayback();
+      seekTo(to, "instant");
+    };
+
+    $("futureDim").oninput = (e) => {
+      playerState.futureDim = Number(e.target.value) / 100;
+      applyFutureDim();
+      renderPlayerUI();
+    };
+
+    // ---- the objects, in space ------------------------------------------
+    //
+    // `data.objects` is a flat list. Boxes and orbs are nodes and are placed
+    // first, because pointers and actions are drawn between them and need to
+    // know where they landed.
+    //
+    // Every mesh is filed under a *label* -- a space for a node, an edgeId for
+    // an action -- which is the same string the doors and the outline use. That
+    // is the whole cross-link between the sidebar and the 3D view.
+    //
+    // Text (the name floating by a node, and its fields) is DECOR: drawn, but
+    // never pickable. Those planes are full rectangles as far as a raycaster is
+    // concerned, and being in front of the node they name they were swallowing
+    // the clicks meant for it.
+
+    const BOX_DIM = 0.33;
+    const COLOR = {
+      box: 0x55aa44,
+      pointer: 0x55aa44,
+      orb: 0x4488aa,
+      dot: 0x000000,
+      action: 0x0088aa,        // get, force
+      actionPut: 0x008877,
+      actionPutForce: 0xaaaaaa,
+    };
+    const GLOW = { off: 0, on: 1.0 };
+    const GLOW_FADE_PER_FRAME = 0.01;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
+    camera.position.set(6, 4, 8);
+
+    const viewport = $("viewport");
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    scene.add(new THREE.AmbientLight(0xffffff));
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1);
+    keyLight.position.set(5, 5, 5);
+    scene.add(keyLight);
+
+    const meshesByLabel = new Map();   // label  -> [mesh, ...], body first
+    const labelByMesh   = new Map();   // mesh   -> label
+    const pickable      = [];          // what a click may hit -- no text planes
+    const dotPositionByField = new Map();   // "label:field" -> Vector3
+    const labelByField       = new Map();   // "label:field" -> label
+
+    function addMesh(label, mesh, { decor = false } = {}) {
+      // The colour it was built with, so the future-dimmer can scale towards
+      // black and back without ever needing to know what it started as.
+      if (!mesh.material.userData.baseColor) {
+        mesh.material.userData.baseColor = mesh.material.color.clone();
+      }
+      scene.add(mesh);
+      labelByMesh.set(mesh, label);
+      pushInto(meshesByLabel, label, mesh);
+      if (!decor) pickable.push(mesh);
+      return mesh;
+    }
+
+    /// White text on a transparent canvas, sized to the text. Returns the
+    /// texture and the aspect ratio so the caller can make a plane that does
+    /// not squash it.
+    function makeTextTexture(text) {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const fontSize = 48, lineHeight = fontSize * 1.2, padding = 20;
+
+      ctx.font = fontSize + "px monospace";
+      const lines = String(text).split("\n");
+      const maxWidth = Math.max(...lines.map((l) => ctx.measureText(l).width));
+
+      canvas.width = maxWidth + padding * 2;
+      canvas.height = lineHeight * lines.length + padding * 2;
+
+      // Resizing the canvas resets the context, so the font is set twice.
+      ctx.font = fontSize + "px monospace";
+      ctx.fillStyle = "white";
+      lines.forEach((line, i) =>
+        ctx.fillText(line, padding, padding + (i + 1) * lineHeight - (lineHeight - fontSize)));
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+      texture.minFilter = THREE.LinearFilter;
+      return { texture, aspect: canvas.height / canvas.width };
+    }
+
+    /// The name plate and the field list that float beside a node.
+    ///
+    /// Boxes light theirs with the node (a MeshStandardMaterial, so it takes an
+    /// emissive), orbs do not (a MeshBasicMaterial, which has no such
+    /// property -- passing one anyway is what printed thousands of
+    /// "'emissive' is not a property of THREE.MeshBasicMaterial" warnings).
+    function addNodeText(obj, body, MaterialClass) {
+      const glows = MaterialClass !== THREE.MeshBasicMaterial
+        ? { emissive: "white", emissiveIntensity: GLOW.off }
+        : {};
+
+      const name = makeTextTexture(obj.label);
+      const namePlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.7, 0.7 * name.aspect),
+        new MaterialClass({ map: name.texture, transparent: false, ...glows }));
+      namePlane.position.copy(body.position.clone().add(new THREE.Vector3(-0.17, 0.17, BOX_DIM)));
+      addMesh(obj.label, namePlane, { decor: true });
+
+      const fields = makeTextTexture(obj.textLines || obj.fields || "");
+      const fieldsPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.5, 0.5 * fields.aspect),
+        new MaterialClass({ map: fields.texture, transparent: true, alphaTest: 0.1, ...glows }));
+      fieldsPlane.position.copy(body.position.clone().add(new THREE.Vector3(0.37, 0, BOX_DIM)));
+      addMesh(obj.label, fieldsPlane, { decor: true });
+    }
+
+    /// One small sphere per pointer field, in a row under the node. These are
+    /// where outgoing pointers start, so their positions are remembered.
+    function addFieldDots(obj, body, material) {
+      if (!obj.pointerFields) return;
+      const spacing = 0.1;
+      const startX = body.position.x - (obj.pointerFields.length - 1) * spacing / 2;
+      obj.pointerFields.forEach((field, i) => {
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 12), material);
+        dot.position.set(startX + i * spacing, body.position.y - 0.17, body.position.z);
+        // Filed under the node it belongs to. They used to be added straight
+        // to the scene with no label, so hovering one left it lit for good:
+        // the un-hover could not find a label and gave up before restoring it.
+        addMesh(obj.label, dot);
+        const key = obj.label + ":" + field;
+        dotPositionByField.set(key, dot.position);
+        labelByField.set(key, obj.label);
+      });
+    }
+
+    function createBoxMesh(obj) {
+      const material = new THREE.MeshStandardMaterial({
+        color: COLOR.box, transparent: true, opacity: 0.618,
+        emissive: "white", emissiveIntensity: GLOW.off, visible: true,
+      });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(BOX_DIM, BOX_DIM, BOX_DIM), material);
+      body.position.set(...obj.position);
+      addMesh(obj.label, body);
+      addNodeText(obj, body, THREE.MeshStandardMaterial);
+      // A box's dots get their own black material; an orb's share the orb's.
+      addFieldDots(obj, body, new THREE.MeshStandardMaterial({
+        color: COLOR.dot, emissive: "white", emissiveIntensity: GLOW.off }));
+      return body;
+    }
+
+    function createOrbMesh(obj) {
+      const material = new THREE.MeshStandardMaterial({
+        color: COLOR.orb, transparent: true, opacity: 0.9,
+        emissive: "white", emissiveIntensity: GLOW.off,
+      });
+      const body = new THREE.Mesh(new THREE.SphereGeometry(BOX_DIM * 0.618), material);
+      body.position.set(...obj.position);
+      addMesh(obj.label, body);
+      addNodeText(obj, body, THREE.MeshBasicMaterial);
+      addFieldDots(obj, body, material);
+      return body;
+    }
+
+    /// A cylinder from `a` to `b`, plus the rotation that points it there.
+    function edgeFrame(a, b) {
+      const dir = new THREE.Vector3().subVectors(b, a);
+      const length = dir.length();
+      const dirNorm = dir.clone().normalize();
+      const quat = new THREE.Quaternion()
+        .setFromUnitVectors(new THREE.Vector3(0, 1, 0), dirNorm);
+      return { dirNorm, length, quat };
+    }
+
+    /// A structural pointer: one field of one node naming another node.
+    function createPointerMesh(label, from, to) {
+      const material = new THREE.MeshStandardMaterial({
+        color: COLOR.pointer, emissive: "white", transparent: true,
+        opacity: 1, emissiveIntensity: GLOW.off,
+      });
+      const { dirNorm, length, quat } = edgeFrame(from, to);
+
+      const tail = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 12), material);
+      tail.position.copy(from);
+      addMesh(label, tail);
+
+      const shaftLen = Math.max(0.001, length - 0.08);
+      const shaft = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.023, 0.035, shaftLen, 8), material);
+      shaft.position.copy(from.clone().addScaledVector(dirNorm, shaftLen / 2));
+      shaft.quaternion.copy(quat);
+      addMesh(label, shaft);
+
+      const head = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.08, 8), material);
+      head.position.copy(to.clone().addScaledVector(dirNorm, -0.04));
+      head.quaternion.copy(quat);
+      addMesh(label, head);
+    }
+
+    /// An action taken over an edge. The head hovers short of the target so it
+    /// does not disappear inside it; `force` and `putForce` get a fatter,
+    /// translucent shaft with a solid one inside, and `put` a double pyramid
+    /// instead of a cone.
+    const ACTION_TINT = {
+      put: COLOR.actionPut,
+      putForce: COLOR.actionPutForce,
+      get: COLOR.action,
+      force: COLOR.action,
+    };
+
+    function createActionMesh(type, source, target, label, hoverOffset = -BOX_DIM) {
+      const tint = ACTION_TINT[type] ?? COLOR.action;
+      const forcing = type === "force" || type === "putForce";
+
+      const dir = new THREE.Vector3().subVectors(target, source);
+      const length = dir.length();
+      dir.normalize();
+
+      const shaftLength = length + hoverOffset * 1.6;
+      const headPos = new THREE.Vector3().copy(target).addScaledVector(dir, hoverOffset);
+      const mid = new THREE.Vector3().addVectors(source, headPos).multiplyScalar(0.5);
+      const aim = new THREE.Quaternion()
+        .setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+
+      const shaft = new THREE.Mesh(
+        new THREE.CylinderGeometry(forcing ? 0.10 : 0.03, forcing ? 0.10 : 0.03, shaftLength, 12),
+        new THREE.MeshStandardMaterial({
+          color: tint, transparent: true, opacity: forcing ? 0.6 : 0.8,
+          emissive: "white", emissiveIntensity: GLOW.off }));
+      shaft.position.copy(mid);
+      shaft.quaternion.copy(aim);
+      addMesh(label, shaft);
+
+      /// A cone sitting `along` units past the head position, pointing either
+      /// with the arrow or against it.
+      const cone = (along = 0, backwards = false, color = tint) => {
+        const mesh = new THREE.Mesh(
+          new THREE.ConeGeometry(0.12, 0.12, 12),
+          new THREE.MeshStandardMaterial({ color, emissive: "white", emissiveIntensity: GLOW.off }));
+        mesh.position.copy(headPos).addScaledVector(dir, along);
+        mesh.quaternion.copy(aim);
+        if (backwards) mesh.rotateX(Math.PI);
+        return addMesh(label, mesh);
+      };
+
+      const innerShaft = (color) => {
+        const inner = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12),
+          new THREE.MeshStandardMaterial({ color, emissive: "white", emissiveIntensity: GLOW.off }));
+        inner.position.copy(mid);
+        inner.quaternion.copy(aim);
+        addMesh(label, inner);
+      };
+
+      // `put` ends in a double pyramid, `get` and `force` in a plain cone, and
+      // `putForce` in both.
+      //
+      // The two halves of the pyramid used to be parented to a THREE.Group
+      // that was never added to the scene. 954 cones -- every put and every
+      // putForce arrowhead -- went unrendered, and because they stayed in the
+      // pick list with a never-updated identity matrix they piled up at the
+      // world origin as invisible click targets. Placing them directly is both
+      // the fix and one fewer thing between a mesh and the scene.
+      if (type !== "put") cone();
+      if (type === "put" || type === "putForce") {
+        cone(+0.06);
+        cone(-0.06, true);
+      }
+
+      if (type === "force")    innerShaft(tint);
+      if (type === "putForce") innerShaft(COLOR.actionPut);
+    }
+
+    const ACTION_TYPES = new Set(["get", "put", "force", "putForce"]);
+
+    function buildSceneObjects() {
+      for (const obj of data.objects) {
+        if (obj.type === "box") createBoxMesh(obj);
+        else if (obj.type === "orb") createOrbMesh(obj);
+      }
+      for (const obj of data.objects) {
+        if (obj.type === "box" || obj.type === "orb") continue;
+
+        const from = dotPositionByField.get(obj.from);
+        const target = meshesByLabel.get(obj.to);
+        if (!from || !target) {
+          console.error("object names an endpoint that is not in the scene:", obj);
+          continue;
+        }
+        if (obj.type === "pointer") {
+          const to = target[0].position.clone().add(new THREE.Vector3(0, BOX_DIM / 2, 0));
+          createPointerMesh(labelByField.get(obj.from), from, to);
+        } else if (ACTION_TYPES.has(obj.type)) {
+          createActionMesh(obj.type, from, target[0].position, obj.edgeId);
+        } else {
+          console.error("do not recognize this object type: " + obj.type);
+        }
+      }
+      log("built", labelByMesh.size, "meshes,", pickable.length, "pickable");
+    }
+
+    // ---- keeping the renderer the size of the viewport -------------------
+    //
+    // Everything about 3D picking depends on one invariant: the pixel the
+    // user clicked and the pixel the ray is cast through are the same pixel.
+    // Three things used to break it, and all three are handled here.
+    //
+    //   1. The canvas is sized by CSS (100% of #viewport) and the drawing
+    //      buffer follows, never the other way round. `setSize(w, h, false)`
+    //      says "buffer only, leave my style alone" -- which is only safe
+    //      *because* the CSS above gives the canvas a size of its own.
+    //   2. #viewport has min-width/min-height 0, so it can shrink. Without
+    //      that a flex item cannot go below its content, the canvas is its
+    //      content, and the viewport could only ever grow: the layout
+    //      ratcheted, the app overflowed the window, and two thirds of the
+    //      canvas hung off-screen while the maths still divided by all of it.
+    //   3. devicePixelRatio is re-read whenever it changes -- dragging the
+    //      window to another monitor, or zooming the page, used to leave the
+    //      buffer at the old density.
+
+    function fitRendererToViewport() {
+      const width = viewport.clientWidth;
+      const height = viewport.clientHeight;
+      if (!width || !height) return;          // hidden, or mid-layout
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    }
+
+    // One observer, on the element whose size actually matters. It fires for
+    // window resizes, devtools opening, the divider being dragged and panels
+    // collapsing alike, so there is no separate window "resize" handler to
+    // disagree with it.
+    new ResizeObserver(fitRendererToViewport).observe(viewport);
+
+    // devicePixelRatio has no event of its own; a media query on the current
+    // ratio flips exactly when it changes, and is then re-armed for the new one.
+    (function watchPixelRatio() {
+      const mq = matchMedia("(resolution: " + (window.devicePixelRatio || 1) + "dppx)");
+      mq.addEventListener("change", () => { fitRendererToViewport(); watchPixelRatio(); },
+                          { once: true });
+    })();
+
+    // ---- picking ----------------------------------------------------------
+
+    const raycaster = new THREE.Raycaster();
+    const pointerNDC = new THREE.Vector2();
+    let pointerIsOverCanvas = false;
+    let pointerMovedSinceLastCast = false;
+
+    /// Normalised device coordinates, measured against the CANVAS -- not the
+    /// container it sits in, and not the window. Those three used to be
+    /// interchangeable and are the first thing to stop being so.
+    function pointerToNDC(event, into) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      into.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      into.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      return into;
+    }
+
+    const pickAt = (ndc) => {
+      raycaster.setFromCamera(ndc, camera);
+      // An object dimmed all the way out is not on screen, and must not be
+      // pickable either -- the raycaster does not check `visible` itself.
+      return raycaster.intersectObjects(pickable, false).find((hit) => hit.object.visible) || null;
+    };
+
+    // ---- flying the camera --------------------------------------------------
+
+    let camTargetPos = null;
+    let camTargetLook = null;
+    let camTransitionStart = 0;
+    const CAM_TRANSITION_SECONDS = 2.3;
+
+    function lookAtMesh(mesh, distance = 3.0) {
+      if (!mesh) return;
+      log("lookAtMesh", labelByMesh.get(mesh));
+      camTargetPos = mesh.position.clone().add(new THREE.Vector3(0, 0, distance));
+      camTargetLook = mesh.position.clone();
+      camTransitionStart = performance.now() / 1000;
+    }
+
+    /// Fly to whatever the sidebar just named. The body mesh is always the
+    /// first one filed under a label, so this lands on the node rather than on
+    /// its name plate.
+    function lookAtLabel(label) {
+      const meshes = meshesByLabel.get(label);
+      if (!meshes) { say(label, NOT_DRAWN); return; }
+      lookAtMesh(meshes[0]);
+    }
+
+    /// Frame an edge's action arrow. Its first mesh is the shaft, and a shaft's
+    /// position is the arrow's midpoint, so this lands in the middle of the
+    /// action; the distance comes from the shaft's own length, because a long
+    /// force arrow framed from the node distance is framed from inside itself.
+    ///
+    /// Not every edge is drawn -- an edge whose action produced no object has a
+    /// door but nowhere to fly to, and saying nothing is the right answer.
+    function lookAtEdge(edgeId) {
+      const meshes = meshesByLabel.get(edgeId);
+      if (!meshes) { say(edgeId, NOT_DRAWN); return; }
+      const shaft = meshes[0];
+      shaft.geometry.computeBoundingSphere();
+      const radius = shaft.geometry.boundingSphere ? shaft.geometry.boundingSphere.radius : 0;
+      lookAtMesh(shaft, Math.max(3.0, radius * 2.2));
+    }
+
+    // ---- pointer on the canvas ---------------------------------------------
+    //
+    // These listen on the canvas, not on `window`. With them on the window a
+    // click anywhere -- an outline row, the divider, a player button -- cast a
+    // ray into the scene as well, and the divider in particular sits at an NDC
+    // just inside the frustum, so dragging it kept flying the camera off.
+
+    const canvas = renderer.domElement;
+    let pressAt = null;
+    const DRAG_SLOP_PX = 4;
+
+    canvas.addEventListener("pointerdown", (e) => {
+      pressAt = { x: e.clientX, y: e.clientY };
+    });
+
+    canvas.addEventListener("click", (e) => {
+      // OrbitControls ends every orbit with a click. Without a slop threshold
+      // letting go after turning the camera also flew it somewhere new.
+      if (pressAt && Math.hypot(e.clientX - pressAt.x, e.clientY - pressAt.y) > DRAG_SLOP_PX) return;
+      const hit = pickAt(pointerToNDC(e, new THREE.Vector2()));
+      if (!hit) return;
+      const label = labelByMesh.get(hit.object);
+      log("picked", label);
+      lookAtMesh(hit.object);
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+      pointerToNDC(e, pointerNDC);
+      pointerIsOverCanvas = true;
+      pointerMovedSinceLastCast = true;
+    });
+    canvas.addEventListener("pointerleave", () => { pointerIsOverCanvas = false; });
+
+    // ---- what the time cursor lights up ------------------------------------
+
+    let hoverMesh = null;
+    const fading = new Set();
+
+    function setGlow(mesh, intensity) {
+      if (!mesh.material.emissive) return;
+      mesh.material.emissiveIntensity = intensity;
+      mesh.material.emissive.setHex(0xffffff);
+      mesh.material.needsUpdate = true;
+    }
+
+    /// Highlight the current moment everywhere: the chips that name it, the
+    /// pane that should scroll to it, and the objects it touched.
+    let playerFocusedChips = [];
+
+    // ---- objects whose moment is still ahead ------------------------------
+    //
+    // The old ⏮ did this in one step and only one way: hide all 5,000 meshes,
+    // then let playback bring them back. It worked, but nothing could undo it
+    // short of playing to the end, and it was a hard switch between "the whole
+    // graph" and "nothing".
+    //
+    // Same idea by degrees. Each material remembers the colour it was built
+    // with; an object whose moment has not arrived is drawn at that colour
+    // scaled towards black by the dimmer. At 0% the scene is exactly as it
+    // stands, at 100% the future is black and playback builds the graph out of
+    // the dark. Scaling the colour rather than the opacity means no material
+    // has to be made transparent, so nothing changes about draw order.
+
+    /// True while every material sits at full colour, so the common case --
+    /// the dimmer at 0, ticking through 1,747 moments -- costs one comparison.
+    let dimIsFlat = true;
+
+    function applyFutureDim() {
+      const flat = playerState.futureDim === 0;
+      if (flat && dimIsFlat) return;
+      dimIsFlat = flat;
+
+      const t = playerState.metaTime;
+      const dimmed = 1 - playerState.futureDim;
+      for (const [label, meshes] of meshesByLabel) {
+        const factor = (bornAt.get(label) ?? 1) <= t ? 1 : dimmed;
+        for (const mesh of meshes) {
+          const material = mesh.material;
+          // Materials are shared within a label but never across one, so the
+          // second mesh of a pair finds the colour already set.
+          if (material.userData.dimFactor !== factor) {
+            material.userData.dimFactor = factor;
+            material.color.copy(material.userData.baseColor).multiplyScalar(factor);
+          }
+          mesh.visible = factor > 0.004;
+        }
+      }
+    }
+
+    function renderPlayerFocus(scrollBehavior = "instant") {
+      const t = playerState.metaTime;
+
+      for (const chip of playerFocusedChips) chip.classList.remove("player-focused");
+      playerFocusedChips = chipsFor("metaTime", t);
+      for (const chip of playerFocusedChips) chip.classList.add("player-focused");
+
+      scrollToMetaTime(t, scrollBehavior);
+
+      applyFutureDim();
+
+      for (const label of labelsAtMetaTime.get(t) || []) {
+        const meshes = meshesByLabel.get(label);
+        // The root "scene" node and the first edge have no geometry: they are
+        // the moment the run started, before anything was placed.
+        if (!meshes) { log("no mesh for", label); continue; }
+        for (const mesh of meshes) {
+          mesh.visible = true;
+          if (!mesh.material.emissive) continue;   // unlit text planes
+          setGlow(mesh, GLOW.on);
+          fading.add(mesh);
+        }
+      }
+    }
+
+    // ---- the frame ---------------------------------------------------------
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      for (const mesh of fading) {
+        const next = mesh.material.emissiveIntensity - GLOW_FADE_PER_FRAME;
+        if (next < 0.01) { mesh.material.emissiveIntensity = GLOW.off; fading.delete(mesh); }
+        else mesh.material.emissiveIntensity = next;
+      }
+
+      if (camTargetPos) {
+        const t = Math.min((performance.now() / 1000 - camTransitionStart) / CAM_TRANSITION_SECONDS, 1);
+        camera.position.lerpVectors(camera.position, camTargetPos, t);
+        controls.target.lerpVectors(controls.target, camTargetLook, t);
+        if (t >= 1) { camTargetPos = null; camTargetLook = null; }
+      }
+
+      // Only when the pointer is over the canvas and has actually moved. The
+      // original cast a ray through ~5,000 meshes every single frame, from a
+      // freshly built array, whether or not anything had changed.
+      if (pointerIsOverCanvas && pointerMovedSinceLastCast) {
+        pointerMovedSinceLastCast = false;
+        const hit = pickAt(pointerNDC);
+        const next = hit ? hit.object : null;
+        if (next !== hoverMesh) {
+          if (hoverMesh) setGlow(hoverMesh, GLOW.off);
+          hoverMesh = next;
+          if (hoverMesh) setGlow(hoverMesh, GLOW.on);
+        }
+      } else if (!pointerIsOverCanvas && hoverMesh) {
+        setGlow(hoverMesh, GLOW.off);
+        hoverMesh = null;
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // ---- the panes: collapse, and drag to size -----------------------------
+
+    for (const header of document.querySelectorAll(".panel-header[data-collapses]")) {
+      header.addEventListener("click", () => header.parentElement.classList.toggle("collapsed"));
+    }
+    $("toast").addEventListener("click", hush);
+    $("closeAllDoorsBtn").addEventListener("click", (e) => {
+      e.stopPropagation();          // not a collapse
+      closeAllDoors();
+    });
+
+    /// Pointer capture rather than window listeners, so a drag that leaves the
+    /// element still ends when the button comes up.
+    function onDrag(handle, move) {
+      handle.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+        handle.classList.add("dragging");
+        const onMove = (ev) => move(ev);
+        const onUp = () => {
+          handle.classList.remove("dragging");
+          handle.removeEventListener("pointermove", onMove);
+          handle.removeEventListener("pointerup", onUp);
         };
-
-        let SCENE = null;
-
-
-
-        function elmOnClick(type, id) {
-            return (e) => {
-                if (e.shiftKey) {
-                    closeDoor(type, id)
-                }
-                else {
-                    if (type == "objectShape") {
-                        let meshes = meshByLabel.get(id);
-                        if (!meshes) { console.warn("no meshes for id", id) }
-                        meshes && lookAtMesh(meshes[0])
-                    } else {
-                        openDoor(type, id);
-                        if (type == "metaTime") {
-                            //scrollToMetaTime(id, "smooth");
-                            playerState.metaTime = id;
-                            playerState.stopResetsTo = playerState.metaTime;
-                            renderPlayerFocusAtMetaTime("smooth");
-                            renderPlayerUI();
-                        }
-                    }
-                }
-            }
-        }
-
-        function createMetaTimeAnchorElm(metaTime) {
-            const elm = document.createElement("span");
-            elm.className = "metaTimeAnchor";
-            elm.textContent = "";
-            elm.metaTime = metaTime;
-            return elm
-        }
-        function createMetaTimeElm(metaTime, isAnchor) {
-            const elm = document.createElement("span");
-            elm.className = "metaTime" + (isAnchor ? " metaTimeAnchor" : "");
-            elm.textContent = metaTime;
-            elm.metaTime = metaTime;
-            elm.onclick = elmOnClick("metaTime", metaTime);
-            return elm
-        }
-
-        function createNodeIdElm(nodeId) {
-            const elm = document.createElement("span");
-            elm.className = "nodeId pointer";
-            elm.textContent = nodeId;
-            elm.nodeId = nodeId;
-            elm.pointer = nodeId[0];
-            elm.onclick = elmOnClick("pointer", nodeId[0]);
-            return elm
-        }
-
-        function createEdgeIdElm(edgeId) {
-            const elm = document.createElement("span");
-            elm.className = "edgeId";
-            elm.textContent = edgeId;
-            elm.edgeId = edgeId;
-            elm.onclick = elmOnClick("edgeId", edgeId);
-            return elm
-        }
-
-        function createPointerElm(ptr, shape) {
-            const elm = document.createElement("span");
-            if (shape == "#thunk_") {
-                elm.className = "pointer pointerThunk";
-            }
-            else if (shape == "#nonThunk") {
-                elm.className = "pointer pointerNonThunk";
-            } else {
-                console.error("unrecognized pointer shape", shape);
-            }
-            elm.textContent = ptr;
-            elm.pointer = ptr;
-            elm.onclick = elmOnClick("pointer", ptr)
-            return elm
-        }
-
-        function createShapeElm(outlineShape = "#thunk_", actionTarget = "scene") {
-            const shapeElm = document.createElement("span");
-            if (outlineShape == "#thunk_") {
-                shapeElm.className = "outline-node-thunk-shape";
-                shapeElm.textContent = "◉";
-                shapeElm.onclick = elmOnClick("objectShape", actionTarget);
-            } else if (outlineShape == "#nonThunk") {
-                shapeElm.className = "outline-node-nonthunk-shape";
-                shapeElm.textContent = "▣";
-                shapeElm.onclick = elmOnClick("objectShape", actionTarget);
-            } else {
-                console.error("unrecognized outline node shape", outlineShape);
-            }
-            return shapeElm
-        }
-
-
-        // # Nodes
-        //
-        // Each node of a DCG corresponds to a "space",
-        // and the set of spaces is the the set of possible values for a "pointer" in Fumola.
-        // each unique space/pointer gets dynamic HTML elements.
-        //
-
-        var pointers = []; // each space/pointer mentioned by a node-based event.
-        var nodesMap = IMap();  // indexed by space: map to the node history item, or { "type": "future"; "metaTime" : _ }.
-        var nodesMap_ = IMap(); // indexed by meta time, mapping to nodesMap for that metaTime.
-        var pointerMetaTimes = new Map(); // all metaTimes relevant for a space/pointer.
-        var objectsAtMetaTime = new Map();
-
-        data.nodes.forEach(nhi => {
-            const space = nhi.nodeId[0];
-
-            if (!objectsAtMetaTime.get(nhi.metaTime)) {
-                objectsAtMetaTime.set(nhi.metaTime, [space]);
-            } else {
-                const spaces = objectsAtMetaTime.get(nhi.metaTime);
-                objectsAtMetaTime.set(nhi.metaTime, [...spaces, space]);
-            }
-
-            if (!pointerMetaTimes.get(space)) {
-                pointers = [...pointers, space];
-                pointerMetaTimes.set(space, [nhi.metaTime])
-            } else {
-                const times = pointerMetaTimes.get(space);
-                pointerMetaTimes.set(space, [...times, nhi.metaTime]);
-            }
-        });
-
-        const pointersEl = document.getElementById("pointers");
-
-        pointerMetaTimes.forEach((metaTimes, space, m) => {
-            nodesMap = nodesMap.set(space, { "type": "future", "metaTime": metaTimes[0] });
-        });
-        data.nodes.forEach(nhi => {
-            const space = nhi.nodeId[0];
-            nodesMap = nodesMap.set(space, nhi);
-            nodesMap_ = nodesMap_.set(nhi.metaTime, nodesMap);
-        });
-        pointers.forEach(sp => {
-            let metaTimes = pointerMetaTimes.get(sp);
-            let firstDef = nodesMap_.get(metaTimes[0]).get(sp);
-
-            const focusEl = createFocusDetailDiv("pointer", sp);
-            var shapeElm = null;
-            const pointerEl = document.createElement("span");
-
-            if (firstDef && firstDef.node.type == "thunk") {
-                pointerEl.classList = "pointer pointerThunk";
-                shapeElm = createShapeElm("#thunk_", sp);
-            } else if (firstDef && firstDef.node.type == "nonThunk") {
-                pointerEl.classList = "pointer pointerNonThunk";
-                shapeElm = createShapeElm("#nonThunk", sp);
-            } else {
-                console.error(sp, firstDef);
-            }
-
-            focusEl.appendChild(shapeElm);
-            focusEl.appendChild(pointerEl);
-
-            pointerEl.textContent = sp;
-            pointerEl.onclick = elmOnClick("pointer", sp);
-            pointerEl.pointer = sp;
-            pointersEl.appendChild(focusEl);
-
-            metaTimes.forEach(mt => {
-                const mtElm = createMetaTimeElm(mt);
-                const mtFocusOuter = createFocusDetailDiv("metaTime", mt, "block", "inline-block");
-                const mtFocusInner = createFocusDetailDiv("metaTime", mt, "inline-block", "none");
-                mtFocusInner.classList.add("inner");
-                focusEl.appendChild(mtFocusOuter);
-                mtFocusOuter.appendChild(mtElm);
-                mtFocusOuter.appendChild(mtFocusInner);
-                let nhi = nodesMap_.get(mt).get(sp);
-                var nhiText = "";
-                if (nhi.node.type == "thunk") {
-                    const bodyEl = document.createElement("span");
-                    bodyEl.className = "thunk-body-text";
-                    bodyEl.textContent = nhi.node.body;
-                    mtFocusInner.appendChild(bodyEl);
-
-                    const traceEl = document.createElement("div");
-                    traceEl.className = "thunk-trace";
-
-                    nhi.node.trace.forEach(edgeId => {
-                        const e = createEdgeIdElm(edgeId);
-                        traceEl.appendChild(e);
-                    });
-                    mtFocusInner.appendChild(traceEl);
-
-                    const resultEl = document.createElement("div");
-                    resultEl.className = "thunk-result";
-                    if (!nhi.node.result) {
-                        resultEl.appendChild(document.createTextNode("result undefined"));
-                    } else {
-                        const resultInnerEl = document.createElement("span");
-                        resultInnerEl.className = "thunk-result-value";
-                        resultInnerEl.textContent = nhi.node.result[1];
-                        resultEl.appendChild(resultInnerEl)
-                    }
-                    mtFocusInner.appendChild(resultEl);
-
-                } else if (nhi.node.type == "nonThunk") {
-
-                    const nhiText = "" + nhi.node.value;
-                    mtFocusInner.appendChild(document.createTextNode("" + nhiText))
-
-                } else {
-                    console.error("invalid node history item node type", nhi.node.type)
-
-                }
-            })
-        })
-
-        // # Edges
-        //
-        // process edges, producing indicies and dynamic HTML elements.
-        const edgeIdsEl = document.getElementById("edgeIds");
-        const edgeIdSet = new Map();
-
-        data.edges.forEach(ehi => {
-            if (!objectsAtMetaTime.get(ehi.metaTime)) {
-                objectsAtMetaTime.set(ehi.metaTime, [ehi.edgeId]);
-            } else {
-                const objects = objectsAtMetaTime.get(ehi.metaTime);
-                objectsAtMetaTime.set(ehi.metaTime, [...objects, ehi.edgeId]);
-            }
-            if (!edgeIdSet.has(ehi.edgeId)) {
-                edgeIdSet.set(ehi.edgeId, ehi);
-                const focusEl = createFocusDetailDiv("edgeId", ehi.edgeId);
-                const edgeIdEl = document.createElement("span");
-                edgeIdEl.textContent = ehi.edgeId;
-                edgeIdEl.className = "edgeId";
-                edgeIdEl.edgeId = ehi.edgeId;
-                edgeIdEl.onclick = elmOnClick("edgeId", ehi.edgeId);
-                focusEl.appendChild(edgeIdEl);
-                edgeIdsEl.appendChild(focusEl);
-
-            }
-        })
-
-        // --- entry point ---
-        function loadScene() {
-            renderEvents(data);
-            renderOutline(data);
-            renderPlayerFocusAtMetaTime("instant");
-            false && console.log(playerState);
-        };
-        loadScene();
-
-
-        // --- EVENTS PANEL ---
-        function renderEvents(json) {
-            const events = json.events;
-            const mtEl = document.getElementById("metaTimes");
-            const el = document.getElementById("events");
-            el.innerHTML = "";
-            var lastMetaTime = null;
-
-            events.forEach(ev => {
-                const row = document.createElement("div");
-                //row.metaTime = ev.metaTime;
-                const ts = createMetaTimeElm(ev.metaTime, (ev.metaTime != lastMetaTime));
-                lastMetaTime = ev.metaTime;
-                row.appendChild(ts);
-                row.appendChild(document.createTextNode(" " + ev.type + " "));
-                if (ev.type == "addNode") {
-                    row.appendChild(createNodeIdElm(ev.nodeId))
-                } else if (ev.type == "addEdge") {
-                    row.appendChild(createEdgeIdElm(ev.edgeId))
-                } else if (ev.type == "forceBegin") {
-                    row.appendChild(createEdgeIdElm(ev.edgeId))
-                } else if (ev.type == "updateEdge") {
-                    row.appendChild(createEdgeIdElm(ev.edgeId))
-                } else if (ev.type == "forceEnd") {
-                    row.appendChild(createEdgeIdElm(ev.edgeId));
-                } else {
-                    console.error("uknown event type", ev);
-                }
-                el.appendChild(row);
-            });
-        }
-
-        const marginFactor = 7;
-
-        function outlineMargin(depth = 0) {
-            // return (depth * 3) + "px"
-            return "9px"
-        }
-
-        function addMetaTimeElementForOutlineEdge(parentElm, outlineEdge, useEndTime = false, isAnchor = false, depth = 0) {
-            const e = outlineEdge;
-            const hasNested = typeof e.metaTimes != "number";
-
-            const metaTime = hasNested ? (useEndTime ? e.metaTimes[1] : e.metaTimes[0]) : e.metaTimes;
-            // console.log(e.metaTimes + " " + ts);
-
-            const span = document.createElement("span");
-            span.textContent = metaTime // + (useEndTime ? (isAnchor ? " }" : " {") : "");
-            span.className = "metaTime";
-            span.onclick = elmOnClick("metaTime", metaTime);
-            if (!useEndTime || isAnchor) {
-                span.metaTime = metaTime;
-            };
-            if (useEndTime && isAnchor) {
-                // begin time span
-                const span_ = document.createElement("span");
-                const beginMetaTime = e.metaTimes[0];
-                span_.textContent = beginMetaTime + ", ";
-                span_.className = "metaTime";
-                span_.onclick = elmOnClick("metaTime", metaTime);
-
-                //span.style.textDecoration = "underline";
-                //span.style.marginLeft = 0;
-                const div = document.createElement("div");
-                div.style.marginLeft = outlineMargin(depth);
-                div.appendChild(span_);
-                div.appendChild(span);
-
-                parentElm.appendChild(div)
-            } else {
-                parentElm.appendChild(span)
-            }
-        }
-
-        // --- OUTLINE PANEL (recursive) ---
-        function renderOutline(json) {
-            // A scene's outline is a forest: zero or more trees, in the order
-            // whoever produced it chose. It used to be a single tree, and an
-            // older scene.json will still hold one, so both are accepted.
-            const outline = Array.isArray(json.outline)
-                ? json.outline
-                : (json.outline ? [json.outline] : []);
-            const panel = document.getElementById("outline");
-            var lastMetaTimeAnchor = null;
-
-            function walk(rootElm, node, depth = 0) {
-                if (!node) return;
-
-                const div = document.createElement("div");
-                //div.style.marginLeft = outlineMargin(depth);
-                div.className = "outline-node";
-                // console.log(node);
-
-                if (depth == 0) {
-                    // to do -- create nodeId div
-                    // no "edge" above the root to print this name.
-                    // otherwise, some edge already printed this out.
-                    div.appendChild(createNodeIdElm(node.nodeId));
-                }
-                rootElm.appendChild(div);
-
-                if (node.edges) {
-                    let rootElm_ = div;
-                    var edgeCount = 0;
-                    const edgetotal = node.edges.length;
-                    node.edges.forEach(e => {
-                        edgeCount += 1;
-                        let div = document.createElement("div");
-                        div.className = "outline-edge";
-                        const hasNested = typeof e.metaTimes != "number";
-                        let metaTimeBegin = hasNested ? e.metaTimes[0] : e.metaTimes;
-                        let metaTimeEnd = hasNested ? e.metaTimes[1] : e.metaTimes;
-
-                        if (!lastMetaTimeAnchor && metaTimeBegin > 1) {
-                            div.appendChild(createMetaTimeAnchorElm(1))
-                            lastMetaTimeAnchor = 1;
-                        }
-
-                        //div.style.marginLeft = outlineMargin(depth); // ???
-                        div.appendChild(createMetaTimeElm(metaTimeBegin, true));
-                        if (hasNested) {
-                            div.appendChild(document.createTextNode(", "));
-                            addMetaTimeElementForOutlineEdge(div, e, true)
-                        };
-                        div.appendChild(document.createTextNode(" "));
-                        div.appendChild(document.createTextNode("(" + edgeCount + "/" + edgetotal + ")"));
-                        //div.appendChild(document.createTextNode(" "));
-                        var edgetext = e.action + "";
-                        let arrows = {
-                            "put": " ───» ",
-                            "get": " ───> ",
-                            "putForce": " ══▷» ",
-                            "force": " ═══▷ ",
-                        };
-                        if (arrows[e.action]) {
-                            edgetext = arrows[e.action]
-                        };
-                        let arrowSpan = document.createElement("span");
-                        arrowSpan.className = "action-arrow  action-" + e.action;
-                        arrowSpan.textContent = edgetext;
-                        div.appendChild(arrowSpan);
-
-                        const shapeElm = createShapeElm(e.outline.shape, e.actionTarget);
-                        div.appendChild(shapeElm);
-
-                        div.appendChild(createPointerElm(e.actionTarget, e.outline.shape));
-                        //if (hasNested) { div.appendChild(document.createTextNode(" {")) };
-                        rootElm_.appendChild(div);
-                        walk(rootElm_, e.outline, depth + 1);
-
-                        div.appendChild(document.createTextNode(" " + e.action + " "));
-
-                        const valueNode = document.createElement("span");
-                        valueNode.textContent = e.value;
-                        valueNode.className = "outline-value-text";
-
-                        if (!hasNested) {
-                            div.appendChild(valueNode);
-                            div.appendChild(createEdgeIdElm(e.edgeId));
-                        } else {
-                            div.appendChild(createEdgeIdElm(e.edgeId));
-
-                            const thunkNode = document.createElement("span");
-                            thunkNode.textContent = e.forcedThunk; // e.outline.nodeId;
-                            // to do -- look up nodeId to get listing/env information, to display here.
-                            thunkNode.className = "outline-forced-thunk-text";
-                            div.appendChild(thunkNode)
-
-                            let arrowSpan = document.createElement("span");
-                            arrowSpan.className = "action-arrow result-arrow";
-                            arrowSpan.textContent = "╰〜〜>";
-
-                            const resultNode = document.createElement("div");
-                            resultNode.className = "outline-internal-result";
-                            //resultNode.style.marginLeft = outlineMargin(depth);
-                            resultNode.appendChild(arrowSpan);
-                            resultNode.appendChild(valueNode);
-                            rootElm_.appendChild(resultNode);
-                            addMetaTimeElementForOutlineEdge(resultNode, e, true, true);
-                        };
-                    }); // foreach edge e
-                }
-            }
-
-            outline.forEach(tree => walk(panel, tree));
-        }
-
-        const glowingMeshes = new Set();
-
-        function renderPlayerFocusAtMetaTime(scrollBehavior = "instant") {
-            const t = playerState.metaTime;
-            false && console.log("renderSceneAtMetaTime", t);
-            document.querySelectorAll(".player-focused")
-                .forEach(el => el.classList.remove("player-focused"));
-            document.querySelectorAll(".metaTime")
-                .forEach(el => {
-                    if (el.metaTime == t) {
-                        el.classList.add("player-focused");
-                    }
-                });
-            scrollToMetaTime(t, scrollBehavior);
-
-            var focusObjects = objectsAtMetaTime.get(t);
-            if (!focusObjects) { focusObjects = [] };
-
-            // if t's has a forceBegin event, then
-            //    for each mesh at t, set the emissive value to yellow, and the intensity to hover node.
-            //    do not add the mesh to the set of glowing meshes, so it's intensity stays constant until
-            //    the corresponding forceEnd event.
-            // each time we make something glow, we shall set the emissive color too 
-            //    (to reset yellow to white when time).
-
-            focusObjects.forEach(obj => {
-                const meshes = meshByLabel.get(obj);
-                if (meshes) {
-                    meshes.forEach(mesh => {
-                        console.log("mesh to glow: ", mesh);
-                        if (!mesh.material.emissive) {
-                            console.warn("mesh's material missing emissive property", mesh, mesh.material);
-                            mesh.visible = true;
-
-                        } else {
-                            mesh.material.emissiveIntensity = emissiveIntensity.hoverNode;
-                            mesh.visible = true;
-                            mesh.material.emissive.setHex(0xffffff);
-                            mesh.material.needsUpdate = true;
-
-                            console.log("worked");
-
-                            false && lookAtMesh(mesh, 20.0);
-                            if (!glowingMeshes.has(mesh)) {
-                                glowingMeshes.add(mesh)
-                            }
-                        }
-                    })
-                } else {
-                    console.warn("could not find mesh for object", obj);
-                }
-            })
-        }
-
-
-        async function animate() {
-            frames++;
-
-            glowingMeshes.forEach(mesh => {
-                if (mesh.material.emissiveIntensity < 0.01) {
-                    mesh.material.emissiveIntensity = emissiveIntensity.noHoverNode;
-                    glowingMeshes.delete(mesh);
-                } else {
-                    mesh.material.emissiveIntensity -= 0.01;
-                }
-            })
-
-            const now = performance.now() / 1000;
-            if (camTargetPos) {
-                const t = Math.min((now - transitionStart) / transitionDuration, 1);
-                camera.position.lerpVectors(camera.position, camTargetPos, t);
-                controls.target.lerpVectors(controls.target, camTargetLook, t);
-                if (t >= 1) camTargetPos = null;
-            }
-
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects([...sceneMeshes]);
-
-            function cancelHoverNode() {
-                const DEBUG = false;
-                if (!hoverNode) {
-                    console.error("no hoverNode to cancel")
-                    return
-                }
-                let label = labelByMesh.get(hoverNode);
-                if (label) {
-                    DEBUG && console.log("old hover node was " + label);
-                    // let material = objectMaterials.get(label);
-                    DEBUG && console.log("  current material uuid is " + hoverNode.material.uuid);
-                    DEBUG && console.log("  original material uuid was " + material.uuid);
-                    // hoverNode.material = material.clone();
-                    hoverNode.material.emissiveIntensity = emissiveIntensity.noHoverNode;
-                    DEBUG && console.log("  restored, and cloned original as " + material.uuid);
-                    hoverNode = null;
-                } else {
-                    DEBUG && console.log("cancelHoverNode() failed to find label.  Internal error.")
-                }
-            }
-
-            if (intersects.length) {
-                const DEBUG = true;
-                if (hoverNode !== intersects[0].object) {
-                    if (hoverNode) { cancelHoverNode() };
-
-                    hoverNode = intersects[0].object;
-                    lastHoverNode.lastHoverNode = hoverNode;
-                    DEBUG && console.log("new hover node is " + labelByMesh.get(hoverNode));
-                    DEBUG && console.log("   material uuid is " + hoverNode.material.uuid);
-
-                    // hoverNode.material = hoverNode.material.clone();
-                    //DEBUG && console.log("   material uuid is  " + hoverNode.material.uuid);
-
-                    hoverNode.material.emissiveIntensity = emissiveIntensity.hoverNode;
-                }
-            }
-            else {
-                if (hoverNode) {
-                    cancelHoverNode()
-                }
-            }
-            controls.update();
-            renderer.render(scene, camera);
-            requestAnimationFrame(animate);
-        }
-        animate();
-
-        // expose
-        window.loadScene = loadScene;
-
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-
-        window.app = {
-            SCENE,
-            inFocus,
-            frames,
-            lastHoverNode,
-            objectMaterials,
-            meshByLabel,
-            labelByMesh,
-            data,
-            pointers,
-            nodesMap,
-            nodesMap_,
-            pointerMetaTimes,
-            scene,
-            camera,
-            renderer,
-            controls,
-            labelByPointerSource,
-        };
-
-    </script>
+        handle.addEventListener("pointermove", onMove);
+        handle.addEventListener("pointerup", onUp);
+      });
+    }
+
+    const appEl = $("app");
+    onDrag($("divider"), (e) => {
+      const bounds = appEl.getBoundingClientRect();
+      const width = Math.min(Math.max(e.clientX - bounds.left, 160), bounds.width - 160);
+      appEl.style.setProperty("--sidebar-w", width + "px");
+    });
+
+    // A splitter fixes the height of the panel above it and lets the ones
+    // below take the rest.
+    for (const splitter of document.querySelectorAll(".splitter")) {
+      const panel = splitter.previousElementSibling;
+      onDrag(splitter, (e) => {
+        const top = panel.getBoundingClientRect().top;
+        const height = Math.min(Math.max(e.clientY - top, 40),
+                                $("sidebar").getBoundingClientRect().height - 80);
+        panel.style.flex = "0 0 auto";
+        panel.style.height = height + "px";
+        panel.style.maxHeight = "none";
+      });
+    }
+
+    // ---- boot ---------------------------------------------------------------
+
+    function loadScene() {
+      buildSceneObjects();
+      buildPointerDoors();
+      buildEdgeDoors();
+      renderOutline();
+      renderEvents();
+      indexAnchorsByPane();
+      fitRendererToViewport();
+      renderOpenDoorCount();
+      seekTo(1, "instant");
+      $("boot").hidden = true;
+    }
+
+    // Give the "building the scene…" notice one frame to paint before the main
+    // thread disappears for a second or two. requestAnimationFrame alone is not
+    // enough: a background tab never gets one, and the page would sit unbuilt
+    // until it was looked at.
+    let started = false;
+    const start = () => {
+      if (started) return;
+      started = true;
+      loadScene();
+      animate();
+    };
+    requestAnimationFrame(start);
+    setTimeout(start, 250);
+
+    // ---- the console handle --------------------------------------------------
+    // `app.debug.on = true` turns the logging back on.
+    window.app = {
+      debug,
+      data,
+      playerState,
+      openDoors, chipIndex, detailIndex,
+      nodeRevisions, edgeRevisions, labelsAtMetaTime, bornAt,
+      meshesByLabel, labelByMesh, pickable,
+      scene, camera, renderer, controls,
+      openDoor, closeDoor, closeAllDoors, seekTo, lookAtLabel,
+      fitRendererToViewport, pickAt, pointerToNDC,
+      get hoverMesh() { return hoverMesh; },
+      // Where the camera is heading, which is what a pick actually sets --
+      // the position only catches up over the next couple of seconds.
+      get camTarget() { return camTargetLook && camTargetLook.toArray(); },
+    };
+  </script>
 
 </body>
 
