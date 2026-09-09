@@ -113,6 +113,92 @@ pub struct DiffCounts {
     pub not_equal_non_thunk: usize,
 }
 
+/// The name a pointer hangs under: the leftmost leaf of its symbol.
+///
+///    `do within space `mergeSort { ... }` makes every name inside it
+/// `mergeSort(...)`, nested to whatever depth the program opened, so the
+/// leftmost leaf of the symbol says which phase of a run a node belongs to --
+/// the input tree, the merge network, a stage thunk. Descending the left of
+/// every composite form, since `within` composes with `Call` but a program may
+/// have used any of them.
+pub fn head_symbol(space: &Pointer) -> Option<crate::value::Symbol_> {
+    fn head(s: &crate::value::Symbol_) -> crate::value::Symbol_ {
+        use crate::value::Symbol::*;
+        match s.as_ref() {
+            Call(x, _) | Dot(x, _) | BinOp(x, _, _) => head(x),
+            UnOp(_, x) => head(x),
+            _ => s.clone(),
+        }
+    }
+    match space {
+        Pointer::Symbol(s) => Some(head(s)),
+        _ => None,
+    }
+}
+
+/// The same comparison, split by the name each pointer hangs under.
+///
+///    For asking which *phase* of a run an edit disturbed, which a single set
+/// of totals cannot say. Sorted by the head's debug rendering, so the order is
+/// the same from one run to the next.
+pub fn diff_by_space(
+    left: &NodeVals,
+    right: &NodeVals,
+) -> Vec<(Option<crate::value::Symbol_>, DiffCounts)> {
+    use std::collections::HashMap as Std;
+    let mut groups: Std<Option<String>, (Option<crate::value::Symbol_>, DiffCounts)> = Std::new();
+    let empty = || DiffCounts {
+        left: 0,
+        right: 0,
+        only_left: 0,
+        only_right: 0,
+        equal: 0,
+        not_equal: 0,
+        not_equal_new_body: 0,
+        not_equal_same_body: 0,
+        not_equal_non_thunk: 0,
+    };
+    let mut bump =
+        |groups: &mut Std<Option<String>, (Option<crate::value::Symbol_>, DiffCounts)>,
+         space: &Pointer,
+         f: &dyn Fn(&mut DiffCounts)| {
+            let h = head_symbol(space);
+            let key = h.as_ref().map(|s| format!("{:?}", s));
+            let entry = groups.entry(key).or_insert_with(|| (h, empty()));
+            f(&mut entry.1);
+        };
+    for (pointer, l) in left.map.iter() {
+        bump(&mut groups, pointer, &|c| c.left += 1);
+        match right.map.get(pointer) {
+            None => bump(&mut groups, pointer, &|c| c.only_left += 1),
+            Some(r) if l == r => bump(&mut groups, pointer, &|c| c.equal += 1),
+            Some(r) => {
+                bump(&mut groups, pointer, &|c| c.not_equal += 1);
+                match (l, r) {
+                    (NodeVal::Thunk(lb, _), NodeVal::Thunk(rb, _)) => {
+                        if lb == rb {
+                            bump(&mut groups, pointer, &|c| c.not_equal_same_body += 1)
+                        } else {
+                            bump(&mut groups, pointer, &|c| c.not_equal_new_body += 1)
+                        }
+                    }
+                    _ => bump(&mut groups, pointer, &|c| c.not_equal_non_thunk += 1),
+                }
+            }
+        }
+    }
+    for (pointer, _) in right.map.iter() {
+        bump(&mut groups, pointer, &|c| c.right += 1);
+        if !left.map.contains_key(pointer) {
+            bump(&mut groups, pointer, &|c| c.only_right += 1);
+        }
+    }
+    let mut out: Vec<(Option<String>, (Option<crate::value::Symbol_>, DiffCounts))> =
+        groups.into_iter().collect();
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out.into_iter().map(|(_, v)| v).collect()
+}
+
 /// Compare two node maps.
 ///
 /// One pass over the left map, deciding each pointer, and one over the right counting what only

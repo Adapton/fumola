@@ -1,4 +1,5 @@
 import Seq "../../collections/levelTree";
+import Pure "../../collections/pureLevelTree";
 import LazyList "../../collections/LazyList";
 import List "../../collections/List";
 import A "../../system/adapton";
@@ -82,6 +83,165 @@ module {
         else if (name == "lazy-pathwise") { ?#lazyPathwise }
         else if (name == "eager-split") { ?#eagerSplit }
         else { null }
+    };
+
+    /// Where the input tree's *shape* comes from.
+    ///
+    ///    `#levelTree` is what `fromList` decides: one coin per symbol, the
+    /// highest in range taking the root, which with the library's positional
+    /// symbols means a 2 : n-2 root at every size up to 512 (issue #72).
+    ///
+    ///    The other two are scaffolding, put up outside the graph and
+    /// introduced as the input tree, to find out what a better-shaped input is
+    /// worth before building one incrementally. `#contracted` is the
+    /// rake-and-compress shape -- coins per (round, gap), contract, repeat --
+    /// whose depth is the round count; `#midpoint` is perfect balance, and is
+    /// the control rather than a candidate. See `pureLevelTree.Build`.
+    public type InputTree = { #levelTree; #contracted; #independentGaps; #contractedSymbolLevels; #midpoint };
+
+    public func inputTreeName(t : InputTree) : Text {
+      switch t {
+        case (#levelTree) "level-tree";
+        case (#contracted) "contracted";
+        case (#independentGaps) "independent-gaps";
+        case (#contractedSymbolLevels) "contracted-symlevels";
+        case (#midpoint) "midpoint";
+      }
+    };
+
+    /// The input tree, from a shape decided outside the graph and then
+    /// embedded.
+    ///
+    ///    All three shapes go through `embed`, including the level tree's, so
+    /// that the graphs being compared are composed the same way: an embedded
+    /// tree and a merge network, and no list-into-tree phase in either. The
+    /// level tree's shape is taken by building it inside `A.scratch` and
+    /// erasing it -- the construction is discarded, the shape survives, and a
+    /// pure tree carries no pointer that could dangle.
+    ///
+    ///    `embed` places whatever it is given under the names `fromList` would
+    /// have used, so the scaffolding is canonically named however it was
+    /// arrived at. That is the whole reason this comparison is possible.
+    func inputTreeOf(pairs : [(Symbol, Nat)], source : InputTree) : ?Seq.LevelTree_<Nat> {
+      let pure = switch source {
+        case (#levelTree) {
+          A.scratch(thunk { Seq.erase(Seq.fromList(List.fromIter(pairs.vals()))) })
+        };
+        case (#contracted) { Pure.Build.byContractionSeeded(pairs, 10) };
+        case (#independentGaps) { Pure.Build.byIndependentGaps(pairs, 10) };
+        case (#contractedSymbolLevels) {
+          Pure.Build.byContractionSeededWith(pairs, 10, #symbol)
+        };
+        case (#midpoint) { Pure.Build.byMidpoint(pairs) };
+      };
+      do within space `inputTree { Seq.embed(pure) }
+    };
+
+    /// One run over a prepared input tree, and the node map it leaves.
+    ///
+    ///    The edit is made to the array before the tree is prepared, which is
+    /// the analogue of editing the list: the two runs of a sample differ only
+    /// in their input. What is *not* in the graph here is the tree's
+    /// construction, so these numbers price the merge network over a given
+    /// shape and are not comparable with `runNodeVals`'s -- only with each
+    /// other, which is the comparison being asked for.
+    public func runNodeValsOver(seed : Nat, size : Nat, remove : ?Symbol,
+                                a : Algorithm, source : InputTree) : A.Native.NodeVals {
+      A.reset();
+      switch a {
+        case (#lazyInductive) { let _ = `lazyMergeSort(`strategy) := #inductive; () };
+        case (#lazyCartesian) { let _ = `lazyMergeSort(`strategy) := #cartesian; () };
+        case (#lazyPathwise) { let _ = `lazyMergeSort(`strategy) := #pathwise; () };
+        case (#eagerSplit) { () };
+      };
+      var pairs = [];
+      for ((s, e) in (R.generateRandomInput(seed, size)).vals()) {
+        let keep = switch remove { case null true; case (?r) s != r };
+        if (keep) { pairs #= [(s, e)] }
+      };
+      let tree = inputTreeOf(pairs, source);
+      switch a {
+        case (#eagerSplit) {
+          let sorted_ = `EagerSorted := thunk {
+            do within space `eagerMergeSort { Seq.eagerMergeSort(tree) }
+          };
+          let _ = force sorted_;
+          ()
+        };
+        case _ {
+          let sorted_ = do within space `mergeSort { Seq.lazyMergeSort_(tree) };
+          let _ = LazyList.takeN_(sorted_, pairs.size());
+          ()
+        };
+      };
+      A.Native.nodeValsNow()
+    };
+
+    /// A sample over a prepared input tree.
+    public func sampleOver(seed : Nat, size : Nat, position : Nat, a : Algorithm,
+                           source : InputTree) : Sample {
+      let baseline = runNodeValsOver(seed, size, null, a, source);
+      let edited = runNodeValsOver(seed, size, ?position, a, source);
+      let c = A.Native.diff(baseline, edited);
+      {
+        size;
+        algorithm = algorithmName(a) # "/" # inputTreeName(source);
+        position;
+        own = c.left;
+        equal = c.equal;
+        notEqual = c.notEqual;
+        newBody = c.notEqualNewBody;
+        sameBody = c.notEqualSameBody;
+        nonThunk = c.notEqualNonThunk;
+        onlyLeft = c.onlyLeft;
+        onlyRight = c.onlyRight;
+        redone = c.notEqualNewBody + c.notEqualSameBody + c.onlyRight;
+        garbage = c.onlyLeft;
+      }
+    };
+
+    /// One (size, algorithm, shape), swept over `positions`.
+    public func sweepOver(seed : Nat, size : Nat, positions : [Nat], a : Algorithm,
+                          source : InputTree) {
+      let baseline = runNodeValsOver(seed, size, null, a, source);
+      for (p in positions.vals()) {
+        let edited = runNodeValsOver(seed, size, ?p, a, source);
+        let c = A.Native.diff(baseline, edited);
+        Prim.print (csvRow({
+          size;
+          algorithm = algorithmName(a) # "/" # inputTreeName(source);
+          position = p;
+          own = c.left;
+          equal = c.equal;
+          notEqual = c.notEqual;
+          newBody = c.notEqualNewBody;
+          sameBody = c.notEqualSameBody;
+          nonThunk = c.notEqualNonThunk;
+          onlyLeft = c.onlyLeft;
+          onlyRight = c.onlyRight;
+          redone = c.notEqualNewBody + c.notEqualSameBody + c.onlyRight;
+          garbage = c.onlyLeft;
+        }))
+      }
+    };
+
+    /// An embedded level tree gives the same sorted answer as one built from a
+    /// list, and the scaffolded shapes give it too -- so a shape may be
+    /// swapped without changing what the sort computes.
+    #[test]
+    func testEveryShapeSortsTheSame() {
+      let expected = do {
+        A.reset();
+        let t = Seq.fromList(List.fromIter((R.generateRandomInput(10, 32)).vals()));
+        Seq.intoArray(t)
+      };
+      for (source in [#levelTree, #contracted, #midpoint].vals()) {
+        A.reset();
+        var pairs = [];
+        for ((s, e) in (R.generateRandomInput(10, 32)).vals()) { pairs #= [(s, e)] };
+        let tree = inputTreeOf(pairs, source);
+        assert (Seq.intoArray(tree) == expected);
+      }
     };
 
     /// One run, and the node map it leaves.
