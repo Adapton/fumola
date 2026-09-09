@@ -6,6 +6,17 @@
 //! papers' dirtying / dirty / clean / cleaning / change propagation. Algorithm 1 is the PLDI 2014
 //! Adapton paper's; the `Eval-*` rules are Nominal Adapton's (OOPSLA 2015, Figure 5).
 use fumola::check::assert_vm_eval as assert_;
+use fumola_semantics::adapton::{MetaTime, Space, Time};
+use fumola_semantics::value::Symbol;
+use fumola_semantics::vm_types::Interruption;
+use fumola_syntax::ast::Id;
+
+/// The space a bare name denotes: `` `k `` is `Space::Symbol(Symbol::Id("k"))`.
+fn adapton_space(name: &str) -> Space {
+    Space::Symbol(fumola_semantics::Shared::new(Symbol::Id(Id::new(
+        name.to_owned(),
+    ))))
+}
 
 /// The spreadsheet of the PLDI 2014 paper's Figure 1, in three cells: change an input, demand
 /// the output.
@@ -173,5 +184,103 @@ fn the_simple_strategy_returns_the_stale_cache_for_that_program() {
     assert_(
         "prim \"adaptonReset\" (#simple); let count = 1 := 0; let myThunk = 2 := thunk { let orig = @ count; count := 1 + (@ count); orig }; force(myThunk); (@ count, force(myThunk))",
         "(1, 0)",
+    )
+}
+
+// ---- the double use of one name ------------------------------------------------
+//
+// Nominal Adapton (OOPSLA 2015) refuses a run that allocates two different things under one
+// name: `Eval-thunkDirty` dirties every path into the re-allocated pointer, and the
+// `all-clean-out` premise of `Eval-computeDep` then fails as the node is popped. The graphical
+// cache asks the same question at the put -- does a thunk whose body is running hold an
+// allocation of this name recording something else? -- so the error names the put that did it.
+//
+// These programs bind their pointers from `:=` and read them with `@`, because the bare `eval`
+// harness has no prelude to supply `peek`, and a bare `` `k `` is a QuotedAst rather than a
+// Symbol, which `@` does not coerce.
+
+/// The shape the check exists for: one evaluation minting a name it has already used.
+#[test]
+fn a_thunk_that_allocates_one_name_twice_is_refused() {
+    fumola::check::assert_vm_interruption(
+        "force(`t := thunk { `k := 1; `k := 2 })",
+        &Interruption::AdaptonError(fumola_semantics::adapton::Error::DoubleUse {
+            pointer: adapton_space("k"),
+            observer: (adapton_space("t"), Time::Now, MetaTime(1u32.into())),
+        }),
+    )
+}
+
+/// Allocating *the same* thing twice under one name is not a double use: it is Nominal
+/// Adapton's `Eval-refClean`, and here a matched put, which returns before the check.
+#[test]
+fn allocating_the_same_value_twice_is_a_matched_put() {
+    assert_(
+        "let v = force(`t := thunk { `k := 1; let p = `k := 1; @ p });
+         (v, @(`adapton(`counts)(`putMatched)), @(`adapton(`counts)(`doubleUses)))",
+        "(1, 1, 0)",
+    )
+}
+
+/// An editor's put over a thunk's allocation is an edit, not a double use. The editor owns the
+/// cells it edits, whoever allocated them -- which is what realignment is for.
+#[test]
+fn an_editors_put_over_a_thunks_allocation_is_an_edit() {
+    assert_(
+        "let t = `t := thunk { `k := 1; 7 }; let _ = force t; let k = `k := 2;
+         (@ k, @(`adapton(`counts)(`doubleUses)))",
+        "(2, 0)",
+    )
+}
+
+/// And a computation's put over the *editor's* allocation is not one either: the editor's
+/// allocation edge leaves the root node, which no repair can ever re-run. (Marking it was the
+/// first thing tried here, and `adapton.testPeekEvents` caught it: the events it added were
+/// events for a repair that can never happen.)
+#[test]
+fn a_computations_put_over_the_editors_allocation_is_not_a_double_use() {
+    assert_(
+        "let k = `k := 1; let _ = force(`t := thunk { `k := 2; 7 });
+         (@ k, @(`adapton(`counts)(`doubleUses)))",
+        "(2, 0)",
+    )
+}
+
+/// A re-evaluation re-putting what it allocated last time is not a double use. The version on
+/// the stack is the new one, and the old version's edges left the graph when repair dropped its
+/// trace -- so nothing matches. This is the case that would have made the check unusable had it
+/// matched on the pointer rather than on the node version.
+#[test]
+fn a_reevaluation_re_putting_its_own_allocation_is_not_a_double_use() {
+    assert_(
+        "let x = `x := 1; let t = `t := thunk { let p = `k := (@ x) * 10; @ p };
+         let before = force t; x := 2; let after = force t;
+         (before, after, @(`adapton(`counts)(`doubleUses)), @(`adapton(`counts)(`reevaluations)))",
+        "(10, 20, 0, 1)",
+    )
+}
+
+/// The gap, pinned rather than hidden: two thunks that have each returned, having allocated
+/// different things under one name, are *not* caught. Nominal Adapton catches this through the
+/// marking it does of allocation edges and the check it makes as a node is popped; this cache
+/// marks no allocation edge (module notes, items 3 and 8). The same gap covers an inner thunk's
+/// allocation that its own caller later overwrites.
+#[test]
+fn two_returned_thunks_colliding_on_one_name_are_not_yet_caught() {
+    assert_(
+        "let a = force(`a := thunk { `k := 1; 1 });
+         let b = force(`b := thunk { let p = `k := 2; @ p });
+         (a, b, @(`adapton(`counts)(`doubleUses)))",
+        "(1, 2, 0)",
+    )
+}
+
+/// The setting turns the refusal off, and the put goes through as an edit would.
+#[test]
+fn the_check_can_be_turned_off() {
+    assert_(
+        "`adapton(`settings)(`checkDoubleUse) := false;
+         force(`t := thunk { `k := 1; let p = `k := 2; @ p })",
+        "2",
     )
 }

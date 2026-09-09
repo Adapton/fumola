@@ -50,6 +50,8 @@ pub struct Counts {
     pub edges_aligned: u64,
     /// Thunks a repair re-evaluated.
     pub reevaluations: u64,
+    /// Puts refused because one evaluation had used the name for something else.
+    pub double_uses: u64,
 }
 
 impl Counts {
@@ -71,6 +73,7 @@ impl Counts {
             repairs: 0,
             edges_aligned: 0,
             reevaluations: 0,
+            double_uses: 0,
         }
     }
 }
@@ -83,6 +86,11 @@ pub struct Settings {
     /// records only the allocation edge -- Nominal Adapton's `Eval-refClean` / `Eval-thunkClean`.
     /// Off, every put makes a new version and signals the readers of the old one.
     pub put_matches_equal_values: bool,
+    /// A put made by a computation, of different contents, under a name that a
+    /// thunk still being evaluated had already observed or allocated, is an
+    /// error (`Error::DoubleUse`) rather than a quiet edit. Off, it signals
+    /// like any other put and the next force repairs whatever it reached.
+    pub check_double_use: bool,
 }
 
 impl Settings {
@@ -91,6 +99,7 @@ impl Settings {
             force_begin_always_misses: false,
             force_end_forgets_result: false,
             put_matches_equal_values: true,
+            check_double_use: true,
         }
     }
 }
@@ -161,6 +170,11 @@ impl State {
                     value.as_ref().into_bool_or(Error::TypeMismatch(line!()))?;
                 Ok(())
             }
+            ReservedSymbol::SettingsCheckDoubleUse => {
+                self.settings.check_double_use =
+                    value.as_ref().into_bool_or(Error::TypeMismatch(line!()))?;
+                Ok(())
+            }
             _ => Err(Error::CannotPutReadOnlyReservedSymbol(symbol)),
         }
     }
@@ -177,12 +191,16 @@ impl State {
             ReservedSymbol::SettingsPutMatchesEqualValues => {
                 self.settings.put_matches_equal_values.to_motoko_shared()
             }
+            ReservedSymbol::SettingsCheckDoubleUse => {
+                self.settings.check_double_use.to_motoko_shared()
+            }
             ReservedSymbol::CountsPutMatched => self.counts.put_matched.to_motoko_shared(),
             ReservedSymbol::CountsSignalings => self.counts.signalings.to_motoko_shared(),
             ReservedSymbol::CountsEdgesSignaled => self.counts.edges_signaled.to_motoko_shared(),
             ReservedSymbol::CountsRepairs => self.counts.repairs.to_motoko_shared(),
             ReservedSymbol::CountsEdgesAligned => self.counts.edges_aligned.to_motoko_shared(),
             ReservedSymbol::CountsReevaluations => self.counts.reevaluations.to_motoko_shared(),
+            ReservedSymbol::CountsDoubleUses => self.counts.double_uses.to_motoko_shared(),
             ReservedSymbol::CountsCells => self.counts.cells.to_motoko_shared(),
             ReservedSymbol::CountsThunkCells => self.counts.thunk_cells.to_motoko_shared(),
             ReservedSymbol::CountsNonThunkCells => self.counts.non_thunk_cells.to_motoko_shared(),

@@ -24,6 +24,7 @@ pub fn is_future_reserved_symbol(symbol: &Symbol) -> bool {
 // `adapton(`settings)(`forceBeginAlwaysMisses).
 // `adapton(`settings)(`forceEndForgetsResult).
 // `adapton(`settings)(`putMatchesEqualValues).
+// `adapton(`settings)(`checkDoubleUse).
 // `adapton(`counts)(`cells)
 //                  (`nonThunkCells)
 //                  (`thunkCells)
@@ -40,6 +41,7 @@ pub fn is_future_reserved_symbol(symbol: &Symbol) -> bool {
 //                  (`repairs)
 //                  (`edgesAligned)
 //                  (`reevaluations)
+//                  (`doubleUses)
 //
 // Operations on these symbols have special meaning:
 //  - They are not part of the graphical representation of dependencies.
@@ -56,6 +58,7 @@ pub enum ReservedSymbol {
     SettingsForceBeginAlwaysMisses,
     SettingsForceEndForgetsResult,
     SettingsPutMatchesEqualValues,
+    SettingsCheckDoubleUse,
     Counts,
     CountsCells,
     CountsThunkCells,
@@ -73,6 +76,7 @@ pub enum ReservedSymbol {
     CountsRepairs,
     CountsEdgesAligned,
     CountsReevaluations,
+    CountsDoubleUses,
 }
 
 pub fn into_reserved_symbol(symbol: &Symbol) -> Option<ReservedSymbol> {
@@ -118,6 +122,7 @@ pub fn into_reserved_symbol(symbol: &Symbol) -> Option<ReservedSymbol> {
                             "repairs" => Some(ReservedSymbol::CountsRepairs),
                             "edgesAligned" => Some(ReservedSymbol::CountsEdgesAligned),
                             "reevaluations" => Some(ReservedSymbol::CountsReevaluations),
+                            "doubleUses" => Some(ReservedSymbol::CountsDoubleUses),
                             _ => None,
                         },
                         "settings" => match z.as_str() {
@@ -130,6 +135,7 @@ pub fn into_reserved_symbol(symbol: &Symbol) -> Option<ReservedSymbol> {
                             "putMatchesEqualValues" => {
                                 Some(ReservedSymbol::SettingsPutMatchesEqualValues)
                             }
+                            "checkDoubleUse" => Some(ReservedSymbol::SettingsCheckDoubleUse),
                             _ => None,
                         },
                         _ => None,
