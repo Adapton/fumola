@@ -406,12 +406,15 @@
         <details class="aside">
           <summary>footnote: repair, so far</summary>
           <p>
-          Repair is where Fumola's own work is. The graph, its event history
-          and its introspection are implemented; the realignment of a graph
-          across an edit &mdash; signaling and repair, in the Recipe's terms
-          &mdash; is the language's ongoing work rather than a finished
-          feature. What the runtime does today is reuse a thunk's cached result
-          on a cache hit, and record what it did either way.
+          Repair is where Fumola's own work is. Since 2026-09-08 the graph
+          <em>realigns</em> after an edit: a put that changes a cell with
+          readers <em>signals</em> the edges that observed it, and a force of
+          a thunk whose trace holds a signaled edge <em>repairs</em> it &mdash;
+          edge by edge, in the order the thunk took them, re-evaluating only
+          when an edge cannot be realigned. Both traversals are written into
+          the event history as they happen. <a href="/alignment/">/alignment/</a>
+          explains it, with the Recipe's rules beside the prose. What is still
+          to come is listed <a href="#now">at the end of this page</a>.
         </p>
         </details>
       </section>
@@ -562,7 +565,7 @@
           Graphical keeps the DCG proper: nodes, edges, each thunk's trace in
           the order it ran, and an event history stamped with a meta-time. It
           is the semantics the pictures on this page are drawn from, the one
-          the introspection below reports on, and the one repair will need.
+          the introspection below reports on, and the one repair runs on.
         </p>
         <p>
           <strong>Simple</strong> keeps a store and no more: cells indexed by
@@ -577,7 +580,7 @@
           The graphical store reports on itself in Fumola's own value language,
           so a program can read its own history as ordinary data:
         </p>
-        <pre><code><span class="c">// the event log: addNode, addEdge, forceBegin, forceEnd, ...</span>
+        <pre><code><span class="c">// the event log: addNode, addEdge, forceBegin, forceEnd, signalingBegin, repairBegin, ...</span>
 <span class="t">Adapton</span>.<span class="v">peekEvents</span>()    <span class="c">// [{metaTime; event}]</span>
 <span class="t">Adapton</span>.<span class="v">peekInfo</span>(<span class="v">p</span>)    <span class="c">// one node, and the edges either side of it</span>
 <span class="t">Adapton</span>.<span class="v">peekHistory</span>()   <span class="c">// events, nodes and edges together</span></code></pre>
@@ -1029,6 +1032,11 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
         <h2>Where to go next<a class="anchor" href="#links" aria-label="Copy link to this heading">#</a></h2>
         <ul class="links">
           <li>
+            <span class="what">/alignment/</span>
+            <span class="desc"><a href="/alignment/">Alignment</a>
+            <small>What it means for the graph to agree with itself, how an edit breaks that, and how signaling and repair put it back. With the Recipe's rules.</small></span>
+          </li>
+          <li>
             <span class="what">/web-play/</span>
             <span class="desc"><a href="/web-play/">Web play</a>
             <small>Write Fumola in the browser with the library beside you. Nothing to install.</small></span>
@@ -1082,6 +1090,85 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
             <span class="what">dfinity/motoko.rs</span>
             <span class="desc"><a href="https://github.com/dfinity/motoko.rs">Where the surface came from</a>
             <small>The Motoko interpreter in Rust that Fumola descends from.</small></span>
+          </li>
+        </ul>
+      </section>
+
+      <section id="now">
+        <h2>What is happening now<a class="anchor" href="#now" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          <strong>Work in progress</strong>, written 2026-09-08 and meant to be
+          rewritten as it moves. Two things changed this week: the graph
+          learned to realign after an edit, and the words for that were
+          settled.
+        </p>
+        <h3 id="the-words">The words<a class="anchor" href="#the-words" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          Fumola's terms for the repair algorithm differ from the Adapton
+          papers' &mdash; deliberately, in terms and not in algorithms. The
+          papers say <em>dirty</em> and <em>clean</em>; those describe a state.
+          Fumola says <em>signaled</em> and <em>aligned</em>: the first says what
+          happened to an edge (a message reached it, and it waits to be
+          checked), the second is already the Recipe's word for a store or a
+          graph that agrees with itself. The change is being made everywhere
+          &mdash; runtime, library, documents, and since 2026-09-09 the Recipe's
+          rules &mdash; and is not finished; where you still meet the old
+          words, they mean these.
+        </p>
+        <table>
+          <caption>The papers' words, and Fumola's</caption>
+          <tr><td class="form">dirtying</td><td>signaling &mdash; the traversal an edit starts, from the changed cell toward its readers</td></tr>
+          <tr><td class="form">dirty</td><td>signaled &mdash; an edge whose recorded observation may no longer agree with the graph</td></tr>
+          <tr><td class="form">clean</td><td>aligned &mdash; an edge that does agree, or a whole node all of whose edges do</td></tr>
+          <tr><td class="form">cleaning</td><td>repair &mdash; the traversal a force runs on a thunk with a signaled edge: check each edge, re-evaluate if one cannot be realigned</td></tr>
+          <tr><td class="form">change propagation</td><td>realignment &mdash; the whole, from an edit to the next consistent demand; signal and repair steps, usually in matching pairs</td></tr>
+        </table>
+        <h3 id="landed">What landed<a class="anchor" href="#landed" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          Signaling on a put that changes a read cell, repair on the next
+          force, and a <em>matched put</em> &mdash; putting what a cell already
+          holds keeps the cell and its readers as they are. Both traversals are
+          bracketed in the event history, so a program, the playground and the
+          replayground can see a repair happen rather than infer it from a
+          diff of two runs. The runtime this host serves carries it.
+        </p>
+        <h3 id="next">What is next<a class="anchor" href="#next" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          In the engine: a cycle check, signaling on delayed puts, and the
+          double-use check of Nominal Adapton. In the tools: a playground
+          example that is one graph edited in place, with the trails drawn from
+          the signaling and repair walk. In the measurement: an oracle that
+          runs the existing comparative examples as repairs and checks them
+          against a from-scratch run, and sweeps that were too expensive when
+          every sample cost two full runs. In the Recipe: the words, a few
+          missing rules, and the typos that surfaced when its rules were lined
+          up with the code. The full list is in the docs.
+        </p>
+        <ul class="links">
+          <li>
+            <span class="what">/alignment/</span>
+            <span class="desc"><a href="/alignment/">Alignment</a>
+            <small>The prose and the formal view: how the graph realigns after signaling, via repair.</small></span>
+          </li>
+          <li>
+            <span class="what">docs/realignment.md</span>
+            <span class="desc"><a href="https://github.com/Adapton/fumola/blob/main/docs/realignment.md">The effort, the words, and what is left</a>
+            <small>Why repair was built now, what the numbers said, and the to-do lists &mdash; engine, tools, measurement, Recipe, docs.</small></span>
+          </li>
+          <li>
+            <span class="what">#106</span>
+            <span class="desc"><a href="https://github.com/Adapton/fumola/pull/106">Signaling and repair: the graphical cache realigns after an edit</a>
+            <small>The change itself. Its module documentation is a rule-by-rule reading guide to the papers and the Recipe.</small></span>
+          </li>
+          <li>
+            <span class="what">#22</span>
+            <span class="desc"><a href="https://github.com/Adapton/fumola/issues/22">Repairing the graphical cache: signaling and realignment algorithms</a>
+            <small>The issue that has tracked this since March; the two unchecked boxes were signaling and repair.</small></span>
+          </li>
+          <li>
+            <span class="what">adapton-recipe</span>
+            <span class="desc"><a href="https://github.com/matthewhammer/adapton-recipe">The Extended Adapton Recipe</a>
+            <small>The formalism this runtime implements. Being brought into line with the code, which is the reference.</small></span>
           </li>
         </ul>
       </section>
