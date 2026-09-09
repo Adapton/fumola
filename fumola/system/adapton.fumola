@@ -244,6 +244,119 @@ module {
         };
     };
 
+    /// Reading the graph where it lies, without converting it into Fumola values.
+    ///
+    ///    `peekHistory` answers with the whole history as ordinary Fumola values: arrays of
+    /// records, every node's thunk body among them. That is what a scene wants -- a program
+    /// that draws its own past behaviour has to be able to walk it -- and it is what a diff
+    /// cannot afford, because a diff only wants to know which pointers disagree, and pays for
+    /// the conversion of every node before it can ask.
+    ///
+    ///    These operations keep the history and the node maps on the Rust side, as the
+    /// runtime's own structures, and answer with a value that Fumola can hold but not look
+    /// inside. What comes back from a diff is numbers, which is what measurement wants.
+    ///
+    ///    Measured on mergeSort at size 1000, removing the highest-level cell; release build,
+    /// medians of three. Two runs and no diff at all cost 28.78 s and 478 MB of peak memory;
+    /// with the Fumola-side diff, 31.85 s and 1472 MB; with this one, 28.93 s and 575 MB. So
+    /// the diffing itself went from 3.07 s and 994 MB to **0.15 s and 97 MB** -- 20x faster,
+    /// and a tenth of the memory.
+    ///
+    ///    On a whole sample the two runs dominate the clock, so a sample is only 1.10x faster.
+    /// What it is, is 2.56x smaller in peak memory, and memory is what killed the sweeps: the
+    /// size-1000 average-case runs died at 10.2 GB. See `docs/native-diff.md`.
+    ///
+    ///    `Diff.nodeValsDiff` is still the way to ask *which* cells differ: it answers with the
+    /// four maps, and `webPlay.pair` colours a comparative example from them. Drawing wants the
+    /// maps; measurement wants the numbers and no allocation. Both stay.
+    public module Native {
+
+        /// A run's event history, as the runtime holds it. Opaque: the point of it is to not be
+        /// converted. `IntoJSON` and the scene functions take the `PeekInfo.History` that
+        /// `peekHistory` answers with instead.
+        public type History = Any;
+
+        /// Every pointer a run named and what it last held. Opaque, and the operand of `diff`.
+        public type NodeVals = Any;
+
+        /// What two runs' node maps say, as numbers.
+        ///
+        ///    The four categories of `Diff.NodeValsDiff`, and `notEqual` split three ways --
+        /// which the Fumola side cannot do without walking the pairs itself. The split is the
+        /// distinction realignment turns on: a thunk whose *body* differs was named again for a
+        /// different closure, so a repair must evaluate it as it would a cell with no
+        /// counterpart; a thunk whose body is the same and whose *result* differs is repair
+        /// proper. On mergeSort at size 1000, 99% of `notEqual` is `notEqualNewBody`.
+        public type DiffCounts = {
+            left : Nat;
+            right : Nat;
+            onlyLeft : Nat;
+            onlyRight : Nat;
+            equal : Nat;
+            notEqual : Nat;
+            notEqualNewBody : Nat;
+            notEqualSameBody : Nat;
+            notEqualNonThunk : Nat;
+        };
+
+        /// The history so far, shared rather than copied.
+        public func history() : History {
+            prim "adaptonHistory" ()
+        };
+
+        /// The node map of a history: the last version of every pointer in it.
+        public func nodeVals(h : History) : NodeVals {
+            prim "adaptonHistoryNodeVals" h
+        };
+
+        /// The node map of the run so far -- `nodeVals(history())`, which is what a sample
+        /// takes at the end of each run it means to compare.
+        public func nodeValsNow() : NodeVals {
+            nodeVals(history())
+        };
+
+        /// How many pointers a node map holds.
+        public func size(nv : NodeVals) : Nat {
+            prim "adaptonNodeValsSize" nv
+        };
+
+        /// Compare two node maps.
+        public func diff(l : NodeVals, r : NodeVals) : DiffCounts {
+            prim "adaptonNodeValsDiff" (l, r)
+        };
+
+        /// The native and the Fumola-side diff answer the same question, and this asserts they
+        /// answer it the same way on a graph with a thunk, a cell, an edit and a repair in it.
+        ///
+        ///    A stronger check runs at size 16 over the merge network, in `levelTree`; this one
+        /// is here so that the two implementations cannot drift without a test in the module
+        /// that defines them both.
+        #[test]
+        func testAgreesWithTheFumolaSideDiff() {
+            let run = func(x : Nat) : (NodeVals, Diff.NodeVals) {
+                reset();
+                let c = `c := x;
+                let t = `t := thunk { let v = @ c; v * 2 };
+                let u = `u := thunk { let v = force t; v + 1 };
+                let _ = force u;
+                (nodeValsNow(), Diff.nodeValsFromNodes(peekHistory().nodes))
+            };
+            let (nl, fl) = run(1);
+            let (nr, fr) = run(2);
+            let native = diff(nl, nr);
+            let fumola = Diff.nodeValsDiff(fl, fr);
+            assert native.left == fl.size();
+            assert native.right == fr.size();
+            assert native.equal == fumola.equal.size();
+            assert native.notEqual == fumola.notEqual.size();
+            assert native.onlyLeft == fumola.onlyLeft.size();
+            assert native.onlyRight == fumola.onlyRight.size();
+            // And the split accounts for exactly the cells that disagree.
+            assert native.notEqual ==
+                native.notEqualNewBody + native.notEqualSameBody + native.notEqualNonThunk;
+        };
+    };
+
     public func reset() {
         prim "adaptonReset" ();
     };

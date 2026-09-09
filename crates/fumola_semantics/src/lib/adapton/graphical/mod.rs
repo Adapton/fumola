@@ -191,7 +191,9 @@ pub struct GraphicalState {
     pub history: History,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+// PartialEq, Eq and Hash so that a history can be a `Value::AdaptonHistory` -- a value form
+// carries them, and every field already has them.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct History {
     pub events: Vector<EventHistoryItem>,
     pub nodes: Vector<NodeHistoryItem>,
@@ -1257,5 +1259,10 @@ impl CacheState for GraphicalState {
 
     fn peek_events(&mut self) -> Res<Value_> {
         Ok(self.history.clone().into_value_())
+    }
+
+    fn history(&self) -> Res<History> {
+        // Three `im_rc::Vector` clones: reference bumps, whatever the history holds.
+        Ok(self.history.clone())
     }
 }

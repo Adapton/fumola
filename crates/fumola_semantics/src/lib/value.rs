@@ -187,6 +187,14 @@ pub enum Value {
     AdaptonPointer(AdaptonPointer),
     AdaptonTime(AdaptonTime),
     AdaptonSpace(AdaptonSpace),
+    /// A run's event history, as the runtime holds it: the `im_rc` structures themselves,
+    /// shared rather than converted. `peekHistory` converts a history into ordinary Fumola
+    /// values, which is what a scene wants and what a diff cannot afford; this is the other
+    /// door. See `adapton::diff`.
+    AdaptonHistory(Shared<crate::adapton::graphical::History>),
+    /// Every pointer a run named and what it last held, built from a history in Rust. The
+    /// operand of `adaptonNodeValsDiff`.
+    AdaptonNodeVals(Shared<crate::adapton::diff::NodeVals>),
     Thunk(ThunkBody),
 }
 
@@ -526,6 +534,26 @@ impl Value {
         }
     }
 
+    pub fn into_adapton_history_or<E>(
+        &self,
+        err: E,
+    ) -> Result<Shared<crate::adapton::graphical::History>, E> {
+        match self {
+            Value::AdaptonHistory(h) => Ok(h.clone()),
+            _ => Err(err),
+        }
+    }
+
+    pub fn into_adapton_node_vals_or<E>(
+        &self,
+        err: E,
+    ) -> Result<Shared<crate::adapton::diff::NodeVals>, E> {
+        match self {
+            Value::AdaptonNodeVals(nv) => Ok(nv.clone()),
+            _ => Err(err),
+        }
+    }
+
     pub fn into_text_or<E>(&self, err: E) -> Result<Text, E> {
         match self {
             Value::Text(t) => Ok(t.clone()),
@@ -681,6 +709,10 @@ impl Value {
             Value::QuotedAst(_) => Err(ValueError::ToRust("QuotedAst".to_string()))?,
             Value::Symbol(_) => Err(ValueError::ToRust("Symbol".to_string()))?,
             Value::AdaptonPointer(_) => Err(ValueError::ToRust("NamedPointer".to_string()))?,
+            // Native by design: a host that wants the history as JSON asks for the converted
+            // one (`peekHistory`), which is what these forms exist to be an alternative to.
+            Value::AdaptonHistory(_) => Err(ValueError::ToRust("AdaptonHistory".to_string()))?,
+            Value::AdaptonNodeVals(_) => Err(ValueError::ToRust("AdaptonNodeVals".to_string()))?,
             Value::Thunk(_) => Err(ValueError::ToRust("Thunk".to_string()))?,
             Value::Pointer(_) => Err(ValueError::ToRust("Pointer".to_string()))?,
             Value::Actor(_) => Err(ValueError::ToRust("Actor".to_string()))?,

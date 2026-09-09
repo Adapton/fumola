@@ -1553,6 +1553,41 @@ module {
     }))
   };
 
+  /// The native diff and the Fumola-side diff agree on a real merge network.
+  ///
+  ///    `A.Native.testAgreesWithTheFumolaSideDiff` checks them against each other on three
+  /// nodes; this checks them on the graph the comparative examples are made of, where the two
+  /// runs disagree in every category at once -- 87 equal, 56 with the same name and other
+  /// contents, 20 named only by the first run and 5 only by the second.
+  ///
+  ///    It also shows that a native node map outlives the graph it came from: `nvLeft` is taken
+  /// before the second run, which opens with `A.reset()`, and is still comparable afterwards.
+  /// The map is a persistent structure holding what it was given, not a window onto the cache.
+  #[test]
+  func testNativeDiffAgreesOnTheMergeNetwork() {
+    let left = mergeFromTreeRunWith(10, 16, null, #inductive);
+    let nvLeft = A.Native.nodeValsNow();
+    let fLeft = A.Diff.nodeValsFromNodes(left.history.nodes);
+    let right = mergeFromTreeRunWith(10, 16, ?3, #inductive);
+    let nvRight = A.Native.nodeValsNow();
+    let fRight = A.Diff.nodeValsFromNodes(right.history.nodes);
+    let native = A.Native.diff(nvLeft, nvRight);
+    let fumola = A.Diff.nodeValsDiff(fLeft, fRight);
+    assert native.left == fLeft.size();
+    assert native.right == fRight.size();
+    assert native.equal == fumola.equal.size();
+    assert native.notEqual == fumola.notEqual.size();
+    assert native.onlyLeft == fumola.onlyLeft.size();
+    assert native.onlyRight == fumola.onlyRight.size();
+    // Every category is exercised, or the agreement would be cheap.
+    assert native.equal > 0;
+    assert native.notEqual > 0;
+    assert native.onlyLeft > 0;
+    assert native.onlyRight > 0;
+    assert native.notEqual ==
+      native.notEqualNewBody + native.notEqualSameBody + native.notEqualNonThunk;
+  };
+
   /// The merge network, before and after one cell is removed.
   ///
   ///    The middle rung of the three, and the one that carries the argument.
