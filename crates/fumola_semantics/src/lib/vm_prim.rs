@@ -319,6 +319,46 @@ pub fn call_prim_function<A: Active>(
             *active.cont() = cont_value(Value::Nat(node_vals.size().into()));
             Ok(Step {})
         }
+        AdaptonNodeValsDiffBySpace => {
+            let pair = args.into_tuple_or(type_mismatch_!(file!(), line!()))?;
+            if pair.len() != 2 {
+                type_mismatch!(file!(), line!())
+            }
+            let left = pair[0]
+                .as_ref()
+                .into_adapton_node_vals_or(type_mismatch_!(file!(), line!()))?;
+            let right = pair[1]
+                .as_ref()
+                .into_adapton_node_vals_or(type_mismatch_!(file!(), line!()))?;
+            let nat = |n: usize| -> Value_ { crate::Shared::new(Value::Nat(n.into())) };
+            let mut rows = im_rc::Vector::new();
+            for (head, c) in crate::adapton::diff::diff_by_space(&left, &right) {
+                let space = match head {
+                    Some(s) => Value::Symbol(s),
+                    None => Value::Null,
+                };
+                rows.push_back(
+                    Value::object_from(
+                        [
+                            ("space", crate::Shared::new(space)),
+                            ("left", nat(c.left)),
+                            ("right", nat(c.right)),
+                            ("onlyLeft", nat(c.only_left)),
+                            ("onlyRight", nat(c.only_right)),
+                            ("equal", nat(c.equal)),
+                            ("notEqual", nat(c.not_equal)),
+                            ("notEqualNewBody", nat(c.not_equal_new_body)),
+                            ("notEqualSameBody", nat(c.not_equal_same_body)),
+                            ("notEqualNonThunk", nat(c.not_equal_non_thunk)),
+                        ]
+                        .iter(),
+                    )
+                    .into(),
+                );
+            }
+            *active.cont() = cont_value(Value::Array(fumola_syntax::ast::Mut::Const, rows));
+            Ok(Step {})
+        }
         AdaptonNodeValsDiff => {
             let pair = args.into_tuple_or(type_mismatch_!(file!(), line!()))?;
             if pair.len() != 2 {

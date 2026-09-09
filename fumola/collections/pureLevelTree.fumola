@@ -124,4 +124,431 @@ module {
     assert (not (equal(t, leaf(`a, 1))));
     assert (debug_show (intoArray(t)) == debug_show ([(`a, 1), (`c, 2)]));
   };
+
+  /// Trees whose shape is *not* a function of their symbols.
+  ///
+  ///    A level tree's shape is decided by `symbolLevel`, one coin per symbol,
+  /// and the highest coin in range takes the root. That gives O(log n) expected
+  /// depth and says nothing about the root's *split*, which is what mergeSort
+  /// pays for: the top merge does work proportional to the smaller side. In
+  /// practice the split is not merely unbalanced but degenerate --- with the
+  /// library's positional symbols, `symbolLevel 3` is the highest in range at
+  /// every size up to 512, so the root splits 2 : n-2 (issue #72). Symbols that
+  /// carry entropy do not rescue it: they put the root at position 84 for every
+  /// size from 128 up, so the split goes 65/35, then 32/68, then 16/84.
+  ///
+  ///    These two builders decide a shape without asking any symbol for its
+  /// level, so a balanced tree can be prepared here and introduced into the
+  /// graph as an input tree with `levelTree.embed`, which places it under the
+  /// names `fromList` would have used. Scaffolding, put up by hand, to find out
+  /// what a balanced input tree is worth before building one incrementally.
+  ///
+  ///    Both keep the treap's heap property --- a parent's level exceeds its
+  /// children's --- so `split` and `append` still mean what they mean. What
+  /// they give up is that `level` is `symbolLevel(symbol)`: these levels come
+  /// from the construction, so `fromList` would not reproduce these trees, and
+  /// `append`'s canonicity tests are about `fromList`'s trees, not these.
+  ///
+  /// ## The two, and why both
+  ///
+  ///    `byMidpoint` is perfectly balanced and, for an incremental setting,
+  /// useless: every midpoint moves when one element is removed, so almost every
+  /// gap is relabelled and a graph built over it has almost nothing to reuse.
+  /// It is the control --- balance without stability.
+  ///
+  ///    `byContraction` is Matthew's proposal, and the shape of a rake-and-
+  /// compress tree: walk the sequence, flip a coin per gap, contract the gaps
+  /// whose coin says so, repeat on what is left until one node remains. Each
+  /// round takes an expected quarter of the gaps, so there are O(log n) rounds
+  /// and the tree's depth *is* the round count --- no single symbol can own the
+  /// root's split, which is what makes the pathology above nearly impossible.
+  /// And the coins are per (round, symbol) rather than per position, so
+  /// removing an element leaves every other gap's coins untouched: balanced,
+  /// and stable under an edit. That pair of properties is the whole argument,
+  /// and comparing the two builders is how to see it rather than assert it.
+  public module Build {
+
+    /// The symbol of the leftmost element: the label the gap to a subtree's
+    /// left takes, by the convention that a gap sits immediately before the
+    /// element it is named for.
+    public func leftmostSymbol<X>(t : LevelTree<X>) : ?Symbol {
+      switch t {
+        case (#empty) null;
+        case (#element(e)) (?e.symbol);
+        case (#binary(b)) leftmostSymbol(b.left);
+      }
+    };
+
+    func gapSymbol<X>(t : LevelTree<X>) : Symbol {
+      switch (leftmostSymbol(t)) {
+        case (?s) s;
+        case null { assert false; `impossible };
+      }
+    };
+
+    /// One deterministic fair coin, for one symbol, in one round, under one
+    /// seed.
+    ///
+    ///    `symbolHash` and not `symbolLevel`: the level is geometric, packed
+    /// out of the trailing zeros of four chunks of the hash, which is what a
+    /// treap wants and the opposite of what a round wants. A round wants one
+    /// unbiased bit, and a fresh one each round, which is what tagging the
+    /// symbol with the round and the seed gives.
+    ///
+    ///    Deterministic in all three, so a tree is reproducible: the same
+    /// pairs under the same seed give the same tree, and -- the property the
+    /// whole construction rests on -- removing an element changes no other
+    /// symbol's coin in any round.
+    public func coin(seed : Nat, round : Nat, s : Symbol) : Nat {
+      (Prim.symbolHash(((`coin(seed))(round))(s))) % 2
+    };
+
+    /// The contraction, as Matthew specified it: walk the cells, and for each
+    /// one flip a coin to keep it as it is or combine it with the next.
+    ///
+    ///    One coin per (cell, round, seed), and the walk resolves what a
+    /// single coin cannot: if a cell combines with the next, the walk steps
+    /// over both, so the next cell does not get to combine with the one after
+    /// it. Expected advance is one and a half cells per flip, so a round
+    /// leaves about two thirds of what it was given and there are about
+    /// 1.7 log2 n rounds.
+    ///
+    ///    The tree's depth is the round count, which is what makes the level
+    /// tree's pathology impossible here: no symbol's coin decides the root, so
+    /// there is no 2 : n-2 split to be had.
+    ///
+    ///    What the walk costs is that a cell's fate depends on the walk having
+    /// reached it, and that depends on the coins before it -- a chain, where
+    /// `byIndependentGaps` below has none. The chain re-synchronises quickly
+    /// (a kept cell puts both walks back in step), so the perturbation from a
+    /// removal is expected to stay local, but "expected" is doing work there
+    /// and the two rules are worth measuring against each other.
+    public func byContractionSeeded<X>(pairs : [(Symbol, X)], seed : Nat) : LevelTree<X> {
+      byContractionSeededWith(pairs, seed, #round)
+    };
+
+    public func byContractionSeededWith<X>(pairs : [(Symbol, X)], seed : Nat,
+                                           levels : LevelSource) : LevelTree<X> {
+      if (pairs.size() == 0) { return (#empty) };
+      var items = [];
+      for ((s, e) in pairs.vals()) { items #= [#element { symbol = s; element = e }] };
+      var round = 0;
+      while (items.size() > 1) {
+        round += 1;
+        let m = items.size();
+        var next = [];
+        var k = 0;
+        while (k < m) {
+          // The coin belongs to this cell: its own leftmost symbol.
+          let combine =
+            if (k + 1 < m) { coin(seed, round, gapSymbol(items[k])) == 1 } else { false };
+          if (combine) {
+            let gap = gapSymbol(items[k + 1]);
+            next #= [#binary {
+              symbol = gap;
+              level = levelFor(levels, round, gap);
+              left = items[k];
+              right = items[k + 1]
+            }];
+            k += 2
+          } else {
+            next #= [items[k]];
+            k += 1
+          }
+        };
+        if (next.size() == m) {
+          // No cell combined, and the coins would say the same again. Take the
+          // first pair, so progress belongs to the construction and not to the
+          // seed.
+          let gap = gapSymbol(items[1]);
+          var forced = [#binary {
+            symbol = gap;
+            level = levelFor(levels, round, gap);
+            left = items[0];
+            right = items[1]
+          }];
+          var j = 2;
+          while (j < m) { forced #= [items[j]]; j += 1 };
+          items := forced
+        } else {
+          items := next
+        }
+      };
+      items[0]
+    };
+
+    /// The other rule: contract a gap when its own coin is 1 and its left
+    /// neighbour's is 0.
+    ///
+    ///    Chosen for one property -- a gap's decision reads two coins and
+    /// nothing else, so there is no walk and no chain, and a removal can
+    /// change only the decisions of the gaps beside the hole. It pays for that
+    /// by contracting a quarter of the gaps per round rather than a third.
+    ///
+    ///    Kept beside `byContractionSeeded` because which of the two is more
+    /// stable under an edit is a question for measurement, not for taste.
+    public func byIndependentGaps<X>(pairs : [(Symbol, X)], seed : Nat) : LevelTree<X> {
+      byIndependentGapsWith(pairs, seed, #round)
+    };
+
+    /// The contraction: coins per gap, contract, repeat.
+    ///
+    ///    A gap contracts when its own coin is 1 and its left neighbour's is 0.
+    /// That rule is local, needs no arbitration, and cannot choose two adjacent
+    /// gaps --- if gap i contracts then coin(i) is 1, and gap i+1 would need
+    /// coin(i) to be 0 --- so no subtree is claimed by two contractions. A gap
+    /// contracts with probability a quarter, so a round takes about a quarter
+    /// of what is left.
+    ///
+    ///    A round can contract nothing, and coins are a function of (round,
+    /// symbol) rather than of chance, so a round that contracts nothing would
+    /// contract nothing again if repeated. It is not repeated --- the next
+    /// round has different coins --- but to make progress a matter of the
+    /// construction rather than of the seed, a round that would contract
+    /// nothing takes its first gap instead.
+    /// Where a contracted gap's `level` field comes from.
+    ///
+    ///    `#round` is the honest one: the round a gap contracted in, which
+    /// makes the tree a valid treap (a parent contracted later than its
+    /// children, so its level is higher) and lets `split` and `append` mean
+    /// what they mean.
+    ///
+    ///    `#symbol` labels each gap with `symbolLevel(symbol)` instead, which
+    /// **breaks the heap property** and so must not be given to `split` or
+    /// `append`. It exists for one measurement: a round shifts when an element
+    /// is removed, and a symbol's level never does, so the difference between
+    /// the two says how much of a contracted tree's churn is its shape moving
+    /// and how much is merely this field being re-labelled. `lazyMergeSort`
+    /// walks the structure and never reads a level, so for that sort the two
+    /// are the same tree wearing different labels.
+    public type LevelSource = { #round; #symbol };
+
+    public func byIndependentGapsWith<X>(pairs : [(Symbol, X)], seed : Nat,
+                                         levels : LevelSource) : LevelTree<X> {
+      if (pairs.size() == 0) { return (#empty) };
+      var items = [];
+      for ((s, e) in pairs.vals()) { items #= [#element { symbol = s; element = e }] };
+      var round = 0;
+      while (items.size() > 1) {
+        round += 1;
+        let m = items.size();
+        // Gap i sits between items[i] and items[i+1], and is labelled by the
+        // leftmost symbol of items[i+1].
+        var coins = [];
+        var i = 0;
+        while (i + 1 < m) { coins #= [coin(seed, round, gapSymbol(items[i + 1]))]; i += 1 };
+        var next = [];
+        var k = 0;
+        while (k < m) {
+          let takeIt =
+            if (k + 1 < m) {
+              let mine = coins[k] == 1;
+              let leftDeclined = if (k == 0) { true } else { coins[k - 1] == 0 };
+              mine and leftDeclined
+            } else { false };
+          if (takeIt) {
+            next #= [#binary {
+              symbol = gapSymbol(items[k + 1]);
+              level = levelFor(levels, round, gapSymbol(items[k + 1]));
+              left = items[k];
+              right = items[k + 1]
+            }];
+            k += 2
+          } else {
+            next #= [items[k]];
+            k += 1
+          }
+        };
+        if (next.size() == m) {
+          // Nothing contracted: take the first gap, so that progress does not
+          // depend on the coins.
+          var forced = [#binary {
+            symbol = gapSymbol(items[1]);
+            level = levelFor(levels, round, gapSymbol(items[1]));
+            left = items[0];
+            right = items[1]
+          }];
+          var j = 2;
+          while (j < m) { forced #= [items[j]]; j += 1 };
+          items := forced
+        } else {
+          items := next
+        }
+      };
+      items[0]
+    };
+
+    func levelFor(levels : LevelSource, round : Nat, s : Symbol) : Nat {
+      switch levels {
+        case (#round) round;
+        case (#symbol) (Prim.symbolLevel s);
+      }
+    };
+
+    /// Perfect balance: split the gaps down the middle, recursively.
+    ///
+    ///    The control, and not a candidate. Levels come from the size of the
+    /// range a node covers, which strictly decreases with depth, so the heap
+    /// property holds.
+    public func byMidpoint<X>(pairs : [(Symbol, X)]) : LevelTree<X> {
+      let n = pairs.size();
+      if (n == 0) { return (#empty) };
+      func build(lo : Nat, hi : Nat) : LevelTree<X> {
+        if (lo == hi) {
+          let (s, e) = pairs[lo];
+          #element { symbol = s; element = e }
+        } else {
+          let mid = lo + (hi - lo) / 2;
+          let (s, _) = pairs[mid + 1];
+          #binary {
+            symbol = s;
+            level = hi - lo;
+            left = build(lo, mid);
+            right = build(mid + 1, hi)
+          }
+        }
+      };
+      build(0, n - 1)
+    };
+
+    /// How many elements fall either side of the root, which is the number
+    /// mergeSort pays for.
+    public func rootSplit<X>(t : LevelTree<X>) : (Nat, Nat) {
+      switch t {
+        case (#binary(b)) (size(b.left), size(b.right));
+        case _ (0, 0);
+      }
+    };
+
+    /// Both builders hold the sequence they were given, in order, and neither
+    /// asks a symbol for its level.
+    #[test]
+    func testHoldsTheSequence() {
+      let pairs = [(1, 10), (2, 20), (3, 30), (4, 40), (5, 50), (6, 60), (7, 70)];
+      assert (intoArray(byContractionSeeded(pairs, 10)) == pairs);
+      assert (intoArray(byMidpoint(pairs)) == pairs);
+      assert (intoArray(byContractionSeeded([(1, 10)], 10)) == [(1, 10)]);
+      assert (byContractionSeeded([], 10) == (#empty));
+    };
+
+    /// The contraction is balanced where `fromList` is degenerate. At 64
+    /// positional symbols `fromList` splits 2 : 62; these do not.
+    #[test]
+    func testBalance() {
+      var pairs = [];
+      var i = 1;
+      while (i <= 64) { pairs #= [(i, i * 7 % 101)]; i += 1 };
+      let contracted = byContractionSeeded(pairs, 10);
+      let midpoint = byMidpoint(pairs);
+      let (cl, cr) = rootSplit(contracted);
+      let (ml, mr) = rootSplit(midpoint);
+      assert (cl + cr == 64);
+      assert (ml + mr == 64);
+      // Perfect balance is exactly half; the contraction is not degenerate.
+      assert (ml == 32);
+      assert (cl >= 8);
+      assert (cr >= 8);
+      // And the depth is the round count, which is logarithmic rather than
+      // the 15 that `fromList` reaches on this input.
+      assert (depth(contracted) <= 12);
+      assert (depth(midpoint) <= 8);
+    };
+
+    /// Stability, which is the point of the coins: removing one element leaves
+    /// most of the contraction's gaps labelled and levelled as they were, while
+    /// perfect balance relabels almost everything.
+    #[test]
+    func testStabilityUnderARemoval() {
+      var pairs = [];
+      var i = 1;
+      while (i <= 64) { pairs #= [(i, i * 7 % 101)]; i += 1 };
+      let without = func(drop : Nat) : [(Symbol, Nat)] {
+        var edited = [];
+        for ((s, e) in pairs.vals()) { if (s != drop) { edited #= [(s, e)] } };
+        edited
+      };
+      // Removing near the front is perfect balance's worst case: every
+      // midpoint to the right of the hole moves by one, so one subtree of 62
+      // survives. Removing near the middle is its best case, and it still
+      // loses half. The contraction is unmoved by where the hole is.
+      let front = without(3);
+      let middle = without(33);
+      assert (sharedSubtrees(byContractionSeeded(pairs, 10), byContractionSeeded(front, 10)) > 40);
+      assert (sharedSubtrees(byContractionSeeded(pairs, 10), byContractionSeeded(middle, 10)) > 40);
+      assert (sharedSubtrees(byMidpoint(pairs), byMidpoint(front)) < 5);
+      assert (sharedSubtrees(byMidpoint(pairs), byMidpoint(middle)) < 40);
+      // Gap labels are the weaker measure, and the walk keeps fewer of them
+      // than the independent rule does: a cell's round depends on the walk
+      // reaching it, so a hole shifts rounds downstream until the two walks
+      // fall back into step. `level` is the field that records the round, and
+      // no sort reads it -- the churn measurement in
+      // `mergeSort/sweep.fumola` finds 0.3% between rounds-as-levels and
+      // symbol-levels -- so this is a fact about the labels and not about the
+      // reuse.
+      let gapsIndependent = sharedGaps(byIndependentGaps(pairs, 10), byIndependentGaps(middle, 10));
+      let gapsWalk = sharedGaps(byContractionSeeded(pairs, 10), byContractionSeeded(middle, 10));
+      assert (gapsIndependent > gapsWalk);
+    };
+
+    /// The gaps of a tree, as (symbol, level) pairs rendered for comparison.
+    func gapsOf<X>(t : LevelTree<X>) : [Text] {
+      switch t {
+        case (#binary(b)) {
+          [(debug_show b.symbol) # "@" # (debug_show b.level)]
+            # gapsOf(b.left) # gapsOf(b.right)
+        };
+        case _ [];
+      }
+    };
+
+    /// Every internal node's subtree, rendered.
+    func subtreesOf<X>(t : LevelTree<X>) : [Text] {
+      switch t {
+        case (#binary(b)) { [render(t)] # subtreesOf(b.left) # subtreesOf(b.right) };
+        case _ [];
+      }
+    };
+
+    /// How many of the second tree's internal nodes have a counterpart in the
+    /// first with the same subtree under it.
+    ///
+    ///    This, and not `sharedGaps`, is the upper bound on what a merge
+    /// network could reuse. A merge node's result is the sorted contents of
+    /// its subtree, so it survives an edit exactly when its subtree does; a
+    /// gap that keeps its label while its subtree changes underneath is a
+    /// merge node that has to run again.
+    ///
+    ///    `sharedGaps` cannot see that, and reports a level tree as perfectly
+    /// stable under any removal -- which it is, in the only sense that
+    /// function measures: a gap's symbol and level are both functions of the
+    /// symbol, so removing one element leaves every other gap's label exactly
+    /// as it was, and moves only the shape.
+    public func sharedSubtrees<X>(a : LevelTree<X>, b : LevelTree<X>) : Nat {
+      let mine = subtreesOf(a);
+      var common = 0;
+      for (g in (subtreesOf(b)).vals()) {
+        var found = false;
+        for (h in mine.vals()) { if (g == h) { found := true } };
+        if (found) { common += 1 }
+      };
+      common
+    };
+
+    /// How many of the second tree's gaps the first tree has too, symbol and
+    /// level alike.
+    ///
+    ///    Weaker than `sharedSubtrees`, and a level tree scores perfectly on
+    /// it for the reason given there. Kept because the contrast between the
+    /// two is the thing worth seeing.
+    public func sharedGaps<X>(a : LevelTree<X>, b : LevelTree<X>) : Nat {
+      let mine = gapsOf(a);
+      var common = 0;
+      for (g in (gapsOf(b)).vals()) {
+        var found = false;
+        for (h in mine.vals()) { if (g == h) { found := true } };
+        if (found) { common += 1 }
+      };
+      common
+    };
+  };
 }

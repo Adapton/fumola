@@ -351,6 +351,99 @@ a high removal, and a Θ(log² n) mean over all removals. Those are the two
 theorems the data supports, and they are very far apart -- at n=1024 the
 mean is a few tens of nodes and the root is 3,621.
 
+### A balanced input tree does not help, and the degeneracy is load-bearing
+
+*Added 2026-09-09, with `pureLevelTree.Build` and `sweep.runNodeValsOver`.*
+
+The premise was that level trees are too badly shaped for mergeSort to have a
+hope: with the library's positional symbols the root splits 2 : n-2 at every
+size up to 512, and the highest-level cell owns the root at every size. So we
+prepared better-shaped trees **outside** the graph and introduced them as the
+input tree, to find out what a good shape is worth before building one
+incrementally. `levelTree.embed` is the door: it places a pure tree under the
+names `fromList` would have used, so scaffolding put up by hand is still
+canonically named.
+
+Three shapes, all embedded, so every graph is composed the same way -- an
+embedded tree and a merge network, and no list-into-tree phase in any of them:
+
+- **level tree** -- what `fromList` decides, taken by building it inside
+  `A.scratch` and erasing it, so only the shape survives.
+- **contracted** -- walk the cells, and for each flip a coin on (seed, round,
+  symbol) to keep it or combine it with the next; repeat until one node
+  remains. Depth is the round count, so no symbol's coin can own the root.
+- **independent gaps** -- the same idea with a rule that reads no walk:
+  contract a gap when its own coin is 1 and its left neighbour's is 0. A
+  quarter per round rather than a third, and no chain.
+- **midpoint** -- perfect balance, as a control.
+
+The shapes are as advertised. Depth at n=128: contracted 12, independent 12,
+level tree 19. The contracted graph is genuinely *smaller* -- 1302 nodes
+against 1510 -- which is the depth win, since a merge network's size is the
+sum of its subtree sizes.
+
+**And churn is several times worse.** Every position, n=128:
+
+| mean redone | level tree | contracted | independent gaps |
+|---|---|---|---|
+| inductive | **37.3** | 203.7 | 115.4 |
+| cartesian | 39.4 | 165.3 | 113.1 |
+| pathwise | 63.0 | 227.0 | 176.7 |
+
+| median | level tree | contracted | independent gaps |
+|---|---|---|---|
+| inductive | **19** | 96 | 24 |
+| cartesian | 25 | **52** | 30 |
+| pathwise | 21 | 56 | 25 |
+
+| max | level tree | contracted | independent gaps |
+|---|---|---|---|
+| inductive | 435 | 811 | 663 |
+| cartesian | **364** | 793 | 665 |
+| pathwise | 1141 | 1117 | 1024 |
+
+The control is far worse still: midpoint balance means 587.7 with a median of
+681, because every midpoint moves when one element is removed and almost
+nothing is left to reuse.
+
+**The level tree wins under every naming**, and that reverses the premise. Its
+degeneracy is *load-bearing* for repair: it concentrates cost onto a few
+positions and leaves most edits nearly free -- a median of 19 in a 1510-node
+graph -- where balance spreads a root path of Theta(n) onto every position.
+Balance is right for sorting and wrong for repairing, and the two are not the
+same question. Issue #72 is a trade-off, not only a bug.
+
+**What was ruled out on the way.** Three candidate explanations, each measured
+rather than argued:
+
+- *The `level` field.* A contracted gap's level is the round it contracted in,
+  and rounds shift under an edit where `symbolLevel` never does. Relabelling
+  every contracted gap with `symbolLevel` instead -- which breaks the heap
+  property, so it is a measurement and not a representation -- changes the
+  total from 15776 to 15722, **0.3%**. Not the levels.
+- *The embedded tree.* `A.Native.diffBySpace` splits the diff by the name each
+  pointer hangs under. Per position the input tree accounts for 1.9 changed
+  cells under `fromList` and 7.2 under contraction, against a merge-network
+  difference of 166. **3%** of the gap. Not the tree.
+- *Namespace churn.* Inductive names a merge cell inside a space opened for
+  the reduction node, so a changed shape renames whole namespaces; cartesian
+  opens none. Cartesian halves contraction's **median** (96 to 52) and leaves
+  its mean and max alone (203.7 to 165.3, 811 to 793). So namespace churn is
+  real, and it explains the typical position and not the distribution.
+
+What remains, by elimination, is the shape -- and elimination is the honest
+word: there is no measurement here that *explains* why the level tree wins,
+only three that say what does not. The subtree-stability figures make the
+puzzle sharper rather than softer: under one removal the contracted tree keeps
+111 to 118 of its 126 subtrees and the level tree 114 to 116, so the *number*
+of disturbed subtrees is much the same and the difference must be in their
+sizes, which is not measured. That is the next thing to measure.
+
+Two limits on all of the above: one size, one seed; and these are from-scratch
+diffs, which bound what a repair would do rather than observing one. Repair
+exists now (#106), and `Scene.realignMergeFromTree` runs a real one, so the
+same matrix could be taken from actual signal and repair counts instead.
+
 ## How to play with each
 
 A local build, since none of this is deployed:
@@ -382,6 +475,19 @@ uniform sample. One CSV row per sample, with `own` beside the counts so a
 figure can be read as a share of its own algorithm's graph; the columns are
 documented in `fumola/examples/mergeSort/sweep.fumola`, which is also where
 the run's shape lives, so a table can be reproduced rather than re-derived.
+
+To sweep over a prepared input tree instead of one built from a list, call
+`Scene`-side `sweepOver(seed, size, positions, algorithm, shape)` with a shape
+of `#levelTree`, `#contracted`, `#independentGaps` or `#midpoint`. And to ask
+*where* an edit landed rather than how much of it there was,
+`A.Native.diffBySpace` gives one row per name the pointers hang under -- the
+input tree, the merge network, a stage thunk.
+
+One caution about `redone` on a prepared tree: it excludes
+`notEqualNonThunk`, on the reasoning that a cell is written by the thunk that
+puts it and that thunk's evaluation is already counted. An embedded tree's
+cells are non-thunk records whose puts belong to no thunk, so `redone` scores
+them as zero. Read `nonThunk` beside it, as the split above does.
 
 In a program, the strategy is a cell the merge network peeks:
 

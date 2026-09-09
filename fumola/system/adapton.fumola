@@ -325,6 +325,60 @@ module {
             prim "adaptonNodeValsDiff" (l, r)
         };
 
+        /// The same comparison, one row per name the pointers hang under.
+        ///
+        ///    `do within space `mergeSort { ... }` puts every name inside it
+        /// under `mergeSort`, so the leftmost part of a pointer's symbol says
+        /// which phase of a run the node belongs to. This groups by that, which
+        /// is how to ask *where* an edit landed rather than how much of it
+        /// there was -- the input tree, the merge network, or a stage thunk.
+        public type SpaceCounts = {
+            space : Any;
+            left : Nat;
+            right : Nat;
+            onlyLeft : Nat;
+            onlyRight : Nat;
+            equal : Nat;
+            notEqual : Nat;
+            notEqualNewBody : Nat;
+            notEqualSameBody : Nat;
+            notEqualNonThunk : Nat;
+        };
+
+        public func diffBySpace(l : NodeVals, r : NodeVals) : [SpaceCounts] {
+            prim "adaptonNodeValsDiffBySpace" (l, r)
+        };
+
+        /// The rows of `diffBySpace` add up to what `diff` says.
+        #[test]
+        func testBySpaceAgreesWithTheWhole() {
+            let run = func(x : Nat) : NodeVals {
+                reset();
+                let c = `c := x;
+                let t = do within space `phaseOne { `t := thunk { let v = @ c; v * 2 } };
+                let u = do within space `phaseTwo { `u := thunk { let v = force t; v + 1 } };
+                let _ = force u;
+                nodeValsNow()
+            };
+            let l = run(1);
+            let r = run(2);
+            let whole = diff(l, r);
+            var left = 0; var right = 0; var equal = 0; var notEqual = 0;
+            var onlyLeft = 0; var onlyRight = 0;
+            for (row in (diffBySpace(l, r)).vals()) {
+                left += row.left; right += row.right; equal += row.equal;
+                notEqual += row.notEqual; onlyLeft += row.onlyLeft; onlyRight += row.onlyRight;
+            };
+            assert left == whole.left;
+            assert right == whole.right;
+            assert equal == whole.equal;
+            assert notEqual == whole.notEqual;
+            assert onlyLeft == whole.onlyLeft;
+            assert onlyRight == whole.onlyRight;
+            // And the two phases are told apart, rather than lumped together.
+            assert (diffBySpace(l, r)).size() >= 2;
+        };
+
         /// The native and the Fumola-side diff answer the same question, and this asserts they
         /// answer it the same way on a graph with a thunk, a cell, an edit and a repair in it.
         ///
