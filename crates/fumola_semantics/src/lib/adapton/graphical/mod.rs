@@ -58,9 +58,12 @@
 //! 3. **What signaling marks.** Algorithm 1 marks every incoming edge; Nominal Adapton's
 //!    `dirty-paths-in` marks every path, allocation edges included; the recipe marks an edge
 //!    only when its action is `misaligned(Space, v)` with the new contents, and past the first
-//!    hop follows `forces` only. This code follows the recipe. Consequence: a `Put` edge is
-//!    never signaled, so the double-use check Nominal Adapton gets from
-//!    `consistent-action(G, alloc e, q)` is not performed here.
+//!    hop follows `forces` only. This code follows the recipe: a `Put` edge is never signaled,
+//!    an allocation being no observation of what the cell later holds. Nominal Adapton's
+//!    `dirty-paths-in` marks every path instead, allocation edges included, and its
+//!    `all-clean-out` check on the popped node then reads a stale allocation as the *double
+//!    use* of one name for two things. This code makes that check directly instead --
+//!    `check_double_use`, at the put -- rather than by marking; see item 8.
 //! 4. **A matched put.** Nominal Adapton's `Eval-refClean` / `Eval-thunkClean` add an
 //!    allocation edge and change nothing else when the contents are unchanged. This code does
 //!    the same while `Settings::put_matches_equal_values` holds (the default), and counts it in
@@ -75,6 +78,16 @@
 //! 7. **No cycle check.** A thunk that forces itself, through any path, is not detected here or
 //!    in the recipe (whose `putImmediate` side condition, `∉ Path`, is the nearest thing).
 //!    Repair adds no new way to form one -- it re-forces only what a from-scratch run forced.
+//! 8. **Double use, within one evaluation.** Nominal Adapton refuses a run that allocates two
+//!    different things under one name: `Eval-thunkDirty` dirties every path into a re-allocated
+//!    pointer, and the `all-clean-out(G2', q)` premise of `Eval-computeDep`, checked as the node
+//!    is popped, then fails. `check_double_use` here answers the same question at the moment the
+//!    put happens, by asking whether any thunk *whose body is running* has an allocation edge to
+//!    this cell recording different contents. Two differences from the paper, both stated in
+//!    `check_double_use`: the error names the put rather than the later force, and the check
+//!    covers one evaluation rather than the whole graph -- an allocation collision between two
+//!    thunks that have both returned is not caught, and needs the marking. The recipe has no
+//!    such rule at all.
 //!
 use crate::ToMotoko;
 use crate::Value;
@@ -695,6 +708,72 @@ impl GraphicalState {
         self.extend_history_with_event(Event::RemoveEdge(edge_id.clone()));
     }
 
+    /// The double use of one name, within one evaluation: Nominal Adapton's condition, asked at
+    /// the put.
+    ///
+    /// A `Put` edge records what its source allocated under this name. If a thunk whose body is
+    /// *running right now* holds such an edge to this cell, and the cell is about to hold
+    /// something else, then this one evaluation has used the name for two different things --
+    /// and everything it computes from here could have come from either, which is the
+    /// unsoundness Nominal Adapton's `all-clean-out` premise exists to refuse. The usual shape
+    /// is a loop or a recursion that mints a name it has already used.
+    ///
+    /// Answered at the put, so the error names the put that did it. The paper answers it as the
+    /// node is popped, which catches one more case -- two thunks that have both returned,
+    /// having allocated different things under one name -- at the cost of marking every
+    /// allocation edge and of reporting the collision at a force far from its cause. That case
+    /// is not caught here (module notes, item 8).
+    ///
+    /// Three things are deliberately *not* a double use:
+    ///
+    /// - An **editor's** put, made outside every force. From there a put is an edit, and the
+    ///   editor owns the cells it edits whoever allocated them -- which is what the whole
+    ///   realignment machinery is for.
+    /// - A put of **what the cell already holds**: allocating the same thing twice under one
+    ///   name is Nominal Adapton's `Eval-refClean`, and here a matched put. This is never
+    ///   reached for one, since `put_pointer` returns first.
+    /// - A **re-evaluation's** re-put of what it allocated last time, under a name a *previous
+    ///   version* of the same thunk allocated. The version being re-evaluated is the one on the
+    ///   stack, the old version's edges left the graph when repair dropped its trace, and the
+    ///   old version's node id is not the new one's -- so nothing matches.
+    fn check_double_use(&self, pointer: &Pointer, new_value: &Value_) -> Res<()> {
+        // The thunks whose bodies are running. Empty means the put is an editor's.
+        let evaluating: Vec<&NodeId> = self
+            .stack
+            .iter()
+            .filter_map(|frame| match &frame.kind {
+                FrameKind::Force(node_id, _) => Some(node_id),
+                _ => None,
+            })
+            .collect();
+        if evaluating.is_empty() {
+            return Ok(());
+        }
+        let readers_key = (pointer.clone(), self.time.clone());
+        let ids = match self.edges_by_target.get(&readers_key) {
+            Some(ids) => ids,
+            None => return Ok(()),
+        };
+        for id in ids.iter() {
+            let edge = match self.edges.get(id) {
+                Some(edge) => edge,
+                None => continue,
+            };
+            match &edge.action {
+                Action::Put(allocated) if allocated != new_value => {
+                    if evaluating.contains(&&edge.source) {
+                        return Err(Error::DoubleUse {
+                            pointer: pointer.clone(),
+                            observer: edge.source.clone(),
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
     /// Signaling: the traversal an edit starts.
     ///
     /// Algorithm 1 (PLDI 2014) lines 1-5: from the changed node, follow the incoming edges,
@@ -918,6 +997,13 @@ impl CacheState for GraphicalState {
                         self.extend_history_with_event(Event::AddEdge(edge_id));
                     }
                     return Ok(());
+                }
+                // Before the graph changes, so a refused put leaves no trace of itself.
+                if settings.check_double_use {
+                    if let Err(e) = self.check_double_use(&pointer, &value) {
+                        counts.double_uses += 1;
+                        return Err(e);
+                    }
                 }
                 self.extend_history_with_new_node(&pointer, None, &new_node);
                 let node_id = self.insert_version(&pointer, &time, new_node);

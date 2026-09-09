@@ -55,6 +55,17 @@ pub enum Error {
     DanglingPointer(Space),
     CannotPutReadOnlyReservedSymbol(ReservedSymbol),
     CannotPutFutureReservedSymbol(Symbol_),
+    /// A computation put different contents under `pointer`, and a thunk still
+    /// being evaluated -- `observer`, or one that forced it -- had already
+    /// observed or allocated that cell in this same evaluation. Nominal
+    /// Adapton's double use: the run has used one name for two things, and
+    /// whatever it computes from here could be from either. Raised at the put
+    /// (see `graphical::GraphicalState::signal`); `Settings::check_double_use`
+    /// turns it off.
+    DoubleUse {
+        pointer: Pointer,
+        observer: (Space, Time, MetaTime),
+    },
 }
 
 /// A force either results in a cache hit, or a cache miss, or -- when the thunk has a cached
