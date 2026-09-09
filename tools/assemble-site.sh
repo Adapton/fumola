@@ -215,9 +215,18 @@ if [ -n "$VENDOR_HASH" ]; then
   KEPT_VENDOR="$(printf '%s' "$VERSIONS" | python3 -c '
 import json, sys
 print("\n".join(v.get("vendor", "") for v in json.load(sys.stdin) if v.get("vendor")))')"
+  # Only the directories this script mints are candidates for pruning, which
+  # is why the name is matched against the shape of a hash rather than merely
+  # against the kept list. A vendored library that lives in a directory of its
+  # own -- vendor/katex/, with its stylesheet and its font files -- is not a
+  # version of anything and has no entry in the manifest, so "not in the kept
+  # list" swept it away on every publish. It was invisible because the loose
+  # files at vendor/'s root, which is how three.js is vendored, are not
+  # directories and were never at risk.
   for dir in "$OUT"/vendor/*/; do
     [ -d "$dir" ] || continue
     name="$(basename "$dir")"
+    [[ "$name" =~ ^[0-9a-f]{16}$ ]] || continue
     if ! grep -qxF "$name" <<< "$KEPT_VENDOR"; then
       echo "pruning vendor $name"
       rm -rf "$dir"

@@ -49,11 +49,19 @@ bindings() { # bindings <dir> <marker>
 }
 
 pages() { # pages <dir> [vendor marker]
-  mkdir -p "$1/web-play" "$1/vendor"
+  mkdir -p "$1/web-play" "$1/vendor" "$1/vendor/katex/fonts"
   echo '<html>index</html>' > "$1/index.html"
   echo '<html>web-play</html>' > "$1/web-play/index.html"
   printf 'three %s\n' "${2:-v1}" > "$1/vendor/three.module.min.js"
   printf "import './three.module.min.js'; // %s\n" "${2:-v1}" > "$1/vendor/OrbitControls.js"
+  # A library vendored as a directory rather than as loose files, which is how
+  # KaTeX arrives: a stylesheet naming its font files by a relative path, so
+  # both have to land under one unhashed directory for a static page to link
+  # them. Every test's pages carry it, because the pruning that used to delete
+  # it ran on every publish and no test that omitted it could notice.
+  printf '@font-face{src:url(fonts/KaTeX.woff2)} /* %s */\n' "${2:-v1}" \
+    > "$1/vendor/katex/katex.min.css"
+  printf 'woff2 %s\n' "${2:-v1}" > "$1/vendor/katex/fonts/KaTeX.woff2"
 }
 
 vendor_of() { python3 -c 'import json,sys; m=json.load(sys.stdin); print(m.get("vendor",""))' < "$1/runtime.json"; }
@@ -162,6 +170,19 @@ check_file "the old vendor version survives for pinned pages" \
 check "the old vendor version still has its ORIGINAL bytes" "same" \
   "$(cmp -s "$WORK/s7${V1}/three.module.min.js" "$WORK/pages/vendor/three.module.min.js" \
      && echo same || echo differ)"
+
+# A library vendored in a directory of its own is not a version and must
+# outlive the pruning of versions, which once deleted it on every publish and
+# left /alignment/'s stylesheet a 404 in production.
+check_file "an unhashed vendor directory survives a first publish" \
+  "$WORK/s1/vendor/katex/katex.min.css"
+check_file "and the files it names by a relative path survive with it" \
+  "$WORK/s1/vendor/katex/fonts/KaTeX.woff2"
+check_file "and it survives a publish that prunes an old vendor version" \
+  "$WORK/s7/vendor/katex/katex.min.css"
+check "and it is the NEW bytes, not a stale copy left by the prune" "same" \
+  "$(cmp -s "$WORK/s7/vendor/katex/katex.min.css" \
+            "$WORK/pages2/vendor/katex/katex.min.css" && echo same || echo differ)"
 
 echo
 echo "refusals"
