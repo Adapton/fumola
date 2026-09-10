@@ -1535,22 +1535,327 @@ module {
     let sorted_ = do within space `mergeSort { lazyMergeSort_(tree) };
     // Demanded, or the network is a promise rather than a graph.
     let _ = LazyList.takeN_(sorted_, size);
-    W.withHistory(A.scratch(thunk {
-      // The tree is laid out first, and not only because it belongs in the
-      // picture: the merge network is placed relative to the tree nodes its
-      // streams come from, and reads the `position` cells that laying the
-      // tree out writes. Without it the network has nowhere to stand and
-      // asks for a pointer that was never made.
-      let treeObjects = Scene.sceneObjects(tree!, A.Scene.zero);
+    W.withHistory(mergeFromTreeLayout(tree, sorted_))
+  };
+
+  /// The layout the merge-from-tree runs share, made inside a scratch so the
+  /// graph records the subject and not the drawing of it.
+  ///
+  ///    The tree is laid out first, and not only because it belongs in the
+  /// picture: the merge network is placed relative to the tree nodes its
+  /// streams come from, and reads the `position` cells that laying the tree
+  /// out writes. Without it the network has nowhere to stand and asks for a
+  /// pointer that was never made.
+  func mergeFromTreeLayout(tree : ?SeqTree_<Nat>, sorted_ : LazyList_<Nat>) : W.ExampleOutput {
+    A.scratch(thunk { mergeFromTreeObjects(tree, sorted_) })
+  };
+
+  /// The objects themselves, for a caller that is already inside a scratch
+  /// and wants to add to them. Laying the tree out writes `position` cells
+  /// that laying the rest out reads, and a scratch inside a scratch would
+  /// take them away again before they were read.
+  func mergeFromTreeObjects(tree : ?SeqTree_<Nat>, sorted_ : LazyList_<Nat>) : W.ExampleOutput {
+    let treeObjects = Scene.sceneObjects(tree!, A.Scene.zero);
+    let geom = Scene.geom2d(tree!);
+    let levelGap = 2.0;
+    let mergeObjects = Scene.sceneObjectsLazyMergeSort_(
+      A.Outline.outline(sorted_),
+      { x = 0.0; y = 1.618 * geom.height; z = -levelGap / 2.0 },
+      { reduce = { x = 0.0; y = 1.0; z = -levelGap / 2.0 };
+        merge = { x = 0.0; y = 0.0; z = -1.0 } });
+    W.scene(treeObjects # mergeObjects, [ A.Outline.outline(sorted_) ])
+  };
+
+  /// What a realignment run answers with: the layout of both states, the
+  /// outline after the repair, and the sorted elements before and after it.
+  public type RealignRun = {
+    objects : A.Scene.SceneObjects;
+    outline : A.Outline.Outlines;
+    before : [Nat];
+    after : [Nat];
+    realignment : RealignCounts;
+  };
+
+  /// What the realignment cost, as the runtime's own counters, taken as the
+  /// difference between just after the first demand and just after the
+  /// second. `misses` are fresh evaluations -- thunks put again with a new
+  /// body and forced for the first time -- and `reevaluations` are repairs
+  /// that could not realign; together they are the work redone. `hits` and
+  /// `edgesAligned` are the work saved.
+  public type RealignCounts = {
+    signalings : Nat;
+    edgesSignaled : Nat;
+    repairs : Nat;
+    edgesAligned : Nat;
+    reevaluations : Nat;
+    putMatched : Nat;
+    misses : Nat;
+    hits : Nat;
+  };
+
+  func realignCounts() : RealignCounts {
+    { signalings = @(`adapton(`counts)(`signalings));
+      edgesSignaled = @(`adapton(`counts)(`edgesSignaled));
+      repairs = @(`adapton(`counts)(`repairs));
+      edgesAligned = @(`adapton(`counts)(`edgesAligned));
+      reevaluations = @(`adapton(`counts)(`reevaluations));
+      putMatched = @(`adapton(`counts)(`putMatched));
+      misses = @(`adapton(`counts)(`forceBeginCacheMiss));
+      hits = @(`adapton(`counts)(`forceBeginCacheHit)) }
+  };
+
+  func countsSince(c0 : RealignCounts, c1 : RealignCounts) : RealignCounts {
+    { signalings = c1.signalings - c0.signalings;
+      edgesSignaled = c1.edgesSignaled - c0.edgesSignaled;
+      repairs = c1.repairs - c0.repairs;
+      edgesAligned = c1.edgesAligned - c0.edgesAligned;
+      reevaluations = c1.reevaluations - c0.reevaluations;
+      putMatched = c1.putMatched - c0.putMatched;
+      misses = c1.misses - c0.misses;
+      hits = c1.hits - c0.hits }
+  };
+
+  /// The realignment run's layout: the merge-from-tree layout, and around it
+  /// what that layout leaves out because the pairs do not draw it -- the list
+  /// the edit lands in, the recursion that builds the tree from it, and the
+  /// two stage thunks -- so that every node the history names has somewhere
+  /// to be drawn. Positions follow the mergeSort example's scheme: the list
+  /// behind the tree, the tree-building orbs between them.
+  func realignLayout(list_ : List_<Nat>, tree_ : SeqTree_<Nat>, sorted_ : LazyList_<Nat>, size : Nat)
+    : W.ExampleOutput {
+    A.scratch(thunk {
+      let tree = force tree_;
+      let base = mergeFromTreeObjects(tree, force sorted_);
       let geom = Scene.geom2d(tree!);
-      let levelGap = 2.0;
-      let mergeObjects = Scene.sceneObjectsLazyMergeSort_(
-        A.Outline.outline(sorted_),
-        { x = 0.0; y = 1.618 * geom.height; z = -levelGap / 2.0 },
-        { reduce = { x = 0.0; y = 1.0; z = -levelGap / 2.0 };
-          merge = { x = 0.0; y = 0.0; z = -1.0 } });
-      W.scene(treeObjects # mergeObjects, [ A.Outline.outline(sorted_) ])
-    }))
+      let e = 2.71828;
+      let levelGap = geom.height * e;
+      let listObjects = List.sceneObjectsFromThunk(list_,
+        { x = 0.0 - (size + 0.0) / 2.0; y = -1.0; z = levelGap });
+      let fromListObjects = Scene.sceneObjectsFromList(A.Outline.outline(tree_),
+        { x = 0.0; y = 0.0; z = levelGap / 2.0 },
+        { binary = { x = 0.0; y = 0.0; z = levelGap / 2.0 };
+          leafL = { x = -(0.2 * e); y = -0.1 * e; z = 1.0 };
+          leafR = { x = (0.2 * e); y = -0.1 * e; z = 1.0 } });
+      let top = 1.618 * geom.height + 2.0;
+      // The two stage thunks, and the three constants every node of the rest
+      // points at: the empty lists the tree and the sort end in, and the cell
+      // the sort peeks its naming from. Labels are the nodes' own names.
+      let stages = [
+        #box { label_ = "Sorted"; position = { x = -3.0; y = top; z = -2.0 };
+               textFields = ""; pointerFields = [] },
+        #box { label_ = "Output"; position = { x = 3.0; y = top; z = -2.0 };
+               textFields = ""; pointerFields = [] },
+        #box { label_ = "inputTree(`(nilList))"; position = { x = 0.0; y = -1.0; z = levelGap / 2.0 };
+               textFields = ""; pointerFields = [] },
+        #box { label_ = "mergeSort(`(nilList))"; position = { x = 0.0; y = top; z = -1.0 };
+               textFields = ""; pointerFields = [] },
+        #box { label_ = "lazyMergeSort(strategy)"; position = { x = -6.0; y = top; z = -2.0 };
+               textFields = ""; pointerFields = [] } ];
+      { objects = base.objects # listObjects # fromListObjects # stages;
+        outline = base.outline }
+    })
+  };
+
+  /// The elements a lazy list holds, in order, demanded in full.
+  func elementsOf(sorted_ : LazyList_<Nat>, size : Nat) : [Nat] {
+    let (cells, _) = LazyList.takeN_(sorted_, size);
+    var xs = [];
+    for ((_, _, x) in cells.vals()) { xs #= [x] };
+    xs
+  };
+
+  /// The label a scene object is drawn under, for the orbs and boxes; the
+  /// edges between them have none of their own.
+  func labelOf(o : A.Scene.SceneObject) : ?Text {
+    switch o {
+      case (#orb(f)) ?f.label_;
+      case (#box(f)) ?f.label_;
+      case _ null;
+    }
+  };
+
+  func containsObject(xs : A.Scene.SceneObjects, o : A.Scene.SceneObject) : Bool {
+    for (x in xs.vals()) { if (x == o) { return true } };
+    false
+  };
+
+  /// Two layouts of one graph, as one: the later layout's objects, and from
+  /// the earlier one whatever the later has no object for.
+  ///
+  ///    A realignment run has two states worth drawing -- before the edit
+  /// and after the repair -- and the replayground places every node by the
+  /// label of an object, so a node that exists only in the first half of the
+  /// history would otherwise have nowhere to stand. A label the two share
+  /// takes its position from after the repair.
+  func unionObjects(after : A.Scene.SceneObjects, before : A.Scene.SceneObjects) : A.Scene.SceneObjects {
+    var seen = Map.new();
+    for (o in after.vals()) {
+      switch (labelOf(o)) {
+        case (?l) { let (m, _) = Map.put(seen, l, ()); seen := m };
+        case null {};
+      }
+    };
+    var extra = [];
+    for (o in before.vals()) {
+      switch (labelOf(o)) {
+        case (?l) {
+          if (Map.get(seen, l) == null) {
+            extra #= [o];
+            let (m, _) = Map.put(seen, l, ());
+            seen := m;
+          }
+        };
+        case null { if (not containsObject(after, o)) { extra #= [o] } };
+      }
+    };
+    after # extra
+  };
+
+  /// One graph, one edit, one repair: the merge network realigned.
+  ///
+  ///    `mergeFromTreeRunWith` runs a program from scratch, and a pair of them
+  /// is compared by diffing. This runs the program once, edits the list in
+  /// place, and demands the sorted output again, so the second half of the
+  /// history is a realignment: the signaling the edit starts, then the repair
+  /// the demand runs. `List.Edit.remove` puts to the pointer that held the
+  /// removed cell, which the tree read; that put is the signal.
+  ///
+  ///    Each stage forces the one before it -- the tree forces the list, the
+  /// sort forces the tree, the demand forces the sort -- so a changed cell
+  /// reaches the output through three repairs rather than three re-runs, and
+  /// the merge network's thunks are put again by their names inside the
+  /// repaired sort, where a matched put finds the ones whose bodies did not
+  /// change. This is the first place the naming strategies run under repair
+  /// rather than under a diff of two runs.
+  ///
+  ///    The layout is taken twice, before the edit and after the repair, and
+  /// joined (see `unionObjects`), so the replayground can place what the
+  /// first half of the history built as well as what the second half left.
+  public func realignMergeFromTree(seed : Nat, size : Nat, removed : Symbol,
+                                   strategy : {#inductive; #cartesian; #pathwise})
+    : RealignRun {
+    A.reset();
+    let _ = `lazyMergeSort(`strategy) := strategy;
+    let array = R.generateRandomInput(seed, size);
+    let list_ = `ListFromArray := thunk {
+      do within space `inputList { List.fromIter(array.vals()) }
+    };
+    // The head cell is read here and captured, as `mergeFromTreeRunWith`
+    // does, rather than forced inside the tree thunk: the dependencies a
+    // repair needs are the gets of the cells `fromList` walks, and those are
+    // inside; the edits never touch the head; and `sceneObjectsFromList`
+    // lays the tree-building recursion out by the count of the root's edges,
+    // which a force here would change.
+    let list = force list_;
+    let tree_ = `LevelTreeFromList := thunk {
+      do within space `inputTree { fromList(list) }
+    };
+    let sorted_ = `Sorted := thunk {
+      do within space `mergeSort { lazyMergeSort_(force tree_) }
+    };
+    let output_ = `Output := thunk { elementsOf(force sorted_, size) };
+    let before = force output_;
+    let laidOutBefore = realignLayout(list_, tree_, sorted_, size);
+    let c0 = realignCounts();
+    do ? {
+      let editor = List.Edit.cursor(list!.next);
+      let editor = List.Edit.gotoSymbol(editor, removed)!;
+      List.Edit.remove(editor);
+    };
+    let after = force output_;
+    let c1 = realignCounts();
+    let laidOutAfter = realignLayout(list_, tree_, sorted_, size);
+    { objects = unionObjects(laidOutAfter.objects, laidOutBefore.objects);
+      outline = laidOutAfter.outline;
+      before;
+      after;
+      realignment = countsSince(c0, c1) }
+  };
+
+  /// The sorted elements a from-scratch run gives, with the removal made
+  /// before anything reads the list: the answer a repair has to agree with.
+  func sortedFromScratch(seed : Nat, size : Nat, remove : ?Symbol,
+                         strategy : {#inductive; #cartesian; #pathwise}) : [Nat] {
+    A.reset();
+    let _ = `lazyMergeSort(`strategy) := strategy;
+    let array = R.generateRandomInput(seed, size);
+    let list = List.fromIter(array.vals());
+    do ? {
+      let editor = List.Edit.cursor(list!.next);
+      let editor = List.Edit.gotoSymbol(editor, remove!)!;
+      List.Edit.remove(editor);
+    };
+    elementsOf(lazyMergeSort_(fromList(list)), size)
+  };
+
+  /// Realignment is from-scratch consistent on the merge network: after the
+  /// repair, the output equals that of a run which never saw the removed
+  /// cell -- under every naming, at the root (cell 3) and at a leaf (cell 10)
+  /// of the size-16 tree the comparative examples use. One signaling, some
+  /// re-evaluation, and the same answer.
+  #[test]
+  func testRealignIsFromScratchConsistent() {
+    for (strategy in [#inductive, #cartesian, #pathwise].vals()) {
+      for (removed in [3, 10].vals()) {
+        let expectedBefore = sortedFromScratch(10, 16, null, strategy);
+        let expectedAfter = sortedFromScratch(10, 16, ?removed, strategy);
+        let run = realignMergeFromTree(10, 16, removed, strategy);
+        assert run.before == expectedBefore;
+        assert run.after == expectedAfter;
+        // The edit is one signaling; the repaired tree, re-putting cells the
+        // sort had read, starts more. Some thunk is re-evaluated, and some
+        // are found again by name.
+        assert run.realignment.signalings >= 1;
+        assert run.realignment.reevaluations >= 1;
+        assert run.realignment.putMatched >= 1;
+      }
+    }
+  };
+
+  /// Write a realignment run as a replayground scene, `tag` naming the
+  /// strategy in the file name; answers with the number of events.
+  public func writeRealignScene(seed : Nat, size : Nat, removed : Symbol,
+                                strategy : {#inductive; #cartesian; #pathwise},
+                                tag : Symbol) : Nat {
+    let run = realignMergeFromTree(seed, size, removed, strategy);
+    let scene = { objects = run.objects; outline = run.outline; history = A.peekHistory() };
+    Files.write(`mergeSort-`Realign-tag-`seed-seed-`size-size-`removed-removed-`Scene-`json,
+                A.IntoJSON.fromScene(scene));
+    scene.history.events.size()
+  };
+
+  /// The realignment runs, for the playground: the six edits the comparative
+  /// pairs make, as one graph each. The playground attaches the history, so
+  /// the events tab shows the signaling and the repair after the first run.
+  #[example]
+  public func exampleRealignInductiveRootRemoval() : W.ExampleOutput {
+    let run = realignMergeFromTree(10, 16, 3, #inductive);
+    W.scene(run.objects, run.outline)
+  };
+  #[example]
+  public func exampleRealignInductiveLeafRemoval() : W.ExampleOutput {
+    let run = realignMergeFromTree(10, 16, 10, #inductive);
+    W.scene(run.objects, run.outline)
+  };
+  #[example]
+  public func exampleRealignCartesianRootRemoval() : W.ExampleOutput {
+    let run = realignMergeFromTree(10, 16, 3, #cartesian);
+    W.scene(run.objects, run.outline)
+  };
+  #[example]
+  public func exampleRealignCartesianLeafRemoval() : W.ExampleOutput {
+    let run = realignMergeFromTree(10, 16, 10, #cartesian);
+    W.scene(run.objects, run.outline)
+  };
+  #[example]
+  public func exampleRealignPathwiseRootRemoval() : W.ExampleOutput {
+    let run = realignMergeFromTree(10, 16, 3, #pathwise);
+    W.scene(run.objects, run.outline)
+  };
+  #[example]
+  public func exampleRealignPathwiseLeafRemoval() : W.ExampleOutput {
+    let run = realignMergeFromTree(10, 16, 10, #pathwise);
+    W.scene(run.objects, run.outline)
   };
 
   /// The native diff and the Fumola-side diff agree on a real merge network.
