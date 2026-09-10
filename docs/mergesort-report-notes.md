@@ -112,6 +112,10 @@ holds the data fixed and varies only the shape's influence.
 
 ### Cartesian caps the tail and raises the floor
 
+*Superseded in part -- see "two corrections" below. These figures are
+`unmatched`, which is mostly garbage; under `redone` cartesian and inductive
+do the same amount of work.*
+
 All 99 removal positions at size 100:
 
 | | inductive | cartesian |
@@ -138,6 +142,9 @@ counterpart, so it and everything built on it begin again. By name-match share
 removal identical.
 
 ### At the root, at scale: the measurement the rest was missing
+
+*Superseded in part -- see "two corrections" below. The highest-level cell is
+not the worst position: an exhaustive sweep finds one 43% dearer at n=128.*
 
 Every earlier figure here removed a cell chosen without reference to the tree
 it sits in. That is the flaw: what an edit costs depends on how much of the
@@ -218,6 +225,132 @@ high-but-not-highest node, and the conclusion drawn from it -- that either
 naming already reuses 99.4% of the graph -- holds for that case and not for the
 worst one.
 
+### Sweeping every position, and two corrections it forces
+
+*Added 2026-09-09, with `fumola/examples/mergeSort/sweep.fumola`.* Diffing two
+runs used to cost 3 s and a gigabyte per sample, so every table above sampled
+positions -- one, or six. `A.Native` (see `docs/native-diff.md`) brought a
+sample down to the two runs and almost nothing else, and an **exhaustive**
+sweep became affordable: every position, no sampling to argue about. Sizes 64,
+128 and 256, all four algorithms -- 1,780 samples, about 10 minutes.
+
+The measure is `redone` = `newBody` + `sameBody` + `onlyRight`, for the reason
+in the section below: `notEqual` counts a re-allocation as if it were a repair,
+and 99% of `notEqual` is re-allocation.
+
+| n | algorithm | own | mean | median | p90 | max | at | mean/own |
+|---|---|---|---|---|---|---|---|---|
+| 64 | inductive | 844 | 34.3 | 22 | 65 | 219 | 39 | 4.06% |
+| 64 | cartesian | 844 | 34.5 | 26 | 50 | 191 | 39 | 4.08% |
+| 64 | pathwise | 844 | 50.0 | 24 | 95 | 483 | 3 | 5.93% |
+| 64 | eager | 1067 | 47.7 | 26 | 95 | 301 | 3 | 4.47% |
+| 128 | inductive | 1895 | 45.5 | 26 | 81 | 461 | 86 | 2.40% |
+| 128 | cartesian | 1895 | 47.7 | 31 | 81 | 390 | 86 | 2.52% |
+| 128 | pathwise | 1895 | 71.2 | 28 | 119 | 1163 | 3 | 3.76% |
+| 128 | eager | 2352 | 62.1 | 33 | 130 | 880 | 3 | 2.64% |
+| 256 | inductive | 3958 | 51.6 | 26 | 87 | 1080 | 175 | 1.30% |
+| 256 | cartesian | 3958 | 56.0 | 35 | 90 | 1019 | 175 | 1.42% |
+| 256 | pathwise | 3958 | 79.8 | 29 | 117 | 2457 | 3 | 2.02% |
+| 256 | eager | 5227 | 81.4 | 37 | 148 | 1644 | 3 | 1.56% |
+
+`at` is the position the maximum was found at, which is the first correction
+below. The median barely moves with n at all -- 22, 26, 26 for inductive --
+so the mean is being carried by the tail, not by the typical edit.
+
+**The mean grows, sublinearly, and the lazy sorts grow differently from the
+eager one.** Per doubling:
+
+| | 64 -> 128 | 128 -> 256 |
+|---|---|---|
+| inductive | 1.33x | 1.13x |
+| cartesian | 1.38x | 1.18x |
+| pathwise | 1.42x | 1.12x |
+| eager | 1.30x | 1.31x |
+| *log n predicts* | *1.17x* | *1.14x* |
+| *log squared predicts* | *1.36x* | *1.31x* |
+| *n^0.4 predicts* | *1.32x* | *1.32x* |
+
+The three lazy sorts' ratios **shrink** -- 1.33 then 1.13 -- and a power law's
+ratios do not shrink, so whatever the lazy average is, it is log-like rather
+than n to some power; the second step lands almost exactly on log n. Eager's
+ratios do not shrink (1.30, 1.31), which is what a power law looks like, and a
+least-squares fit gives n^0.39 with the three points nearly on the line. So the
+eager sort's average cost grows in n and the lazy sorts' in log n, which is a
+difference in kind and not in constant -- the first such difference these
+tables have shown.
+
+Three points still cannot *pin* the lazy law: 1.33 then 1.13 sits between log n
+and log squared, and a log-squared fit is within 11% at every size. But the
+shape is settled, and so is the earlier reading, which was wrong. The
+six-sample means (27.2, 42.2, 21.3, 26.3 for inductive at 64/128/256/512) were
+flat and non-monotonic, and I reported them as evidence that the average case
+might be O(1). The exhaustive means are monotonic and rising. Six uniform
+samples could not see a 1.17x-per-doubling trend, and the non-monotonicity was
+the sampling, not the algorithm.
+
+The share of the graph, though, falls: 4.06%, 2.40%, 1.30% for inductive,
+roughly halving per doubling, because the graph grows about 2.2x and the mean
+about 1.2x.
+
+**Correction: the highest-level cell is not the worst position, and the error
+grows.** Every table above takes the root -- the cell of highest `symbolLevel`
+in range -- as the worst case. For the lazy sorts it is not, and the gap widens
+with n:
+
+| n | root | its cost | worst position | its cost | ratio |
+|---|---|---|---|---|---|
+| 64 | 3 | 169 | 39 | 219 | 1.30x |
+| 128 | 3 | 322 | 86 | 461 | 1.43x |
+| 256 | 3 | 582 | 175 | 1080 | 1.86x |
+
+Cell 3 has the highest level in range at every size up to 512, and it roots a
+2 : n-2 split -- issue #72's degeneracy, one step further on. Removing the root
+of a degenerate split disturbs *less* than removing a high node with a real
+subtree on either side, which is what cells 39, 86 and 175 are. So the "at the
+root, at scale" table below prices a high removal and calls it the worst one,
+and by n=256 the true worst is nearly twice as dear.
+
+For pathwise and the eager sort the root *is* the worst position at all three
+sizes, which fits: their cost is dominated by how much of the tree's shape
+moves, and removing the top reshapes from the top down.
+
+The lesson for the report is that a worst case has to be **swept for**, not
+picked by a property of the symbol. That is what `all` is for.
+
+**Correction: cartesian's advantage is garbage, not work.** With `redone` as
+the measure, cartesian and inductive are the same algorithm as far as work
+goes:
+
+| n | inductive | cartesian |
+|---|---|---|
+| 64 | 20.0% of own | 20.5% |
+| 128 | 17.0% | 17.6% |
+| 256 | 14.7% | 15.2% |
+| 512 | 18.8% | 18.3% |
+| 1024 | 19.3% | 20.7% |
+
+At the root, at n=1024, cartesian redoes *more*: 3870 against 3621. What it
+does less of is **garbage** -- 615 against 1033 -- which is the `onlyLeft`
+column, cells the second run never names.
+
+It does cap the true tail, consistently, at every size swept: 191 against 219
+at n=64, 390 against 461 at 128, 1019 against 1080 at 256 -- 10 to 15% lower
+at the worst position, while its mean and median are slightly higher. That is
+"caps the tail and raises the floor" exactly, and it is invisible at cell 3,
+where cartesian looks slightly worse.
+
+So "cartesian caps the tail and grows with n" was right about the shape and
+wrong about the cause: the earlier figure was `unmatched` = `onlyLeft` +
+`onlyRight`, which is mostly garbage, and garbage is what cartesian saves.
+Work redone it leaves alone.
+
+**The worst case is a constant fraction of the graph.** `redone` at the root
+holds between 14.7% and 20.7% of `own` from n=64 to n=1024, for both lazy
+namings, while the graph grows 22x. Not logarithmic: Θ(n log n) work redone at
+a high removal, and a Θ(log² n) mean over all removals. Those are the two
+theorems the data supports, and they are very far apart -- at n=1024 the
+mean is a few tens of nodes and the root is 3,621.
+
 ## How to play with each
 
 A local build, since none of this is deployed:
@@ -236,6 +369,19 @@ for any of `examplePairInductiveVsCartesian`,
 `examplePairInductiveLeafRemoval`, `examplePairCartesianLeafRemoval`. Opening
 the body rather than the call means the seed, size and removal are `let`s you
 can edit in place, and the view survives the re-run.
+
+To sweep, rather than to look:
+
+    cargo build --release
+    tools/sweep-run.sh /tmp/worst.csv root 64 128 256 512 1024 -- \
+        lazy-inductive lazy-cartesian lazy-pathwise eager-split
+    tools/sweep-run.sh /tmp/avg.csv all 64 128 -- lazy-inductive eager-split
+
+`root` takes the highest-level cell, `all` every position, `random:N` a
+uniform sample. One CSV row per sample, with `own` beside the counts so a
+figure can be read as a share of its own algorithm's graph; the columns are
+documented in `fumola/examples/mergeSort/sweep.fumola`, which is also where
+the run's shape lives, so a table can be reproduced rather than re-derived.
 
 In a program, the strategy is a cell the merge network peeks:
 
@@ -268,11 +414,21 @@ with nothing to say about naming. Use application: `(xc.symbol)(yc.symbol)`.
 A literal head like `` `merge-x `` is safe because the head is not a number,
 which is why the existing inductive code never hit this.
 
-**Verify that incremental output is actually incremental** before relying on
-it. A sweep at n=1000 was written to print each sample as it landed, so a long
-run could be interrupted without losing everything. Nothing reached the file:
-the output sat in a pipe buffer for 27 minutes and was lost when the run was
-stopped at 10.2 GB. Test the streaming on a small case first.
+**A Fumola program cannot stream its output, and the reason is not a pipe.**
+A sweep at n=1000 was written to print each sample as it landed, so a long run
+could be interrupted without losing everything. Nothing reached the file, and
+the diagnosis recorded here -- "the output sat in a pipe buffer" -- was wrong.
+`Prim.print` puts its line in the agent's own output, and the host drains that
+when evaluation *returns*: a process that is killed prints nothing, however it
+is piped, and `stdbuf` cannot help.
+
+Nor is that a defect to fix in `print`. The semantics has to run under Wasm,
+where there is no stdout and the host is the only thing that can say what
+output means. Streaming belongs in a `Value::Dynamic` that a host binds into
+the Core -- an object with methods a program calls, printing or dumping as
+that host is able -- which is worth doing and is not done. Until then the
+process boundary is the flush, which is why `tools/sweep-run.sh` runs one
+process per (size, algorithm).
 
 **n=1000 sweeps are expensive and grow.** About 14 s per run, so 100 sampled
 positions is 200 runs, and resident memory reached 10.2 GB before being

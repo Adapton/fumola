@@ -1,0 +1,293 @@
+import Seq "../../collections/levelTree";
+import LazyList "../../collections/LazyList";
+import List "../../collections/List";
+import A "../../system/adapton";
+import R "../../collections/randomInput";
+import Prim "../../system/prim";
+
+/// The mergeSort report's measurement harness: what one edit costs, swept.
+///
+///    Every table in `docs/mergesort-report-notes.md` was made by a program written for that
+/// table and thrown away, which is why the same mistakes were made twice -- one removal
+/// position taken for a measurement, `notEqual` taken for repair, a sweep whose output never
+/// arrived. This is that program, kept, with the corrections in it.
+///
+///    A sample is two runs of the same sort -- one on the input, one on the input with a cell
+/// removed -- and the difference between the node maps they leave. `A.Native` does the
+/// comparing (`docs/native-diff.md`): the maps stay in Rust, so a sample costs the two runs
+/// and almost nothing else, and holds a tenth of the memory the Fumola-side diff did. That is
+/// what makes an exhaustive sweep worth writing.
+///
+/// ## What the columns mean
+///
+///    `own` is the unedited run's own graph, so a churn figure can be read as a share of the
+/// algorithm it belongs to rather than against another algorithm's size.
+///
+///    `redone` is the measure to use, and it is not `notEqual`. A thunk whose *body* differs
+/// was named again for a different closure, so realignment evaluates it exactly as it would a
+/// cell with no counterpart -- `newBody` and `onlyRight` are the same kind of work. A thunk
+/// whose body is the same and whose result differs is repair proper (`sameBody`). So
+/// `redone = newBody + sameBody + onlyRight`, and `notEqual` on its own reads a re-allocation
+/// as if it were a repair. At size 1000, 99% of `notEqual` is `newBody`, and that is what
+/// corrected "cartesian caps the tail": cartesian's advantage there is `garbage`, not work.
+///
+///    `nonThunk` is a cell both runs named whose contents changed. It is not in `redone`: a
+/// cell is written by the thunk that puts it, and that thunk's own evaluation is already
+/// counted.
+///
+/// ## Running one
+///
+///    `tools/sweep.py` writes the program and `tools/sweep-run.sh` runs the sweeps one process
+/// at a time, appending CSV. One process per (size, algorithm) is not fussiness: `Prim.print`
+/// puts its line in the agent's own output, which the host drains when evaluation returns, so
+/// a process that is killed prints nothing at all. That is what cost the 27-minute sweep its
+/// rows -- not a pipe buffer, as the notes used to say.
+///
+///    Nor is that buffering a defect to fix in `print`: the semantics has to run under Wasm,
+/// where there is no stdout to write to and the host is the only thing that can say what
+/// output means. Streaming belongs in a `Value::Dynamic` that a host binds into the Core --
+/// an object with methods a program can call, printing or dumping as that host is able. Then
+/// a sweep could stream from the CLI and mean something else in a browser, and this harness
+/// would not need to be cut into processes. Until then, processes are the flush.
+///
+/// ----------------------------------------------------------------------------
+module {
+
+    /// The sorts the report compares. Three lazy ones differing only in how the merge network
+    /// names its cells, and the eager one, which merges as it goes and keeps a level tree
+    /// throughout.
+    ///
+    ///    `#eagerRebuild` -- the sort that rebuilds through `fromList` -- is not here because
+    /// it is not on `main` yet (#105). Adding it is one arm of `runNodeVals` and one name.
+    public type Algorithm = {
+        #lazyInductive;
+        #lazyCartesian;
+        #lazyPathwise;
+        #eagerSplit;
+    };
+
+    public func algorithmName(a : Algorithm) : Text {
+        switch a {
+            case (#lazyInductive) "lazy-inductive";
+            case (#lazyCartesian) "lazy-cartesian";
+            case (#lazyPathwise) "lazy-pathwise";
+            case (#eagerSplit) "eager-split";
+        }
+    };
+
+    /// For a caller that has a name rather than a tag -- a generated program, say.
+    public func algorithmOf(name : Text) : ?Algorithm {
+        if (name == "lazy-inductive") { ?#lazyInductive }
+        else if (name == "lazy-cartesian") { ?#lazyCartesian }
+        else if (name == "lazy-pathwise") { ?#lazyPathwise }
+        else if (name == "eager-split") { ?#eagerSplit }
+        else { null }
+    };
+
+    /// One run, and the node map it leaves.
+    ///
+    ///    The removal happens where the editor would make it: after the list is built and
+    /// before anything reads it, so the two runs of a sample differ only in their input. (A
+    /// realignment run edits *after* a demand instead; that is `Scene.realignMergeFromTree`,
+    /// and it measures a repair rather than the difference two from-scratch runs leave.)
+    ///
+    ///    The naming strategy has to be written after `A.reset()`, which takes the cell with
+    /// it, and is read by the merge network as it builds.
+    public func runNodeVals(seed : Nat, size : Nat, remove : ?Symbol, a : Algorithm)
+        : A.Native.NodeVals {
+        A.reset();
+        switch a {
+            case (#lazyInductive) { let _ = `lazyMergeSort(`strategy) := #inductive; () };
+            case (#lazyCartesian) { let _ = `lazyMergeSort(`strategy) := #cartesian; () };
+            case (#lazyPathwise) { let _ = `lazyMergeSort(`strategy) := #pathwise; () };
+            case (#eagerSplit) { () };
+        };
+        let array = R.generateRandomInput(seed, size);
+        let list_ = `ListFromArray := thunk {
+            do within space `inputList { List.fromIter(array.vals()) }
+        };
+        let list = force list_;
+        do ? {
+            let editor = List.Edit.cursor(list!.next);
+            let editor = List.Edit.gotoSymbol(editor, remove!)!;
+            List.Edit.remove(editor);
+        };
+        let tree_ = `LevelTreeFromList := thunk {
+            do within space `inputTree { Seq.fromList(list) }
+        };
+        let tree = force tree_;
+        switch a {
+            case (#eagerSplit) {
+                let sorted_ = `EagerSorted := thunk {
+                    do within space `eagerMergeSort { Seq.eagerMergeSort(tree) }
+                };
+                let _ = force sorted_;
+                ()
+            };
+            case _ {
+                let sorted_ = do within space `mergeSort { Seq.lazyMergeSort_(tree) };
+                // Demanded, or the network is a promise rather than a graph.
+                let _ = LazyList.takeN_(sorted_, size);
+                ()
+            };
+        };
+        A.Native.nodeValsNow()
+    };
+
+    /// What one edit cost, in the terms above.
+    public type Sample = {
+        size : Nat;
+        algorithm : Text;
+        position : Nat;
+        own : Nat;
+        equal : Nat;
+        notEqual : Nat;
+        newBody : Nat;
+        sameBody : Nat;
+        nonThunk : Nat;
+        onlyLeft : Nat;
+        onlyRight : Nat;
+        redone : Nat;
+        garbage : Nat;
+    };
+
+    /// A sample against a baseline already taken, which is what a sweep does: the unedited run
+    /// is paid for once per (size, algorithm) rather than once per position.
+    public func sampleAgainst(baseline : A.Native.NodeVals, seed : Nat, size : Nat,
+                              position : Nat, a : Algorithm) : Sample {
+        let edited = runNodeVals(seed, size, ?position, a);
+        let c = A.Native.diff(baseline, edited);
+        {
+            size;
+            algorithm = algorithmName(a);
+            position;
+            own = c.left;
+            equal = c.equal;
+            notEqual = c.notEqual;
+            newBody = c.notEqualNewBody;
+            sameBody = c.notEqualSameBody;
+            nonThunk = c.notEqualNonThunk;
+            onlyLeft = c.onlyLeft;
+            onlyRight = c.onlyRight;
+            redone = c.notEqualNewBody + c.notEqualSameBody + c.onlyRight;
+            garbage = c.onlyLeft;
+        }
+    };
+
+    /// One sample, baseline and all.
+    public func sample(seed : Nat, size : Nat, position : Nat, a : Algorithm) : Sample {
+        sampleAgainst(runNodeVals(seed, size, null, a), seed, size, position, a)
+    };
+
+    public func csvHeader() : Text {
+        "size,algorithm,position,own,equal,notEqual,newBody,sameBody,nonThunk,onlyLeft,onlyRight,redone,garbage"
+    };
+
+    public func csvRow(s : Sample) : Text {
+        (debug_show s.size) # "," # s.algorithm # "," # (debug_show s.position) # "," #
+        (debug_show s.own) # "," # (debug_show s.equal) # "," # (debug_show s.notEqual) # "," #
+        (debug_show s.newBody) # "," # (debug_show s.sameBody) # "," # (debug_show s.nonThunk) # "," #
+        (debug_show s.onlyLeft) # "," # (debug_show s.onlyRight) # "," #
+        (debug_show s.redone) # "," # (debug_show s.garbage)
+    };
+
+    /// The gap that roots the input tree: the highest `symbolLevel` among the positions in
+    /// range. Removing it is the worst case, and the one every table in the notes uses -- and
+    /// it is not a fixed cell, which is the mistake the first sweep made. At size 16 it is 3;
+    /// at 1000 it is 586.
+    public func rootPosition(size : Nat) : Nat {
+        var i = 2;
+        var best = 2;
+        var bestLevel = 0;
+        while (i <= size) {
+            let level = Prim.symbolLevel i;
+            if (level > bestLevel) { bestLevel := level; best := i };
+            i += 1
+        };
+        best
+    };
+
+    /// Every position an edit could remove: the average case, exhaustively, with no sampling to
+    /// argue about. `size - 1` samples, since position 1 has no gap before it.
+    public func allPositions(size : Nat) : [Nat] {
+        var i = 2;
+        var result = [];
+        while (i <= size) { result #= [i]; i += 1 };
+        result
+    };
+
+    /// `count` positions drawn uniformly from the range, with replacement.
+    ///
+    ///    Uniform over *positions*, which weights by position and not by level -- and the
+    /// levels are what the strategies differ on, high ones being O(log n) rare. So this is the
+    /// honest average for "a user edits a random element" and the wrong one for "how bad can
+    /// it get". Prefer `allPositions` where it is affordable; it has no such question.
+    public func randomPositions(seed : Nat, size : Nat, count : Nat) : [Nat] {
+        let iter = prim "fastRandIterNew" (?count, seed);
+        var result = [];
+        for (x in iter) { result #= [x % (size - 1) + 2] };
+        result
+    };
+
+    /// One (size, algorithm), swept over `positions`, a CSV row per sample.
+    public func sweep(seed : Nat, size : Nat, positions : [Nat], a : Algorithm) {
+        let baseline = runNodeVals(seed, size, null, a);
+        for (p in positions.vals()) {
+            Prim.print (csvRow(sampleAgainst(baseline, seed, size, p, a)))
+        }
+    };
+
+    /// The harness answers the numbers the notes report.
+    ///
+    ///    Size 16, seed 10, the root removed, named inductively: the case
+    /// `examplePairInductiveRootRemoval` draws and the case the notes' first table prices --
+    /// 87 equal, 56 with the same name and other contents, 20 named only by the first run and
+    /// 5 only by the second. Those are the notes' published figures, to the node, which is the
+    /// check that matters: the harness has to price what the report already reported.
+    ///
+    ///    The four categories are pinned, so a change to the run's shape -- what it demands,
+    /// where the edit lands, which spaces it opens -- cannot pass quietly. The strategy cell is
+    /// one of those nodes, written here as `mergeFromTreeRunWith` writes it; a run that leaves
+    /// it out has one fewer equal node and does not match the tables.
+    #[test]
+    func testSampleAtSizeSixteen() {
+        let root = rootPosition(16);
+        assert root == 3;
+        let s = sample(10, 16, root, #lazyInductive);
+        assert s.equal == 87;
+        assert s.notEqual == 56;
+        assert s.onlyLeft == 20;
+        assert s.onlyRight == 5;
+        assert s.own == s.equal + s.notEqual + s.onlyLeft;
+        assert s.redone == s.newBody + s.sameBody + s.onlyRight;
+        assert s.notEqual == s.newBody + s.sameBody + s.nonThunk;
+        assert s.garbage == s.onlyLeft;
+    };
+
+    /// A leaf removal is the control: it costs the same under every naming, because naming
+    /// matters only where the tree moves.
+    #[test]
+    func testLeafRemovalIsTheSameUnderEveryNaming() {
+        let inductive = sample(10, 16, 10, #lazyInductive);
+        let cartesian = sample(10, 16, 10, #lazyCartesian);
+        assert inductive.redone == cartesian.redone;
+        assert inductive.garbage == cartesian.garbage;
+        // And it is far cheaper than the root, which is the whole point of sampling positions.
+        let root = sample(10, 16, rootPosition(16), #lazyInductive);
+        assert inductive.redone < root.redone;
+    };
+
+    /// Positions are drawn in range, and a sweep of one position agrees with a lone sample --
+    /// so reusing a baseline across positions changes no answer.
+    #[test]
+    func testRandomPositionsAndBaselineReuse() {
+        let ps = randomPositions(7, 16, 5);
+        assert ps.size() == 5;
+        for (p in ps.vals()) { assert p >= 2; assert p <= 16 };
+        let baseline = runNodeVals(10, 16, null, #lazyInductive);
+        let reused = sampleAgainst(baseline, 10, 16, 3, #lazyInductive);
+        let alone = sample(10, 16, 3, #lazyInductive);
+        assert reused.redone == alone.redone;
+        assert reused.own == alone.own;
+    };
+}
