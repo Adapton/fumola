@@ -30,7 +30,7 @@ assertions are its own tests).
 
 | | before | after |
 |---|---|---|
-| `panic!` | 5 | 1 |
+| `panic!` | 5 | 0 |
 | `unreachable!` | 10 | 0 |
 | `todo!` | 115 | 0 |
 | `unimplemented!` | 2 | 0 |
@@ -38,9 +38,8 @@ assertions are its own tests).
 
 Counts are over `crates/*/src`, excluding `check.rs`, `prelude.rs` and
 `module_path.rs` (test-only, see above) and excluding commented-out lines. The
-one `panic!` and the 71 remaining unwraps are accounted for below: each is
-either not reachable from evaluation, or reachable only past a check a few
-lines above it.
+71 remaining unwraps are accounted for below: each is either not reachable from
+evaluation, or reachable only past a check a few lines above it.
 
 ## Confirmed reachable, with the program that reached it
 
@@ -158,12 +157,13 @@ Listed so the next person does not have to work them out again.
 - **`fumola_wasm/src/lib.rs`**: a key taken from the map being read; a
   coercion the `if` guard just performed.
 - **`crates/fumola/src/bin/fumola.rs:270`**: inside `if false`.
-- **`ast.rs:713`**, `Exp::object_body`. The one `panic!` left in non-test code.
-  Its three callers are all in `parser.lalrpop`, applied to the result of
+- **`Exp::object_body`** was the last `panic!` in non-test code, and is gone.
+  Its three callers were all in `parser.lalrpop`, applied to the result of
   `Exp::obj_field_fields`, `obj_id_fields` or `obj_base_bases` -- each of which
-  produces `Exp::Object` on every path. Parse time, not evaluation. Removing it
-  means changing what those three return, which means editing the grammar and
-  paying the lalrpop rebuild; worth doing, not worth doing here.
+  wrapped a body in `Exp::Object` for the grammar to unwrap again a moment
+  later. The wrap and the unwrap cancelled: the three now return
+  `ExpObjectBody`, the grammar takes it as it is, and there is no arm left to
+  panic in. Parse time, not evaluation, so no program reached it either way.
 
 ## Reading an interruption
 

@@ -707,23 +707,28 @@ impl Exp {
         Exp::Var(NodeData(IdPos { id, unquote: false }, source).share())
     }
 
-    pub fn object_body(&self) -> ExpObjectBody {
-        match self {
-            Exp::Object(body) => body.clone(),
-            _ => panic!(),
-        }
-    }
-
-    pub fn obj_field_fields(f1: ExpField_, fs: Option<ExpFields>) -> Exp {
+    /// The three `obj_*` constructors below build an object *body*, not an
+    /// object.
+    ///
+    /// They used to return `Exp::Object(body)`, and the grammar unwrapped
+    /// each one again with an `object_body()` whose other arm was `panic!()`
+    /// -- reachable only if one of them ever returned something that was not
+    /// an `Exp::Object`, which none of them could. The wrap and the unwrap
+    /// cancelled, so both are gone: there is no longer an expression to take
+    /// apart, and so no arm to panic in.
+    ///
+    /// `ExpObj` and the quoted-record rule both want the body; the one place
+    /// that wants a whole expression wraps it there.
+    pub fn obj_field_fields(f1: ExpField_, fs: Option<ExpFields>) -> ExpObjectBody {
         match fs {
-            None => Exp::Object((None, Some(Delim::one(f1)))),
+            None => (None, Some(Delim::one(f1))),
             Some(mut fs) => {
                 fs.vec.push_front(f1);
-                Exp::Object((None, Some(fs)))
+                (None, Some(fs))
             }
         }
     }
-    pub fn obj_id_fields(id: IdPos_, fields: ExpFields) -> Exp {
+    pub fn obj_id_fields(id: IdPos_, fields: ExpFields) -> ExpObjectBody {
         let field1_source = id.1.clone();
         let exp = Some(NodeData(Exp::Var(id.clone()), id.1.clone()).share());
         let field1 = NodeData(
@@ -738,7 +743,7 @@ impl Exp {
         .share();
         let mut fields = fields;
         fields.vec.push_front(field1);
-        Exp::Object((None, Some(fields)))
+        (None, Some(fields))
     }
     /// A brace body that is a single expression, with no `and` and no
     /// `with`, is only meaningful when that expression is a variable: it is
@@ -754,7 +759,7 @@ impl Exp {
         base1: Exp_,
         bases: Option<Delim<Exp_>>,
         efs: Option<ExpFields>,
-    ) -> Result<Exp, &'static str> {
+    ) -> Result<ExpObjectBody, &'static str> {
         match (bases, efs) {
             (None, None) => match &base1.0 {
                 Exp::Var(x) => Ok(Exp::obj_id_fields(x.clone(), Delim::new())),
@@ -763,10 +768,10 @@ impl Exp {
                      write `{ x = e }` for a field, or extend a base with `and` / `with`",
                 ),
             },
-            (None, efs) => Ok(Exp::Object((Some(Delim::one(base1)), efs))),
+            (None, efs) => Ok((Some(Delim::one(base1)), efs)),
             (Some(mut bs), efs) => {
                 bs.vec.push_front(base1);
-                Ok(Exp::Object((Some(bs), efs)))
+                Ok((Some(bs), efs))
             }
         }
     }
