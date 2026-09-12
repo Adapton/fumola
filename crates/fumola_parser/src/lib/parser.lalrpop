@@ -526,9 +526,9 @@ ExpObjectBody: ExpObjectBody = {
     // LR(1) language of menhir.  To bridge this gap, we parse the
     // first field in a more case-by-case way.
     //
-    <field1:ExpFieldNoBareId_> <fields:(";" <Delim0<ExpField_, ";">>)?> => Exp::obj_field_fields(field1, fields).object_body(),
-    <id:IdPos_> ";" <fields:Delim1<ExpField_, ";">> => Exp::obj_id_fields(id, fields).object_body(),
-    <base1:ExpPost_<Ob>> <bases:("and" <Delim1<ExpPost_<Ob>, "and">>)?> <efs:("with" <Delim1<ExpField_, ";">>)?> =>? Exp::obj_base_bases(base1, bases, efs).map(|e| e.object_body()).map_err(|error| lalrpop_util::ParseError::User { error }),
+    <field1:ExpFieldNoBareId_> <fields:(";" <Delim0<ExpField_, ";">>)?> => Exp::obj_field_fields(field1, fields),
+    <id:IdPos_> ";" <fields:Delim1<ExpField_, ";">> => Exp::obj_id_fields(id, fields),
+    <base1:ExpPost_<Ob>> <bases:("and" <Delim1<ExpPost_<Ob>, "and">>)?> <efs:("with" <Delim1<ExpField_, ";">>)?> =>? Exp::obj_base_bases(base1, bases, efs).map_err(|error| lalrpop_util::ParseError::User { error }),
 }
 
 #[inline]
