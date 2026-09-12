@@ -301,6 +301,9 @@
         margin-top: 0.25rem;
       }
       .pub-why { display: block; margin-top: 0.5rem; font-size: 0.91rem; }
+      /* One line, the newest mention, so the homepage never grows a list. */
+      .press-latest { margin-top: 0.6rem; }
+      .press-latest .pub-venue { display: block; margin-top: 0.25rem; }
 
       /* ---- link list ---------------------------------------------------- */
 
@@ -320,9 +323,116 @@
         .links li { display: block; }
         .links .what { margin-bottom: 0.15rem; }
       }
+
+      /* ---- The floating outline, left gutter ------------------------------
+         `main` is 45rem centred, so on a wide viewport the space either side
+         of it is already empty. The outline moves into that space and nothing
+         else moves: no change to main's width, margin or padding. Below the
+         width where the gutter can hold it, it is simply not there -- the
+         breakpoint is about whether there is room beside the column, which is
+         why it is min-width on the whole layout rather than the 34rem
+         content breakpoint further up.
+
+         The list of sections is built from the document (see buildOutline),
+         not written out here. A new section with an id joins the outline by
+         existing. The page list below it is hand-written, because it is the
+         one thing a page cannot know: where its siblings are. */
+      .outline {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 15rem;
+        height: 100vh;
+        padding: 5rem 1rem 3rem 1.5rem;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        font-size: 0.8rem;
+        line-height: 1.45;
+        z-index: 5;
+      }
+      /* 45rem of column + 15rem of outline each side, and a little air. */
+      @media (min-width: 78rem) {
+        .outline { display: block; }
+      }
+      /* The scrollbar is noise beside body text; the outline still scrolls. */
+      .outline { scrollbar-width: none; }
+      .outline::-webkit-scrollbar { display: none; }
+
+      .outline-label {
+        font: 400 0.66rem/1.6 var(--mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--dim);
+        margin: 0 0 0.5rem;
+      }
+
+      .outline ul {
+        list-style: none;
+        margin: 0 0 1.6rem;
+        padding: 0;
+        border-left: 1px solid var(--rule);
+      }
+      .outline li { margin: 0; }
+      .outline a {
+        display: block;
+        padding: 0.2rem 0.6rem;
+        margin-left: -1px;
+        border-left: 1px solid transparent;
+        border-bottom: none;
+        color: var(--dim);
+        text-decoration: none;
+      }
+      .outline a:hover { color: var(--fg); border-bottom: none; }
+      /* The h3s under a section, one step in and a shade quieter. */
+      .outline li.sub a { padding-left: 1.5rem; font-size: 0.76rem; }
+
+      /* Where the reader is. aria-current carries it for a screen reader;
+         the colour and the rule carry it for everyone else. */
+      .outline a[aria-current="true"] {
+        color: var(--var);
+        border-left-color: var(--eff);
+      }
+      .outline li.sub a[aria-current="true"] { color: var(--fg); }
+
+      /* The page list: the current page named but not a link, so the outline
+         always says which page you are reading. */
+      .outline-pages a { color: var(--blue); }
+      .outline-pages .here {
+        display: block;
+        padding: 0.2rem 0.6rem;
+        color: var(--var);
+        border-left: 1px solid var(--eff);
+        margin-left: -1px;
+      }
+      .outline-pages .ext::after {
+        content: "\2197";
+        margin-left: 0.4ch;
+        color: var(--dim);
+        font-size: 0.9em;
+      }
+
+      /* An in-page jump lands under a fixed outline that does not overlap the
+         column, so this is only about not pinning the heading to the very top
+         edge. */
+      :target { scroll-margin-top: 2rem; }
+      @media (prefers-reduced-motion: no-preference) {
+        html { scroll-behavior: smooth; }
+      }
     </style>
   </head>
   <body>
+    <nav class="outline" id="outline" aria-label="Page outline">
+      <p class="outline-label">Pages</p>
+      <ul class="outline-pages">
+        <li><span class="here">Home</span></li>
+        <li><a href="/press/">Press</a></li>
+        <li><a href="/alignment/">Alignment</a></li>
+        <li><a href="/web-play/">Web play</a></li>
+      </ul>
+      <p class="outline-label">On this page</p>
+      <ul id="outline-list"></ul>
+    </nav>
     <main>
       <header>
         <h1>fumola</h1>
@@ -802,30 +912,18 @@
 
         <h3 id="press">Press about Fumola<a class="anchor" href="#press" aria-label="Copy link to this heading">#</a></h3>
         <p>
-          Writing about this work from outside this repository.
+          Writing about this work from outside this repository, on its own
+          page: <a href="/press/"><strong>Press</strong></a>. It is mostly
+          <em>Week in Hazel</em>, a weekly digest that has covered the
+          <a href="#hazel">Fumola integration</a>, so the list grows on its own
+          schedule rather than this page's &mdash; which is why it is a page
+          and not a section here.
         </p>
-
-        <ul class="pubs">
-          <li>
-            <span class="pub-title"><a href="https://andrewblinn.com/hazel/weekly/issues/001/#fumola">Two languages. One notebook.</a></span>
-            <span class="pub-authors">Editor Astra; reporting Ellis, Rowan &amp; Mica. The masthead credits an AI editorial team.</span>
-            <span class="pub-venue">Week in Hazel, issue 001 &middot; September 4&ndash;10, 2026</span>
-            <span class="pub-why">
-              A digest for the Hazel community. One of the issue's ten sections
-              is the <a href="#hazel">Fumola integration</a>, and it reads it
-              the way this page does: a Hazel document naming an external
-              runtime, livelits that share a store by naming the same instance,
-              named thunks giving successive edits an identity inside it, and
-              the <a href="#modes">two modes</a> &mdash; simple by default,
-              graphical recording nodes, dependencies and events as groundwork
-              for a repair the examples do not yet exercise. It ends on the
-              gap rather than the demo: the translation fixtures check the
-              expected formats, but the evaluator suite skips the four live
-              forms, so those tests can stay green while the published runtime
-              changes underneath them.
-            </span>
-          </li>
-        </ul>
+        <p class="press-latest">
+          Most recent:
+          <a href="https://andrewblinn.com/hazel/weekly/issues/001/#fumola">Two languages. One notebook.</a>
+          <span class="pub-venue">Week in Hazel, issue 001 &middot; September 4&ndash;10, 2026</span>
+        </p>
       </section>
 
       <section id="drafts">
@@ -1058,6 +1156,11 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
       <section id="links">
         <h2>Where to go next<a class="anchor" href="#links" aria-label="Copy link to this heading">#</a></h2>
         <ul class="links">
+          <li>
+            <span class="what">/press/</span>
+            <span class="desc"><a href="/press/">Press</a>
+            <small>What has been written about Fumola from outside this repository, newest first.</small></span>
+          </li>
           <li>
             <span class="what">/alignment/</span>
             <span class="desc"><a href="/alignment/">Alignment</a>
@@ -1421,6 +1524,98 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
       // the first press fetches the runtime and then evaluates.
       runEl.disabled = false;
       statusEl.textContent = "\u2318\u21a9 to run";
+
+      // ---- The floating outline -------------------------------------------
+      // Built from the document rather than written out, so the outline and
+      // the page cannot disagree: a section that exists is in it, a section
+      // that is renamed is renamed here too, and adding one is nothing but
+      // adding it. The only thing hand-kept is the list of sibling pages in
+      // the markup, which is the one fact this page does not contain.
+      (function () {
+        const nav = document.getElementById("outline");
+        if (!nav) return;
+        const list = nav.querySelector("#outline-list");
+        if (!list) return;
+
+        // The heading text without the trailing "#" that copies its link.
+        const label = (h) => {
+          const c = h.cloneNode(true);
+          c.querySelectorAll(".anchor").forEach((a) => a.remove());
+          return c.textContent.trim();
+        };
+
+        // h2 for a section, h3 for the named subsections inside it. Headings
+        // without an id are skipped rather than given one: an outline entry
+        // that cannot be linked to is a dead row.
+        const entries = [];
+        document.querySelectorAll("main section[id]").forEach((section) => {
+          const h2 = section.querySelector("h2");
+          if (h2) entries.push({ id: section.id, text: label(h2), sub: false });
+          section.querySelectorAll("h3[id]").forEach((h3) => {
+            entries.push({ id: h3.id, text: label(h3), sub: true });
+          });
+        });
+        if (!entries.length) {
+          nav.remove();
+          return;
+        }
+
+        const links = entries.map((e) => {
+          const li = document.createElement("li");
+          if (e.sub) li.className = "sub";
+          const a = document.createElement("a");
+          a.href = "#" + e.id;
+          a.textContent = e.text;
+          li.appendChild(a);
+          list.appendChild(li);
+          return { a, el: document.getElementById(e.id) };
+        });
+
+        // Which entry the reader is in: the last heading to have passed a
+        // line a third of the way down. A band rather than the very top, so
+        // the active row changes at about the moment the eye arrives at a new
+        // section rather than when it touches the top edge.
+        let current = null;
+        const mark = () => {
+          const line = window.innerHeight * 0.33;
+          let found = links[0];
+          for (const l of links) {
+            if (!l.el) continue;
+            if (l.el.getBoundingClientRect().top <= line) found = l;
+            else break;
+          }
+          // At the very bottom the last section may never cross the line.
+          if (window.scrollY + window.innerHeight >= document.body.scrollHeight - 4) {
+            found = links[links.length - 1];
+          }
+          if (found === current) return;
+          if (current) current.a.removeAttribute("aria-current");
+          if (found) found.a.setAttribute("aria-current", "true");
+          current = found;
+          // Keep the active row visible when the outline is longer than the
+          // viewport, without scrolling the page itself.
+          if (found && nav.scrollHeight > nav.clientHeight) {
+            const r = found.a.getBoundingClientRect();
+            const n = nav.getBoundingClientRect();
+            if (r.top < n.top + 8 || r.bottom > n.bottom - 8) {
+              found.a.scrollIntoView({ block: "nearest" });
+            }
+          }
+        };
+
+        let ticking = false;
+        const onScroll = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(() => {
+            ticking = false;
+            mark();
+          });
+        };
+        window.addEventListener("scroll", onScroll, { passive: true });
+        window.addEventListener("resize", onScroll, { passive: true });
+        mark();
+      })();
     </script>
   </body>
 </html>
