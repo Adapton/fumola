@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fumola — press</title>
+    <meta name="description" content="Writing about Fumola from outside its own repository: the Week in Hazel issues that have covered the Adapton runtime and its Hazel integration.">
+    <style>
+      :root {
+        --bg:      #000000;
+        --panel:   #0b0b0d;
+        --rule:    #212124;
+        --fg:      #d4d4d4;
+        --dim:     #7d7d82;
+
+        --green:   #6A9955;  /* comment      */
+        --blue:    #569CD6;  /* keyword      */
+        --pink:    #C586C0;  /* decorator    */
+        --type:    #a989d0;  /* type name    */
+        --sym:     #a086a5;  /* symbol       */
+        --op:      #9999dd;  /* operator     */
+        --eff:     #ffaaaa;  /* := and @     */
+        --str:     #c87e60;  /* string       */
+        --var:     #f6ead2;  /* identifier   */
+
+        /* Whatever the reader already has. Nothing is fetched. */
+        --ui:   system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+                "Liberation Mono", "DejaVu Sans Mono", monospace;
+      }
+
+      * { box-sizing: border-box; }
+
+      /* The whole page is sized in rem, so this is the only knob: text and
+         the column widen together on a big screen, which keeps the line
+         length steady instead of leaving a small column in the middle of it.
+         Unchanged below roughly 1100px, so phones and the narrow layout are
+         exactly as they were. */
+      html {
+        background: var(--bg);
+        font-size: clamp(16px, 11px + 0.55vw, 22px);
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font: 400 0.95rem/1.65 var(--ui);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      main {
+        max-width: 45rem;
+        margin: 0 auto;
+        padding: 5rem 1.5rem 8rem;
+      }
+
+      /* ---- masthead ------------------------------------------------- */
+
+      header { margin-bottom: 4.5rem; }
+
+      h1, h2, h3 { color: var(--var); font-family: var(--ui); font-weight: 600; }
+
+      h1 {
+        font-size: 2.4rem;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+        margin: 0 0 0.9rem;
+      }
+      h1 .tick { color: var(--sym); }
+
+      .tagline {
+        margin: 0;
+        max-width: 34rem;
+        font-size: 1.06rem;
+        color: var(--fg);
+      }
+
+      /* The repository, directly under the tagline: someone who wants the
+         code should not have to read to the end of the page to find it. */
+      .masthead-repo {
+        margin: 1.1rem 0 0;
+        font-size: 0.95rem;
+        color: var(--dim);
+      }
+      .masthead-repo a {
+        display: inline-block;
+        padding: 0.3rem 0.6rem;
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        font-family: var(--mono);
+        font-size: 0.88rem;
+        color: var(--var);
+        text-decoration: none;
+      }
+      .masthead-repo a:hover { border-color: #3a3a40; background: var(--panel); }
+      .masthead-repo .what { margin-left: 0.6rem; }
+
+      .masthead-note {
+        margin: 1.6rem 0 0;
+        padding-left: 0.9rem;
+        border-left: 1px solid var(--rule);
+        font-size: 0.9rem;
+        color: var(--dim);
+      }
+
+      /* ---- sections -------------------------------------------------- */
+
+      section { border-top: 1px solid var(--rule); padding-top: 2rem; margin-top: 3.25rem; }
+
+      h2 {
+        font-size: 1.5rem;
+        line-height: 1.25;
+        margin: 0 0 1.2rem;
+      }
+
+      h3 {
+        font-size: 1.08rem;
+        line-height: 1.4;
+        margin: 2.2rem 0 0.6rem;
+      }
+
+      p { margin: 0 0 1.05rem; }
+      p:last-child { margin-bottom: 0; }
+
+      a { color: var(--blue); text-decoration: none; border-bottom: 1px solid #2b3f52; }
+      a:hover { color: #7db6e8; border-bottom-color: #4a7ba6; }
+
+      strong { font-weight: 600; color: var(--var); }
+      em { color: var(--fg); }
+
+      code {
+        font: 400 0.88em/1.5 var(--mono);
+        color: var(--var);
+        white-space: nowrap;
+      }
+
+      /* ---- code blocks ----------------------------------------------- */
+
+      pre {
+        font: 400 0.84rem/1.65 var(--mono);
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        padding: 1rem 1.1rem;
+        margin: 1.4rem 0;
+        overflow-x: auto;
+        color: var(--fg);
+      }
+      pre code { white-space: pre; font-size: inherit; color: inherit; }
+
+      .c   { color: var(--green); font-style: italic; }
+      .k   { color: var(--blue);  font-weight: 600; }
+      .t   { color: var(--type);  font-weight: 600; }
+      .sy  { color: var(--sym);   font-weight: 600; }
+      .o   { color: var(--op); }
+      .eff { color: var(--eff); }
+      .st  { color: var(--str);   font-style: italic; }
+      .v   { color: var(--var); }
+      .d   { color: var(--pink);  font-weight: 600; }
+      .n   { color: var(--str); }
+
+      /* ---- primitive table -------------------------------------------- */
+
+      table { width: 100%; border-collapse: collapse; margin: 1.4rem 0; font-size: 0.92rem; }
+      td { border-top: 1px solid var(--rule); padding: 0.62rem 0.9rem 0.62rem 0; vertical-align: baseline; }
+      tr:first-child td { border-top: none; }
+      td.form { white-space: nowrap; width: 12.5rem; font-family: var(--mono); font-size: 0.85rem; }
+      caption { caption-side: bottom; text-align: left; padding-top: 1rem; font-size: 0.86rem; color: var(--dim); }
+
+
+      /* ---- aside ------------------------------------------------------- */
+
+      .aside {
+        border-left: 1px solid var(--rule);
+        padding: 0.1rem 0 0.1rem 1rem;
+        margin: 1.5rem 0;
+        color: var(--dim);
+        font-size: 0.9rem;
+      }
+      .aside code { color: var(--sym); }
+
+      /* ---- copyable heading anchors -------------------------------------- */
+
+      h2, h3 { position: relative; }
+      .anchor {
+        margin-left: 0.6ch;
+        border-bottom: none;
+        color: var(--dim);
+        opacity: 0;
+        font-weight: 400;
+        text-transform: none;
+        transition: opacity 0.12s ease;
+      }
+      h2:hover .anchor, h3:hover .anchor, .anchor:focus-visible { opacity: 1; }
+      .anchor:hover { color: var(--blue); border-bottom: none; }
+      /* absolutely positioned so confirming a copy never nudges the layout */
+      .anchor[data-copied]::after {
+        content: "link copied";
+        position: absolute;
+        margin-left: 0.8ch;
+        font: 400 0.68rem/1.6 var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: none;
+        white-space: nowrap;
+        color: var(--green);
+      }
+
+      /* ---- footnotes: an aside is collapsed until asked for ------------- */
+
+      details.aside > summary {
+        cursor: pointer;
+        width: fit-content;
+        font: 400 0.82rem/1.5 var(--mono);
+        color: var(--dim);
+        list-style: none;
+      }
+      details.aside > summary::-webkit-details-marker { display: none; }
+      details.aside > summary::marker { content: ""; }
+      details.aside > summary:hover { color: var(--fg); }
+      details.aside > summary:focus-visible { outline: 1px solid var(--rule); outline-offset: 3px; }
+      details.aside[open] > summary { margin-bottom: 0.6rem; }
+      details.aside > p { margin: 0; }
+
+      /* ---- try it ------------------------------------------------------ */
+
+
+      figure { margin: 1.6rem 0 0; }
+      figure img { display: block; width: 100%; height: auto; border: 1px solid var(--rule); border-radius: 2px; }
+      figcaption { margin-top: 0.7rem; font-size: 0.86rem; color: var(--dim); }
+
+      /* ---- publications and drafts ---------------------------------------- */
+
+      .pubs { list-style: none; margin: 0; padding: 0; }
+      .pubs li { border-top: 1px solid var(--rule); padding: 0.9rem 0; }
+      .pubs li:first-child { border-top: none; padding-top: 0.2rem; }
+      .pub-title { display: block; font-size: 0.98rem; }
+      .pub-authors { display: block; color: var(--dim); font-size: 0.88rem; margin-top: 0.2rem; }
+      .pub-venue {
+        display: block;
+        font: 400 0.79rem/1.5 var(--mono);
+        letter-spacing: 0.03em;
+        color: var(--sym);
+        margin-top: 0.25rem;
+      }
+      .pub-why { display: block; margin-top: 0.5rem; font-size: 0.91rem; }
+      /* One line, the newest mention, so the homepage never grows a list. */
+      .press-latest { margin-top: 0.6rem; }
+      .press-latest .pub-venue { display: block; margin-top: 0.25rem; }
+
+      /* ---- link list ---------------------------------------------------- */
+
+      .links { list-style: none; margin: 0; padding: 0; }
+      .links li { border-top: 1px solid var(--rule); padding: 0.7rem 0; display: flex; gap: 1.2rem; align-items: baseline; }
+      .links li:first-child { border-top: none; }
+      .links .what { flex: 0 0 11rem; font: 400 0.82rem/1.5 var(--mono); color: var(--dim); }
+      .links .desc { flex: 1; font-size: 0.92rem; }
+      .links .desc small { display: block; color: var(--dim); font-size: 0.84rem; margin-top: 0.1rem; }
+
+      footer { border-top: 1px solid var(--rule); margin-top: 4rem; padding-top: 1.4rem; font-size: 0.84rem; color: var(--dim); }
+
+      @media (max-width: 34rem) {
+        main { padding-top: 3rem; }
+        h1 { font-size: 2rem; }
+        td.form { width: auto; white-space: normal; }
+        .links li { display: block; }
+        .links .what { margin-bottom: 0.15rem; }
+      }
+
+      /* ---- The outline ----------------------------------------------------
+         Three layouts, and the outline is reachable in all of them.
+
+         Wide (78rem and up): `main` is 45rem centred, so the space either side
+         is already empty. The outline sits in it and nothing else moves -- no
+         change to main's width, margin or padding.
+
+         Sidebar (48rem to 78rem): the gutter can no longer hold the outline
+         beside a centred column, but the viewport can still hold the two side
+         by side. The outline keeps its place and the column starts where the
+         outline ends; the page stops being centred and becomes two columns.
+         48rem is 768px, which is a tablet held upright, and every desktop
+         window worth the name is wider than it. The step across 78rem is
+         1.5rem of column movement -- a centred column starts at 16.5rem there,
+         a two-column one at 15rem -- so the breakpoint is not a jump.
+
+         Below 48rem there is no room for two columns: 15rem of outline would
+         leave 33rem, and that is not a column. So the outline stops being
+         beside the page and becomes the whole of it, behind the button at the
+         top left. Hidden until asked for, then everything. */
+      .outline {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 15rem;
+        height: 100vh;
+        padding: 5rem 1rem 3rem 1.5rem;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        background: var(--bg);
+        font-size: 0.8rem;
+        line-height: 1.45;
+        z-index: 15;
+      }
+      /* The scrollbar is noise beside body text; the outline still scrolls. */
+      .outline { scrollbar-width: none; }
+      .outline::-webkit-scrollbar { display: none; }
+
+      /* Opened on a narrow screen: the whole viewport, not a column in it. */
+      .outline.is-open {
+        display: block;
+        width: auto;
+        right: 0;
+        padding: 4.25rem 1.5rem 3rem 1.5rem;
+        font-size: 0.95rem;
+        line-height: 1.6;
+      }
+      .outline.is-open .outline-label { font-size: 0.72rem; }
+      .outline.is-open a,
+      .outline.is-open .outline-pages .here { padding: 0.45rem 0.8rem; }
+      body.outline-open { overflow: hidden; }
+
+      @media (min-width: 48rem) {
+        .outline { display: block; }
+        /* margin-right stays auto, so the column takes the width it needs and
+           leaves the remainder on the right rather than stretching to it. */
+        main { margin-left: 15rem; }
+      }
+      @media (min-width: 78rem) {
+        main { margin-left: auto; }
+      }
+
+      /* ---- The button that opens it ---------------------------------------
+         Top left, over the page, and only where the outline is not already
+         beside the page. main's padding-top is 5rem, so it sits above the
+         first line of content rather than on it -- including the breadcrumb
+         the subpages start with. */
+      .outline-toggle {
+        display: flex;
+        position: fixed;
+        top: 0.75rem;
+        left: 0.75rem;
+        z-index: 20;
+        width: 2.5rem;
+        height: 2.5rem;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        border-radius: 5px;
+        color: var(--fg);
+        cursor: pointer;
+      }
+      .outline-toggle:hover { border-color: #3a3a40; }
+      .outline-toggle:focus-visible { outline: 1px solid var(--eff); outline-offset: 2px; }
+      .outline-toggle svg { width: 1.15rem; height: 1.15rem; display: block; }
+      .outline-toggle .bars { display: block; }
+      .outline-toggle .ex { display: none; }
+      .outline-toggle[aria-expanded="true"] .bars { display: none; }
+      .outline-toggle[aria-expanded="true"] .ex { display: block; }
+      @media (min-width: 48rem) {
+        .outline-toggle { display: none; }
+      }
+
+      .outline-label {
+        font: 400 0.66rem/1.6 var(--mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--dim);
+        margin: 0 0 0.5rem;
+      }
+
+      .outline ul {
+        list-style: none;
+        margin: 0 0 1.6rem;
+        padding: 0;
+        border-left: 1px solid var(--rule);
+      }
+      .outline li { margin: 0; }
+      .outline a {
+        display: block;
+        padding: 0.2rem 0.6rem;
+        margin-left: -1px;
+        border-left: 1px solid transparent;
+        border-bottom: none;
+        color: var(--dim);
+        text-decoration: none;
+      }
+      .outline a:hover { color: var(--fg); border-bottom: none; }
+      /* The h3s under a section, one step in and a shade quieter. */
+      .outline li.sub a { padding-left: 1.5rem; font-size: 0.76rem; }
+      .outline.is-open li.sub a { padding-left: 2rem; font-size: 0.88rem; }
+
+      /* Where the reader is. aria-current carries it for a screen reader;
+         the colour and the rule carry it for everyone else. */
+      .outline a[aria-current="true"] {
+        color: var(--var);
+        border-left-color: var(--eff);
+      }
+      .outline li.sub a[aria-current="true"] { color: var(--fg); }
+
+      /* The page list: the current page named but not a link, so the outline
+         always says which page you are reading. */
+      .outline-pages a { color: var(--blue); }
+      .outline-pages .here {
+        display: block;
+        padding: 0.2rem 0.6rem;
+        color: var(--var);
+        border-left: 1px solid var(--eff);
+        margin-left: -1px;
+      }
+
+      /* An in-page jump lands under a fixed outline that does not overlap the
+         column, so this is only about not pinning the heading to the very top
+         edge. */
+      :target { scroll-margin-top: 2rem; }
+      @media (prefers-reduced-motion: no-preference) {
+        html { scroll-behavior: smooth; }
+      }
+      /* The breadcrumb the alignment page already uses, same rule. */
+      .back { font-size: 0.86rem; color: var(--dim); margin-bottom: 2rem; }
+
+      /* ---- The issue list -------------------------------------------------
+         A weekly digest is a series, not a pile of unrelated mentions, so it
+         is one section with a row per issue rather than an entry per issue.
+         The row is the unit that has to stay cheap: a number, a date, a
+         title, and a sentence saying what it said. At a year of these the
+         page is still one screen of scanning, which a stack of full
+         paragraphs would not be. */
+      .issues { list-style: none; margin: 0; padding: 0; }
+      .issues li {
+        display: grid;
+        grid-template-columns: 3.5rem 1fr;
+        gap: 0 0.9rem;
+        border-top: 1px solid var(--rule);
+        padding: 0.9rem 0;
+      }
+      .issues li:first-child { border-top: none; padding-top: 0.2rem; }
+      .issue-no {
+        font: 400 0.8rem/1.9 var(--mono);
+        color: var(--dim);
+        letter-spacing: 0.04em;
+      }
+      .issue-title { display: block; font-size: 0.98rem; }
+      .issue-date {
+        display: block;
+        font: 400 0.76rem/1.7 var(--mono);
+        color: var(--dim);
+        letter-spacing: 0.03em;
+        margin-top: 0.15rem;
+      }
+      .issue-note { display: block; margin-top: 0.5rem; font-size: 0.91rem; }
+      @media (max-width: 34rem) {
+        .issues li { grid-template-columns: 1fr; gap: 0; }
+        .issue-no { line-height: 1.4; }
+      }
+    </style>
+  </head>
+  <body>
+    <button class="outline-toggle" id="outline-toggle" type="button"
+            aria-controls="outline" aria-expanded="false" aria-label="Open page outline">
+      <svg class="bars" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M2 4h12M2 8h12M2 12h12"/>
+      </svg>
+      <svg class="ex" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+    <nav class="outline" id="outline" aria-label="Page outline">
+      <p class="outline-label">Pages</p>
+      <ul class="outline-pages">
+        <li><a href="/">Home</a></li>
+        <li><span class="here">Press</span></li>
+        <li><a href="/alignment/">Alignment</a></li>
+        <li><a href="/web-play/">Web play</a></li>
+      </ul>
+      <p class="outline-label">On this page</p>
+      <ul id="outline-list"></ul>
+    </nav>
+    <main>
+      <p class="back"><a href="/">fumola</a> / press</p>
+      <header>
+        <h1>press</h1>
+        <p class="tagline">
+          Writing about <a href="/">Fumola</a> from outside this repository.
+          The papers the language is built on are
+          <a href="/#publications">on the homepage</a>; this page is the other
+          direction &mdash; what other people have said about it.
+        </p>
+      </header>
+
+      <!-- Adding a mention: a new row at the TOP of .issues, newest first.
+           Number, date range, the section's own heading as the link text, and
+           a sentence or two on what it actually said. Link to the section
+           anchor (#fumola), not the issue root, so the link lands on the part
+           this page is about. Keep the note to a sentence or two: at a year
+           of weekly issues this list is the page, and a paragraph each would
+           make it unreadable. If a mention is substantial enough to deserve
+           more than that, it wants its own section below, not a longer row. -->
+      <section id="week-in-hazel">
+        <h2>Week in Hazel<a class="anchor" href="#week-in-hazel" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          <a href="https://andrewblinn.com/hazel/weekly/">Week in Hazel</a> is a
+          weekly digest for the Hazel community, published by
+          <a href="https://andrewblinn.com/">Andrew Blinn</a>. Its masthead
+          says the content is generated from the Hazel repository and GitHub
+          data, with the reporting, writing and illustrations all AI-produced.
+        </p>
+        <p>
+          Issue numbers follow reporting weeks rather than publication order,
+          so the series also runs backwards: issues with negative numbers are
+          earlier weeks reconstructed after the fact. Those predate the Fumola
+          work and do not mention it. Listed here are the issues that do,
+          newest first.
+        </p>
+
+        <ol class="issues">
+          <li>
+            <span class="issue-no">001</span>
+            <span>
+              <a class="issue-title" href="https://andrewblinn.com/hazel/weekly/issues/001/#fumola">Two languages. One notebook.</a>
+              <span class="issue-date">September 4&ndash;10, 2026</span>
+              <span class="issue-note">
+                Reads the <a href="/#hazel">Hazel integration</a> the way the
+                homepage does &mdash; a Hazel document naming an external
+                runtime, livelits that share a store by naming the same
+                instance, named thunks giving successive edits an identity
+                inside it, and the <a href="/#modes">two modes</a>, simple by
+                default and graphical recording nodes, dependencies and events
+                as groundwork for a repair the examples do not yet exercise.
+                It ends on the gap rather than the demo: the translation
+                fixtures check the expected formats, but the evaluator suite
+                skips the four live forms, so those tests can stay green while
+                the published runtime changes underneath them.
+              </span>
+            </span>
+          </li>
+        </ol>
+      </section>
+    </main>
+    <script type="module">
+      // Heading anchors. They are real links, so they work with JavaScript
+      // off; this only adds the clipboard copy on top. Same behaviour as the
+      // homepage, kept here rather than fetched: every page on this host
+      // carries its own styles and scripts.
+      document.addEventListener("click", (e) => {
+        const a = e.target.closest(".anchor");
+        if (!a) return;
+        const url = location.origin + location.pathname + new URL(a.href).hash;
+        const done = () => {
+          a.setAttribute("data-copied", "");
+          setTimeout(() => a.removeAttribute("data-copied"), 1400);
+        };
+        const fallback = () => {
+          const t = document.createElement("textarea");
+          t.value = url;
+          t.setAttribute("readonly", "");
+          t.style.cssText = "position:fixed;top:-9999px;opacity:0";
+          document.body.appendChild(t);
+          t.select();
+          let okay = false;
+          try { okay = document.execCommand("copy"); } catch (_) {}
+          t.remove();
+          if (okay) done();
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(done, fallback);
+        } else {
+          fallback();
+        }
+      });
+
+      // ---- The floating outline -------------------------------------------
+      // Built from the document rather than written out, so the outline and
+      // the page cannot disagree: a section that exists is in it, a section
+      // that is renamed is renamed here too, and adding one is nothing but
+      // adding it. The only thing hand-kept is the list of sibling pages in
+      // the markup, which is the one fact this page does not contain.
+      (function () {
+        const nav = document.getElementById("outline");
+        if (!nav) return;
+        const list = nav.querySelector("#outline-list");
+        if (!list) return;
+
+        // The heading text without the trailing "#" that copies its link.
+        const label = (h) => {
+          const c = h.cloneNode(true);
+          c.querySelectorAll(".anchor").forEach((a) => a.remove());
+          return c.textContent.trim();
+        };
+
+        // h2 for a section, h3 for the named subsections inside it. Headings
+        // without an id are skipped rather than given one: an outline entry
+        // that cannot be linked to is a dead row.
+        const entries = [];
+        document.querySelectorAll("main section[id]").forEach((section) => {
+          const h2 = section.querySelector("h2");
+          if (h2) entries.push({ id: section.id, text: label(h2), sub: false });
+          section.querySelectorAll("h3[id]").forEach((h3) => {
+            entries.push({ id: h3.id, text: label(h3), sub: true });
+          });
+        });
+        if (!entries.length) {
+          nav.remove();
+          return;
+        }
+
+        const links = entries.map((e) => {
+          const li = document.createElement("li");
+          if (e.sub) li.className = "sub";
+          const a = document.createElement("a");
+          a.href = "#" + e.id;
+          a.textContent = e.text;
+          li.appendChild(a);
+          list.appendChild(li);
+          return { a, el: document.getElementById(e.id) };
+        });
+
+        // Which entry the reader is in: the last heading to have passed a
+        // line a third of the way down. A band rather than the very top, so
+        // the active row changes at about the moment the eye arrives at a new
+        // section rather than when it touches the top edge.
+        let current = null;
+        const mark = () => {
+          const line = window.innerHeight * 0.33;
+          let found = links[0];
+          for (const l of links) {
+            if (!l.el) continue;
+            if (l.el.getBoundingClientRect().top <= line) found = l;
+            else break;
+          }
+          // At the very bottom the last section may never cross the line.
+          if (window.scrollY + window.innerHeight >= document.body.scrollHeight - 4) {
+            found = links[links.length - 1];
+          }
+          if (found === current) return;
+          if (current) current.a.removeAttribute("aria-current");
+          if (found) found.a.setAttribute("aria-current", "true");
+          current = found;
+          // Keep the active row visible when the outline is longer than the
+          // viewport, without scrolling the page itself.
+          if (found && nav.scrollHeight > nav.clientHeight) {
+            const r = found.a.getBoundingClientRect();
+            const n = nav.getBoundingClientRect();
+            if (r.top < n.top + 8 || r.bottom > n.bottom - 8) {
+              found.a.scrollIntoView({ block: "nearest" });
+            }
+          }
+        };
+
+        let ticking = false;
+        const onScroll = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(() => {
+            ticking = false;
+            mark();
+          });
+        };
+        window.addEventListener("scroll", onScroll, { passive: true });
+        window.addEventListener("resize", onScroll, { passive: true });
+        mark();
+
+        // ---- Opening it on a narrow screen --------------------------------
+        // Below the width where the outline sits beside the page it is the
+        // page instead: the button at the top left, and the whole viewport
+        // when it is pressed. Escape closes it, so does choosing a section,
+        // and so does widening the window past the breakpoint -- the open
+        // class describes a full-screen overlay and would be wrong applied to
+        // a sidebar.
+        const toggle = document.getElementById("outline-toggle");
+        if (toggle) {
+          const SIDEBAR = window.matchMedia("(min-width: 48rem)");
+          const setOpen = (open) => {
+            nav.classList.toggle("is-open", open);
+            document.body.classList.toggle("outline-open", open);
+            toggle.setAttribute("aria-expanded", open ? "true" : "false");
+            toggle.setAttribute("aria-label", open ? "Close page outline" : "Open page outline");
+            if (open) nav.scrollTop = 0;
+          };
+          const close = () => {
+            if (!nav.classList.contains("is-open")) return;
+            setOpen(false);
+            toggle.focus();
+          };
+          toggle.addEventListener("click", () => {
+            setOpen(!nav.classList.contains("is-open"));
+          });
+          // A link is a jump within this page, so the overlay has done its job.
+          nav.addEventListener("click", (e) => {
+            if (e.target.closest("a") && nav.classList.contains("is-open")) setOpen(false);
+          });
+          document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") close();
+          });
+          const onBreakpoint = () => { if (SIDEBAR.matches) setOpen(false); };
+          if (SIDEBAR.addEventListener) SIDEBAR.addEventListener("change", onBreakpoint);
+          else SIDEBAR.addListener(onBreakpoint);
+        }
+      })();
+    </script>
+  </body>
+</html>

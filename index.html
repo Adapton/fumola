@@ -1,0 +1,1723 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fumola</title>
+    <meta name="description" content="Fumola: an experimental language whose execution model is Adapton. This host also serves the Fumola runtime, compiled to WebAssembly.">
+    <style>
+      /* Palette taken from the Fumola VS Code theme, vscode/themes/fumola-color-theme.json.
+         Same colors, same roles: what the editor paints, this page paints. */
+      :root {
+        --bg:      #000000;
+        --panel:   #0b0b0d;
+        --rule:    #212124;
+        --fg:      #d4d4d4;
+        --dim:     #7d7d82;
+
+        --green:   #6A9955;  /* comment      */
+        --blue:    #569CD6;  /* keyword      */
+        --pink:    #C586C0;  /* decorator    */
+        --type:    #a989d0;  /* type name    */
+        --sym:     #a086a5;  /* symbol       */
+        --op:      #9999dd;  /* operator     */
+        --eff:     #ffaaaa;  /* := and @     */
+        --str:     #c87e60;  /* string       */
+        --var:     #f6ead2;  /* identifier   */
+
+        /* Whatever the reader already has. Nothing is fetched. */
+        --ui:   system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+                "Liberation Mono", "DejaVu Sans Mono", monospace;
+      }
+
+      * { box-sizing: border-box; }
+
+      /* The whole page is sized in rem, so this is the only knob: text and
+         the column widen together on a big screen, which keeps the line
+         length steady instead of leaving a small column in the middle of it.
+         Unchanged below roughly 1100px, so phones and the narrow layout are
+         exactly as they were. */
+      html {
+        background: var(--bg);
+        font-size: clamp(16px, 11px + 0.55vw, 22px);
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font: 400 0.95rem/1.65 var(--ui);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      main {
+        max-width: 45rem;
+        margin: 0 auto;
+        padding: 5rem 1.5rem 8rem;
+      }
+
+      /* ---- masthead ------------------------------------------------- */
+
+      header { margin-bottom: 4.5rem; }
+
+      h1, h2, h3 { color: var(--var); font-family: var(--ui); font-weight: 600; }
+
+      h1 {
+        font-size: 2.4rem;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+        margin: 0 0 0.9rem;
+      }
+      h1 .tick { color: var(--sym); }
+
+      .tagline {
+        margin: 0;
+        max-width: 34rem;
+        font-size: 1.06rem;
+        color: var(--fg);
+      }
+
+      /* The repository, directly under the tagline: someone who wants the
+         code should not have to read to the end of the page to find it. */
+      .masthead-repo {
+        margin: 1.1rem 0 0;
+        font-size: 0.95rem;
+        color: var(--dim);
+      }
+      .masthead-repo a {
+        display: inline-block;
+        padding: 0.3rem 0.6rem;
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        font-family: var(--mono);
+        font-size: 0.88rem;
+        color: var(--var);
+        text-decoration: none;
+      }
+      .masthead-repo a:hover { border-color: #3a3a40; background: var(--panel); }
+      .masthead-repo .what { margin-left: 0.6rem; }
+
+      .masthead-note {
+        margin: 1.6rem 0 0;
+        padding-left: 0.9rem;
+        border-left: 1px solid var(--rule);
+        font-size: 0.9rem;
+        color: var(--dim);
+      }
+
+      /* ---- sections -------------------------------------------------- */
+
+      section { border-top: 1px solid var(--rule); padding-top: 2rem; margin-top: 3.25rem; }
+
+      h2 {
+        font-size: 1.5rem;
+        line-height: 1.25;
+        margin: 0 0 1.2rem;
+      }
+
+      h3 {
+        font-size: 1.08rem;
+        line-height: 1.4;
+        margin: 2.2rem 0 0.6rem;
+      }
+
+      p { margin: 0 0 1.05rem; }
+      p:last-child { margin-bottom: 0; }
+
+      a { color: var(--blue); text-decoration: none; border-bottom: 1px solid #2b3f52; }
+      a:hover { color: #7db6e8; border-bottom-color: #4a7ba6; }
+
+      strong { font-weight: 600; color: var(--var); }
+      em { color: var(--fg); }
+
+      code {
+        font: 400 0.88em/1.5 var(--mono);
+        color: var(--var);
+        white-space: nowrap;
+      }
+
+      /* ---- code blocks ----------------------------------------------- */
+
+      pre {
+        font: 400 0.84rem/1.65 var(--mono);
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        padding: 1rem 1.1rem;
+        margin: 1.4rem 0;
+        overflow-x: auto;
+        color: var(--fg);
+      }
+      pre code { white-space: pre; font-size: inherit; color: inherit; }
+
+      .c   { color: var(--green); font-style: italic; }
+      .k   { color: var(--blue);  font-weight: 600; }
+      .t   { color: var(--type);  font-weight: 600; }
+      .sy  { color: var(--sym);   font-weight: 600; }
+      .o   { color: var(--op); }
+      .eff { color: var(--eff); }
+      .st  { color: var(--str);   font-style: italic; }
+      .v   { color: var(--var); }
+      .d   { color: var(--pink);  font-weight: 600; }
+      .n   { color: var(--str); }
+
+      /* ---- primitive table -------------------------------------------- */
+
+      table { width: 100%; border-collapse: collapse; margin: 1.4rem 0; font-size: 0.92rem; }
+      td { border-top: 1px solid var(--rule); padding: 0.62rem 0.9rem 0.62rem 0; vertical-align: baseline; }
+      tr:first-child td { border-top: none; }
+      td.form { white-space: nowrap; width: 12.5rem; font-family: var(--mono); font-size: 0.85rem; }
+      caption { caption-side: bottom; text-align: left; padding-top: 1rem; font-size: 0.86rem; color: var(--dim); }
+
+
+      /* ---- aside ------------------------------------------------------- */
+
+      .aside {
+        border-left: 1px solid var(--rule);
+        padding: 0.1rem 0 0.1rem 1rem;
+        margin: 1.5rem 0;
+        color: var(--dim);
+        font-size: 0.9rem;
+      }
+      .aside code { color: var(--sym); }
+
+      /* ---- copyable heading anchors -------------------------------------- */
+
+      h2, h3 { position: relative; }
+      .anchor {
+        margin-left: 0.6ch;
+        border-bottom: none;
+        color: var(--dim);
+        opacity: 0;
+        font-weight: 400;
+        text-transform: none;
+        transition: opacity 0.12s ease;
+      }
+      h2:hover .anchor, h3:hover .anchor, .anchor:focus-visible { opacity: 1; }
+      .anchor:hover { color: var(--blue); border-bottom: none; }
+      /* absolutely positioned so confirming a copy never nudges the layout */
+      .anchor[data-copied]::after {
+        content: "link copied";
+        position: absolute;
+        margin-left: 0.8ch;
+        font: 400 0.68rem/1.6 var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: none;
+        white-space: nowrap;
+        color: var(--green);
+      }
+
+      /* ---- footnotes: an aside is collapsed until asked for ------------- */
+
+      details.aside > summary {
+        cursor: pointer;
+        width: fit-content;
+        font: 400 0.82rem/1.5 var(--mono);
+        color: var(--dim);
+        list-style: none;
+      }
+      details.aside > summary::-webkit-details-marker { display: none; }
+      details.aside > summary::marker { content: ""; }
+      details.aside > summary:hover { color: var(--fg); }
+      details.aside > summary:focus-visible { outline: 1px solid var(--rule); outline-offset: 3px; }
+      details.aside[open] > summary { margin-bottom: 0.6rem; }
+      details.aside > p { margin: 0; }
+
+      /* ---- try it ------------------------------------------------------ */
+
+      .repl { margin-top: 1.4rem; }
+
+      .presets { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.8rem; }
+
+      button {
+        font: 400 0.8rem/1 var(--mono);
+        color: var(--fg);
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        padding: 0.45rem 0.7rem;
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) { border-color: #3a3a40; color: var(--var); }
+      button:disabled { opacity: 0.4; cursor: default; }
+      button.run { color: var(--blue); border-color: #2b3f52; }
+      button.run:hover:not(:disabled) { background: #0d1620; }
+
+      textarea {
+        display: block;
+        width: 100%;
+        min-height: 6.5rem;
+        resize: vertical;
+        font: 400 0.84rem/1.65 var(--mono);
+        color: var(--var);
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        padding: 0.9rem 1rem;
+        tab-size: 2;
+      }
+      textarea:focus { outline: none; border-color: #3a3a40; }
+
+      .controls { display: flex; align-items: center; gap: 0.8rem; margin-top: 0.7rem; }
+      .status { font: 400 0.8rem/1.4 var(--mono); color: var(--dim); }
+
+      .out {
+        font: 400 0.84rem/1.65 var(--mono);
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        padding: 0.9rem 1rem;
+        margin-top: 0.7rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+        min-height: 2.2rem;
+        max-height: 18rem;
+        overflow-y: auto;
+        color: var(--fg);
+      }
+      .out .tag { color: var(--type); }
+      .out .err { color: var(--eff); }
+      .out .hint { color: var(--dim); font-style: italic; }
+
+      /* ---- figure ------------------------------------------------------ */
+
+      figure { margin: 1.6rem 0 0; }
+      figure img { display: block; width: 100%; height: auto; border: 1px solid var(--rule); border-radius: 2px; }
+      figcaption { margin-top: 0.7rem; font-size: 0.86rem; color: var(--dim); }
+
+      /* ---- publications and drafts ---------------------------------------- */
+
+      .pubs { list-style: none; margin: 0; padding: 0; }
+      .pubs li { border-top: 1px solid var(--rule); padding: 0.9rem 0; }
+      .pubs li:first-child { border-top: none; padding-top: 0.2rem; }
+      .pub-title { display: block; font-size: 0.98rem; }
+      .pub-authors { display: block; color: var(--dim); font-size: 0.88rem; margin-top: 0.2rem; }
+      .pub-venue {
+        display: block;
+        font: 400 0.79rem/1.5 var(--mono);
+        letter-spacing: 0.03em;
+        color: var(--sym);
+        margin-top: 0.25rem;
+      }
+      .pub-why { display: block; margin-top: 0.5rem; font-size: 0.91rem; }
+      /* One line, the newest mention, so the homepage never grows a list. */
+      .press-latest { margin-top: 0.6rem; }
+      .press-latest .pub-venue { display: block; margin-top: 0.25rem; }
+
+      /* ---- link list ---------------------------------------------------- */
+
+      .links { list-style: none; margin: 0; padding: 0; }
+      .links li { border-top: 1px solid var(--rule); padding: 0.7rem 0; display: flex; gap: 1.2rem; align-items: baseline; }
+      .links li:first-child { border-top: none; }
+      .links .what { flex: 0 0 11rem; font: 400 0.82rem/1.5 var(--mono); color: var(--dim); }
+      .links .desc { flex: 1; font-size: 0.92rem; }
+      .links .desc small { display: block; color: var(--dim); font-size: 0.84rem; margin-top: 0.1rem; }
+
+      footer { border-top: 1px solid var(--rule); margin-top: 4rem; padding-top: 1.4rem; font-size: 0.84rem; color: var(--dim); }
+
+      @media (max-width: 34rem) {
+        main { padding-top: 3rem; }
+        h1 { font-size: 2rem; }
+        td.form { width: auto; white-space: normal; }
+        .links li { display: block; }
+        .links .what { margin-bottom: 0.15rem; }
+      }
+
+      /* ---- The outline ----------------------------------------------------
+         Three layouts, and the outline is reachable in all of them.
+
+         Wide (78rem and up): `main` is 45rem centred, so the space either side
+         is already empty. The outline sits in it and nothing else moves -- no
+         change to main's width, margin or padding.
+
+         Sidebar (48rem to 78rem): the gutter can no longer hold the outline
+         beside a centred column, but the viewport can still hold the two side
+         by side. The outline keeps its place and the column starts where the
+         outline ends; the page stops being centred and becomes two columns.
+         48rem is 768px, which is a tablet held upright, and every desktop
+         window worth the name is wider than it. The step across 78rem is
+         1.5rem of column movement -- a centred column starts at 16.5rem there,
+         a two-column one at 15rem -- so the breakpoint is not a jump.
+
+         Below 48rem there is no room for two columns: 15rem of outline would
+         leave 33rem, and that is not a column. So the outline stops being
+         beside the page and becomes the whole of it, behind the button at the
+         top left. Hidden until asked for, then everything. */
+      .outline {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 15rem;
+        height: 100vh;
+        padding: 5rem 1rem 3rem 1.5rem;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        background: var(--bg);
+        font-size: 0.8rem;
+        line-height: 1.45;
+        z-index: 15;
+      }
+      /* The scrollbar is noise beside body text; the outline still scrolls. */
+      .outline { scrollbar-width: none; }
+      .outline::-webkit-scrollbar { display: none; }
+
+      /* Opened on a narrow screen: the whole viewport, not a column in it. */
+      .outline.is-open {
+        display: block;
+        width: auto;
+        right: 0;
+        padding: 4.25rem 1.5rem 3rem 1.5rem;
+        font-size: 0.95rem;
+        line-height: 1.6;
+      }
+      .outline.is-open .outline-label { font-size: 0.72rem; }
+      .outline.is-open a,
+      .outline.is-open .outline-pages .here { padding: 0.45rem 0.8rem; }
+      body.outline-open { overflow: hidden; }
+
+      @media (min-width: 48rem) {
+        .outline { display: block; }
+        /* margin-right stays auto, so the column takes the width it needs and
+           leaves the remainder on the right rather than stretching to it. */
+        main { margin-left: 15rem; }
+      }
+      @media (min-width: 78rem) {
+        main { margin-left: auto; }
+      }
+
+      /* ---- The button that opens it ---------------------------------------
+         Top left, over the page, and only where the outline is not already
+         beside the page. main's padding-top is 5rem, so it sits above the
+         first line of content rather than on it -- including the breadcrumb
+         the subpages start with. */
+      .outline-toggle {
+        display: flex;
+        position: fixed;
+        top: 0.75rem;
+        left: 0.75rem;
+        z-index: 20;
+        width: 2.5rem;
+        height: 2.5rem;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        border-radius: 5px;
+        color: var(--fg);
+        cursor: pointer;
+      }
+      .outline-toggle:hover { border-color: #3a3a40; }
+      .outline-toggle:focus-visible { outline: 1px solid var(--eff); outline-offset: 2px; }
+      .outline-toggle svg { width: 1.15rem; height: 1.15rem; display: block; }
+      .outline-toggle .bars { display: block; }
+      .outline-toggle .ex { display: none; }
+      .outline-toggle[aria-expanded="true"] .bars { display: none; }
+      .outline-toggle[aria-expanded="true"] .ex { display: block; }
+      @media (min-width: 48rem) {
+        .outline-toggle { display: none; }
+      }
+
+      .outline-label {
+        font: 400 0.66rem/1.6 var(--mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--dim);
+        margin: 0 0 0.5rem;
+      }
+
+      .outline ul {
+        list-style: none;
+        margin: 0 0 1.6rem;
+        padding: 0;
+        border-left: 1px solid var(--rule);
+      }
+      .outline li { margin: 0; }
+      .outline a {
+        display: block;
+        padding: 0.2rem 0.6rem;
+        margin-left: -1px;
+        border-left: 1px solid transparent;
+        border-bottom: none;
+        color: var(--dim);
+        text-decoration: none;
+      }
+      .outline a:hover { color: var(--fg); border-bottom: none; }
+      /* The h3s under a section, one step in and a shade quieter. */
+      .outline li.sub a { padding-left: 1.5rem; font-size: 0.76rem; }
+      .outline.is-open li.sub a { padding-left: 2rem; font-size: 0.88rem; }
+
+      /* Where the reader is. aria-current carries it for a screen reader;
+         the colour and the rule carry it for everyone else. */
+      .outline a[aria-current="true"] {
+        color: var(--var);
+        border-left-color: var(--eff);
+      }
+      .outline li.sub a[aria-current="true"] { color: var(--fg); }
+
+      /* The page list: the current page named but not a link, so the outline
+         always says which page you are reading. */
+      .outline-pages a { color: var(--blue); }
+      .outline-pages .here {
+        display: block;
+        padding: 0.2rem 0.6rem;
+        color: var(--var);
+        border-left: 1px solid var(--eff);
+        margin-left: -1px;
+      }
+
+      /* An in-page jump lands under a fixed outline that does not overlap the
+         column, so this is only about not pinning the heading to the very top
+         edge. */
+      :target { scroll-margin-top: 2rem; }
+      @media (prefers-reduced-motion: no-preference) {
+        html { scroll-behavior: smooth; }
+      }
+    </style>
+  </head>
+  <body>
+    <button class="outline-toggle" id="outline-toggle" type="button"
+            aria-controls="outline" aria-expanded="false" aria-label="Open page outline">
+      <svg class="bars" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M2 4h12M2 8h12M2 12h12"/>
+      </svg>
+      <svg class="ex" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+    <nav class="outline" id="outline" aria-label="Page outline">
+      <p class="outline-label">Pages</p>
+      <ul class="outline-pages">
+        <li><span class="here">Home</span></li>
+        <li><a href="/press/">Press</a></li>
+        <li><a href="/alignment/">Alignment</a></li>
+        <li><a href="/web-play/">Web play</a></li>
+      </ul>
+      <p class="outline-label">On this page</p>
+      <ul id="outline-list"></ul>
+    </nav>
+    <main>
+      <header>
+        <h1>fumola</h1>
+        <p class="tagline">
+          An experimental programming language whose execution model is
+          <strong>Adapton</strong>: a program's run leaves behind a graph of
+          what it named, read and demanded, and that graph is what the next run
+          reuses.
+        </p>
+        <p class="masthead-repo">
+          <a href="https://github.com/Adapton/fumola">github.com/Adapton/fumola</a>
+          <span class="what">the source, the Fumola library, and the issues</span>
+        </p>
+        <p class="masthead-note">
+          This host also serves the Fumola runtime compiled to WebAssembly
+          &mdash; <code>fumola_wasm.js</code> and
+          <code>fumola_wasm_bg.wasm</code>, in this directory. It is what the
+          <a href="#hazel">Hazel Fumola livelit</a> can load, and what the
+          <a href="#try">box below</a> is running.
+        </p>
+        <p class="masthead-note">
+          There is also a <a href="/web-play/"><strong>web playground</strong></a>:
+          the same runtime full-screen, with the library beside you, syntax
+          highlighting, and no button to press.
+        </p>
+      </header>
+
+      <section id="language">
+        <h2>The language<a class="anchor" href="#language" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          Fumola is two things joined. Its surface is conventional and
+          borrowed: functions, records, variants, modules, pattern matching,
+          arithmetic &mdash; taken from
+          <a href="https://github.com/dfinity/motoko.rs">Motoko</a>, whose Rust
+          interpreter Fumola descends from. Those features are deliberately
+          ordinary, so that they stay out of the way.
+        </p>
+        <p>
+          What is not ordinary is how a Fumola program runs. Its incremental
+          primitives come from
+          <a href="https://github.com/matthewhammer/adapton-recipe">The Extended
+          Adapton Recipe</a>, including <strong>Demanded Computation
+          Graphs</strong> extended with symbolic space and time. 
+        </p>
+        <pre><code><span class="k">public func</span> <span class="v">gcd</span>(<span class="v">a</span> : <span class="t">Nat</span>, <span class="v">b</span> : <span class="t">Nat</span>) : <span class="t">Nat</span> {
+  <span class="k">if</span> (<span class="v">b</span> <span class="o">==</span> <span class="n">0</span>) { <span class="v">a</span> } <span class="k">else</span> {
+    <span class="v">gcd</span>(<span class="v">b</span>, <span class="v">a</span> <span class="o">%</span> <span class="v">b</span>)
+  }
+}</code></pre>
+        <details class="aside">
+          <summary>footnote: nothing incremental here</summary>
+          <p>
+          That is the whole of <code>Gcd</code>, one of the library modules
+          compiled into the runtime. Nothing about it is incremental &mdash;
+          it reads no cells, so there is nothing for Adapton to reuse. The primitives are what you reach for
+          when you want a computation to survive being edited.
+        </p>
+        </details>
+      </section>
+
+      <section id="adapton">
+        <h2>Adapton, briefly<a class="anchor" href="#adapton" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          Adapton is a way of running a program so that changing its input does
+          not mean running it again. As the program executes it builds a
+          <strong>demanded computation graph</strong>: a bipartite record of
+          <em>cells</em>, which hold values, and <em>thunks</em>, which are
+          suspended computations, with an edge for every action a thunk took
+          &mdash; every cell it wrote, every cell it read, every thunk it
+          forced &mdash; kept in the order it took them.
+        </p>
+        <p>
+          The graph exists so that a later run can be <em>repaired</em> rather
+          than redone. When a cell changes, the thunks that read it are the
+          ones whose results are in question; everything else in the graph is
+          still good, and is reused as it stands. What makes this addressable
+          at all is that every cell and thunk has a <strong>name</strong>: the
+          run after the edit has to recognise the node it is about to
+          recompute as the same node as last time, and a name is how it does.
+        </p>
+        <details class="aside">
+          <summary>footnote: repair, so far</summary>
+          <p>
+          Repair is where Fumola's own work is. Since 2026-09-08 the graph
+          <em>realigns</em> after an edit: a put that changes a cell with
+          readers <em>signals</em> the edges that observed it, and a force of
+          a thunk whose trace holds a signaled edge <em>repairs</em> it &mdash;
+          edge by edge, in the order the thunk took them, re-evaluating only
+          when an edge cannot be realigned. Both traversals are written into
+          the event history as they happen. <a href="/alignment/">/alignment/</a>
+          explains it, with the Recipe's rules beside the prose. What is still
+          to come is listed <a href="#now">at the end of this page</a>.
+        </p>
+        </details>
+      </section>
+
+      <section id="primitives">
+        <h2>The primitives<a class="anchor" href="#primitives" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          There are not many. Two ways to make a node, two ways to depend on
+          one, one way to look without depending, and a way to say where the
+          nodes you make should live.
+        </p>
+
+        <table>
+          <tr>
+            <td class="form"><span class="k">thunk</span> { <span class="v">e</span> }</td>
+            <td>Suspend a computation. A thunk is an ordinary Fumola value: it
+            can be bound, passed and stored.</td>
+          </tr>
+          <tr>
+            <td class="form"><span class="sy">`n</span> <span class="eff">:=</span> <span class="v">e</span></td>
+            <td><strong>put</strong>. Write the value of <code>e</code> into
+            the cell named <code>`n</code>, and evaluate to a pointer to that
+            cell. Putting a thunk is how a named thunk comes to exist.</td>
+          </tr>
+          <tr>
+            <td class="form"><span class="v">pointer</span>(<span class="sy">`n</span>)</td>
+            <td>The pointer that the symbol <code>`n</code> names, whether or
+            not anything has been written there.</td>
+          </tr>
+          <tr>
+            <td class="form"><span class="eff">@</span> <span class="v">p</span> &nbsp;&nbsp; <span class="v">get</span>(<span class="sy">`n</span>)</td>
+            <td><strong>get</strong>. Read a cell, <em>recording a
+            dependency</em>: an edge from the thunk doing the reading to the
+            cell read. <code>get(`n)</code> is <code>@(pointer(`n))</code>
+            &mdash; note the space in <code>@ p</code>, and the brackets
+            here.</td>
+          </tr>
+          <tr>
+            <td class="form"><span class="k">force</span>(<span class="v">p</span>)</td>
+            <td><strong>force</strong>. Demand the thunk at <code>p</code>,
+            recording a dependency on it. A cache hit answers with what that
+            thunk already computed; a cache miss runs its body.</td>
+          </tr>
+          <tr>
+            <td class="form"><span class="v">peek</span>(<span class="sy">`n</span>)</td>
+            <td>Read a cell <em>without</em> recording anything. Answers an
+            option, since the cell may never have been written.</td>
+          </tr>
+          <tr>
+            <td class="form"><span class="k">do within space</span> <span class="sy">`s</span> { <span class="v">e</span> }</td>
+            <td>Navigate. Names the region that the cells and thunks allocated
+            inside <code>e</code> belong to, so that a subcomputation can
+            allocate freely without colliding with its callers.</td>
+          </tr>
+          <tr>
+            <td class="form"><span class="k">force</span>(<span class="sy">`n</span> <span class="eff">:=</span> <span class="k">thunk</span> { <span class="v">e</span> })</td>
+            <td>Not a primitive but the idiom the others are usually reached
+            through: name a thunk, put a computation in it, demand it. Running
+            it again with the same name is what an <em>edit</em> is.</td>
+          </tr>
+        </table>
+
+        <p>
+          Two things to know about writing <code>@</code>. It must be separated
+          from what it reads &mdash; <code>@ p</code>, not <code>@p</code>
+          &mdash; because an identifier may begin with <code>@</code>, so
+          <code>@p</code> is a single name rather than a read of <code>p</code>.
+          Those names are reserved: Fumola inherits them from the Motoko lineage
+          its syntax comes from, where a program may use the ones the language
+          defines but never define its own. <code>@here</code> and
+          <code>@now</code>, which Fumola adds, are exactly that. And
+          <code>@</code> takes one nullary expression, so reading the result of
+          a call needs brackets: <code>@(pointer(`n))</code>, not
+          <code>@ pointer(`n)</code>.
+        </p>
+
+        <details class="aside">
+          <summary>footnote: why these colours</summary>
+          <p>
+          The Fumola VS Code theme paints <code>:=</code> and <code>@</code> in
+          their own color, distinct from every other operator. Put and get are two of the effects the graph is a record of.
+        </p>
+        </details>
+
+        <h3 id="names-are-values">Names are values<a class="anchor" href="#names-are-values" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          A name in Fumola is a <strong>symbol</strong>, and symbols are
+          first-order data. An identifier is a symbol, written with a leading
+          backtick; a number is a symbol; and symbols compose by application,
+          as deeply as you like. So a name can be computed &mdash; which is
+          what lets a recursive algorithm give each of its nodes a name derived
+          from its position rather than from a counter.
+        </p>
+        <pre><code><span class="sy">`hello</span>                 <span class="c">// an identifier</span>
+<span class="n">7</span>                      <span class="c">// a number is a symbol too</span>
+<span class="sy">`adapton</span>(<span class="sy">`settings</span>)    <span class="c">// application, and it nests</span></code></pre>
+
+        <h3 id="space-and-time">Space and time<a class="anchor" href="#space-and-time" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          The Recipe's extension is that a name has two dimensions, not one.
+          <strong>Space</strong> is where a cell lives: put <code>`x</code>
+          inside the region <code>`region</code> and the cell allocated is
+          <code>`region(`x)</code>, so a subcomputation can name things
+          freely without colliding with its caller. <strong>Time</strong> is
+          when it holds what it holds, which is what lets one name carry a
+          history rather than a single value. Each is mostly just a symbol, and
+          each has a relative form for the place evaluation happens to be:
+        </p>
+        <pre><code><span class="t">Adapton</span>.<span class="v">here</span>()         <span class="c">// the space we are in now</span>
+<span class="t">Adapton</span>.<span class="v">now</span>()          <span class="c">// the time we are at now</span>
+<span class="t">Adapton</span>.<span class="v">space</span>(<span class="sy">`region</span>) <span class="c">// a space named outright</span></code></pre>
+      </section>
+
+      <section id="modes">
+        <h2>Two modes<a class="anchor" href="#modes" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          A Fumola program runs in one of two modes, and which one it is in is
+          decided by whether a force is underway.
+        </p>
+        <p>
+          The <strong>archivist</strong> runs inside a force. Its operations are
+          the tracked ones &mdash; put, get, and force itself &mdash; because
+          there is a computation in progress for a dependency to be recorded
+          <em>against</em>. An edge recorded while a computation is in progress belongs to that computation; a put or get made outside a force is recorded against the graph's root instead.
+        </p>
+        <p>
+          The <strong>editor</strong> is the more general mode, and always runs
+          on a force-free stack. It is where changes come from. Resetting the store and reading the graph belong to it alone: a reset from inside a force pulls the store out from under the computation making it, and nothing in the runtime prevents that.
+        </p>
+        <p>
+          <code>peek</code> belongs to the editor,
+          but it stays available inside a force on purpose, because reading a
+          cell without recording a dependency is exactly how you look at a
+          computation while it runs. A peek in a thunk is meaningful; it is
+          merely untracked.
+        </p>
+      </section>
+
+      <section id="semantics">
+        <h2>Two semantics: graphical and simple<a class="anchor" href="#semantics" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          The primitives above have two implementations in the runtime, and an
+          instance runs one or the other. <strong>Graphical</strong> is the
+          default &mdash; it is what the VM constructs, what the REPL starts
+          in, and what the examples throughout the repo run.
+        </p>
+        <p>
+          Graphical keeps the DCG proper: nodes, edges, each thunk's trace in
+          the order it ran, and an event history stamped with a meta-time. It
+          is the semantics the pictures on this page are drawn from, the one
+          the introspection below reports on, and the one repair runs on.
+        </p>
+        <p>
+          <strong>Simple</strong> keeps a store and no more: cells indexed by
+          space and time, thunks with their cached results. Forcing a thunk
+          that has already run answers with what it computed. It is
+          predictable and cheap, and it keeps no graph, so there is nothing to
+          introspect and nothing to repair. It has to be asked for by name
+          &mdash; which the Hazel integration currently does, for a reason
+          given below.
+        </p>
+        <p>
+          The graphical store reports on itself in Fumola's own value language,
+          so a program can read its own history as ordinary data:
+        </p>
+        <pre><code><span class="c">// the event log: addNode, addEdge, forceBegin, forceEnd, signalingBegin, repairBegin, ...</span>
+<span class="t">Adapton</span>.<span class="v">peekEvents</span>()    <span class="c">// [{metaTime; event}]</span>
+<span class="t">Adapton</span>.<span class="v">peekInfo</span>(<span class="v">p</span>)    <span class="c">// one node, and the edges either side of it</span>
+<span class="t">Adapton</span>.<span class="v">peekHistory</span>()   <span class="c">// events, nodes and edges together</span></code></pre>
+        <p>
+           Because the graph
+          is readable as data <em>from inside the language</em>, a Fumola
+          library can process its own past behavior into something to look at
+          &mdash; the outlines, scenes and JSON exports in
+          <code>fumola/system/adapton</code> &mdash; without any of it being
+          built into the runtime.
+        </p>
+      </section>
+
+      <section id="try">
+        <h2>Try it<a class="anchor" href="#try" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          The runtime this host serves, running here. One graphical instance
+          &mdash; Fumola's default &mdash; that persists across every program
+          you run below, so a cell written by one is still there for the next.
+          That persistence is what makes an edit an edit rather than a fresh start.
+        </p>
+        <p>
+          Take <em>a named thunk</em>, change the <code>21</code>, and run it
+          again. Same name, same thunk, re-forced &mdash; which is exactly what
+          a Hazel livelit does to itself as you edit it.
+        </p>
+        <p>
+          This box is deliberately small. The
+          <a href="/web-play/">web playground</a> is the same runtime with room
+          to work: the library on the left to read as you go, highlighting from
+          the language's own lexer, and evaluation as you type rather than on
+          a button.
+        </p>
+
+        <div class="repl">
+          <div class="presets" id="presets"></div>
+          <textarea id="src" spellcheck="false" aria-label="Fumola program"></textarea>
+          <div class="controls">
+            <button class="run" id="run" disabled>Run</button>
+            <span class="status" id="status">the runtime loads when you first run something</span>
+          </div>
+          <div class="out" id="out"></div>
+        </div>
+      </section>
+
+      <section id="mergesort">
+        <h2>mergeSort, drawn as a graph<a class="anchor" href="#mergesort" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          Demand-driven <code>mergeSort</code> on 44 unsorted elements, drawn
+          as its DCG. The input list is the column of green boxes on the left;
+          a balanced level tree over those elements is built beside it; the
+          blue orbs are thunks, and the edges leaving each one are the actions
+          it took. The long horizontal run through the middle is the stream of
+          <code>merge</code> thunks producing the sorted output, extending
+          rightward only as far as the output was demanded.
+        </p>
+        <figure>
+          <img
+            src="https://github.com/user-attachments/assets/c34cd768-0b55-4110-8cb8-33ef4c455a75"
+            alt="lazyMergeSort on 44 elements, drawn as a Demanded Computation Graph."
+            width="1357" height="1105"
+            onerror="this.hidden = true">
+          <figcaption>
+            <a href="http://matthewhammer.org/replayground/mergeSort44.html">Interactive
+            version</a> &mdash; the <em>replayground</em>, which lets you move
+            through the graph and inspect the data held in it. The scene it
+            plays is generated by Fumola code reading its own event history.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section id="hazel">
+        <h2>Fumola in Hazel<a class="anchor" href="#hazel" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          <a href="https://hazel.org">Hazel</a> is a live functional programming
+          environment: every edit state has a meaning, so a program has a result
+          even while it is incomplete. It has <strong>livelits</strong> &mdash;
+          user-defined graphical literals embedded in the program text, which
+          expand to the expression they stand for.
+        </p>
+        <p>
+          The experimental integration puts Fumola behind three of them. It is
+          not on Hazel's default branch; it lives on
+          <a href="https://github.com/hazelgrove/hazel/tree/fumola-livelit-mvp"><code>fumola-livelit-mvp</code></a>,
+          and that branch has a
+          <a href="https://hazel.org/build/fumola-livelit-mvp/">live build</a>
+          you can open.
+        </p>
+        <pre><code><span class="c"># declare a runtime, and the Adapton semantics it runs #</span>
+<span class="k">let</span> <span class="v">rt</span> : <span class="t">Int</span> = <span class="d">^fumola_new</span>(<span class="n">7</span>, <span class="t">Graphical</span>) <span class="k">in</span>
+
+<span class="c"># run a program as a named thunk, and use its result as a Hazel value #</span>
+<span class="k">let</span> <span class="v">answer</span> : <span class="t">Int</span> =
+  <span class="d">^fumola_put_force</span>(<span class="n">7</span>, <span class="st">"`gcd"</span>, <span class="st">"Gcd.gcd(12, 18)"</span>) <span class="k">in</span>
+
+<span class="c"># read the graph the run left behind, as a table of records #</span>
+<span class="k">let</span> <span class="v">events</span> : [<span class="t">EventRow</span>] =
+  <span class="d">^fumola_eval</span>(<span class="n">7</span>, <span class="st">"Adapton.peekEvents()"</span>) <span class="k">in</span>
+
+<span class="d">^^probe_table</span>(<span class="v">events</span>);</code></pre>
+        <p>
+          The three do different jobs, and the split follows the archivist/editor distinction.
+          <code>^fumola_put_force</code> wraps its program as
+          <code>force(`n := thunk { … })</code>, so it runs on a forceful stack
+          &mdash; archivist mode, where the tracked operations live. That
+          wrapper is also what gives an edit its incremental meaning: editing
+          the program re-assigns the <em>same</em> name and re-forces it, so the
+          thunk's history is reused rather than discarded.
+          <code>^fumola_eval</code> runs its program at the top level with no
+          thunk around it &mdash; editor mode, which is where <code>peek</code>,
+          <code>reset</code> and the graph introspection belong.
+          <code>^fumola_new</code> declares which semantics a runtime runs.
+        </p>
+        <p>
+          A livelit expands to a Hazel value, so Fumola's values have to cross:
+          numbers, floats, booleans, tuples, records as labeled tuples,
+          variants, arrays as lists, options, symbols as their text. A pointer
+          crosses as a reference that carries what it points at, so it can be
+          used as the value while still showing which cell that value came
+          from. Values whose meaning depends on the runtime &mdash; a thunk, a
+          function &mdash; cross opaque, carrying the source Fumola prints for
+          them, and <code>force</code> is what turns one into something Hazel
+          does have a value for.
+        </p>
+        <details class="aside">
+          <summary>footnote: two layers meeting</summary>
+          <p>
+          Two incremental systems meet here, and how they compose is the open
+          question: Hazel re-evaluating a program as it is edited, Adapton
+          repairing a graph underneath it. So the Hazel integration inverts
+          Fumola's default and starts a runtime <em>simple</em>, with graphical
+          asked for by name. That is a conservative choice for the design phase
+          this work is in rather than a settled one &mdash; the intent is for
+          Hazel to default to graphical too, once the composed semantics is
+          understood.
+        </p>
+        </details>
+      </section>
+
+      <!-- #publications and #drafts, like #hazel, are linked to from
+           elsewhere. Keep these three ids stable. -->
+      <section id="publications">
+        <h2>Publications<a class="anchor" href="#publications" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          Fumola's primitives come from two papers in particular. Between them
+          they are the primitives above: the first is the machinery, the second
+          is what makes it addressable.
+        </p>
+
+        <ul class="pubs">
+          <li>
+            <span class="pub-title"><a href="https://doi.org/10.1145/2594291.2594324">Adapton: composable, demand-driven incremental computation</a></span>
+            <span class="pub-authors">Matthew A. Hammer, Khoo Yit Phang, Michael Hicks, Jeffrey S. Foster</span>
+            <span class="pub-venue">PLDI 2014 &middot; pp. 156&ndash;166 &middot; doi:10.1145/2594291.2594324</span>
+            <span class="pub-why">
+              Adapton itself. Demand drives the computation, the demanded
+              computation graph records what that demand touched, and the graph
+              is what a later run repairs. <code>thunk</code>, <code>force</code>,
+              put and get are this paper's.
+            </span>
+          </li>
+          <li>
+            <span class="pub-title"><a href="https://doi.org/10.1145/2814270.2814305">Incremental computation with names</a></span>
+            <span class="pub-authors">Matthew A. Hammer, Jana Dunfield, Kyle Headley, Nicholas Labich, Jeffrey S. Foster, Michael Hicks, David Van Horn</span>
+            <span class="pub-venue">OOPSLA 2015 &middot; pp. 748&ndash;766 &middot; doi:10.1145/2814270.2814305</span>
+            <span class="pub-why">
+              Names, made explicit and first-class. This is the paper the
+              <a href="#primitives">symbols</a> above come from &mdash; what it
+              calls a <em>name</em>, Fumola spells with a backtick. Without them a second run has to infer which node is which; with them, reuse becomes something a program can control deliberately.
+            </span>
+          </li>
+        </ul>
+
+        <details class="aside">
+          <summary>footnote: the earlier lineage</summary>
+          <p>
+          Further back: Adapton descends from self-adjusting computation, whose
+          root is <a href="https://doi.org/10.1145/503272.503296">Adaptive
+          functional programming</a> (Umut A. Acar, Guy E. Blelloch, Robert
+          Harper, POPL 2002).
+        </p>
+        </details>
+
+        <h3 id="hazel-papers">Hazel<a class="anchor" href="#hazel-papers" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          The environment the <a href="#hazel">integration</a> above plugs into,
+          and the mechanism it plugs in through.
+        </p>
+
+        <ul class="pubs">
+          <li>
+            <span class="pub-title"><a href="https://doi.org/10.1145/3009837.3009900">Hazelnut: a bidirectionally typed structure editor calculus</a></span>
+            <span class="pub-authors">Cyrus Omar, Ian Voysey, Michael Hilton, Jonathan Aldrich, Matthew A. Hammer</span>
+            <span class="pub-venue">POPL 2017 &middot; pp. 86&ndash;99 &middot; doi:10.1145/3009837.3009900</span>
+            <span class="pub-why">
+              Every edit state has a static meaning, so an incomplete program
+              is still a program.
+            </span>
+          </li>
+          <li>
+            <span class="pub-title"><a href="https://doi.org/10.1145/3290327">Live functional programming with typed holes</a></span>
+            <span class="pub-authors">Cyrus Omar, Ian Voysey, Ravi Chugh, Matthew A. Hammer</span>
+            <span class="pub-venue">POPL 2019 &middot; PACMPL 3(POPL), 14:1&ndash;14:32 &middot; doi:10.1145/3290327</span>
+            <span class="pub-why">
+              And a dynamic meaning too, so an incomplete program still runs.
+              This is what makes a livelit's expansion evaluable while the
+              program around it is still being written.
+            </span>
+          </li>
+          <li>
+            <span class="pub-title"><a href="https://doi.org/10.1145/3453483.3454059">Filling typed holes with live GUIs</a></span>
+            <span class="pub-authors">Cyrus Omar, David Moon, Andrew Blinn, Ian Voysey, Nick Collins, Ravi Chugh</span>
+            <span class="pub-venue">PLDI 2021 &middot; pp. 511&ndash;525 &middot; doi:10.1145/3453483.3454059</span>
+            <span class="pub-why">
+              Livelits: the graphical literals a Fumola program is embedded in.
+            </span>
+          </li>
+        </ul>
+
+        <h3 id="press">Press about Fumola<a class="anchor" href="#press" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          Writing about this work from outside this repository, on its own
+          page: <a href="/press/"><strong>Press</strong></a>. It is mostly
+          <em>Week in Hazel</em>, a weekly digest that has covered the
+          <a href="#hazel">Fumola integration</a>, so the list grows on its own
+          schedule rather than this page's &mdash; which is why it is a page
+          and not a section here.
+        </p>
+        <p class="press-latest">
+          Most recent:
+          <a href="https://andrewblinn.com/hazel/weekly/issues/001/#fumola">Two languages. One notebook.</a>
+          <span class="pub-venue">Week in Hazel, issue 001 &middot; September 4&ndash;10, 2026</span>
+        </p>
+      </section>
+
+      <section id="drafts">
+        <h2>Drafts<a class="anchor" href="#drafts" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          A line of work on <strong>typing</strong> these primitives, rather
+          than only running them. If names decide what gets reused, then using
+          a name twice for two different things is a bug the type system ought
+          to catch &mdash; and the effects a computation has on the graph are
+          exactly what a type-and-effect system is for.
+        </p>
+
+        <ul class="pubs">
+          <li>
+            <span class="pub-title"><a href="https://arxiv.org/abs/1808.07826">Fungi: Typed incremental computation with names</a></span>
+            <span class="pub-authors">Matthew A. Hammer, Jana Dunfield, Kyle Headley, Monal Narasimhamurthy, Dimitrios J. Economou</span>
+            <span class="pub-venue">arXiv:1808.07826 &middot; v1, 20 August 2018 &middot; the latest version</span>
+            <span class="pub-why">
+              A type-and-effect system in which the programmer states local
+              invariants about names and the system composes them into a global
+              uniqueness property, with a bidirectional formulation and a
+              prototype in Rust.
+            </span>
+          </li>
+          <li>
+            <span class="pub-title"><a href="https://arxiv.org/abs/1610.00097">Refinement types for precisely named cache locations</a></span>
+            <span class="pub-authors">Matthew A. Hammer, Jana Dunfield, Dimitrios J. Economou, Monal Narasimhamurthy</span>
+            <span class="pub-venue">arXiv:1610.00097 &middot; v5, 21 October 2017 &middot; v1 was titled &ldquo;Typed Adapton&rdquo;</span>
+            <span class="pub-why">
+              The predecessor: refinement types ensuring each name identifies at
+              most one value or subcomputation.
+            </span>
+          </li>
+        </ul>
+
+        <p>
+          Drafts, and they stayed drafts &mdash; neither the theory nor the
+          implementation was finished at the time.
+        </p>
+        <h3 id="human-fungi-interface">Human-Fungi Interface<a class="anchor" href="#human-fungi-interface" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          Something did get built, though. <a href="https://github.com/rvanasa/fungi-vis">Human-Fungi
+          Interface</a>, by <a href="https://ryanvandersmith.com">Ryan
+          Vandersmith</a>, was the web interface to Fungi: it pretty-printed
+          the code and its traces, highlighted variables, ran the program in
+          the browser, and drew the type-and-effect derivations themselves
+          &mdash; a renderer per judgement form, for effects, kinds, index
+          sorts, name terms and contexts. The drafts above are about typing
+          these programs; that was where you went to see the types.
+          Its first commit is dated the day before the Fungi implementation's
+          own. 
+        </p>
+        <p>
+          Its build instructions say
+          <code>rustup target add wasm32-unknown-unknown</code> &mdash; the same
+          line this repository's publish workflow runs. Both are the same arrangement: a Rust incremental runtime compiled to wasm, executing
+          in a browser, with the interface reading the trace back out and
+          drawing it. What has changed is the setting. Hazel stands where the
+          hand-written JavaScript was, and a program that can read its own event
+          log stands where the trace pretty-printer was. Its demo is gone
+          &mdash; the free host it lived on stopped existing, and no archive
+          caught it &mdash; so the source is what remains of it, and the
+          <a href="#hazel">Hazel integration</a> is the project taken up again.
+          The reason to take it up is not only that it was unfinished. It was a
+          pleasure the first time.
+        </p>
+        <h3 id="abstract-interpretation">Abstract interpretation as another lens (beyond just types)<a class="anchor" href="#abstract-interpretation" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          In 2025, conversations with
+          <a href="https://www.colorado.edu/cs/bor-yuh-evan-chang">Bor-Yuh Evan
+          Chang</a> at CU Boulder pointed to abstract interpretation as a second
+          way in. The drafts above approach the graph through types alone;
+          taking the two together is meant to reach more of it &mdash; the
+          dynamics as well as the statics, and the patterns of use a DCG falls
+          into. His Fall 2025 graduate seminar there,
+          <em>Program Analysis: Theory and Practice</em> (CSCI 4830/7135), is
+          where that framing is being worked out. The two
+          have been at the neighbouring problem before, in
+          <a href="https://doi.org/10.1145/2993236.2993255">A vision for online
+          verification-validation</a> (with David Van Horn, GPCE 2016).
+        </p>
+
+        <details class="aside">
+          <summary>footnote: checking, made incremental</summary>
+          <p>
+           Type-and-effect checking a Fumola
+          program is itself a computation over a structure that is edited a
+          little at a time &mdash; which is the shape of problem Fumola exists
+          to make incremental. So the checker is not just a thing to build for
+          Fumola; it is a thing to build <em>in</em> it.
+        </p>
+        </details>
+      </section>
+
+      <section id="views">
+        <h2>Three ways of looking<a class="anchor" href="#views" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          Three interfaces to the same idea, eight years apart. Each has had
+          something the other two lacked, and none has yet had everything.
+        </p>
+        <p>
+           Ryan
+          Vandersmith and Matthew Hammer met at CU Boulder, in an experimental
+          class on the principles of functional programming that followed course
+          material from Ravi Chugh &mdash; who is also a co-author on two of the
+          <a href="#publications">Hazel papers</a> this work is built on.
+        </p>
+
+        <h3 id="the-derivations">2018 &mdash; the derivations<a class="anchor" href="#the-derivations" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          Human-Fungi Interface put a Fungi program in a browser and drew what
+          the type system knew about it: the expression, its type, its effects,
+          and the kinds, index sorts and name terms underneath &mdash; then the
+          trace it produced when it ran. It is the only one of the three that
+          has shown the derivations. It could not let you
+          change the program: it read bundles generated ahead of time.
+        </p>
+
+        <h3 id="the-graph">Now &mdash; the graph<a class="anchor" href="#the-graph" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          The <a href="http://matthewhammer.org/replayground/mergeSort44.html">replayground</a>
+          draws a whole run as a scene you move through &mdash; the
+          <a href="#mergesort">44-element mergeSort</a> above, every cell and
+          thunk and edge of it, at a scale a derivation tree could not show. It
+          shows what a computation <em>did</em>, which is the thing the 2018
+          view could only show one step at a time. It cannot let you change the
+          program either: it is a static file exported from a demo, and live
+          editing is still listed under future work.
+        </p>
+
+        <h3 id="both-and-live">Next &mdash; both, and live<a class="anchor" href="#both-and-live" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          <a href="#hazel">Hazel</a> is the one where the program is editable
+          and still means something while you are halfway through typing it.
+          That is the missing half of both earlier views, and it works today: a
+          livelit runs Fumola as you type and hands the result back as a Hazel
+          value. What is missing now is the picture. The event log arrives as a
+          table, not as a graph, and nothing yet draws a type the way the 2018
+          interface did.
+        </p>
+
+        <p>
+          So: the first had the types and not the editing, the second has the
+          graph and not the editing, the third has the editing and not yet the
+          picture. 
+        </p>
+
+        <details class="aside">
+          <summary>footnote: the intervening years</summary>
+          <p>
+          Most of that time went elsewhere. Two children arrived along the way; a career
+          entirely academic until January 2019, then a decision to leave
+          academia for four and a half years at DFINITY and then a return to
+          independent research.
+           This repository's history
+          starts in July 2022, and it starts as Motoko's Rust interpreter: the
+          industry work is the substrate Fumola runs on. Every crate this repository inherited from that
+          interpreter still carries the same two authors it did &mdash; Matthew
+          Hammer and Ryan Vandersmith. The newest crate carries a single name: the one that compiles Fumola for a browser, which is
+          what runs the console above.
+        </p>
+        </details>
+      </section>
+
+      <section id="runtime">
+        <h2>The runtime this host serves<a class="anchor" href="#runtime" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          Alongside this page: <code>fumola_wasm.js</code>, the wasm-bindgen
+          glue, and <code>fumola_wasm_bg.wasm</code>, the runtime. Both are
+          built from the <code>fumola_wasm</code> crate by
+          <code>.github/workflows/wasm-pages.yml</code> on every push to
+          <code>main</code>, and neither is checked in.
+        </p>
+        <p>
+          Published as a Pages site rather than as a release asset, deliberately:
+          release downloads carry no <code>Access-Control-Allow-Origin</code>
+          header, so a browser can never fetch one cross-origin &mdash; which is
+          the only thing this artifact exists to do. Pages serves it with CORS
+          and the right content type.
+        </p>
+        <pre><code><span class="c">// The current build. runtime.json names a content-addressed</span>
+<span class="c">// directory, so a new publish is a new URL and never a stale cache.</span>
+<span class="k">const</span> m = <span class="k">await</span> (<span class="k">await</span> fetch(<span class="st">"https://fumola.org/runtime.json"</span>,
+                        { cache: <span class="st">"no-cache"</span> })).json();
+<span class="k">const</span> { <span class="k">default</span>: init, fumola_create, fumola_eval_top } =
+  <span class="k">await</span> <span class="k">import</span>(<span class="st">"https://fumola.org"</span> + m.js);
+<span class="k">await</span> init({ module_or_path: <span class="st">"https://fumola.org"</span> + m.wasm });
+
+<span class="k">const</span> id = fumola_create();
+fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
+<span class="c">// -> {"ok":true,"tag":"Int","value":"42"}</span></code></pre>
+        <p>
+          To pin a build instead, skip the manifest and name the version
+          directly &mdash; <code>/v/&lt;hash&gt;/fumola_wasm.js</code> and its
+          <code>.wasm</code> sibling. Those bytes never change. Take the glue
+          and the binary from the same directory: wasm-bindgen emits them as a
+          matched pair and they will not load if their versions disagree.
+          Recent versions are listed in
+          <code><a href="/versions.json">versions.json</a></code>; only a
+          bounded number are kept, so a pin is good for the near term rather
+          than forever.
+        </p>
+        <p>
+          The stable <code>fumola_wasm.js</code> and
+          <code>fumola_wasm_bg.wasm</code> beside this page still work and are
+          always the current build at publish time. They are what a browser
+          can serve you a version behind, which is what the manifest exists to
+          avoid.
+        </p>
+        <p>
+          Fetch them from <code>fumola.org</code>, which is where this site
+          lives. The older <code>adapton.github.io/fumola</code> path still
+          works for a link, but it now redirects here, and a Pages
+          custom-domain redirect carries no
+          <code>Access-Control-Allow-Origin</code> &mdash; so it can no longer
+          be fetched cross-origin, which is the one thing this artifact is for.
+        </p>
+        <p>
+          The <a href="/web-play/">web playground</a> on this host loads them
+          the same way, from a relative path rather than across an origin.
+        </p>
+        <p>
+          The glue and the <code>.wasm</code> are generated together and will
+          not load if their versions disagree, so take both from the same
+          place. Hazel prefers a locally built pair when there is one and falls
+          back to this published build otherwise.
+        </p>
+      </section>
+
+      <section id="links">
+        <h2>Where to go next<a class="anchor" href="#links" aria-label="Copy link to this heading">#</a></h2>
+        <ul class="links">
+          <li>
+            <span class="what">/press/</span>
+            <span class="desc"><a href="/press/">Press</a>
+            <small>What has been written about Fumola from outside this repository, newest first.</small></span>
+          </li>
+          <li>
+            <span class="what">/alignment/</span>
+            <span class="desc"><a href="/alignment/">Alignment</a>
+            <small>What it means for the graph to agree with itself, how an edit breaks that, and how signaling and repair put it back. With the Recipe's rules.</small></span>
+          </li>
+          <li>
+            <span class="what">/web-play/</span>
+            <span class="desc"><a href="/web-play/">Web play</a>
+            <small>Write Fumola in the browser with the library beside you. Nothing to install.</small></span>
+          </li>
+          <li>
+            <span class="what">Adapton/fumola</span>
+            <span class="desc"><a href="https://github.com/Adapton/fumola">The language</a>
+            <small>The Rust implementation, the Fumola module library under <code>fumola/</code>, and the examples.</small></span>
+          </li>
+          <li>
+            <span class="what">adapton-recipe</span>
+            <span class="desc"><a href="https://github.com/matthewhammer/adapton-recipe">The Extended Adapton Recipe</a>
+            <small>The semantics Fumola implements: DCGs with symbolic space and time.</small></span>
+          </li>
+          <li>
+            <span class="what">replayground</span>
+            <span class="desc"><a href="http://matthewhammer.org/replayground/mergeSort44.html">mergeSort on 44 elements</a>
+            <small>An interactive DCG, exported from a Fumola program that read its own history.</small></span>
+          </li>
+          <li>
+            <span class="what">hazel branch</span>
+            <span class="desc"><a href="https://hazel.org/build/fumola-livelit-mvp/">The Hazel integration, running</a>
+            <small>Open the Fumola chapters from the documentation cards.</small></span>
+          </li>
+          <li>
+            <span class="what">&nbsp;</span>
+            <span class="desc"><a href="https://github.com/hazelgrove/hazel/blob/fumola-livelit-mvp/docs/livelits.md">docs/livelits.md</a>
+            <small>What the three livelits are, what crosses the boundary, and what is not settled.</small></span>
+          </li>
+          <li>
+            <span class="what">&nbsp;</span>
+            <span class="desc"><a href="https://github.com/hazelgrove/hazel/tree/fumola-livelit-mvp/hazel-programs/docs/reference">The Fumola chapters</a>
+            <small>A tour of Fumola as Hazel sees it, in eight cards of increasing complexity &mdash; values, symbols, cells, thunks, input, runtimes, then two worked examples from this repo. Source for the cards in the live build.</small></span>
+          </li>
+          <li>
+            <span class="what">crates/fumola_wasm</span>
+            <span class="desc"><a href="https://github.com/Adapton/fumola/tree/main/crates/fumola_wasm">The JS boundary</a>
+            <small>The instance store, the value translation, and the API this host publishes.</small></span>
+          </li>
+          <li>
+            <span class="what">adapton/</span>
+            <span class="desc"><a href="https://github.com/Adapton/fumola/tree/main/crates/fumola_semantics/src/lib/adapton">The two semantics</a>
+            <small><code>simple.rs</code> and <code>graphical/</code>, behind one <code>AdaptonState</code> trait.</small></span>
+          </li>
+          <li>
+            <span class="what">system/adapton.fumola</span>
+            <span class="desc"><a href="https://github.com/Adapton/fumola/blob/main/fumola/system/adapton.fumola">The graph, in Fumola</a>
+            <small>The value-level types for the store, and the outline and scene exports built on them.</small></span>
+          </li>
+          <li>
+            <span class="what">dfinity/motoko.rs</span>
+            <span class="desc"><a href="https://github.com/dfinity/motoko.rs">Where the surface came from</a>
+            <small>The Motoko interpreter in Rust that Fumola descends from.</small></span>
+          </li>
+        </ul>
+      </section>
+
+      <section id="now">
+        <h2>What is happening now<a class="anchor" href="#now" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          <strong>Work in progress</strong>, written 2026-09-08 and meant to be
+          rewritten as it moves. Two things changed this week: the graph
+          learned to realign after an edit, and the words for that were
+          settled.
+        </p>
+        <h3 id="the-words">The words<a class="anchor" href="#the-words" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          Fumola's terms for the repair algorithm differ from the Adapton
+          papers' &mdash; deliberately, in terms and not in algorithms. The
+          papers say <em>dirty</em> and <em>clean</em>; those describe a state.
+          Fumola says <em>signaled</em> and <em>aligned</em>: the first says what
+          happened to an edge (a message reached it, and it waits to be
+          checked), the second is already the Recipe's word for a store or a
+          graph that agrees with itself. The change is being made everywhere
+          &mdash; runtime, library, documents, and since 2026-09-09 the Recipe's
+          rules &mdash; and is not finished; where you still meet the old
+          words, they mean these.
+        </p>
+        <table>
+          <caption>The papers' words, and Fumola's</caption>
+          <tr><td class="form">dirtying</td><td>signaling &mdash; the traversal an edit starts, from the changed cell toward its readers</td></tr>
+          <tr><td class="form">dirty</td><td>signaled &mdash; an edge whose recorded observation may no longer agree with the graph</td></tr>
+          <tr><td class="form">clean</td><td>aligned &mdash; an edge that does agree, or a whole node all of whose edges do</td></tr>
+          <tr><td class="form">cleaning</td><td>repair &mdash; the traversal a force runs on a thunk with a signaled edge: check each edge, re-evaluate if one cannot be realigned</td></tr>
+          <tr><td class="form">change propagation</td><td>realignment &mdash; the whole, from an edit to the next consistent demand; signal and repair steps, usually in matching pairs</td></tr>
+        </table>
+        <h3 id="landed">What landed<a class="anchor" href="#landed" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          Signaling on a put that changes a read cell, repair on the next
+          force, and a <em>matched put</em> &mdash; putting what a cell already
+          holds keeps the cell and its readers as they are. Both traversals are
+          bracketed in the event history, so a program, the playground and the
+          replayground can see a repair happen rather than infer it from a
+          diff of two runs. The runtime this host serves carries it.
+        </p>
+        <h3 id="next">What is next<a class="anchor" href="#next" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          In the engine: a cycle check, signaling on delayed puts, and the
+          double-use check of Nominal Adapton. In the tools: a playground
+          example that is one graph edited in place, with the trails drawn from
+          the signaling and repair walk. In the measurement: an oracle that
+          runs the existing comparative examples as repairs and checks them
+          against a from-scratch run, and sweeps that were too expensive when
+          every sample cost two full runs. In the Recipe: the words, a few
+          missing rules, and the typos that surfaced when its rules were lined
+          up with the code. The full list is in the docs.
+        </p>
+        <ul class="links">
+          <li>
+            <span class="what">/alignment/</span>
+            <span class="desc"><a href="/alignment/">Alignment</a>
+            <small>The prose and the formal view: how the graph realigns after signaling, via repair.</small></span>
+          </li>
+          <li>
+            <span class="what">docs/realignment.md</span>
+            <span class="desc"><a href="https://github.com/Adapton/fumola/blob/main/docs/realignment.md">The effort, the words, and what is left</a>
+            <small>Why repair was built now, what the numbers said, and the to-do lists &mdash; engine, tools, measurement, Recipe, docs.</small></span>
+          </li>
+          <li>
+            <span class="what">#106</span>
+            <span class="desc"><a href="https://github.com/Adapton/fumola/pull/106">Signaling and repair: the graphical cache realigns after an edit</a>
+            <small>The change itself. Its module documentation is a rule-by-rule reading guide to the papers and the Recipe.</small></span>
+          </li>
+          <li>
+            <span class="what">#22</span>
+            <span class="desc"><a href="https://github.com/Adapton/fumola/issues/22">Repairing the graphical cache: signaling and realignment algorithms</a>
+            <small>The issue that has tracked this since March; the two unchecked boxes were signaling and repair.</small></span>
+          </li>
+          <li>
+            <span class="what">adapton-recipe</span>
+            <span class="desc"><a href="https://github.com/matthewhammer/adapton-recipe">The Extended Adapton Recipe</a>
+            <small>The formalism this runtime implements. Being brought into line with the code, which is the reference.</small></span>
+          </li>
+        </ul>
+      </section>
+
+      <footer>
+        Fumola is a research prototype and everything here is subject to
+        change. Built from <code>pages/index.html</code> in
+        <a href="https://github.com/Adapton/fumola">Adapton/fumola</a>.
+      </footer>
+    </main>
+
+    <script type="module">
+      // Heading anchors. They are real links, so they work with JavaScript
+      // off; this only adds the clipboard copy on top.
+      document.addEventListener("click", (e) => {
+        const a = e.target.closest(".anchor");
+        if (!a) return;
+        const url = location.origin + location.pathname + new URL(a.href).hash;
+        const done = () => {
+          a.setAttribute("data-copied", "");
+          setTimeout(() => a.removeAttribute("data-copied"), 1400);
+        };
+        // The async clipboard needs a secure origin and, in most browsers, a
+        // real user gesture. Both hold for an actual click on https or
+        // localhost -- but not always, so fall back to the old textarea
+        // trick rather than leave the click looking like it did nothing.
+        const fallback = () => {
+          const t = document.createElement("textarea");
+          t.value = url;
+          t.setAttribute("readonly", "");
+          t.style.cssText = "position:fixed;top:-9999px;opacity:0";
+          document.body.appendChild(t);
+          t.select();
+          let okay = false;
+          try { okay = document.execCommand("copy"); } catch (_) {}
+          t.remove();
+          if (okay) done();
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(done, fallback);
+        } else {
+          fallback();
+        }
+      });
+
+      // The glue and the binary are a matched pair -- wasm-bindgen emits them
+      // together and they do not load if their versions disagree -- so both
+      // come from whichever version `runtime.json` names. That is the whole
+      // fix for #69: Pages stamps `max-age=600` on everything and gives us no
+      // say in it, so a deploy cannot be made to invalidate a cached binary.
+      // A new build gets a new URL instead, and the stale copy is simply
+      // never asked for again. The manifest is the one mutable URL left in
+      // this path, and it is a few hundred bytes.
+      //
+      // Bound late rather than imported statically because the import URL is
+      // not known until the manifest is read, and read lazily rather than at
+      // page load so that the manifest fetch cannot delay the page for a
+      // reader who never runs anything.
+      let fumola_create, fumola_ensure_mode, fumola_eval_top;
+      const loadRuntime = async () => {
+        let glue = "./fumola_wasm.js",
+            wasm = "./fumola_wasm_bg.wasm",
+            version = "stable";
+        try {
+          const reply = await fetch("./runtime.json", { cache: "no-cache" });
+          if (reply.ok) {
+            const manifest = await reply.json();
+            glue = manifest.js;
+            wasm = manifest.wasm;
+            version = manifest.hash;
+          }
+        } catch (e) {
+          // The copies beside this page, which are always the current build
+          // at publish time. Reached only if the manifest is unavailable.
+        }
+        const mod = await import(glue);
+        ({ fumola_create, fumola_ensure_mode, fumola_eval_top } = mod);
+        await mod.default({ module_or_path: wasm });
+        console.info("Fumola runtime " + version);
+      };
+
+      const $ = (id) => document.getElementById(id);
+      const srcEl = $("src");
+      const outEl = $("out");
+      const runEl = $("run");
+      const statusEl = $("status");
+
+      // Ordered so that running them top to bottom tells a story: peek only
+      // finds anything because put ran first, and the event log only has
+      // something to report because all of them did.
+      const PRESETS = [
+        ["gcd", "Gcd.gcd(12, 18)"],
+        ["put and get", "`count := 41;\nget(`count) + 1"],
+        ["peek", "peek(`count)"],
+        ["thunk and force", "let t = thunk { Gcd.gcd(12, 18) };\n(t, force(t))"],
+        ["a named thunk", "`n := 21;\nforce(`double := thunk { get(`n) * 2 })"],
+        ["where am I", "(Adapton.here(),\n do within space `region { Adapton.here() })"],
+        ["a symbol", "`adapton(`settings)"],
+        ["the event log", "Adapton.peekEvents()"],
+      ];
+
+      for (const [label, program] of PRESETS) {
+        const b = document.createElement("button");
+        b.textContent = label;
+        b.addEventListener("click", () => {
+          srcEl.value = program;
+          run();
+        });
+        $("presets").appendChild(b);
+      }
+      srcEl.value = PRESETS[0][1];
+
+      let instance = null;
+
+      // Render the {ok, tag, value} shape that fumola_eval_top answers with.
+      // Structure is kept structural -- a tuple prints as a tuple -- rather
+      // than being flattened, since keeping structure across the boundary is
+      // part of what the runtime does.
+      const show = (v) => {
+        if (v === null || v === undefined) return "?";
+        switch (v.tag) {
+          case "Unit": return "()";
+          case "Null": return "null";
+          case "Option": return "?(" + show(v.value) + ")";
+          case "String": return v.value;
+          case "Symbol": return symbolSource(v.value);
+          case "List": return "[" + v.value.map(show).join(", ") + "]";
+          case "Tuple": return "(" + v.value.map(show).join(", ") + ")";
+          case "Record":
+            return "{" + Object.entries(v.value)
+              .map(([k, f]) => k + " = " + show(f)).join("; ") + "}";
+          case "Variant":
+            return "#" + v.value.name +
+              (v.value.value === null ? "" : "(" + show(v.value.value) + ")");
+          case "AdaptonPointer": return "pointer(" + v.value.source + ")";
+          case "Pointer": return JSON.stringify(v.value);
+          default: return String(v.value);
+        }
+      };
+
+      // Symbols cross as structure rather than as text, so this rebuilds the
+      // source that denotes one -- mirroring `symbol_to_source` on the Rust
+      // side, where a name carries its own backtick and the composite forms
+      // do not add another.
+      const symbolSource = (s) => {
+        if (s === null || typeof s !== "object") return String(s);
+        switch (s.tag) {
+          case "Num": return String(s.value);
+          case "Name": return "`" + s.value;
+          case "Call": return symbolSource(s.fun) + "(" + symbolSource(s.arg) + ")";
+          case "Dot": return symbolSource(s.left) + "." + symbolSource(s.right);
+          default: return JSON.stringify(s);
+        }
+      };
+
+      // The runtime is 5 MB and most readers never run anything, so nothing
+      // is fetched until the first attempt to run -- not the manifest, not
+      // the 16 KB of wasm-bindgen glue, and not the binary.
+      let starting = null;
+      const ensureRuntime = () => {
+        if (starting) return starting;
+        statusEl.textContent = "starting the runtime\u2026";
+        starting = loadRuntime()
+          .then(() => {
+            instance = fumola_create();
+            // Graphical, which is Fumola's own default: the VM constructs
+            // one, and the REPL and the repo's examples all run it. Asked
+            // for by name only because fumola_create starts an instance
+            // simple -- a default chosen for the Hazel integration, not for
+            // here.
+            fumola_ensure_mode(instance, "graphical");
+            statusEl.textContent =
+              "instance " + instance + " \u00b7 graphical \u00b7 \u2318\u21a9 to run";
+          })
+          .catch((e) => {
+            statusEl.textContent = "the runtime could not be loaded";
+            outEl.innerHTML = '<span class="hint"></span>';
+            outEl.firstChild.textContent = String(e);
+            starting = null; // let a later click try again
+            throw e;
+          });
+        return starting;
+      };
+
+      const run = async () => {
+        try {
+          await ensureRuntime();
+        } catch (e) {
+          return; // ensureRuntime has already said so in the status line
+        }
+        let reply;
+        try {
+          reply = JSON.parse(fumola_eval_top(instance, srcEl.value));
+        } catch (e) {
+          outEl.innerHTML = '<span class="err"></span>';
+          outEl.firstChild.textContent = String(e);
+          return;
+        }
+        outEl.textContent = "";
+        if (reply.ok) {
+          const tag = document.createElement("span");
+          tag.className = "tag";
+          tag.textContent = reply.tag + "  ";
+          outEl.append(tag, show(reply));
+        } else {
+          const err = document.createElement("span");
+          err.className = "err";
+          // A syntax error is what a half-typed program looks like, and the
+          // parser's own report of one is a page of expected tokens. The kind
+          // is there so a host can stay quiet about it.
+          err.textContent =
+            reply.kind === "syntax" ? "syntax error" : reply.error;
+          outEl.append(err);
+        }
+      };
+
+      runEl.addEventListener("click", run);
+      srcEl.addEventListener("keydown", (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run();
+      });
+
+      // Nothing is loaded until asked for. The button is live from the start;
+      // the first press fetches the runtime and then evaluates.
+      runEl.disabled = false;
+      statusEl.textContent = "\u2318\u21a9 to run";
+
+      // ---- The floating outline -------------------------------------------
+      // Built from the document rather than written out, so the outline and
+      // the page cannot disagree: a section that exists is in it, a section
+      // that is renamed is renamed here too, and adding one is nothing but
+      // adding it. The only thing hand-kept is the list of sibling pages in
+      // the markup, which is the one fact this page does not contain.
+      (function () {
+        const nav = document.getElementById("outline");
+        if (!nav) return;
+        const list = nav.querySelector("#outline-list");
+        if (!list) return;
+
+        // The heading text without the trailing "#" that copies its link.
+        const label = (h) => {
+          const c = h.cloneNode(true);
+          c.querySelectorAll(".anchor").forEach((a) => a.remove());
+          return c.textContent.trim();
+        };
+
+        // h2 for a section, h3 for the named subsections inside it. Headings
+        // without an id are skipped rather than given one: an outline entry
+        // that cannot be linked to is a dead row.
+        const entries = [];
+        document.querySelectorAll("main section[id]").forEach((section) => {
+          const h2 = section.querySelector("h2");
+          if (h2) entries.push({ id: section.id, text: label(h2), sub: false });
+          section.querySelectorAll("h3[id]").forEach((h3) => {
+            entries.push({ id: h3.id, text: label(h3), sub: true });
+          });
+        });
+        if (!entries.length) {
+          nav.remove();
+          return;
+        }
+
+        const links = entries.map((e) => {
+          const li = document.createElement("li");
+          if (e.sub) li.className = "sub";
+          const a = document.createElement("a");
+          a.href = "#" + e.id;
+          a.textContent = e.text;
+          li.appendChild(a);
+          list.appendChild(li);
+          return { a, el: document.getElementById(e.id) };
+        });
+
+        // Which entry the reader is in: the last heading to have passed a
+        // line a third of the way down. A band rather than the very top, so
+        // the active row changes at about the moment the eye arrives at a new
+        // section rather than when it touches the top edge.
+        let current = null;
+        const mark = () => {
+          const line = window.innerHeight * 0.33;
+          let found = links[0];
+          for (const l of links) {
+            if (!l.el) continue;
+            if (l.el.getBoundingClientRect().top <= line) found = l;
+            else break;
+          }
+          // At the very bottom the last section may never cross the line.
+          if (window.scrollY + window.innerHeight >= document.body.scrollHeight - 4) {
+            found = links[links.length - 1];
+          }
+          if (found === current) return;
+          if (current) current.a.removeAttribute("aria-current");
+          if (found) found.a.setAttribute("aria-current", "true");
+          current = found;
+          // Keep the active row visible when the outline is longer than the
+          // viewport, without scrolling the page itself.
+          if (found && nav.scrollHeight > nav.clientHeight) {
+            const r = found.a.getBoundingClientRect();
+            const n = nav.getBoundingClientRect();
+            if (r.top < n.top + 8 || r.bottom > n.bottom - 8) {
+              found.a.scrollIntoView({ block: "nearest" });
+            }
+          }
+        };
+
+        let ticking = false;
+        const onScroll = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(() => {
+            ticking = false;
+            mark();
+          });
+        };
+        window.addEventListener("scroll", onScroll, { passive: true });
+        window.addEventListener("resize", onScroll, { passive: true });
+        mark();
+
+        // ---- Opening it on a narrow screen --------------------------------
+        // Below the width where the outline sits beside the page it is the
+        // page instead: the button at the top left, and the whole viewport
+        // when it is pressed. Escape closes it, so does choosing a section,
+        // and so does widening the window past the breakpoint -- the open
+        // class describes a full-screen overlay and would be wrong applied to
+        // a sidebar.
+        const toggle = document.getElementById("outline-toggle");
+        if (toggle) {
+          const SIDEBAR = window.matchMedia("(min-width: 48rem)");
+          const setOpen = (open) => {
+            nav.classList.toggle("is-open", open);
+            document.body.classList.toggle("outline-open", open);
+            toggle.setAttribute("aria-expanded", open ? "true" : "false");
+            toggle.setAttribute("aria-label", open ? "Close page outline" : "Open page outline");
+            if (open) nav.scrollTop = 0;
+          };
+          const close = () => {
+            if (!nav.classList.contains("is-open")) return;
+            setOpen(false);
+            toggle.focus();
+          };
+          toggle.addEventListener("click", () => {
+            setOpen(!nav.classList.contains("is-open"));
+          });
+          // A link is a jump within this page, so the overlay has done its job.
+          nav.addEventListener("click", (e) => {
+            if (e.target.closest("a") && nav.classList.contains("is-open")) setOpen(false);
+          });
+          document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") close();
+          });
+          const onBreakpoint = () => { if (SIDEBAR.matches) setOpen(false); };
+          if (SIDEBAR.addEventListener) SIDEBAR.addEventListener("change", onBreakpoint);
+          else SIDEBAR.addListener(onBreakpoint);
+        }
+      })();
+    </script>
+  </body>
+</html>
