@@ -391,18 +391,22 @@ fn test_array_index() {
     assert_to("x [ 0 ]", "x[0]");
 }
 
-#[ignore]
+/// Was `#[ignore]`d, with expectations describing a printer that wrapped every
+/// argument in parentheses -- `f(x)` as `f((x))`. That printer is gone, so the
+/// test could not come back until something else held the argument apart from
+/// the function; the space in the `Call` arm is that something. Its standing
+/// note, `to do -- handle type instantiations`, is answered by the last line.
 #[test]
 fn test_call() {
-    // to do -- handle type instantiations, via <(Type,)+> syntax
-    //assert_to("f 0", "f(0)");
-    assert_to("f (0, 1)", "f((0, 1))");
-    //assert_to("0 0", "0(0)");
-    //assert_to("0 f", "0(f)");
-    assert_to("(0) (f)", "(0)((f))");
-    assert_to("f(x)", "f((x))");
-    assert_to("(f)(x)", "(f)((x))");
-    assert_to("(f)x", "(f)(x)");
+    assert_to("f 0", "f 0");
+    assert_to("f (0, 1)", "f (0, 1)");
+    assert_to("0 0", "0 0");
+    assert_to("0 f", "0 f");
+    assert_to("(0) (f)", "(0) (f)");
+    assert_to("f(x)", "f (x)");
+    assert_to("(f)(x)", "(f) (x)");
+    assert_to("(f)x", "(f) x");
+    assert_to("f<Nat> (3)", "f<Nat> (3)");
 }
 
 #[test]
@@ -519,4 +523,41 @@ fn test_object_bodies_keep_their_shape() {
 
     // The empty body is its own rule and has no constructor to go through.
     assert_to("{ }", "{}");
+}
+
+/// What the printer emits must be something the parser accepts, and printing
+/// it a second time must not move it again.
+///
+/// Asserting only the first half misses the failure that matters here. A
+/// separator glued to its left neighbour -- `{ x and y }` printed as
+/// `{xand y}`, `f x` printed as `fx` -- still parses. It parses as something
+/// else: `xand` and `fx` are perfectly good identifiers. The output is wrong
+/// in a way that only shows up on the way back in.
+fn assert_prints_and_reparses(input: &str, printed: &str) {
+    assert_to(input, printed);
+    assert_to(printed, printed);
+}
+
+/// `and` is a keyword, and `vector`'s separator is glued to the item on its
+/// left, so it needed the space on its near side. Both base lists want it --
+/// the second arm is the one #120's predecessor filled in, which is why this
+/// covers `{ x and y }` as well as the form with fields.
+#[test]
+fn test_object_bases_keep_their_separator() {
+    assert_prints_and_reparses("{ x with z = 3 }", "{x with z=3}");
+    assert_prints_and_reparses("{ x and y }", "{x and y}");
+    assert_prints_and_reparses("{ x and y with z = 3 }", "{x and y with z=3}");
+    assert_prints_and_reparses("{ x and y and z with w = 3 }", "{x and y and z with w=3}");
+}
+
+/// A call is juxtaposition, so the printer has to supply the separator itself.
+#[test]
+fn test_calls_keep_their_argument_separate() {
+    assert_prints_and_reparses("f x", "f x");
+    assert_prints_and_reparses("f x y", "f x y");
+    assert_prints_and_reparses("f (x)", "f (x)");
+    assert_prints_and_reparses("f (0, 1)", "f (0, 1)");
+    assert_prints_and_reparses("f (g x)", "f (g x)");
+    assert_prints_and_reparses("f<Nat> (3)", "f<Nat> (3)");
+    assert_prints_and_reparses("{ f x and g y with z = 3 }", "{f x and g y with z=3}");
 }
