@@ -103,8 +103,32 @@ Several arms turned out to have a real rendering to give instead -- characters,
 opaque pointers, actors, actor methods, `or`-patterns, temp vars, `reifyCore`,
 `reflectCore` -- and those print properly now rather than as a marker.
 
-Nothing that printed before prints differently, so no hash changes and no level
-assignment moves.
+Nothing that printed before printed differently *as a result of this change*,
+so no hash moved and no level assignment shifted. That mattered:
+`portable_hash` sets the level of every symbol, which sets level-tree shape and
+the mergeSort numbers, so a printer change is a measurement change.
+
+It did not stay true of the printer for long, and why is worth recording.
+Filling in the `(Some(_), None)` arm gave it `vector(&bases.vec, "and")`,
+copied from the arm beside it -- and that separator was already wrong.
+`strict_concat` puts its separator against the item on its *left*, so
+`{ x and y }` printed as `{xand y}`. Which parses: as one identifier applied to
+another. The `todo!()` had been standing in front of a formatting bug, and
+filling it in gave that bug a second home.
+
+[#121](https://github.com/Adapton/fumola/pull/121) fixed both sites, and the
+`Call` arm, which had lost its separator the same way (`f x` printing as `fx`).
+Two things to carry forward from it:
+
+- **Making a printer total can propagate a bug the `todo!()` was hiding.** Look
+  at what the arm beside the one you are filling in actually does, rather than
+  copying it.
+- **#121 does change what prints**, so the hashing question came back. Its
+  answer: `Symbol::Call` has its own arm and never reaches `Exp::Call`, so the
+  only route from a symbol into changed output is `Symbol::QuotedAst` over
+  syntax containing a call or a multi-base object. Nothing in the repo does --
+  `./fumola-scripts.sh` regenerated every measurement file byte-identically --
+  but a program that quotes a call now hashes differently than it did.
 
 **Source positions** (`ast.rs`, `Source::expand`). Widening one source against
 another stopped on every pair that was not two spans, and quoted syntax carries
