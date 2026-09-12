@@ -492,3 +492,31 @@ fn test_brace_bodies_that_are_meaningful_still_parse() {
     assert_parse_ok("{ x and y }");
     assert_parse_ok("thunk { 1 }");
 }
+
+/// What each of the three object-body rules builds, not merely that it parses.
+///
+/// `Exp::obj_field_fields`, `obj_id_fields` and `obj_base_bases` used to
+/// return `Exp::Object(body)` for the grammar to unwrap again with an
+/// `object_body()` whose other arm was `panic!()`. They return the body
+/// itself now. Printing is how the shape of that body becomes visible: a
+/// field pushed to the wrong end, a base dropped, or a pun left unexpanded
+/// would all still parse, and would all show up here.
+#[test]
+fn test_object_bodies_keep_their_shape() {
+    // Rule one: a first field that cannot be a bare id, then the rest.
+    assert_to("{ x = 1 }", "{x=1}");
+    assert_to("{ x = 1; y = 2 }", "{x=1; y=2}");
+    // A trailing bare id stays a bare field on this rule.
+    assert_to("{ var x = 3; y }", "{var x=3; y}");
+
+    // Rule two: a punned first field, then the rest. The pun expands.
+    assert_to("{ x; y = 1 }", "{x=x; y=1}");
+
+    // Rule three: bases, with or without fields. `{ x }` is the lone-variable
+    // case, which hands off to rule two's constructor and so also expands.
+    assert_to("{ x }", "{x=x}");
+    assert_to("{ x with y = 1 }", "{x with y=1}");
+
+    // The empty body is its own rule and has no constructor to go through.
+    assert_to("{ }", "{}");
+}
