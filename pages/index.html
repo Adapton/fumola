@@ -169,6 +169,9 @@
       tr:first-child td { border-top: none; }
       td.form { white-space: nowrap; width: 12.5rem; font-family: var(--mono); font-size: 0.85rem; }
       caption { caption-side: bottom; text-align: left; padding-top: 1rem; font-size: 0.86rem; color: var(--dim); }
+      /* the words table: the new term leads, the papers' word recedes */
+      table.words td.form { color: var(--dim); }
+      .term { font-weight: 600; font-size: 1.1em; font-style: normal; }
 
 
       /* ---- aside ------------------------------------------------------- */
@@ -1107,7 +1110,7 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
           Fumola's terms for the repair algorithm differ from the Adapton
           papers' &mdash; deliberately, in terms and not in algorithms. The
           papers say <em>dirty</em> and <em>clean</em>; those describe a state.
-          Fumola says <em>signaled</em> and <em>aligned</em>: the first says what
+          Fumola says <strong class="term">signaled</strong> and <strong class="term">aligned</strong>: the first says what
           happened to an edge (a message reached it, and it waits to be
           checked), the second is already the Recipe's word for a store or a
           graph that agrees with itself. The change is being made everywhere
@@ -1115,13 +1118,13 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
           rules &mdash; and is not finished; where you still meet the old
           words, they mean these.
         </p>
-        <table>
+        <table class="words">
           <caption>The papers' words, and Fumola's</caption>
-          <tr><td class="form">dirtying</td><td>signaling &mdash; the traversal an edit starts, from the changed cell toward its readers</td></tr>
-          <tr><td class="form">dirty</td><td>signaled &mdash; an edge whose recorded observation may no longer agree with the graph</td></tr>
-          <tr><td class="form">clean</td><td>aligned &mdash; an edge that does agree, or a whole node all of whose edges do</td></tr>
-          <tr><td class="form">cleaning</td><td>repair &mdash; the traversal a force runs on a thunk with a signaled edge: check each edge, re-evaluate if one cannot be realigned</td></tr>
-          <tr><td class="form">change propagation</td><td>realignment &mdash; the whole, from an edit to the next consistent demand; signal and repair steps, usually in matching pairs</td></tr>
+          <tr><td class="form">dirtying</td><td><strong class="term">signaling</strong> &mdash; the traversal an edit starts, from the changed cell toward its readers</td></tr>
+          <tr><td class="form">dirty</td><td><strong class="term">signaled</strong> &mdash; an edge whose recorded observation may no longer agree with the graph</td></tr>
+          <tr><td class="form">clean</td><td><strong class="term">aligned</strong> &mdash; an edge that does agree, or a whole node all of whose edges do</td></tr>
+          <tr><td class="form">cleaning</td><td><strong class="term">repair</strong> &mdash; the traversal a force runs on a thunk with a signaled edge: check each edge, re-evaluate if one cannot be realigned</td></tr>
+          <tr><td class="form">change propagation</td><td><strong class="term">realignment</strong> &mdash; the whole, from an edit to the next consistent demand; signal and repair steps, usually in matching pairs</td></tr>
         </table>
         <h3 id="landed">What landed<a class="anchor" href="#landed" aria-label="Copy link to this heading">#</a></h3>
         <p>
