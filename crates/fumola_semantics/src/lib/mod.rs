@@ -15,6 +15,7 @@ pub mod value;
 pub mod format;
 mod format_utils;
 
+pub mod vm_big;
 pub mod vm_core;
 pub mod vm_def;
 pub mod vm_match;

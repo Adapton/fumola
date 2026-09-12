@@ -634,6 +634,17 @@ pub enum AdaptonNav {
 }
 pub type AdaptonNav_ = Node<AdaptonNav>;
 
+/// How a `do <mode> { .. }` region is evaluated.
+///
+/// One variant today. It is an enum rather than a bare `IdPos_` so that a mode
+/// carrying an argument -- `do budget 10000 { .. }`, say -- arrives later as a
+/// second variant here, without touching `Exp` or any of its exhaustive matches.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum EvalMode {
+    Named(IdPos_),
+}
+pub type EvalMode_ = Node<EvalMode>;
+
 pub type ExpObjectBody = (Option<Delim<Exp_>>, Option<ExpFields>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -699,6 +710,13 @@ pub enum Exp {
     Force(Exp_),
     Thunk(Exp_),
     GetAdaptonPointer(Exp_),
+    /// `do <mode> { .. }` -- a block whose evaluation strategy is named.
+    ///
+    /// Appended rather than placed beside `Do`: `Exp` derives `Hash`, the derive
+    /// writes the variant index, and a symbol can carry an `Exp_` through
+    /// `Symbol::QuotedAst`. Inserting mid-enum would reshuffle hash-map buckets
+    /// and with them the shape of the graph a program builds.
+    DoMode(EvalMode_, Exp_),
 }
 
 impl Exp {

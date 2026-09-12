@@ -181,63 +181,7 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
         }
         Assign1(e2) => exp_conts(active, Assign2(v), &e2),
         BinAssign1(b, e2) => exp_conts(active, BinAssign2(v, b), &e2),
-        Assign2(v1) => match &*v1 {
-            Value::Pointer(p) => {
-                active.store().mutate(p.clone(), v)?;
-                unit_step(active)
-            }
-            Value::Index(p, i) => {
-                active.store().mutate_index(p.clone(), i.fast_clone(), v)?;
-                unit_step(active)
-            }
-            Value::AdaptonPointer(name) => {
-                active.adapton().put_pointer(name.clone(), v)?;
-                return_step(active, Value::AdaptonPointer(name.clone()).share())
-            }
-            Value::Symbol(symbol) => {
-                let p = active.adapton().put_symbol(symbol.clone(), v)?;
-                return_step(active, Value::AdaptonPointer(p).share())
-            }
-            Value::Tuple(vs) => match (vs.get(0), vs.get(1)) {
-                (Some(v11), Some(v12)) => {
-                    let time = v12.into_time_or(Interruption::TypeMismatch(OptionCoreSource(
-                                Some(crate::vm_types::CoreSource {
-                                    name: Some("adapton put, delayed".to_owned()),
-                                    description: Some("Expected a symbol or time value in second component of assigned pair.".to_owned()),
-                                    file: file!().to_string(),
-                                    line: line!(),
-                                }),
-                            )))?;
-                    if let Value::AdaptonPointer(pointer) = &**v11 {
-                        active
-                            .adapton()
-                            .put_pointer_delay(pointer.clone(), time, v)?;
-                        unit_step(active)
-                    } else if let Ok(symbol) = v11.into_sym_or(()) {
-                        active.adapton().put_symbol_delay(symbol, time, v)?;
-                        unit_step(active)
-                    } else {
-                        type_mismatch!(file!(), line!())
-                    }
-                }
-                _ => type_mismatch!(file!(), line!()),
-            },
-            v1 => {
-                if let Ok(symbol) = v1.into_sym_or(()) {
-                    let p = active.adapton().put_symbol(symbol.clone(), v)?;
-                    return_step(active, Value::AdaptonPointer(p).share())
-                } else {
-                    return Err(crate::Interruption::TypeMismatch(
-                        crate::vm_types::OptionCoreSource(Some(crate::vm_types::CoreSource {
-                            description: Some("assignment to non-assignable value.".to_string()),
-                            name: Some("assignment".to_string()),
-                            file: (file!()).to_string(),
-                            line: (line!()),
-                        })),
-                    ));
-                }
-            }
-        },
+        Assign2(v1) => assign_to(active, v1, v),
         BinAssign2(v1, bop) => {
             // to do -- generalize to work with Adapton pointers.
             let v1d = match &*v1 {
@@ -820,6 +764,78 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             let shown = format_one_line(v.as_ref());
             *active.cont() = Cont::Value_(Value::Text(Text::new(shown)).into());
             Ok(Step {})
+        }
+    }
+}
+
+/// Assign `v` to whatever `v1` names: a store pointer or an index into one,
+/// or one of the four adapton puts.
+///
+/// Extracted from the `Assign2` frame arm so that the big-step evaluator can
+/// reduce an assignment by calling it rather than by copying it. The puts are
+/// the part that must not drift: two of them mint a pointer and answer with it,
+/// and a copy that answered with unit instead would put the same value in the
+/// graph and hand the program a different one.
+pub(crate) fn assign_to<A: Active>(
+    active: &mut A,
+    v1: Value_,
+    v: Value_,
+) -> Result<Step, Interruption> {
+    match &*v1 {
+        Value::Pointer(p) => {
+            active.store().mutate(p.clone(), v)?;
+            unit_step(active)
+        }
+        Value::Index(p, i) => {
+            active.store().mutate_index(p.clone(), i.fast_clone(), v)?;
+            unit_step(active)
+        }
+        Value::AdaptonPointer(name) => {
+            active.adapton().put_pointer(name.clone(), v)?;
+            return_step(active, Value::AdaptonPointer(name.clone()).share())
+        }
+        Value::Symbol(symbol) => {
+            let p = active.adapton().put_symbol(symbol.clone(), v)?;
+            return_step(active, Value::AdaptonPointer(p).share())
+        }
+        Value::Tuple(vs) => match (vs.get(0), vs.get(1)) {
+            (Some(v11), Some(v12)) => {
+                let time = v12.into_time_or(Interruption::TypeMismatch(OptionCoreSource(
+                            Some(crate::vm_types::CoreSource {
+                                name: Some("adapton put, delayed".to_owned()),
+                                description: Some("Expected a symbol or time value in second component of assigned pair.".to_owned()),
+                                file: file!().to_string(),
+                                line: line!(),
+                            }),
+                        )))?;
+                if let Value::AdaptonPointer(pointer) = &**v11 {
+                    active
+                        .adapton()
+                        .put_pointer_delay(pointer.clone(), time, v)?;
+                    unit_step(active)
+                } else if let Ok(symbol) = v11.into_sym_or(()) {
+                    active.adapton().put_symbol_delay(symbol, time, v)?;
+                    unit_step(active)
+                } else {
+                    type_mismatch!(file!(), line!())
+                }
+            }
+            _ => type_mismatch!(file!(), line!()),
+        },
+        v1 => {
+            if let Ok(symbol) = v1.into_sym_or(()) {
+                let p = active.adapton().put_symbol(symbol.clone(), v)?;
+                return_step(active, Value::AdaptonPointer(p).share())
+            } else {
+                return Err(crate::Interruption::TypeMismatch(
+                    crate::vm_types::OptionCoreSource(Some(crate::vm_types::CoreSource {
+                        description: Some("assignment to non-assignable value.".to_string()),
+                        name: Some("assignment".to_string()),
+                        file: (file!()).to_string(),
+                        line: (line!()),
+                    })),
+                ));
+            }
         }
     }
 }

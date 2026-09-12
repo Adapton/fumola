@@ -7,7 +7,8 @@ use crate::vm_types::def::Module;
 use crate::vm_types::{Env, LocalPointer, ScheduleChoice, def::CtxId};
 use fumola_syntax::ast::{
     AdaptonNav, AdaptonNavDim, BinOp, BindSort, Case, CasesPos, Dec, Dec_, DecField, DecFieldsPos,
-    Delim, Exp, Exp_, ExpField, Function, Id, IdPos, Literal, Loc, Mut, NodeData, ObjSort, Pat,
+    Delim, EvalMode, Exp, Exp_, ExpField, Function, Id, IdPos, Literal, Loc, Mut, NodeData,
+    ObjSort, Pat,
     PatField, PrimFunction, PrimType, ProjIndex, QuotedAst, RelOp, Stab, Type, TypeBind, TypeField,
     TypePath, TypeTag, TypeTag_, UnOp, Unquote, Vis,
 };
@@ -579,6 +580,14 @@ impl ToDoc for AdaptonNav {
     }
 }
 
+impl ToDoc for EvalMode {
+    fn doc(&'_ self) -> RcDoc<'_> {
+        match self {
+            EvalMode::Named(id) => id.doc().append(RcDoc::space()),
+        }
+    }
+}
+
 impl ToDoc for AdaptonNavDim {
     fn doc(&'_ self) -> RcDoc<'_> {
         match self {
@@ -654,6 +663,7 @@ impl ToDoc for Exp {
                 .append(a.doc()),
             Block(decs) => block(decs),
             Do(e) => kwd("do").append(e.doc()),
+            DoMode(m, e) => kwd("do").append(m.doc()).append(e.doc()),
             DoAdaptonNav(nav, e) => kwd("do").append(vector(nav, " ")).append(e.doc()),
             DoAdaptonPutForceThunk(e1, e2) => kwd("do @").append(e1.doc()).append(e2.doc()),
             Not(e) => kwd("not").append(e.doc()),
