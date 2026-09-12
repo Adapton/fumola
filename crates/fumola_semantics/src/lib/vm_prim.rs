@@ -357,7 +357,7 @@ pub fn call_prim_function<A: Active>(
                     *active.cont() = cont_value_(args[0].clone());
                     Ok(Step {})
                 } else if args.len() == 3 {
-                    todo!()
+                    nyi!(line!(), "adaptonPoke with a third argument")
                 } else {
                     type_mismatch!(file!(), line!())
                 }
@@ -365,8 +365,8 @@ pub fn call_prim_function<A: Active>(
                 type_mismatch!(file!(), line!())
             }
         }
-        ReifyCore => todo!(),
-        ReflectCore => todo!(),
+        ReifyCore => nyi!(line!(), "the reifyCore prim"),
+        ReflectCore => nyi!(line!(), "the reflectCore prim"),
     }
 }
 

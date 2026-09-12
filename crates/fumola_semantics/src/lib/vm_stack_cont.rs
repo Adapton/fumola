@@ -16,7 +16,7 @@ use crate::vm_types::{
     stack::{FieldContext, FieldValue, Frame, FrameCont},
 };
 use crate::vm_types::{OptionCoreSource, Store};
-use crate::{Dynamic, Shared, nyi, type_mismatch_, vm_step};
+use crate::{Dynamic, Shared, impossible, nyi, type_mismatch_, vm_step};
 use crate::{type_mismatch, value};
 use fumola_syntax::ast::{Cases, Exp_, Inst, Mut, Pat_, ProjIndex, QuotedAst};
 use fumola_syntax::shared::{FastClone, Share};
@@ -101,12 +101,10 @@ impl Dynamic for crate::value::ArrayIteratorNextFunc {
         args: Value_,
     ) -> crate::dynamic::Result {
         if let Value::Unit = args.as_ref() {
-            let position = store.array_iter_next(&self.position);
-            if position < self.array.len() {
-                let elm = self.array.get(position);
-                Ok(Value::Option(elm.unwrap().clone()).into())
-            } else {
-                Ok(Value::Null.into())
+            let position = store.array_iter_next(&self.position)?;
+            match self.array.get(position) {
+                Some(elm) => Ok(Value::Option(elm.clone()).into()),
+                None => Ok(Value::Null.into()),
             }
         } else {
             type_mismatch!(file!(), line!())
@@ -132,19 +130,20 @@ impl Dynamic for crate::value::ArrayIterator {
     }
 
     fn iter_next(&mut self, store: &mut crate::vm_types::Store) -> crate::dynamic::Result {
-        let position = store.array_iter_next(&self.position);
-        if position < self.array.len() {
-            let elm = self.array.get(position);
-            Ok(Value::Option(elm.unwrap().clone()).into())
-        } else {
-            Ok(Value::Null.into())
+        let position = store.array_iter_next(&self.position)?;
+        match self.array.get(position) {
+            Some(elm) => Ok(Value::Option(elm.clone()).into()),
+            None => Ok(Value::Null.into()),
         }
     }
 }
 
 fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Interruption> {
     use FrameCont::*;
-    let frame = active.stack().pop_front().unwrap();
+    let frame = match active.stack().pop_front() {
+        Some(frame) => frame,
+        None => return impossible!(line!(), "the stack emptied between the check and the pop"),
+    };
     match &frame.cont {
         Decs(_) => { /* decs in same block share an environment. */ }
         _ => {
@@ -159,7 +158,10 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
     *active.cont_prim_type() = frame.cont_prim_type;
     *active.cont_source() = frame.source;
     match frame.cont {
-        ForOpaqueIter(..) => unreachable!(),
+        ForOpaqueIter(..) => impossible!(
+            line!(),
+            "an opaque-iteration frame reached the slow path, which does not handle it"
+        ),
         Respond(target) => Err(Interruption::Response(Response { target, value: v })),
         UnOp(un) => {
             *active.cont() = cont_value(crate::vm_ops::unop(un, v)?);
@@ -809,9 +811,11 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             *active.cont() = Cont::Value_(v);
             Ok(Step {})
         }
-        DoAdaptonPutForceThunk1(_) => todo!(),
-        DoAdaptonPutForceThunk2(_) => todo!(),
-        DoAdaptonPutForceThunk3 => todo!(),
+        DoAdaptonPutForceThunk1(_) => nyi!(line!(), "the first step of an Adapton put-force-thunk"),
+        DoAdaptonPutForceThunk2(_) => {
+            nyi!(line!(), "the second step of an Adapton put-force-thunk")
+        }
+        DoAdaptonPutForceThunk3 => nyi!(line!(), "the third step of an Adapton put-force-thunk"),
         DebugShow => {
             let shown = format_one_line(v.as_ref());
             *active.cont() = Cont::Value_(Value::Text(Text::new(shown)).into());

@@ -6,9 +6,9 @@ use std::slice::Iter;
 use crate::Interruption;
 use crate::adapton::{Pointer as AdaptonPointer, Space as AdaptonSpace, Time as AdaptonTime};
 use crate::dynamic::Dynamic;
-use crate::type_mismatch;
 use crate::vm_types::LocalPointer;
 use crate::vm_types::{Env, def::Actor as ActorDef, def::CtxId, def::Module as ModuleDef};
+use crate::{nyi, type_mismatch};
 use fumola_syntax::ast::{
     BinOp, Dec, Decs, Exp, Exp_, Function, Id, Id_, Literal, Mut, Pat_, PrimFunction, QuotedAst,
     ToId, UnOp,
@@ -305,7 +305,12 @@ impl<'de> Deserialize<'de> for DynamicValue {
     where
         D: serde::Deserializer<'de>,
     {
-        todo!()
+        // A dynamic value is a live Rust object behind an `Rc`; there is
+        // nothing in a serialized form to rebuild it from. Said as a serde
+        // error, which the caller already handles, rather than as a panic.
+        Err(serde::de::Error::custom(
+            "a dynamic value cannot be deserialized",
+        ))
     }
 }
 
@@ -317,8 +322,13 @@ impl Clone for DynamicValue {
 }
 
 impl PartialEq for DynamicValue {
-    fn eq(&self, _other: &Self) -> bool {
-        todo!()
+    /// Two dynamic values are the same one, or they are not.
+    ///
+    /// There is no structural equality to appeal to -- the contents are a Rust
+    /// object this module knows nothing about -- so identity is the only
+    /// honest answer. Comparing two of them used to stop the VM.
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
     }
 }
 impl Eq for DynamicValue {}
@@ -423,7 +433,7 @@ impl Value {
         match self {
             Value::QuotedAst(QuotedAst::TuplePats(ps)) => match ps.vec.len() {
                 1 => Ok(ps.vec[0].clone()),
-                _ => panic!(),
+                n => nyi!(line!(), "unquoting {} patterns where one is expected", n),
             },
             _ => type_mismatch!(file!(), line!()),
         }
@@ -433,7 +443,7 @@ impl Value {
         match self {
             Value::QuotedAst(QuotedAst::TupleExps(es)) => match es.vec.len() {
                 1 => Ok(es.vec[0].clone()),
-                _ => panic!(),
+                n => nyi!(line!(), "unquoting {} expressions where one is expected", n),
             },
             _ => type_mismatch!(file!(), line!()),
         }
@@ -742,8 +752,8 @@ impl Value {
             Value::Dynamic(d) => {
                 serde_json::to_value(d).map_err(|e| ValueError::ToRust(e.to_string()))?
             }
-            Value::AdaptonTime(_time) => todo!(),
-            Value::AdaptonSpace(_space) => todo!(),
+            Value::AdaptonTime(_time) => Err(ValueError::ToRust("AdaptonTime".to_string()))?,
+            Value::AdaptonSpace(_space) => Err(ValueError::ToRust("AdaptonSpace".to_string()))?,
         })
     }
 

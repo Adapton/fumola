@@ -26,7 +26,7 @@ impl Def {
 
 impl CtxId {
     pub fn get_field<'a, A: ActiveBorrow>(&self, a: &'a A, id: &Id) -> Option<&'a FieldDef> {
-        a.defs().map.get(self).unwrap().fields.get(id)
+        a.defs().map.get(self)?.fields.get(id)
     }
 }
 
@@ -70,8 +70,21 @@ impl Defs {
         self.active_ctx = CtxId(x);
         (saved, CtxId(x))
     }
-    pub fn reenter_context(&mut self, local_id: Option<Id_>, x: &CtxId) -> (CtxId, CtxId, Ctx) {
-        let old_ctx = self.map.get(x).unwrap().clone();
+    pub fn reenter_context(
+        &mut self,
+        local_id: Option<Id_>,
+        x: &CtxId,
+    ) -> Result<(CtxId, CtxId, Ctx), Interruption> {
+        let old_ctx = match self.map.get(x) {
+            Some(ctx) => ctx.clone(),
+            None => {
+                return Err(crate::impossible_!(
+                    line!(),
+                    "re-entering context {:?}, which the def table does not hold",
+                    x
+                ));
+            }
+        };
         let new_ctx = Ctx {
             parent: old_ctx.parent.clone(),
             fields: HashMap::new(),
@@ -80,7 +93,7 @@ impl Defs {
         let saved = self.active_ctx.clone();
         self.active_ctx = x.clone();
         self.map.insert(x.clone(), new_ctx);
-        (saved, x.clone(), old_ctx)
+        Ok((saved, x.clone(), old_ctx))
     }
     pub fn insert_field(
         &mut self,
@@ -91,8 +104,7 @@ impl Defs {
         def: Def,
     ) -> Result<(), Interruption> {
         let s = source.clone();
-        let a = self.active_ctx.clone();
-        let y = self.map.get_mut(&a).unwrap().fields.insert(
+        let y = self.active_ctx_mut(line!())?.fields.insert(
             i.clone(),
             crate::vm_types::def::Field {
                 source,
@@ -121,8 +133,7 @@ impl Defs {
         stab: Option<Stab_>,
         def: Def,
     ) -> Result<(), Interruption> {
-        let a = self.active_ctx.clone();
-        let y = self.map.get_mut(&a).unwrap().fields.insert(
+        let y = self.active_ctx_mut(line!())?.fields.insert(
             i.clone(),
             crate::vm_types::def::Field {
                 source,
@@ -134,22 +145,69 @@ impl Defs {
         if let Some(_) = y {
             Ok(())
         } else {
-            unreachable!()
+            // The caller reached here to replace a definition, and there was
+            // none. The insert above stands; what is wrong is the caller's
+            // belief about what it was replacing.
+            crate::impossible!(
+                line!(),
+                "re-inserting {}, which had no definition to replace",
+                i.as_str()
+            )
         }
     }
 
-    pub fn leave_context(&mut self, saved: CtxId, sanity_check_active: &CtxId) {
-        assert_eq!(&self.active_ctx, sanity_check_active);
-        if let Some(parent) = self
-            .map
-            .get(&self.active_ctx)
-            .expect("leave context")
-            .parent
-            .as_ref()
-        {
-            assert_eq!(parent, &saved)
+    /// The context this definition table is currently filling in.
+    fn active_ctx_mut(&mut self, line: u32) -> Result<&mut Ctx, Interruption> {
+        let a = self.active_ctx.clone();
+        match self.map.get_mut(&a) {
+            Some(ctx) => Ok(ctx),
+            None => Err(crate::impossible_!(
+                line,
+                "the active context {:?} is not in the def table",
+                a
+            )),
+        }
+    }
+
+    pub fn leave_context(
+        &mut self,
+        saved: CtxId,
+        sanity_check_active: &CtxId,
+    ) -> Result<(), Interruption> {
+        // Three beliefs the caller holds about the shape of the context stack.
+        // Each was an assertion that stopped the process; each now leaves by
+        // the same door as every other failure.
+        if &self.active_ctx != sanity_check_active {
+            return crate::impossible!(
+                line!(),
+                "leaving context {:?} while {:?} is active",
+                sanity_check_active,
+                self.active_ctx
+            );
+        }
+        let ctx = match self.map.get(&self.active_ctx) {
+            Some(ctx) => ctx,
+            None => {
+                return crate::impossible!(
+                    line!(),
+                    "leaving context {:?}, which the def table does not hold",
+                    self.active_ctx
+                );
+            }
+        };
+        if let Some(parent) = ctx.parent.as_ref() {
+            if parent != &saved {
+                return crate::impossible!(
+                    line!(),
+                    "leaving context {:?} to {:?}, which is not its parent {:?}",
+                    self.active_ctx,
+                    saved,
+                    parent
+                );
+            }
         }
         self.active_ctx = saved;
+        Ok(())
     }
     pub fn report_diff(&self, _old_ctx: &Ctx) {
         // to do
@@ -160,11 +218,20 @@ impl Defs {
         // - for entries in only old context, the new context is deleting them.
         // - for entries in only the new context, the new context is adding it.
     }
-    pub fn releave_context(&mut self, saved: CtxId, sanity_check_active: &CtxId, old_ctx: &Ctx) {
+    pub fn releave_context(
+        &mut self,
+        saved: CtxId,
+        sanity_check_active: &CtxId,
+        old_ctx: &Ctx,
+    ) -> Result<(), Interruption> {
         self.report_diff(old_ctx);
         self.leave_context(saved, sanity_check_active)
     }
 }
+
+/// What a test is filed under when it was declared in a program the VM was
+/// handed directly, rather than in a module read from a file.
+pub const PROGRAM_WITH_NO_FILE: &str = "<program>";
 
 pub fn module_project(
     defs: &Defs,
@@ -351,7 +418,7 @@ pub mod def {
                     &fields,
                     None,
                 )?;
-                active.defs().leave_context(saved, &ctxid);
+                active.defs().leave_context(saved, &ctxid)?;
                 *active.env() = importing_env;
                 *active.package() = importing_package;
                 if let Some(top_path) = active.module_files().import_stack.pop_back() {
@@ -380,9 +447,20 @@ pub mod def {
                         }
                         None => active.defs().active_path = None,
                     };
-                    assert_eq!(top_path, path)
+                    if top_path != path {
+                        return crate::impossible!(
+                            line!(),
+                            "finished importing {:?}, but the import stack had {:?} on top",
+                            path,
+                            top_path
+                        );
+                    }
                 } else {
-                    unreachable!()
+                    return crate::impossible!(
+                        line!(),
+                        "finished importing {:?} with an empty import stack",
+                        path
+                    );
                 };
                 if let Value::Module(m) = &*v {
                     let mf = ModuleFile {
@@ -396,7 +474,11 @@ pub mod def {
                         .insert(path.clone(), ModuleFileState::Defined(mf.clone()));
                     mf
                 } else {
-                    unreachable!()
+                    return crate::impossible!(
+                        line!(),
+                        "defining module {:?} produced a value that is not a module",
+                        path
+                    );
                 }
             }
         };
@@ -424,7 +506,10 @@ pub mod def {
                     .unwrap_or("".to_string());
                 ("func".to_string(), f)
             }
-            _ => todo!(),
+            // Only the two kinds with a name to list. Anything else lists as
+            // its own kind and no name, which is what a listing can say about
+            // it, rather than stopping the run.
+            d => (crate::format::format_one_line(d), String::new()),
         }
     }
 
@@ -435,35 +520,48 @@ pub mod def {
     ) -> Result<(), Interruption> {
         if let Some(ref attrs) = df.attrs {
             // to do -- introduce better semantic logic for attributes.
-            attrs.vec.iter().for_each(|attr| match &attr.0 {
-                ast::Attr::Id(id) => {
-                    if id.0.as_str() == "test" {
-                        let file = active
-                            .module_files()
-                            .import_stack
-                            .back()
-                            .map(|m| m.local_path.clone());
-                        let (_, y) = dec_field_kind_and_id(df);
-                        debug!("{}.{}", &file.clone().unwrap(), y);
-                        let ctx_id = active.defs().active_context();
-                        let defs = active.defs().clone();
-                        let ctx = defs.map.get(&ctx_id).unwrap().clone();
-
-                        let item = TestSuiteItem {
-                            file: file.clone().unwrap(),
-                            defs,
-                            ctx,
-                            ctx_id,
-                            dec_field: df.clone(),
-                            function: fd.clone(),
-                        };
-                        let _ = active.test_suite().insert(item, ());
-                        ()
-                    } else {
-                    }
+            for attr in attrs.vec.iter() {
+                let ast::Attr::Id(id) = &attr.0 else {
+                    continue;
+                };
+                if id.0.as_str() != "test" {
+                    continue;
                 }
-                _ => (),
-            });
+                // A test declared in a program the VM was handed directly --
+                // `fumola eval`, the REPL, a host embedding the VM -- sits in
+                // no imported file, and the import stack is empty. It is still
+                // a test; it is named for where it came from instead.
+                let file = active
+                    .module_files()
+                    .import_stack
+                    .back()
+                    .map(|m| m.local_path.clone())
+                    .unwrap_or_else(|| PROGRAM_WITH_NO_FILE.to_string());
+                let (_, y) = dec_field_kind_and_id(df);
+                debug!("{}.{}", &file, y);
+                let ctx_id = active.defs().active_context();
+                let defs = active.defs().clone();
+                let ctx = match defs.map.get(&ctx_id) {
+                    Some(ctx) => ctx.clone(),
+                    None => {
+                        return crate::impossible!(
+                            line!(),
+                            "test {} is declared in context {:?}, which the def table does not hold",
+                            y,
+                            ctx_id
+                        );
+                    }
+                };
+                let item = TestSuiteItem {
+                    file,
+                    defs,
+                    ctx,
+                    ctx_id,
+                    dec_field: df.clone(),
+                    function: fd.clone(),
+                };
+                let _ = active.test_suite().insert(item, ());
+            }
             return Ok(());
         };
         Ok(())
@@ -572,7 +670,7 @@ pub mod def {
                     df.dec.1.clone(),
                     df.vis.clone(),
                     df.stab.clone(),
-                    dfs.dec_fields(),
+                    crate::vm_step::dec_fields(dfs, line!())?,
                     None,
                 )?;
                 if let Some(id) = id {
@@ -587,7 +685,10 @@ pub mod def {
                     };
                     Ok(())
                 } else {
-                    unreachable!()
+                    return crate::impossible!(
+                        line!(),
+                        "a named module definition produced a value that is not a module"
+                    );
                 }
             }
             Dec::Func(f) => {
@@ -780,7 +881,7 @@ pub mod def {
         for df in dfs.vec.iter() {
             insert_owned_field(active, &ScheduleChoice::Actor(id.clone()), &df.1, &df.0)?;
         }
-        active.defs().leave_context(parent, &fields);
+        active.defs().leave_context(parent, &fields)?;
         let context = active.defs().active_context();
         let actor = crate::vm_types::def::Actor { context, fields };
         match id {
@@ -810,11 +911,11 @@ pub mod def {
         dfs: &DecFields,
         old_def: &ActorDef,
     ) -> Result<Value_, Interruption> {
-        let (saved, fields, old_ctx) = active.defs().reenter_context(None, &old_def.fields);
+        let (saved, fields, old_ctx) = active.defs().reenter_context(None, &old_def.fields)?;
         for df in dfs.vec.iter() {
             insert_owned_field(active, &ScheduleChoice::Actor(id.clone()), &df.1, &df.0)?;
         }
-        active.defs().releave_context(saved, &fields, &old_ctx);
+        active.defs().releave_context(saved, &fields, &old_ctx)?;
         let context = active.defs().active_context();
         let actor = crate::vm_types::def::Actor { context, fields };
         match id {
@@ -846,11 +947,11 @@ pub mod def {
         ctx_id: Option<CtxId>,
     ) -> Result<Value_, Interruption> {
         if let Some(ctx_id) = ctx_id {
-            let (saved, fields, old_ctx) = active.defs().reenter_context(id.clone(), &ctx_id);
+            let (saved, fields, old_ctx) = active.defs().reenter_context(id.clone(), &ctx_id)?;
             for df in dfs.vec.iter() {
                 insert_static_field(active, &df.1, &df.0)?;
             }
-            active.defs().releave_context(saved, &fields, &old_ctx);
+            active.defs().releave_context(saved, &fields, &old_ctx)?;
             let context = active.defs().active_context();
             let module = crate::vm_types::def::Module { context, fields };
             match id {
@@ -869,7 +970,7 @@ pub mod def {
             for df in dfs.vec.iter() {
                 insert_static_field(active, &df.1, &df.0)?;
             }
-            active.defs().leave_context(parent, &fields);
+            active.defs().leave_context(parent, &fields)?;
             let context = active.defs().active_context();
             let module = crate::vm_types::def::Module { context, fields };
             /*
@@ -964,7 +1065,10 @@ fn dec_is_static(d: &Dec) -> bool {
     match d {
         Dec::Exp(e) => exp_is_static(&e.0),
         Dec::Func(_) => true,
-        _ => todo!("dec_is_static({:?})", d),
+        // A declaration whose staticness this has no rule for is not static.
+        // The caller turns that into `ModuleNotStatic`, which names the
+        // declaration, rather than stopping the run here.
+        _ => false,
     }
 }
 
@@ -999,7 +1103,17 @@ pub fn resolve_def(
     is_public_projection: bool,
     x: &Id,
 ) -> Result<FieldDef, Interruption> {
-    let ctx = defs.map.get(&ctx_id).unwrap();
+    let ctx = match defs.map.get(&ctx_id) {
+        Some(ctx) => ctx,
+        None => {
+            return Err(crate::impossible_!(
+                line!(),
+                "resolving {} in context {:?}, which the def table does not hold",
+                x.as_str(),
+                ctx_id
+            ));
+        }
+    };
     match ctx.fields.get(x) {
         Some(d) => {
             let f_is_public = match &d.vis {

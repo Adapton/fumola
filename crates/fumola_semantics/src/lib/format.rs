@@ -16,10 +16,28 @@ use fumola_syntax::lexer_types::{GroupType, Token, TokenTree};
 use fumola_syntax::shared::Shared;
 use pretty::RcDoc;
 
+/// What the printer says about a form it does not render.
+///
+/// The printer has no error path to take: `Value::portable_hash` and the
+/// `Display` impls below both reach it from signatures that cannot carry an
+/// `Interruption` back out. A form it does not cover used to stop the process
+/// where it stood; it now prints as this marker, naming the form, and
+/// evaluation carries on to whatever the program does next.
+pub fn unrendered<'a>(what: &str) -> RcDoc<'a> {
+    RcDoc::text(format!("@unrendered(\"{}\")", what))
+}
+
 pub fn format_(doc: RcDoc, width: usize) -> String {
     let mut w = Vec::new();
-    doc.render(width, &mut w).unwrap();
-    String::from_utf8(w).unwrap()
+    // Writing into a `Vec` cannot fail for want of a device, and the printer
+    // emits only UTF-8; both arms say so rather than stopping the process.
+    if doc.render(width, &mut w).is_err() {
+        return "@unrendered(\"the pretty printer could not render this\")".to_string();
+    }
+    match String::from_utf8(w) {
+        Ok(s) => s,
+        Err(_) => "@unrendered(\"the pretty printer emitted invalid UTF-8\")".to_string(),
+    }
 }
 
 pub fn format_pretty(to_doc: &dyn ToDoc, width: usize) -> String {
@@ -302,7 +320,7 @@ impl ToDoc for PrimFunction {
             PrimFunction::NatToText => str("\"natToText\""),
             PrimFunction::ReflectValue => str("\"reifyValue\""),
             PrimFunction::ReifyValue => str("\"reifyValue\""),
-            PrimFunction::Collection(_collection_function) => todo!(),
+            PrimFunction::Collection(_) => unrendered("a collection prim"),
             PrimFunction::SymbolLevel => str("\"symbolLevel\""),
             PrimFunction::IntoSymbol => str("\"intoSymbol\""),
             PrimFunction::WriteFile => str("\"writeFile\""),
@@ -316,8 +334,8 @@ impl ToDoc for PrimFunction {
             PrimFunction::AdaptonNodeValsDiff => str("\"adaptonNodeValsDiff\""),
             PrimFunction::AdaptonNodeValsSize => str("\"adaptonNodeValsSize\""),
             PrimFunction::AdaptonPoke => str("\"adaptonPoke\""),
-            PrimFunction::ReifyCore => todo!(),
-            PrimFunction::ReflectCore => todo!(),
+            PrimFunction::ReifyCore => str("\"reifyCore\""),
+            PrimFunction::ReflectCore => str("\"reflectCore\""),
             PrimFunction::SymbolHash => str("\"symbolHash\""),
         }
     }
@@ -332,9 +350,9 @@ impl ToDoc for Value {
             Value::Nat(n) => RcDoc::text(n.to_string()),
             Value::Int(i) => RcDoc::text(i.to_string()),
             Value::Float(f) => RcDoc::text(f.to_string()),
-            Value::Char(_) => todo!(),
+            Value::Char(c) => RcDoc::text(format!("{:?}", c)),
             Value::Text(t) => RcDoc::text(format!("{:?}", t.to_string())),
-            Value::Blob(_) => todo!(),
+            Value::Blob(_) => unrendered("a blob"),
             Value::Array(Mut::Const, vs) => enclose("[", vector(vs, ","), "]"),
             Value::Array(Mut::Var, vs) => enclose("[var ", vector(vs, ","), "]"),
             Value::Tuple(vs) => vector_tuple(vs),
@@ -369,8 +387,8 @@ impl ToDoc for Value {
             )), */
             Value::Pointer(p) => p.doc(),
             Value::Symbol(s) => s.doc(),
-            Value::Opaque(_) => todo!(),
-            Value::Index(_, _) => todo!(),
+            Value::Opaque(p) => kwd("@opaque").append(enclose("(", p.doc(), ")")),
+            Value::Index(_, _) => unrendered("an index value"),
             Value::Function(f) => kwd("@func").append(enclose(
                 "(",
                 f.0.ctx
@@ -389,11 +407,15 @@ impl ToDoc for Value {
             }
             Value::Collection(c) => match c {
                 crate::value::Collection::HashMap(m) => hashmap(m),
-                crate::value::Collection::FastRandIter(_) => todo!(),
+                crate::value::Collection::FastRandIter(_) => unrendered("a fast random iterator"),
             },
             Value::Dynamic(d) => kwd("@dynamic").append(RcDoc::text(format!("{:?}", d))),
-            Value::Actor(_) => todo!(),
-            Value::ActorMethod(_) => todo!(),
+            Value::Actor(a) => kwd("@actor").append(RcDoc::text(format!("{:?}", a.id))),
+            Value::ActorMethod(m) => kwd("@actorMethod").append(RcDoc::text(format!(
+                "{:?}.{}",
+                m.actor,
+                m.method.as_str()
+            ))),
             Value::QuotedAst(q) => q.doc(),
             Value::AdaptonTime(time) => kwd("@adaptonTime").append(enclose("(", time.doc(), ")")),
             // Opaque on purpose: the point of these forms is not to be spelled out. What is
@@ -436,7 +458,7 @@ impl ToDoc for QuotedAst {
                 ")",
             )),
             QuotedAst::Cases(cases) => str("`").append(enclose("{", delim(cases, ";"), "}")),
-            _ => todo!(),
+            _ => unrendered("this kind of quoted syntax"),
         }
     }
 }
@@ -454,7 +476,7 @@ impl ToDoc for Literal {
             Float(f) => f,
             Text(t) => t,
             Char(c) => c,
-            Blob(_) => unimplemented!(),
+            Blob(_) => return unrendered("a blob literal"),
             // _ => text("Display-TODO={:?}", self),
         })
     }
@@ -590,11 +612,11 @@ impl ToDoc for Exp {
                 Err(s) => kwd("prim").append(format!("{:?}", s)),
             },
             Var(id) => id.doc(),
-            ActorUrl(_) => todo!(),
+            ActorUrl(_) => unrendered("an actor URL"),
             Rel(e1, r, e2) => bin_op(e1, r.doc(), e2),
             Show(e) => kwd("debug_show").append(e.doc()),
-            ToCandid(_) => todo!(),
-            FromCandid(_) => todo!(),
+            ToCandid(_) => unrendered("a to-Candid expression"),
+            FromCandid(_) => unrendered("a from-Candid expression"),
             //            Proj(e1, n) => e1.doc().append(format!(".{}", n)),
             Opt(e) => str("?").append(e.doc()),
             DoOpt(e) => kwd("do ?").append(e.doc()),
@@ -670,7 +692,7 @@ impl ToDoc for Exp {
             Import(s) => kwd("import").append(s.doc()), // new permissive syntax?
             Throw(e) => kwd("throw").append(e.doc()),
             Try(_e, _cs) => {
-                todo!()
+                unrendered("a try expression")
                 // let mut doc = kwd("try").append(e.doc());
                 // // ?????
                 // for c in cs {
@@ -692,7 +714,7 @@ impl ToDoc for Exp {
                 match (bases, fields) {
                     (None, None) => RcDoc::nil(),
                     (None, Some(fields)) => vector(&fields.vec, ";"),
-                    (Some(_), None) => todo!(),
+                    (Some(bases), None) => vector(&bases.vec, "and"),
                     (Some(bases), Some(fields)) => vector(&bases.vec, "and")
                         .append(kwd(" with"))
                         .append(vector(&fields.vec, ";")),
@@ -700,10 +722,10 @@ impl ToDoc for Exp {
                 "}",
             ),
             DebugShow(e) => kwd("debug_show").append(e.doc()),
-            Async(_) => todo!(),
-            AsyncStar(_) => todo!(),
-            AwaitStar(_) => todo!(),
-            Annot(_, _, _) => todo!(),
+            Async(_) => unrendered("an async block"),
+            AsyncStar(_) => unrendered("an async* block"),
+            AwaitStar(_) => unrendered("an await*"),
+            Annot(_, _, _) => unrendered("an annotated expression"),
             QuotedAst(q) => q.doc(),
             Unquote(e) => kwd("~").append(e.doc()),
             Thunk(e) => kwd("thunk").append(e.doc()),
@@ -746,7 +768,7 @@ impl ToDoc for Dec {
     fn doc(&'_ self) -> RcDoc<'_> {
         use Dec::*;
         match self {
-            Attrs(_a, _d) => todo!(),
+            Attrs(_a, d) => d.doc(),
             Exp(e) => e.doc(),
             Let(p, e) => kwd("let")
                 .append(p.doc())
@@ -768,8 +790,8 @@ impl ToDoc for Dec {
                 .append(" = ")
                 .append(t.doc()),
             Type(i, None, t) => kwd("type").append(i.doc()).append(" = ").append(t.doc()),
-            Class(_) => todo!(),
-            _ => todo!(),
+            Class(_) => unrendered("a class declaration"),
+            _ => unrendered("this kind of declaration"),
         }
     }
 }
@@ -896,7 +918,7 @@ impl ToDoc for Pat {
         match self {
             Wild => str("_"),
             Var(s) => s.doc(),
-            UnOpLiteral(_u, _l) => todo!(),
+            UnOpLiteral(u, l) => u.doc().append(l.doc()),
             Literal(l) => l.doc(),
             Tuple(ps) => tuple(ps),
             Object(fields) => enclose("{", vector(&fields.vec, ";"), "}"),
@@ -905,12 +927,12 @@ impl ToDoc for Pat {
                 .append(s.doc())
                 .append(p.as_ref().map(|p| p.doc()).unwrap_or(RcDoc::nil())),
             //            Alt(d) => delim_left(d, " |"),
-            Annot(_t) => todo!(),
+            Annot(t) => kwd(":").append(t.doc()),
             AnnotPat(p, t) => p.doc().append(kwd(":")).append(t.doc()),
             Paren(p) => enclose("(", p.doc(), ")"),
-            Or(_, _) => todo!(),
-            Unquote(_) => todo!(),
-            TempVar(_) => todo!(),
+            Or(p1, p2) => p1.doc().append(kwd(" or ")).append(p2.doc()),
+            Unquote(u) => kwd("~").append(u.doc()),
+            TempVar(n) => RcDoc::text(format!("@temp{}", n)),
         }
     }
 }
@@ -929,7 +951,7 @@ impl ToDoc for TypeField {
     fn doc(&'_ self) -> RcDoc<'_> {
         match self {
             TypeField::Val(vtf) => vtf.id.doc().append(" : ").append(vtf.typ.doc()),
-            _ => todo!(),
+            _ => unrendered("this kind of type field"),
         }
     }
 }
@@ -968,7 +990,7 @@ impl ToDoc for Vis {
     fn doc(&'_ self) -> RcDoc<'_> {
         use Vis::*;
         match self {
-            Public(Some(_)) => todo!(), // ??
+            Public(Some(id)) => kwd("public").append(id.doc()),
             Public(None) => str("public"),
             Private => str("private"),
             System => str("system"),
@@ -1082,7 +1104,10 @@ impl ToDoc for TokenTree {
                 };
                 // let concat = RcDoc::concat(docs);
                 let (open, close) = if let Some((Loc(open, _), Loc(close, _))) = pair {
-                    (&open.data().unwrap()[..], &close.data().unwrap()[..])
+                    (
+                        open.data().map(|d| &d[..]).unwrap_or(""),
+                        close.data().map(|d| &d[..]).unwrap_or(""),
+                    )
                 } else {
                     ("", "") // TODO refactor GroupType into Option
                 };
@@ -1103,7 +1128,10 @@ impl ToDoc for Token {
         match self {
             &Line(_) => RcDoc::hardline(),
             &MultiLine(_) => RcDoc::hardline().append(RcDoc::hardline()),
-            t => str(t.data().unwrap()),
+            t => match t.data() {
+                Ok(d) => str(d),
+                Err(()) => unrendered("a token with no text"),
+            },
         }
         // str(self.data().unwrap())
     }

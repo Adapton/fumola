@@ -12,10 +12,33 @@ use fumola_syntax::ast::{
 use fumola_syntax::shared::{FastClone, Share};
 use im_rc::{HashMap, Vector, vector};
 
-pub use crate::{nyi, type_mismatch, type_mismatch_};
+pub use crate::{impossible, impossible_, nyi, type_mismatch, type_mismatch_};
 
 pub use crate::vm_stack_cont::call_function_def;
 use crate::vm_stack_cont::stack_cont;
+
+/// The declaration fields of an object, module or actor body.
+///
+/// A body written as `~x` arrives here with the unquote unsubstituted, which
+/// the AST cannot represent as fields. That is a program the VM does not
+/// handle yet, and it now says so rather than stopping.
+pub fn dec_fields<'a>(
+    dfs: &'a fumola_syntax::ast::DecFieldsPos,
+    line: u32,
+) -> Result<&'a fumola_syntax::ast::DecFields, Interruption> {
+    match dfs.dec_fields() {
+        Some(dfs) => Ok(dfs),
+        None => Err(crate::vm_types::Interruption::NotYetImplemented(
+            crate::vm_types::CoreSource {
+                name: None,
+                description: Some("Not yet implemented in current VM logic".to_string()),
+                file: file!().to_string(),
+                line,
+            },
+            Some("an unquote still standing where declaration fields were expected".to_string()),
+        )),
+    }
+}
 
 pub fn unit_step<A: Active>(active: &mut A) -> Result<Step, Interruption> {
     *active.cont() = Cont::Value_(Value::Unit.share());
@@ -124,7 +147,15 @@ pub fn step_adapton_nav<A: Active>(
     mut nav: Vector<AdaptonNav_>,
     body: &Exp_,
 ) -> Result<Step, Interruption> {
-    let first = nav.pop_front().unwrap();
+    let first = match nav.pop_front() {
+        Some(first) => first,
+        None => {
+            return impossible!(
+                line!(),
+                "adapton navigation stepped with nothing left to step"
+            );
+        }
+    };
     let (tag, e) = match &first.0 {
         AdaptonNavAst::Goto(Some(d), e) => match d.0 {
             AdaptonNavDim::Time => (AdaptonNav::GotoTime, e),
@@ -186,7 +217,13 @@ pub fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interrupti
             Ok(Step {})
         }
         Variant(id, Some(e)) => exp_conts(active, FrameCont::Variant(id.0.id_()), e),
-        Switch(e1, cases) => exp_conts(active, FrameCont::Switch(cases.cases().clone()), e1),
+        Switch(e1, cases) => match cases.cases() {
+            Some(cases) => exp_conts(active, FrameCont::Switch(cases.clone()), e1),
+            None => nyi!(
+                line!(),
+                "an unquote still standing where a switch's cases were expected"
+            ),
+        },
         Block(decs) => exp_conts_(
             active,
             source.clone(),
@@ -289,8 +326,9 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
     active_trace(active);
     let cont = active.cont().clone();
     match cont {
-        Cont::Frame(_, _) => unreachable!(
-            "VM logic is broken. Old frame continuation (for debugging) should be replaced by now."
+        Cont::Frame(_, _) => impossible!(
+            line!(),
+            "the frame continuation kept for debugging outlived the step that installed it"
         ),
         Cont::Exp_(e, decs) => {
             if decs.is_empty() {
@@ -312,15 +350,19 @@ fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
         }
         Cont::LetVarRet(_, i) => {
             match i {
-                Some(i) => {
-                    *active.cont() = Cont::Value_(
-                        active
-                            .env()
-                            .get(&i.0)
-                            .ok_or(Interruption::Impossible)?
-                            .fast_clone(),
-                    )
-                }
+                Some(i) => *active.cont() = Cont::Value_(
+                    active
+                        .env()
+                        .get(&i.0)
+                        .ok_or_else(|| {
+                            impossible_!(
+                                line!(),
+                                "let-var return names {}, which its own environment does not bind",
+                                i.0.as_str()
+                            )
+                        })?
+                        .fast_clone(),
+                ),
                 None => *active.cont() = cont_value(Value::Unit),
             };
             Ok(Step {})
@@ -373,7 +415,15 @@ pub fn decs_step<A: Active>(active: &mut A, mut decs: Vector<Dec_>) -> Result<St
 
         Ok(Step {})
     } else {
-        let dec_ = decs.pop_front().unwrap();
+        let dec_ = match decs.pop_front() {
+            Some(dec_) => dec_,
+            None => {
+                return impossible!(
+                    line!(),
+                    "a declaration list just checked non-empty is empty"
+                );
+            }
+        };
         match &dec_.0 {
             Dec::Type(..) => {
                 *active.cont() = Cont::Decs(decs);
@@ -403,7 +453,7 @@ pub fn decs_step<A: Active>(active: &mut A, mut decs: Vector<Dec_>) -> Result<St
             Dec::LetActor(i, _, dfs) => {
                 let v = match i {
                     /* Are we upgrading a local Actor? */
-                    None => todo!(),
+                    None => return nyi!(line!(), "an actor declaration with no name"),
                     Some(local_name) => {
                         let ctx_id = active.defs().active_ctx.clone();
                         let old_def = ctx_id
@@ -419,7 +469,7 @@ pub fn decs_step<A: Active>(active: &mut A, mut decs: Vector<Dec_>) -> Result<St
                                 dec_.1.clone(),
                                 None,
                                 None,
-                                dfs.dec_fields(),
+                                dec_fields(dfs, line!())?,
                             )?,
                             Some(FieldDef {
                                 def: Def::Actor(old_def),
@@ -431,10 +481,17 @@ pub fn decs_step<A: Active>(active: &mut A, mut decs: Vector<Dec_>) -> Result<St
                                 dec_.1.clone(),
                                 None,
                                 None,
-                                dfs.dec_fields(),
+                                dec_fields(dfs, line!())?,
                                 &old_def,
                             )?,
-                            _ => unreachable!(),
+                            Some(other) => {
+                                return nyi!(
+                                    line!(),
+                                    "actor {} would replace a {}, which is not an actor",
+                                    local_name.0.id().as_str(),
+                                    other.def.kind_name()
+                                );
+                            }
                         }
                     }
                 };
@@ -461,7 +518,7 @@ pub fn decs_step<A: Active>(active: &mut A, mut decs: Vector<Dec_>) -> Result<St
                     dec_.1.clone(),
                     None,
                     None,
-                    dfs.dec_fields(),
+                    dec_fields(dfs, line!())?,
                     None,
                 )?;
                 match id {
@@ -562,7 +619,10 @@ fn stack_cont_has_redex<A: ActiveBorrow>(active: &A, v: &Value) -> Result<bool, 
         Ok(false)
     } else {
         use FrameCont::*;
-        let frame = active.stack().front().unwrap();
+        let frame = match active.stack().front() {
+            Some(frame) => frame,
+            None => return impossible!(line!(), "a stack just checked non-empty is empty"),
+        };
         let r = match &frame.cont {
             Respond(_) => true,
             UnOp(_) => true,

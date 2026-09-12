@@ -335,7 +335,13 @@ impl Node {
     pub fn force_action(&mut self) -> Res<Action> {
         match self {
             Node::NonThunk(_) => Err(Error::Unreachable),
-            Node::Thunk(t) => Ok(Action::Force(t.body.clone(), t.result.clone().unwrap().1)),
+            Node::Thunk(t) => match t.result.clone() {
+                Some((_, value)) => Ok(Action::Force(t.body.clone(), value)),
+                // A force of a thunk with no cached result is a force of
+                // something that has not run; `force_begin_action` is the one
+                // to take then.
+                None => Err(Error::Unreachable),
+            },
         }
     }
     pub fn force_begin_action(&mut self) -> Res<Action> {
@@ -375,14 +381,19 @@ impl GraphicalState {
             node,
         });
     }
-    fn extend_history_with_edge_update(&mut self, edge_id: EdgeId) {
-        let edge = self.edges.get(&edge_id).unwrap().clone();
+    fn extend_history_with_edge_update(&mut self, edge_id: EdgeId) -> Res<()> {
+        let edge = self
+            .edges
+            .get(&edge_id)
+            .ok_or(Error::Internal(line!()))?
+            .clone();
         self.extend_history_with_event(Event::UpdateEdge(edge_id.clone()));
         self.history.edges.push_back(EdgeHistoryItem {
             meta_time: self.meta_time.clone(),
             edge_id,
             edge,
         });
+        Ok(())
     }
     fn extend_history_with_new_node(&mut self, p: &Pointer, t: Option<&Time>, n: &Node) {
         let time = match t {
@@ -416,11 +427,7 @@ impl GraphicalState {
         p: &Pointer,
         t: &Time,
     ) -> Option<(&'a MetaTime, &'a mut Node)> {
-        let res = self.get_node_by_time_mut(p).get_mut(t);
-        if res == None {
-            return None;
-        };
-        let res = res.unwrap();
+        let res = self.get_node_by_time_mut(p).get_mut(t)?;
         let mut latest: Option<(&MetaTime, &'a mut Node)> = None;
         for (m, n) in res.iter_mut() {
             if let Some((m0, _)) = latest {
@@ -510,7 +517,11 @@ impl GraphicalState {
         updated_action: Action,
         meta_time_begin: Option<MetaTime>,
     ) -> Res<()> {
-        let edge = self.edges.get(edge_id).unwrap().clone();
+        let edge = self
+            .edges
+            .get(edge_id)
+            .ok_or(Error::Internal(line!()))?
+            .clone();
         let meta_time = self.meta_time.clone();
         self.edges = self.edges.update(
             edge_id.clone(),
@@ -585,30 +596,27 @@ impl GraphicalState {
             .get(&readers_key)
             .unwrap_or(&vector!())
             .clone();
-        Ok(edge_ids
+        edge_ids
             .into_iter()
             .map(|edge_id| {
-                let edge = self.edges.get(&edge_id).unwrap();
-                (edge_id.clone(), edge.clone())
+                let edge = self.edges.get(&edge_id).ok_or(Error::Internal(line!()))?;
+                Ok((edge_id.clone(), edge.clone()))
             })
-            .collect())
+            .collect()
     }
     fn get_outgoing_edges<'a>(&'a self, pointer: &Pointer) -> Res<Vector<(EdgeId, Edge)>> {
         let (_nid, node) = self.get_node(pointer)?;
         match node {
             Node::NonThunk(_) => Ok(vector!()),
-            Node::Thunk(thunk_node) => {
-                let edges = thunk_node
-                    .trace
-                    .clone()
-                    .into_iter()
-                    .map(|edge_id| {
-                        let edge = self.edges.get(&edge_id).unwrap();
-                        (edge_id.clone(), edge.clone())
-                    })
-                    .collect();
-                Ok(edges)
-            }
+            Node::Thunk(thunk_node) => thunk_node
+                .trace
+                .clone()
+                .into_iter()
+                .map(|edge_id| {
+                    let edge = self.edges.get(&edge_id).ok_or(Error::Internal(line!()))?;
+                    Ok((edge_id.clone(), edge.clone()))
+                })
+                .collect(),
         }
     }
 
@@ -888,7 +896,8 @@ impl GraphicalState {
                         latest = Some((m, n))
                     }
                 }
-                let latest = latest.unwrap();
+                // `nodes` is a non-empty map, so the loop above found one.
+                let latest = latest.ok_or(Error::UndefinedNow(pointer.clone()))?;
                 let node_id = (pointer.clone(), self.time.clone(), latest.0.clone());
                 Ok((node_id, latest.1))
             } else {
@@ -913,16 +922,11 @@ impl GraphicalState {
                         }
                     }
                 }
-                match node {
-                    Some(node) => Ok((
-                        (
-                            pointer.clone(),
-                            time.unwrap().clone(),
-                            meta_time.unwrap().clone(),
-                        ),
-                        node,
-                    )),
-                    None => Err(Error::UndefinedNow(pointer.clone())),
+                match (node, time, meta_time) {
+                    (Some(node), Some(time), Some(meta_time)) => {
+                        Ok(((pointer.clone(), time.clone(), meta_time.clone()), node))
+                    }
+                    _ => Err(Error::UndefinedNow(pointer.clone())),
                 }
             }
         } else {
@@ -1157,9 +1161,10 @@ impl CacheState for GraphicalState {
             FrameKind::Force(_node_id, edge_id) => {
                 self.extend_history_with_event(Event::ForceEnd(edge_id.clone()));
                 self.update_edge(&edge_id, action, Some(fr.meta_time))?;
-                self.extend_history_with_edge_update(edge_id);
+                self.extend_history_with_edge_update(edge_id)?;
             }
-            _ => unreachable!(),
+            // `force_end` is reached only from the force this pops.
+            _ => return Err(Error::UnreachableForceEnd),
         };
         Ok(())
     }

@@ -76,6 +76,35 @@ macro_rules! nyi {
     };
 }
 
+/// The Interruption that replaces a panic on an invariant the VM relies on.
+///
+/// `nyi!` says "this program asked for something the VM does not implement yet".
+/// `impossible!` says something different: the VM believed a thing about its own
+/// state, and the thing was not so. Both leave by the same door, so a host that
+/// embeds Fumola has one error path to handle rather than an error path and a
+/// process that stops.
+#[macro_export]
+macro_rules! impossible_ {
+    ($line:expr, $($mesg:tt)+) => {
+        $crate::Interruption::Impossible(
+            $crate::vm_types::CoreSource {
+                name: None,
+                description: Some("An invariant of the VM did not hold".to_string()),
+                file: file!().to_string(),
+                line: $line,
+            },
+            Some(format!($($mesg)+)),
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! impossible {
+    ($line:expr, $($mesg:tt)+) => {
+        Err($crate::impossible_!($line, $($mesg)+))
+    };
+}
+
 pub mod def {
     use fumola_syntax::ast::{Id, Id_, Source, Stab_, Vis_};
     use im_rc::HashMap;
@@ -123,6 +152,19 @@ pub mod def {
         /// We represent "static values" as expressions.
         /// (to permit variables that mention other static values.)
         StaticValue(CtxId, super::Exp_),
+    }
+
+    impl Def {
+        /// What to call this definition in a message meant for a person.
+        pub fn kind_name(&self) -> &'static str {
+            match self {
+                Def::Module(..) => "module",
+                Def::Actor(..) => "actor",
+                Def::Func(..) => "function",
+                Def::Var(..) => "variable",
+                Def::StaticValue(..) => "static value",
+            }
+        }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -205,13 +247,10 @@ pub fn source_from_cont(cont: &Cont) -> Source {
     match cont {
         Frame(_v, _fr) => Source::Evaluation,
         Decs(decs) => fumola_syntax::ast::source_from_decs(decs),
-        Exp_(exp_, decs) => {
-            if decs.is_empty() {
-                exp_.1.clone()
-            } else {
-                exp_.1.expand(&decs.back().unwrap().1)
-            }
-        }
+        Exp_(exp_, decs) => match decs.back() {
+            Some(last) => exp_.1.expand(&last.1),
+            None => exp_.1.clone(),
+        },
         LetVarRet(s, _) => s.clone(),
         Value_(_v) => fumola_syntax::ast::Source::Evaluation,
     }
@@ -317,7 +356,7 @@ pub mod stack {
                     Value::Dynamic(..) => Call2Dyn,
                     _ => None?,
                 },
-                _ => todo!(),
+                _ => None?,
             })
         }
     }
@@ -390,10 +429,21 @@ impl Store {
         }
     }
 
-    pub fn array_iter_next(&mut self, p: &LocalPointer) -> usize {
-        let x = self.array_iter_positions.get(p).unwrap().clone();
+    pub fn array_iter_next(&mut self, p: &LocalPointer) -> Result<usize, Interruption> {
+        // The position belongs to an iterator this store allocated. One that
+        // arrived from somewhere else -- a value carried across stores -- has
+        // no position here, and is reported rather than stopping the VM.
+        let x = match self.array_iter_positions.get(p) {
+            Some(x) => *x,
+            None => {
+                return Err(Interruption::Dangling(Pointer {
+                    owner: self.owner.clone(),
+                    local: p.clone(),
+                }));
+            }
+        };
         self.array_iter_positions.insert(p.clone(), x + 1);
-        x
+        Ok(x)
     }
 
     fn alloc(&mut self, value: impl Into<Value_>) -> Pointer {
@@ -407,15 +457,27 @@ impl Store {
         }
     }
 
-    pub fn alloc_named(&mut self, name: Id, value: impl Into<Value_>) -> Pointer {
+    pub fn alloc_named(
+        &mut self,
+        name: Id,
+        value: impl Into<Value_>,
+    ) -> Result<Pointer, Interruption> {
         let value = value.into();
         let ptr = LocalPointer::Named(NamedPointer(name));
-        let prev = self.map.insert(ptr.clone(), value);
-        assert_eq!(prev, None);
-        Pointer {
+        // Allocating over a name already in the store would drop the value
+        // that was there, with nothing to say it had happened.
+        if self.map.contains_key(&ptr) {
+            return Err(crate::impossible_!(
+                line!(),
+                "the store already holds a named pointer for {:?}",
+                ptr
+            ));
+        }
+        self.map.insert(ptr.clone(), value);
+        Ok(Pointer {
             owner: self.owner.clone(),
             local: ptr,
-        }
+        })
     }
 
     pub fn dealloc(&mut self, pointer: &LocalPointer) -> Option<Value_> {
@@ -624,9 +686,7 @@ impl PartialOrd for TestSuiteItem {
 fn ord_id_pos_option(left: &Option<IdPos_>, right: &Option<IdPos_>) -> std::cmp::Ordering {
     match (left, right) {
         (Some(id_left), Some(id_right)) => id_left.0.id().as_str().cmp(id_right.0.id().as_str()),
-        (None, None) => {
-            todo!()
-        }
+        (None, None) => std::cmp::Ordering::Equal,
         (None, Some(_)) => std::cmp::Ordering::Less,
         (Some(_), None) => std::cmp::Ordering::Greater,
     }
@@ -913,9 +973,127 @@ pub enum Interruption {
     MisplacedReturn,
     NotYetImplemented(CoreSource, Option<String>),
     Unknown,
-    Impossible,
+    Impossible(CoreSource, Option<String>),
     AdaptonError(crate::adapton::Error),
     Other(String),
+}
+
+/// One line a person can read, for each way a step can stop.
+///
+/// Hosts embedding the VM report interruptions; `{:?}` gives them a Rust dump
+/// with the message buried in it. This is the sentence instead. `CoreSource`
+/// keeps the file and line, which is what to quote when reporting a VM bug.
+impl std::fmt::Display for CoreSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.file, self.line)
+    }
+}
+
+impl std::fmt::Display for OptionCoreSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.0 {
+            Some(source) => write!(f, " (at {})", source),
+            None => Ok(()),
+        }
+    }
+}
+
+impl std::fmt::Display for Interruption {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Interruption::*;
+        match self {
+            Done(_) => write!(f, "the program is done"),
+            Send(m, _, _) => write!(f, "sending {} to an actor", m.method.as_str()),
+            Response(_) => write!(f, "an actor responded"),
+            Breakpoint(b) => write!(f, "stopped at a breakpoint ({}..{})", b.start, b.end),
+            Dangling(p) => write!(f, "a pointer that names nothing in the store: {:?}", p),
+            NotOwner(p) => write!(f, "a pointer belonging to another agent: {:?}", p),
+            ImportCycle(paths) => write!(
+                f,
+                "these modules import each other in a cycle: {}",
+                paths
+                    .iter()
+                    .map(|p| p.local_path.clone())
+                    .collect::<Vec<_>>()
+                    .join(" -> ")
+            ),
+            ModuleFileNotFound(p) => write!(f, "no module file at {}", p.local_path),
+            ModuleNotStatic(source, Some(what)) => {
+                write!(
+                    f,
+                    "{} at {} is not static, so it cannot be a module field",
+                    what, source
+                )
+            }
+            ModuleNotStatic(source, None) => {
+                write!(
+                    f,
+                    "the declaration at {} is not static, so it cannot be a module field",
+                    source
+                )
+            }
+            ModuleFieldNotPublic(id) => write!(f, "the field {} is not public", id.as_str()),
+            TypeMismatch(source) => write!(f, "a value of the wrong kind{}", source),
+            NonLiteralInit(source) => {
+                write!(
+                    f,
+                    "a var field at {} is initialized by something other than a literal",
+                    source
+                )
+            }
+            NoMatchingCase => write!(f, "no case matched the value being switched on"),
+            ValueError(e) => write!(f, "a value could not be converted: {:?}", e),
+            EvalInitError(e) => write!(f, "the VM was not ready to evaluate: {:?}", e),
+            UnboundIdentifer(id) => write!(f, "{} is not bound here", id.as_str()),
+            MissingActorDefinition => write!(f, "no actor definition was given"),
+            NotAnActorDefinition => write!(f, "this is not an actor definition"),
+            NotAModuleDefinition => write!(f, "this is not a module definition"),
+            MissingModuleDefinition => write!(f, "no module definition was given"),
+            AmbiguousActorId(id) => write!(f, "more than one actor is named {:?}", id),
+            ActorIdNotFound(id) => write!(f, "no actor is named {:?}", id),
+            ActorFieldNotFound(id, x) => {
+                write!(f, "actor {:?} has no field {}", id, x.as_str())
+            }
+            ActorFieldNotPublic(id, x) => {
+                write!(
+                    f,
+                    "the field {} of actor {:?} is not public",
+                    x.as_str(),
+                    id
+                )
+            }
+            AmbiguousIdentifer(id, s1, s2) => write!(
+                f,
+                "{} is defined twice, at {} and at {}",
+                id.as_str(),
+                s1,
+                s2
+            ),
+            UnrecognizedPrim(name) => write!(f, "there is no prim called {}", name),
+            Limit(limit) => write!(f, "a limit was reached: {:?}", limit),
+            DivideByZero => write!(f, "division by zero"),
+            AmbiguousOperation => write!(f, "an operation with more than one meaning here"),
+            AssertionFailure => write!(f, "an assertion failed"),
+            IndexOutOfBounds => write!(f, "an index past the end"),
+            NoDoQuestBangNull => write!(f, "a null reached `!` outside any `do ?` block"),
+            MisplacedReturn => write!(f, "a return outside any function"),
+            NotYetImplemented(source, Some(what)) => {
+                write!(f, "not yet implemented: {} (at {})", what, source)
+            }
+            NotYetImplemented(source, None) => {
+                write!(f, "not yet implemented (at {})", source)
+            }
+            Unknown => write!(f, "something went wrong, with nothing recorded about what"),
+            Impossible(source, Some(what)) => {
+                write!(f, "a VM invariant did not hold: {} (at {})", what, source)
+            }
+            Impossible(source, None) => {
+                write!(f, "a VM invariant did not hold (at {})", source)
+            }
+            AdaptonError(e) => write!(f, "the Adapton engine stopped: {:?}", e),
+            Other(s) => write!(f, "{}", s),
+        }
+    }
 }
 
 impl From<crate::adapton::Error> for Interruption {

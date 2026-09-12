@@ -85,11 +85,15 @@ fn pattern_matches_temps_(pat: &Pat, v: Value_, mut out: Vec<Value_>) -> Option<
         (Pat::Literal(Literal::Unit), Value::Unit) => Some(out),
         (Pat::Paren(p), _) => pattern_matches_temps_(&p.0, v, out),
         (Pat::AnnotPat(p, _), _) => pattern_matches_temps_(&p.0, v, out),
-        (Pat::Var(_x), _) => {
-            unreachable!()
-        }
+        // Callers build these patterns with `pattern::temps`, which produces
+        // only temp vars in order. Anything else is not a pattern this match
+        // can answer for, and saying "no match" hands the caller its own error
+        // path instead of stopping the VM on the way there.
+        (Pat::Var(_x), _) => None,
         (Pat::TempVar(n), _) => {
-            assert_eq!(out.len() as u16, *n);
+            if out.len() as u16 != *n {
+                return None;
+            }
             out.push(v.fast_clone());
             Some(out)
         }

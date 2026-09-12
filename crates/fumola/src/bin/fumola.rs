@@ -336,7 +336,11 @@ fn repl(state: &mut State) {
             }
         }
     }
-    rl.save_history("history.txt").unwrap();
+    // A REPL that cannot save its history has still done its job; saying so
+    // is better than stopping on the way out.
+    if let Err(e) = rl.save_history("history.txt") {
+        error!("could not save REPL history: {}", e);
+    }
 }
 
 fn post_eval(state: &mut State, result: Result<Value_, Error>) {
@@ -363,11 +367,17 @@ fn post_eval(state: &mut State, result: Result<Value_, Error>) {
             path_string,
             truncate_with_ellipsis(content.as_str(), 69)
         );
-        let mut file = File::create(path_string).expect("opening output file");
+        // A program chose this path with `prim "writeFile"`. The filesystem
+        // may refuse it -- a missing directory, no permission, a name it will
+        // not take -- and that is the program's problem to hear about, not a
+        // reason to stop the CLI where it stands.
         let content_to_write = expand_escapes(content.as_str());
-        file.write_all(content_to_write.to_string().as_bytes())
-            .expect("writing output file");
-        file.flush().expect("flush output file")
+        if let Err(e) = File::create(&path_string).and_then(|mut file| {
+            file.write_all(content_to_write.to_string().as_bytes())?;
+            file.flush()
+        }) {
+            error!("could not write file `{}`: {}", path_string, e);
+        }
     }
     state.semantic_state.output_files = im_rc::hashmap::HashMap::new();
 
@@ -424,7 +434,10 @@ fn report_error(state: &mut State, error: fumola::Error) {
     let cont = state.semantic_state.cont().clone();
     let cont_source = state.semantic_state.cont_source().clone();
     eprintln!("");
-    error!("{:?}", error);
+    // The sentence first, then the dump: a reader wants to know what happened
+    // before they want the structure it happened in.
+    error!("{}", error);
+    debug!("{:?}", error);
     eprintln!("");
 
     eprintln!("Current continuation is");
