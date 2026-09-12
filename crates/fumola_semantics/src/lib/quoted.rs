@@ -1,5 +1,5 @@
-use crate::type_mismatch;
 use crate::vm_types::{Env, Interruption};
+use crate::{nyi, type_mismatch};
 use fumola_syntax::ast::{
     Case, CasesPos, Dec, DecField, DecFieldsPos, Delim, Exp, ExpField, IdPos, NodeData, Pat,
     PatField, QuotedAst, Type,
@@ -81,7 +81,7 @@ impl QuotedClose for Pat {
             Pat::Wild => Ok(Pat::Wild),
             Pat::Var(x) => Ok(Pat::Var(x.clone())),
             Pat::Literal(l) => Ok(Pat::Literal(l.clone())),
-            Pat::UnOpLiteral(_, _) => todo!(),
+            Pat::UnOpLiteral(..) => nyi!(line!(), "a negated literal pattern inside a quotation"),
             Pat::Tuple(ps) => {
                 // to do -- Ok(Pat::Tuple(ps.map(|x| x.quoted_close(env))))
                 Ok(Pat::Tuple(ps.clone()))
@@ -91,10 +91,10 @@ impl QuotedClose for Pat {
             Pat::Variant(id, pat) => {
                 Ok(Pat::Variant(id.quoted_close(env)?, pat.quoted_close(env)?))
             }
-            Pat::Or(_, _) => todo!(),
+            Pat::Or(..) => nyi!(line!(), "an or-pattern inside a quotation"),
             Pat::AnnotPat(p, t) => Ok(Pat::AnnotPat(p.quoted_close(env)?, t.clone())),
-            Pat::Annot(_) => todo!(),
-            Pat::Paren(_) => todo!(),
+            Pat::Annot(..) => nyi!(line!(), "a type-annotation pattern inside a quotation"),
+            Pat::Paren(..) => nyi!(line!(), "a parenthesized pattern inside a quotation"),
             Pat::Unquote(i) => match env.get(&i.id.0) {
                 Some(v) => {
                     if v.is_quoted_id() {
@@ -105,7 +105,7 @@ impl QuotedClose for Pat {
                 }
                 None => Err(Interruption::UnboundIdentifer(i.id.0.clone())),
             },
-            Pat::TempVar(_) => todo!(),
+            Pat::TempVar(..) => nyi!(line!(), "a temporary-variable pattern inside a quotation"),
         }
     }
 }
@@ -120,14 +120,14 @@ impl QuotedClose for Dec {
                 // to do -- remove vars bound in p from env
                 Ok(Dec::Let(p.quoted_close(env)?, e.quoted_close(env)?))
             }
-            Dec::LetImport(_, _, _) => todo!(),
-            Dec::LetModule(_, _, _) => todo!(),
-            Dec::LetActor(_, _, _) => todo!(),
-            Dec::LetObject(_, _, _) => todo!(),
+            Dec::LetImport(..) => nyi!(line!(), "an import declaration inside a quotation"),
+            Dec::LetModule(..) => nyi!(line!(), "a module declaration inside a quotation"),
+            Dec::LetActor(..) => nyi!(line!(), "an actor declaration inside a quotation"),
+            Dec::LetObject(..) => nyi!(line!(), "an object declaration inside a quotation"),
             Dec::Func(f) => Ok(Dec::Func(f.clone())), // to do -- fix me
-            Dec::Var(_, _) => todo!(),
-            Dec::Type(_, _, _) => todo!(),
-            Dec::Class(_) => todo!(),
+            Dec::Var(..) => nyi!(line!(), "a var declaration inside a quotation"),
+            Dec::Type(..) => nyi!(line!(), "a type declaration inside a quotation"),
+            Dec::Class(..) => nyi!(line!(), "a class declaration inside a quotation"),
         }
     }
 }
@@ -151,19 +151,19 @@ impl QuotedClose for Type {
 
 impl QuotedClose for PatField {
     fn quoted_close(&self, _env: &Env) -> Result<PatField, Interruption> {
-        todo!()
+        nyi!(line!(), "an object-pattern field inside a quotation")
     }
 }
 
 impl QuotedClose for DecField {
     fn quoted_close(&self, _env: &Env) -> Result<DecField, Interruption> {
-        todo!()
+        nyi!(line!(), "a declaration field inside a quotation")
     }
 }
 
 impl QuotedClose for CasesPos {
     fn quoted_close(&self, _env: &Env) -> Result<CasesPos, Interruption> {
-        todo!()
+        nyi!(line!(), "switch cases inside a quotation")
     }
 }
 
@@ -178,7 +178,7 @@ impl QuotedClose for Case {
 
 impl QuotedClose for DecFieldsPos {
     fn quoted_close(&self, _env: &Env) -> Result<DecFieldsPos, Interruption> {
-        todo!()
+        nyi!(line!(), "declaration fields inside a quotation")
     }
 }
 
@@ -187,7 +187,7 @@ impl QuotedClose for Exp {
         use Exp::*;
         match &self {
             // Exp::Value_(_) => todo!(),
-            Exp::Hole => todo!(),
+            Exp::Hole => nyi!(line!(), "a hole inside a quotation"),
             Exp::Prim(_) => Ok(self.clone()),
             Exp::Var(x) => {
                 if x.0.unquote {
@@ -212,32 +212,34 @@ impl QuotedClose for Exp {
                 }
             }
             Exp::Literal(l) => Ok(Exp::Literal(l.clone())),
-            Exp::ActorUrl(_) => todo!(),
-            Exp::Un(_, _) => todo!(),
+            Exp::ActorUrl(..) => nyi!(line!(), "an actor URL inside a quotation"),
+            Exp::Un(..) => nyi!(line!(), "a unary operation inside a quotation"),
             Exp::Bin(e1, b, e2) => Ok(Exp::Bin(
                 e1.quoted_close(env)?,
                 b.clone(),
                 e2.quoted_close(env)?,
             )),
-            Exp::Rel(_, _, _) => todo!(),
-            Exp::Show(_) => todo!(),
-            Exp::ToCandid(_) => todo!(),
-            Exp::FromCandid(_) => todo!(),
+            Exp::Rel(..) => nyi!(line!(), "a comparison inside a quotation"),
+            Exp::Show(..) => nyi!(line!(), "a show expression inside a quotation"),
+            Exp::ToCandid(..) => nyi!(line!(), "a to-Candid expression inside a quotation"),
+            Exp::FromCandid(..) => nyi!(line!(), "a from-Candid expression inside a quotation"),
             Exp::Tuple(es) => Ok(Tuple(es.quoted_close(env)?)),
-            Exp::Proj(_, _) => todo!(),
-            Exp::Opt(_) => todo!(),
-            Exp::DoOpt(_) => todo!(),
-            Exp::DoAdaptonNav(_, _) => todo!(),
-            Exp::DoAdaptonPutForceThunk(_, _) => todo!(),
-            Exp::Bang(_) => todo!(),
-            Exp::ObjectBlock(_, _) => todo!(),
-            Exp::Object(_) => todo!(),
-            Exp::Variant(_, _) => todo!(),
-            Exp::Dot(_, _) => todo!(),
-            Exp::Assign(_, _) => todo!(),
-            Exp::BinAssign(_, _, _) => todo!(),
+            Exp::Proj(..) => nyi!(line!(), "a tuple projection inside a quotation"),
+            Exp::Opt(..) => nyi!(line!(), "an option expression inside a quotation"),
+            Exp::DoOpt(..) => nyi!(line!(), "a do-option block inside a quotation"),
+            Exp::DoAdaptonNav(..) => nyi!(line!(), "an Adapton navigation inside a quotation"),
+            Exp::DoAdaptonPutForceThunk(..) => {
+                nyi!(line!(), "an Adapton put-force-thunk inside a quotation")
+            }
+            Exp::Bang(..) => nyi!(line!(), "a null-check (!) inside a quotation"),
+            Exp::ObjectBlock(..) => nyi!(line!(), "an object block inside a quotation"),
+            Exp::Object(..) => nyi!(line!(), "an object literal inside a quotation"),
+            Exp::Variant(..) => nyi!(line!(), "a variant inside a quotation"),
+            Exp::Dot(..) => nyi!(line!(), "a field projection inside a quotation"),
+            Exp::Assign(..) => nyi!(line!(), "an assignment inside a quotation"),
+            Exp::BinAssign(..) => nyi!(line!(), "a compound assignment inside a quotation"),
             Exp::Array(m, es) => Ok(Exp::Array(m.clone(), es.quoted_close(env)?)),
-            Exp::Index(_, _) => todo!(),
+            Exp::Index(..) => nyi!(line!(), "an index expression inside a quotation"),
             Exp::Function(f) => Ok(Exp::Function(f.clone())), // to do -- fix me
             Exp::Call(fun, inst, args) => Ok(Call(
                 fun.quoted_close(env)?,
@@ -246,29 +248,29 @@ impl QuotedClose for Exp {
             )),
             Exp::Block(b) => Ok(Block(b.quoted_close(env)?)),
             Exp::Do(e) => Ok(Do(e.quoted_close(env)?)),
-            Exp::Not(_) => todo!(),
-            Exp::And(_, _) => todo!(),
-            Exp::Or(_, _) => todo!(),
-            Exp::If(_, _, _) => todo!(),
-            Exp::Switch(_, _) => todo!(),
-            Exp::While(_, _) => todo!(),
-            Exp::Loop(_, _) => todo!(),
-            Exp::For(_, _, _) => todo!(),
-            Exp::Label(_, _, _) => todo!(),
-            Exp::Break(_, _) => todo!(),
-            Exp::Return(_) => todo!(),
-            Exp::Debug(_) => todo!(),
-            Exp::DebugShow(_) => todo!(),
-            Exp::Async(_) => todo!(),
-            Exp::AsyncStar(_) => todo!(),
-            Exp::Await(_) => todo!(),
-            Exp::AwaitStar(_) => todo!(),
-            Exp::Assert(_) => todo!(),
+            Exp::Not(..) => nyi!(line!(), "a negation inside a quotation"),
+            Exp::And(..) => nyi!(line!(), "an and expression inside a quotation"),
+            Exp::Or(..) => nyi!(line!(), "an or expression inside a quotation"),
+            Exp::If(..) => nyi!(line!(), "an if expression inside a quotation"),
+            Exp::Switch(..) => nyi!(line!(), "a switch expression inside a quotation"),
+            Exp::While(..) => nyi!(line!(), "a while loop inside a quotation"),
+            Exp::Loop(..) => nyi!(line!(), "a loop inside a quotation"),
+            Exp::For(..) => nyi!(line!(), "a for loop inside a quotation"),
+            Exp::Label(..) => nyi!(line!(), "a label inside a quotation"),
+            Exp::Break(..) => nyi!(line!(), "a break inside a quotation"),
+            Exp::Return(..) => nyi!(line!(), "a return inside a quotation"),
+            Exp::Debug(..) => nyi!(line!(), "a debug block inside a quotation"),
+            Exp::DebugShow(..) => nyi!(line!(), "a debugShow expression inside a quotation"),
+            Exp::Async(..) => nyi!(line!(), "an async block inside a quotation"),
+            Exp::AsyncStar(..) => nyi!(line!(), "an async* block inside a quotation"),
+            Exp::Await(..) => nyi!(line!(), "an await inside a quotation"),
+            Exp::AwaitStar(..) => nyi!(line!(), "an await* inside a quotation"),
+            Exp::Assert(..) => nyi!(line!(), "an assertion inside a quotation"),
             Exp::Annot(h, e, t) => Ok(Annot(h.clone(), e.quoted_close(env)?, t.clone())),
-            Exp::Import(_) => todo!(),
-            Exp::Throw(_) => todo!(),
-            Exp::Try(_, _) => todo!(),
-            Exp::Ignore(_) => todo!(),
+            Exp::Import(..) => nyi!(line!(), "an import expression inside a quotation"),
+            Exp::Throw(..) => nyi!(line!(), "a throw inside a quotation"),
+            Exp::Try(..) => nyi!(line!(), "a try expression inside a quotation"),
+            Exp::Ignore(..) => nyi!(line!(), "an ignore expression inside a quotation"),
             Exp::Paren(e) => Ok(Paren(e.quoted_close(env)?)),
             Exp::QuotedAst(q) => Ok(QuotedAst(q.quoted_close(env)?)),
             Exp::Unquote(e) => Ok(Unquote(e.quoted_close(env)?)),
@@ -327,9 +329,9 @@ pub fn append(
         )
         .share())),
         (Decs(ds1), Decs(ds2)) => Ok(Decs(ds1.append(ds2))),
-        (TuplePats(_), TuplePats(_)) => todo!(),
-        (RecordPats(_), RecordPats(_)) => todo!(),
-        (DecFields(_), DecFields(_)) => todo!(),
+        (TuplePats(_), TuplePats(_)) => nyi!(line!(), "appending two quoted tuple patterns"),
+        (RecordPats(_), RecordPats(_)) => nyi!(line!(), "appending two quoted record patterns"),
+        (DecFields(_), DecFields(_)) => nyi!(line!(), "appending two quoted declaration fields"),
         (_, _) => crate::type_mismatch!(file!(), line!()),
     }
 }

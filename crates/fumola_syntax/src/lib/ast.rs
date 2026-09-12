@@ -118,13 +118,15 @@ impl Source {
             })),
             (_, Unknown) => self.clone(),
             (Unknown, _) => other.clone(),
-            (CoreInit, _) => todo!(),
-            (_, CoreInit) => todo!(),
-            (Evaluation, _) => todo!(),
-            (_, Evaluation) => todo!(),
-            _ => todo!(),
-            // (ExpStep { .. }, _) => todo!(),
-            // (_, ExpStep { .. }) => todo!(),
+            // A span and a non-span do not add up to a wider span, so the side
+            // that names a place in a file is the one worth keeping. Quoted
+            // syntax carries `Evaluation` and the prelude carries `CoreInit`,
+            // and both get spliced beside code that came from a file; widening
+            // used to stop the VM there.
+            (Known(_), _) => self.clone(),
+            (_, Known(_)) => other.clone(),
+            // Neither side names a place. Nothing is lost by saying so.
+            _ => Unknown,
         }
     }
 }
@@ -246,19 +248,26 @@ pub enum CasesPos {
 }
 
 impl CasesPos {
-    pub fn cases<'a>(&'a self) -> &'a Cases {
+    /// The cases, when an unquote in this position has been substituted away.
+    ///
+    /// `None` means it has not been: `switch e ~x` reaches the evaluator with
+    /// the unquote still standing, and the caller reports that rather than
+    /// stopping the VM.
+    pub fn cases<'a>(&'a self) -> Option<&'a Cases> {
         match self {
-            CasesPos::Cases(c) => c,
-            CasesPos::Unquote(_) => panic!(),
+            CasesPos::Cases(c) => Some(c),
+            CasesPos::Unquote(_) => None,
         }
     }
 }
 
 impl DecFieldsPos {
-    pub fn dec_fields<'a>(&'a self) -> &'a DecFields {
+    /// The declaration fields, when an unquote here has been substituted away.
+    /// `None` means it has not been; see [`CasesPos::cases`].
+    pub fn dec_fields<'a>(&'a self) -> Option<&'a DecFields> {
         match self {
-            DecFieldsPos::DecFields(dfs) => dfs,
-            DecFieldsPos::Unquote(_) => panic!(),
+            DecFieldsPos::DecFields(dfs) => Some(dfs),
+            DecFieldsPos::Unquote(_) => None,
         }
     }
 }
@@ -999,7 +1008,10 @@ pub fn source_from_decs(decs: &im_rc::Vector<Dec_>) -> Source {
     if decs.is_empty() {
         Source::Unknown
     } else {
-        let first = decs.front().unwrap().1.clone();
+        let first = match decs.front() {
+            Some(first) => first.1.clone(),
+            None => return Source::Unknown,
+        };
         match decs.back() {
             None => first,
             Some(back) => first.expand(&back.1),

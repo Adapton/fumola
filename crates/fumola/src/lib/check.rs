@@ -153,7 +153,7 @@ pub fn assert_module_def(path: ModulePath, s: &str) -> Result<ModuleFileInit, cr
                 package_name: path.package_name,
                 local_path: path.local_path,
                 code,
-            }))
+            }));
         }
         Ok(r) => r,
     };
@@ -164,15 +164,20 @@ pub fn assert_module_def(path: ModulePath, s: &str) -> Result<ModuleFileInit, cr
     let last = vec.pop_back();
     match last {
         Some(d) => match &d.0 {
-            Dec::LetModule(id, _, dfs) => Ok(ModuleFileInit {
-                file_content: s.to_string(),
-                outer_decs: vec,
-                id: id.clone().map(|i| i.0.id_()),
-                fields: dfs.dec_fields().clone(),
-            }),
+            Dec::LetModule(id, _, dfs) => match dfs.dec_fields() {
+                Some(dfs) => Ok(ModuleFileInit {
+                    file_content: s.to_string(),
+                    outer_decs: vec,
+                    id: id.clone().map(|i| i.0.id_()),
+                    fields: dfs.clone(),
+                }),
+                // The module's body is an unquote nothing has substituted.
+                None => Err(Interruption::NotAModuleDefinition.into()),
+            },
             _ => Err(Interruption::NotAModuleDefinition.into()),
         },
-        None => unreachable!(),
+        // `p.vec` was checked non-empty just above, so `pop_back` found one.
+        None => Err(Interruption::MissingModuleDefinition.into()),
     }
 }
 
@@ -186,7 +191,7 @@ pub fn assert_actor_def(
                 package_name: None,
                 local_path,
                 code,
-            }))
+            }));
         }
         Ok(r) => r,
     };
@@ -197,11 +202,14 @@ pub fn assert_actor_def(
     let last = vec.pop_back();
     match last {
         Some(d) => match &d.0 {
-            Dec::LetActor(id, _, dfs) => {
-                Ok((vec, id.clone().map(|i| i.0.id_()), dfs.dec_fields().clone()))
-            }
+            Dec::LetActor(id, _, dfs) => match dfs.dec_fields() {
+                Some(dfs) => Ok((vec, id.clone().map(|i| i.0.id_()), dfs.clone())),
+                // The actor's body is an unquote nothing has substituted.
+                None => Err(Interruption::NotAnActorDefinition.into()),
+            },
             _ => Err(Interruption::NotAnActorDefinition.into()),
         },
-        None => unreachable!(),
+        // `p.vec` was checked non-empty just above, so `pop_back` found one.
+        None => Err(Interruption::MissingActorDefinition.into()),
     }
 }

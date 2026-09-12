@@ -854,11 +854,14 @@ fn trace_of(state: &mut State) -> String {
 }
 
 fn error_of(e: &fumola::Error) -> String {
+    // `Display`, not `Debug`: a browser console shows this to a person, and a
+    // host that surfaces it in its own UI has a sentence rather than a dump.
+    // The structured detail is still in `trace` and `frames` beside it.
     match e {
         fumola::Error::SyntaxError(_) | fumola::Error::SyntaxErrorCode(_) => {
-            error_json_of_kind("syntax", &format!("{:?}", e))
+            error_json_of_kind("syntax", &format!("{}", e))
         }
-        _ => error_json_of_kind("runtime", &format!("{:?}", e)),
+        _ => error_json_of_kind("runtime", &format!("{}", e)),
     }
 }
 

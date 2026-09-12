@@ -181,7 +181,9 @@ impl Space {
         match self {
             Space::Here => Ok(Shared::new(Symbol::Id(Id::new("@here".to_owned())))),
             Space::Symbol(s) => Ok(s.clone()),
-            Space::Exp_(_, _) => todo!(),
+            // A space written as an expression has no symbol until the
+            // expression is evaluated into one.
+            Space::Exp_(_, _) => Err(Error::TypeMismatch(line!())),
         }
     }
 }
@@ -238,9 +240,11 @@ impl PartialOrd for Symbol {
                     cmp1
                 }
             }
-            (s1, s2) => {
-                todo!("{:?} <= {:?}", s1, s2)
-            }
+            // Two symbols of kinds this has no rule for are not ordered
+            // against each other. `None` is what `partial_cmp` exists to say,
+            // and the caller already handles it; stopping the VM here was
+            // never the alternative the signature offered.
+            (_s1, _s2) => None,
         }
     }
 }

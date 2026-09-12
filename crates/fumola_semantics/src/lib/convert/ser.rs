@@ -365,10 +365,17 @@ impl serde::ser::SerializeMap for SerializeMap {
     where
         T: ?Sized + Serialize,
     {
-        let key = self
-            .next_key
-            .take()
-            .expect("serialize_value called before serialize_key");
+        // serde's own contract puts `serialize_key` before every
+        // `serialize_value`. A caller that gets it wrong hears about it the
+        // same way every other serialization failure is heard.
+        let key = match self.next_key.take() {
+            Some(key) => key,
+            None => {
+                return Err(crate::value::ValueError::ToMotoko(
+                    "serialize_value called before serialize_key".to_string(),
+                ));
+            }
+        };
         self.map.insert(key, value.serialize(Serializer)?.share());
         Ok(())
     }

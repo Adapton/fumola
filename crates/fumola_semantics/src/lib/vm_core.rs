@@ -194,11 +194,11 @@ impl Active for Core {
         let adapton_state = crate::adapton::state::State::new(crate::adapton::Strategy::Graphical);
         let mut store = Store::new(ScheduleChoice::Actor(name.clone()));
         let mut env = self.env().clone();
-        let ctx = self.defs().map.get(&def.fields).unwrap();
+        let ctx = self.def_ctx(&def.fields, line!())?.clone();
         for (i, field) in ctx.fields.iter() {
             match &field.def {
                 Def::Var(v) => {
-                    store.alloc_named(i.clone(), v.init.fast_clone());
+                    store.alloc_named(i.clone(), v.init.fast_clone())?;
                     let owner = ScheduleChoice::Actor(name.clone());
                     env.insert(
                         i.clone(),
@@ -227,7 +227,7 @@ impl Active for Core {
         };
         let a0 = self.actors.map.insert(name, a);
         if let Some(_a0) = a0 {
-            todo!("upgrade")
+            return nyi!(line!(), "creating an actor over one that already exists");
         };
         Ok(v.share())
     }
@@ -243,16 +243,22 @@ impl Active for Core {
             id: name.clone(),
         });
         let mut env = HashMap::new();
-        let mut store = self.actors.map.get(&name).unwrap().store.clone();
+        let (mut store, counts) = {
+            let actor = self
+                .actors
+                .map
+                .get(&name)
+                .ok_or_else(|| Interruption::ActorIdNotFound(name.clone()))?;
+            (actor.store.clone(), actor.counts.clone())
+        };
         let adapton_state = crate::adapton::state::State::new(crate::adapton::Strategy::Graphical);
-        let counts = self.actors.map.get(&name).unwrap().counts.clone();
-        let ctx = self.defs().map.get(&def.fields).unwrap();
+        let ctx = self.def_ctx(&def.fields, line!())?.clone();
         for (i, field) in ctx.fields.iter() {
             match &field.def {
                 Def::Var(v) => {
                     match store.get(&LocalPointer::Named(NamedPointer(i.clone()))) {
                         None => {
-                            let p = store.alloc_named(i.clone(), v.init.fast_clone());
+                            let p = store.alloc_named(i.clone(), v.init.fast_clone())?;
                             let pv = Value::Pointer(p).share();
                             env.insert(i.clone(), pv);
                         }
@@ -271,7 +277,14 @@ impl Active for Core {
                 Def::Func(..) => {
                     // to do
                 }
-                _ => todo!(),
+                other => {
+                    return nyi!(
+                        line!(),
+                        "upgrading an actor whose field {} is a {}",
+                        i.as_str(),
+                        other.kind_name()
+                    );
+                }
             }
         }
         let a = Actor {
@@ -506,7 +519,47 @@ impl Core {
     }
 
     /// Attempt a single-step of VM, under some limits.
+    /// The definition context with this id, which the caller expects to exist.
+    fn def_ctx(
+        &mut self,
+        id: &CtxId,
+        line: u32,
+    ) -> Result<&crate::vm_types::def::Ctx, Interruption> {
+        match self.defs.map.get(id) {
+            Some(ctx) => Ok(ctx),
+            None => Err(crate::impossible_!(
+                line,
+                "context {:?} is named by a definition but not held by the def table",
+                id
+            )),
+        }
+    }
+
+    /// That the agent named by `schedule_choice` is one this core can step.
+    ///
+    /// The `Active` accessors -- `cont`, `env`, `store`, `counts`, `adapton`
+    /// -- each hand back a `&mut` into the scheduled agent's own state, and a
+    /// borrow has no room to carry an `Interruption` out. So the question they
+    /// cannot ask is asked here instead, once, before any of them runs: every
+    /// path that steps a core comes through `step`, and a core that fails this
+    /// check stops with an error rather than inside an accessor.
+    fn check_schedule_choice(&self) -> Result<(), Interruption> {
+        let ScheduleChoice::Actor(id) = &self.schedule_choice else {
+            return Ok(());
+        };
+        match self.actors.map.get(id) {
+            None => Err(Interruption::ActorIdNotFound(id.clone())),
+            Some(actor) if actor.active.is_none() => Err(crate::impossible_!(
+                line!(),
+                "actor {:?} is scheduled but has no activation to step",
+                id
+            )),
+            Some(_) => Ok(()),
+        }
+    }
+
     pub fn step(&mut self, limits: &Limits) -> Result<Step, Interruption> {
+        self.check_schedule_choice()?;
         match crate::vm_step::active_step(self, limits) {
             Ok(Step {}) => Ok(Step {}),
             Err(Interruption::Send(am, inst, v)) => self.send(limits, am, inst, v),
@@ -544,7 +597,11 @@ impl Core {
         let context = self.defs().active_ctx.clone();
         let resp_target = self.schedule_choice.clone();
         self.schedule_choice = ScheduleChoice::Actor(am.actor.clone());
-        let actor = self.actors.map.get(&am.actor).unwrap();
+        let actor = self
+            .actors
+            .map
+            .get(&am.actor)
+            .ok_or_else(|| Interruption::ActorIdNotFound(am.actor.clone()))?;
         let actor_env = actor.env.fast_clone();
         let f = {
             let f = self.get_public_actor_field(&am.actor, &am.method)?;
@@ -553,7 +610,16 @@ impl Core {
                 _ => type_mismatch!(file!(), line!()),
             }
         };
-        assert!(actor.active.is_none());
+        if actor.active.is_some() {
+            // Calling into an actor that is part-way through a call of its own
+            // would overwrite the activation it is still using.
+            return crate::impossible!(
+                line!(),
+                "actor {:?} is already running, and cannot take the call to {}",
+                am.actor,
+                am.method.as_str()
+            );
+        }
         let mut activation = Activation::new();
         activation.stack.push_front(Frame {
             context,
@@ -562,7 +628,11 @@ impl Core {
             env: actor.env.fast_clone(),
             cont: FrameCont::Respond(resp_target),
         });
-        let actor = self.actors.map.get_mut(&am.actor).unwrap();
+        let actor = self
+            .actors
+            .map
+            .get_mut(&am.actor)
+            .ok_or_else(|| Interruption::ActorIdNotFound(am.actor.clone()))?;
         actor.active = Some(activation);
         crate::vm_step::call_function_def(self, actor_env, &f, inst, v)
     }
@@ -570,10 +640,17 @@ impl Core {
     fn response(&mut self, _limits: &Limits, r: Response) -> Result<Step, Interruption> {
         match self.schedule_choice {
             ScheduleChoice::Actor(ref i) => {
-                let actor = self.actors.map.get_mut(i).unwrap();
+                let actor = self
+                    .actors
+                    .map
+                    .get_mut(i)
+                    .ok_or_else(|| Interruption::ActorIdNotFound(i.clone()))?;
                 actor.active = None;
             }
-            _ => unreachable!(),
+            // Only an actor responds; the agent has nobody to respond to.
+            ScheduleChoice::Agent => {
+                return crate::impossible!(line!(), "the agent produced a response");
+            }
         };
         self.schedule_choice = r.target;
         *self.cont() = Cont::Value_(r.value);

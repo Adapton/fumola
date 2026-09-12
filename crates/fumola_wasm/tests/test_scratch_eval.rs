@@ -29,8 +29,11 @@ fn a_scratch_program_leaves_no_bindings_behind() {
     // The binding went with the branch.
     let after = reply(fumola_eval_top(id, "onlyInScratch"));
     assert_eq!(after["ok"], serde_json::json!(false), "the binding survived: {}", after);
+    // The message is `Display`, so it names the identifier rather than the
+    // Rust variant. A host shows this to a person.
+    let said = after["error"].as_str().unwrap_or("");
     assert!(
-        after["error"].as_str().unwrap_or("").contains("UnboundIdentifer"),
+        said.contains("onlyInScratch") && said.contains("not bound"),
         "expected an unbound identifier, got {}",
         after
     );

@@ -286,8 +286,12 @@ impl CacheState for SimpleState {
         }
     }
     fn force_end(&mut self, settings: &Settings, value: Value_) -> Res<()> {
+        let thunk_pointer = self
+            .thunk_pointer
+            .clone()
+            .ok_or(Error::UnreachableForceEnd)?;
         let cell = self
-            .get_cell_mut(&self.thunk_pointer.clone().unwrap(), &self.now())
+            .get_cell_mut(&thunk_pointer, &self.now())
             .ok_or(Error::Unreachable)?;
         if !settings.force_end_forgets_result {
             cell.set_cache_value(value)?;

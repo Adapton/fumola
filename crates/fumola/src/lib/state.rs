@@ -126,7 +126,7 @@ impl State {
             None,
             &dfs,
         )?;
-        self.semantic_state.defs().leave_context(saved, &new_root);
+        self.semantic_state.defs().leave_context(saved, &new_root)?;
         Ok(())
     }
 
@@ -141,7 +141,7 @@ impl State {
         let (saved, ctxid, old_ctx) = self
             .semantic_state
             .defs()
-            .reenter_context(None, &old_def.context);
+            .reenter_context(None, &old_def.context)?;
         for dec in decs.iter() {
             let dec = dec.clone();
             let df = fumola_syntax::ast::DecField {
@@ -164,7 +164,7 @@ impl State {
         )?;
         self.semantic_state
             .defs()
-            .releave_context(saved, &ctxid, &old_ctx);
+            .releave_context(saved, &ctxid, &old_ctx)?;
         Ok(())
     }
 
@@ -223,7 +223,7 @@ impl State {
             let (saved, ctxid, old_ctx) = self
                 .semantic_state
                 .defs()
-                .reenter_context(None, &old.context);
+                .reenter_context(None, &old.context)?;
             for dec in init.outer_decs.iter() {
                 let dec = dec.clone();
                 let df = DecField {
@@ -246,7 +246,7 @@ impl State {
             )?;
             self.semantic_state
                 .defs()
-                .releave_context(saved, &ctxid, &old_ctx);
+                .releave_context(saved, &ctxid, &old_ctx)?;
         } else {
             self.semantic_state
                 .module_files
