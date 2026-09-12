@@ -967,7 +967,15 @@ fn call_function<A: Active>(
     }
 }
 
-fn call_cont<A: Active>(
+/// The reduction a `Call2` frame makes: dispatch on what the callee turned out
+/// to be, and set the machine up to run it.
+///
+/// Made visible so that the big-step evaluator dispatches by calling this rather
+/// than by matching on the callee itself. There are five cases here -- a closure,
+/// a primitive, a dynamic value, an actor method, and a pair of symbols that
+/// compose into a third -- and a second reading of that list would be a second
+/// thing to keep in step.
+pub(crate) fn call_cont<A: Active>(
     active: &mut A,
     func_value: Value_,
     inst: Option<Inst>,

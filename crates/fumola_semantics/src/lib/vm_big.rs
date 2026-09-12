@@ -34,7 +34,7 @@
 //! graph, so graph equality says nothing about them.
 
 use crate::value::{Closed, ClosedFunction, Value, Value_};
-use crate::vm_types::{Active, Cont, Interruption, Step, def::CtxId};
+use crate::vm_types::{Active, Cont, Interruption, Step, def::CtxId, stack::FrameCont};
 use fumola_syntax::ast::{Dec, Dec_, Exp, Exp_, Pat, PrimType, Source};
 use fumola_syntax::shared::{FastClone, Share};
 use im_rc::Vector;
@@ -74,24 +74,66 @@ struct Ambient {
     source: Source,
 }
 
-/// Past this many nested forms, hand the node to the machine.
+/// How much Rust stack a region may use before it starts handing nodes back.
 ///
-/// The machine's stack is on the heap and grows until memory runs out. This
-/// one is bounded by the native stack -- about a megabyte under wasm -- and a
-/// stack overflow is not catchable: it aborts natively and traps in wasm. So
-/// depth is spent rather than risked, and running out of it is the same
-/// demotion an unsupported form gets, not a failure.
+/// The machine's stack is on the heap and grows until memory runs out. This one
+/// is the native stack, and running out of it is not catchable: it aborts
+/// natively and traps in wasm. So the depth is spent rather than risked, and
+/// running out is the same demotion any unsupported form gets.
 ///
-/// Unreachable as the set stands, since calls are delegated and `while`
-/// iterates rather than recurses. It is here for the sets that come later.
-const MAX_DEPTH: usize = 256;
+/// Measured in bytes rather than in syntax nodes, which was the first attempt
+/// and does not work: a debug build's frames are several times a release
+/// build's, so the same constant that leaves headroom in one overflows in the
+/// other. Counting 256 nested forms overflowed a 2 MiB test thread in debug and
+/// would have been far too cautious in release.
+///
+/// The budget is sized for the smallest stack this runs on -- roughly a
+/// megabyte under wasm, and 2 MiB for a Rust test thread -- with most of it
+/// left over, because the reading below is an approximation and the cost of
+/// being wrong is an abort rather than an error.
+const STACK_BUDGET: usize = 256 * 1024;
+
+/// A region in progress: where its stack began, and how deep the machine's
+/// stack was when it was entered.
+#[derive(Clone, Copy)]
+struct Region {
+    /// The machine's stack depth at the region boundary. Below it, the region
+    /// is over; at it with a value in `cont`, the node is finished.
+    watermark: usize,
+    /// The address of a local taken at the region boundary, for reading how
+    /// much Rust stack has been spent since.
+    base: usize,
+}
+
+impl Region {
+    fn at(self, watermark: usize) -> Region {
+        Region { watermark, ..self }
+    }
+}
+
+/// An approximate reading of the Rust stack spent since `base`.
+///
+/// The address of a local sits within a frame of the stack pointer, so the
+/// distance from one taken at the region boundary reads the depth in bytes.
+/// `abs_diff` rather than a subtraction on purpose: the stack grows downward on
+/// every target this runs on, but a guard that silently reads zero on one that
+/// did not would fail in the direction that aborts.
+fn stack_spent(base: usize) -> usize {
+    let here = 0u8;
+    base.abs_diff(&here as *const u8 as usize)
+}
 
 /// Evaluate the body of a region, and answer with its value un-dereferenced.
 ///
 /// Raw because the machine is about to pop the region's own `Do` frame, and the
 /// implicit-deref rule is decided against that frame, not against this call.
 pub fn eval_region<A: Active>(active: &mut A, body: &Exp_, watermark: usize) -> Result<Value_, Ctl> {
-    eval_exp_no_deref(active, body, 0, watermark)
+    let here = 0u8;
+    let region = Region {
+        watermark,
+        base: &here as *const u8 as usize,
+    };
+    eval_exp_no_deref(active, body, 0, region)
 }
 
 fn ambient<A: Active>(active: &mut A) -> Ambient {
@@ -127,12 +169,12 @@ fn sub<A: Active>(
     amb: &Ambient,
     e: &Exp_,
     depth: usize,
-    watermark: usize,
+    region: Region,
     redex: usize,
 ) -> Result<Value_, Ctl> {
     restore(active, amb);
     *active.cont_source() = e.1.clone();
-    let v = eval_exp_no_deref(active, e, depth, watermark)?;
+    let v = eval_exp_no_deref(active, e, depth, region)?;
     deref_value(active, v, redex)
 }
 
@@ -145,11 +187,11 @@ fn sub_no_deref<A: Active>(
     amb: &Ambient,
     e: &Exp_,
     depth: usize,
-    watermark: usize,
+    region: Region,
 ) -> Result<Value_, Ctl> {
     restore(active, amb);
     *active.cont_source() = e.1.clone();
-    eval_exp_no_deref(active, e, depth, watermark)
+    eval_exp_no_deref(active, e, depth, region)
 }
 
 /// As [`sub`], minus the span write.
@@ -161,11 +203,11 @@ fn sub_tail<A: Active>(
     amb: &Ambient,
     e: &Exp_,
     depth: usize,
-    watermark: usize,
+    region: Region,
     redex: usize,
 ) -> Result<Value_, Ctl> {
     restore(active, amb);
-    let v = eval_exp_no_deref(active, e, depth, watermark)?;
+    let v = eval_exp_no_deref(active, e, depth, region)?;
     deref_value(active, v, redex)
 }
 
@@ -214,20 +256,9 @@ fn value_after<A: Active>(
 /// each step, which is what makes `len < watermark` an exact reading of
 /// "crossed the boundary" and what keeps the value raw -- one more step would
 /// have dereferenced it against the wrong frame.
-fn delegate<A: Active>(active: &mut A, e: &Exp_, watermark: usize) -> Result<Value_, Ctl> {
+fn delegate<A: Active>(active: &mut A, e: &Exp_, region: Region) -> Result<Value_, Ctl> {
     crate::vm_step::exp_cont(active, e).map_err(Ctl::Interrupt)?;
-    loop {
-        let len = active.stack().len();
-        if len < watermark {
-            return Err(Ctl::Escaped);
-        }
-        if len == watermark {
-            if let Cont::Value_(v) = active.cont() {
-                return Ok(v.fast_clone());
-            }
-        }
-        step_once(active)?;
-    }
+    run_to(active, region.watermark)
 }
 
 /// One machine step, with the counts `active_step` charges and without the
@@ -255,13 +286,13 @@ fn eval_exp_no_deref<A: Active>(
     active: &mut A,
     e: &Exp_,
     depth: usize,
-    watermark: usize,
+    region: Region,
 ) -> Result<Value_, Ctl> {
-    if depth >= MAX_DEPTH {
-        return delegate(active, e, watermark);
+    if stack_spent(region.base) >= STACK_BUDGET {
+        return delegate(active, e, region);
     }
     let depth = depth + 1;
-    let w = watermark;
+    let w = region;
     use Exp::*;
     match &e.0 {
         // 1 step, 0 redex -- `literal_step`.
@@ -547,7 +578,119 @@ fn eval_exp_no_deref<A: Active>(
             Ok(v)
         }
 
-        _ => delegate(active, e, watermark),
+        // Call1 => false, Call2 => true, Call3 => false.
+        //
+        // The callee is not examined here. `call_cont` is the machine's own
+        // dispatch -- a closure, a primitive, a dynamic value, an actor method,
+        // or two symbols composing into a third -- and calling it means there is
+        // one reading of that list rather than two. What it leaves behind says
+        // what to do next: a closure pushes a `Call3` frame and points `cont` at
+        // the body, which is the case worth recursing into, and everything else
+        // is finished by the machine.
+        Call(e1, inst, e2) => {
+            let amb = ambient(active);
+            bump(active, 0);
+            let f = sub(active, &amb, e1, depth, w, 0)?;
+            restore(active, &amb);
+            bump(active, 0);
+            let arg = sub(active, &amb, e2, depth, w, 1)?;
+            restore(active, &amb);
+
+            // Where the stack stands before the call: the level a `return` inside
+            // the body unwinds back to, and the level the answer arrives at.
+            let caller = active.stack().len();
+            crate::vm_stack_cont::call_cont(active, f, inst.clone(), arg)
+                .map_err(Ctl::Interrupt)?;
+            bump(active, 1);
+
+            let entered_body = active.stack().len() == caller + 1
+                && matches!(
+                    active.stack().front().map(|fr| &fr.cont),
+                    Some(FrameCont::Call3)
+                );
+            if !entered_body {
+                // A primitive, a dynamic value, or a symbol composition. It has
+                // either answered already or pushed frames of its own; either way
+                // the machine finishes it, from wherever it left off.
+                return run_to(active, caller);
+            }
+
+            let body = match active.cont() {
+                Cont::Exp_(body, decs) if decs.is_empty() => body.fast_clone(),
+                // `call_function` sets exactly this, and nothing else does. If
+                // that stops being true, say so rather than guess.
+                _ => {
+                    return Err(Ctl::Interrupt(impossible_!(
+                        line!(),
+                        "entering a function body did not leave the body in `cont`"
+                    )));
+                }
+            };
+
+            match eval_exp_no_deref(active, &body, depth, region.at(caller + 1)) {
+                Ok(v) => {
+                    // `Call3` is not one of the four keep-the-pointer frames, so
+                    // a pointer is dereferenced before it pops, and charged
+                    // against `Call3`, which retires nothing.
+                    let v = deref_value(active, v, 0)?;
+                    pop_call3(active)?;
+                    bump(active, 0);
+                    Ok(v)
+                }
+                // A `return` inside the body. `return_` scans the real stack,
+                // finds this call's own `Call3`, pops it and writes the value --
+                // so the work left is to notice that the stack came back to
+                // exactly this call's level and take the answer it left.
+                Err(Ctl::Escaped) if active.stack().len() == caller => {
+                    match active.cont() {
+                        Cont::Value_(v) => Ok(v.fast_clone()),
+                        _ => Err(Ctl::Escaped),
+                    }
+                }
+                Err(other) => Err(other),
+            }
+        }
+
+        _ => delegate(active, e, region),
+    }
+}
+
+/// Pop a frame this evaluator pushed through the machine, restoring what its
+/// arm would have restored.
+fn pop_call3<A: Active>(active: &mut A) -> Result<(), Ctl> {
+    let frame = match active.stack().pop_front() {
+        Some(f) => f,
+        None => {
+            return Err(Ctl::Interrupt(impossible_!(
+                line!(),
+                "the call frame this evaluator pushed is gone"
+            )));
+        }
+    };
+    *active.env() = frame.env;
+    active.defs().active_ctx = frame.context;
+    *active.cont_prim_type() = frame.cont_prim_type;
+    *active.cont_source() = frame.source;
+    Ok(())
+}
+
+/// Let the machine finish whatever it has started, and take the value back.
+///
+/// Used where a reduction has already run and may have left frames standing --
+/// a primitive that evaluates Fumola code, for instance. The same two tests as
+/// `delegate`, made in the same order and for the same reasons.
+fn run_to<A: Active>(active: &mut A, watermark: usize) -> Result<Value_, Ctl> {
+    loop {
+        let len = active.stack().len();
+        if len < watermark {
+            return Err(Ctl::Escaped);
+        }
+        if len == watermark {
+            if let Cont::Value_(v) = active.cont() {
+                return Ok(v.fast_clone());
+            }
+        }
+        step_once(active)?;
     }
 }
 
@@ -562,9 +705,9 @@ fn eval_decs<A: Active>(
     active: &mut A,
     decs: &Vector<Dec_>,
     depth: usize,
-    watermark: usize,
+    region: Region,
 ) -> Result<Value_, Ctl> {
-    let w = watermark;
+    let w = region;
     let mut rest: Vector<Dec_> = decs.fast_clone();
     loop {
         if rest.is_empty() {
@@ -650,7 +793,7 @@ fn eval_decs<A: Active>(
             Dec::Var(p, e) => {
                 let x = match crate::vm_match::get_pat_var(&p.0) {
                     Some(x) => x.fast_clone(),
-                    None => return delegate_decs(active, dec_, rest, w),
+                    None => return delegate_decs(active, dec_, rest, w.watermark),
                 };
                 bump(active, 0);
                 let v = sub(active, &dec_amb, e, depth, w, 1)?;
@@ -686,7 +829,7 @@ fn eval_decs<A: Active>(
             // than one node. Modules, actors, imports and object declarations
             // all arrive here; each of them reaches state that no `Active`
             // accessor can see, which is the reason they are not in the set.
-            _ => return delegate_decs(active, dec_, rest, w),
+            _ => return delegate_decs(active, dec_, rest, w.watermark),
         }
     }
 }
@@ -701,16 +844,5 @@ fn delegate_decs<A: Active>(
     let mut decs = rest;
     decs.push_front(dec_);
     *active.cont() = Cont::Decs(decs);
-    loop {
-        let len = active.stack().len();
-        if len < watermark {
-            return Err(Ctl::Escaped);
-        }
-        if len == watermark {
-            if let Cont::Value_(v) = active.cont() {
-                return Ok(v.fast_clone());
-            }
-        }
-        step_once(active)?;
-    }
+    run_to(active, watermark)
 }

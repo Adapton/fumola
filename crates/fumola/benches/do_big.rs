@@ -146,6 +146,41 @@ fn nested_calls(n: usize) -> String {
     format!("func f(x : Nat) : Nat {{ x + 1 }}; {}", s)
 }
 
+/// Recursion through calls, with no adapton anywhere.
+fn fib(n: usize) -> String {
+    format!(
+        "func fib(n : Nat) : Nat {{ if (n < 2) n else fib(n - 1) + fib(n - 2) }}; fib({})",
+        n
+    )
+}
+
+/// The identical computation, inside a forced thunk.
+///
+/// `force` is delegated, and entering a thunk body is the machine's own
+/// `enter_thunk_body`. If a region stops at the edge of a force, this pair says
+/// so: the same work, the same steps, one of them reachable by the recursive
+/// evaluator and one of them not.
+fn fib_in_a_force(n: usize) -> String {
+    format!(
+        "func fib(n : Nat) : Nat {{ if (n < 2) n else fib(n - 1) + fib(n - 2) }}; \
+         force (thunk {{ fib({}) }})",
+        n
+    )
+}
+
+/// A loop whose body switches, which is the shape list and tree code has.
+fn switching(n: usize) -> String {
+    format!(
+        "var i = 0; var s = 0; \
+         while (i < {}) {{ \
+           let o = if (i % 2 == 0) ?i else null; \
+           s := s + (switch (o) {{ case (?x) x; case null 0 }}); \
+           i := i + 1 \
+         }}; s",
+        n
+    )
+}
+
 /// The shape real code has: binders and nesting inside a loop.
 fn mixed(n: usize) -> String {
     format!(
@@ -207,11 +242,27 @@ fn main() {
             recursive: Recursive::Partly,
             source: loop_with(20_000, 0, 4),
         },
-        // The control: one delegation, nothing else.
         Workload {
             name: "nested calls (5k)",
-            recursive: Recursive::No,
+            recursive: Recursive::Yes,
             source: nested_calls(5_000),
+        },
+        // Where a region stops. Same work, once reachable and once behind a
+        // force -- which is the question mergeSort turns on.
+        Workload {
+            name: "fib 22",
+            recursive: Recursive::Yes,
+            source: fib(22),
+        },
+        Workload {
+            name: "fib 22, in a force",
+            recursive: Recursive::No,
+            source: fib_in_a_force(22),
+        },
+        Workload {
+            name: "switching loop (20k)",
+            recursive: Recursive::Partly,
+            source: switching(20_000),
         },
     ];
 

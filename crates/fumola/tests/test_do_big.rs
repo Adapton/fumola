@@ -351,3 +351,139 @@ fn a_failed_scratch_inside_a_region_leaves_the_session_as_it_was() {
          @ c",
     );
 }
+
+// ---------------------------------------------------------------------------
+// Calls, which the recursive evaluator now enters rather than handing back.
+// ---------------------------------------------------------------------------
+
+/// Recursion, where the Rust stack now tracks the user's.
+#[test]
+fn recursion() {
+    agrees_on(
+        "func fact(n : Nat) : Nat { if (n == 0) 1 else n * fact(n - 1) }; fact(10)",
+        "3628800",
+    );
+    agrees_on(
+        "func fib(n : Nat) : Nat { if (n < 2) n else fib(n - 1) + fib(n - 2) }; fib(15)",
+        "610",
+    )
+}
+
+/// Mutual recursion, so the two functions' environments interleave.
+///
+/// Through a parameter, because a forward reference does not work in Fumola at
+/// all: `Dec::Func` inserts the closure when the declaration runs, so a body
+/// naming a function declared later captured an environment without it. That is
+/// the case below, and both modes say so in the same words -- which is a real
+/// assertion, not a concession, since error identity is part of what a region
+/// has to preserve.
+#[test]
+fn mutual_recursion_through_a_parameter() {
+    agrees_on(
+        "func evenWith(od : Nat -> Bool, n : Nat) : Bool { if (n == 0) true else od(n - 1) }; \
+         func odd(n : Nat) : Bool { if (n == 0) false else evenWith(odd, n - 1) }; \
+         (odd(7), odd(8))",
+        "(true, false)",
+    )
+}
+
+/// And the forward reference fails alike under both modes.
+#[test]
+fn a_forward_reference_fails_alike() {
+    agree(
+        "func even(n : Nat) : Bool { if (n == 0) true else odd(n - 1) }; \
+         func odd(n : Nat) : Bool { if (n == 0) false else even(n - 1) }; \
+         even(10)",
+    );
+}
+
+/// A `return` from inside a recursive call unwinds to that call's own frame,
+/// not to the region's.
+///
+/// The machine's `return_` scans the real stack for a `Call3`, and this
+/// evaluator pushes a real one through `call_cont` -- so the target it finds is
+/// the right one, and what is left is to notice that the stack came back to the
+/// call's level and take the value.
+#[test]
+fn a_return_inside_a_call() {
+    agrees_on("func f(n : Nat) : Nat { return n + 1; 99 }; f(1)", "2");
+    agrees_on(
+        "func f(n : Nat) : Nat { if (n > 3) { return 0 }; n }; (f(1), f(10))",
+        "(1, 0)",
+    );
+    // A return out of a loop inside a call.
+    agrees_on(
+        "func first(n : Nat) : Nat { \
+           var i = 0; while (i < 100) { if (i == n) { return i }; i := i + 1 }; 999 \
+         }; first(7)",
+        "7",
+    );
+    // Nested calls, each with its own return.
+    agrees_on(
+        "func inner(n : Nat) : Nat { return n * 2 }; \
+         func outer(n : Nat) : Nat { return inner(n) + 1 }; outer(5)",
+        "11",
+    )
+}
+
+/// A closure carries its environment, and a call must not see the caller's.
+#[test]
+fn closures_keep_their_environment() {
+    agrees_on(
+        "let x = 1; func f() : Nat { x }; do { let x = 2; f() }",
+        "1",
+    );
+    agrees_on(
+        "func adder(n : Nat) : (Nat -> Nat) { func (m : Nat) : Nat { n + m } }; \
+         let add3 = adder(3); add3(4)",
+        "7",
+    )
+}
+
+/// A primitive is dispatched by the same `call_cont` and finished by the
+/// machine, because it may evaluate Fumola code of its own.
+#[test]
+fn a_primitive_call_is_finished_by_the_machine() {
+    agrees_on("prim \"natToText\" 42", "\"42\"");
+    agree("let Debug = { print = prim \"print\" }; Debug.print 1");
+}
+
+/// A call whose callee is an actor method still refuses, rather than resuming
+/// into a continuation that is no longer there.
+#[test]
+fn an_actor_call_inside_a_region_still_refuses() {
+    let src = r#"
+        actor A { public func get() : async Nat { 1 } };
+        do big { let x = 1; A.get() }
+    "#;
+    match fumola::eval::eval(src) {
+        Err(fumola::Error::Interruption(Interruption::BigStepEscape(_))) => {}
+        other => panic!("expected the send to be refused, got {:?}", other),
+    }
+}
+
+/// Recursion deeper than the evaluator will go on the Rust stack.
+///
+/// Past the depth budget a node is handed to the machine, which is the same
+/// demotion any unsupported form gets -- so the answer, the steps and the
+/// redexes are unchanged, and only the time differs. This is the test that says
+/// the demotion is invisible.
+#[test]
+fn recursion_past_the_depth_budget() {
+    agrees_on(
+        "func count(n : Nat) : Nat { if (n == 0) 0 else 1 + count(n - 1) }; count(400)",
+        "400",
+    )
+}
+
+/// Calls inside a `force`, so a call and the graph meet.
+#[test]
+fn a_call_inside_a_force() {
+    agree(
+        "prim \"adaptonReset\" (#graphical); \
+         func double(n : Nat) : Nat { n * 2 }; \
+         let x = `x := 3; \
+         let t = `t := thunk { double(@ x) }; \
+         let a = force t; x := 5; (a, force t)",
+    );
+}

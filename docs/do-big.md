@@ -51,28 +51,49 @@ A region never takes any of them over.
 
 Binders (`let`, `var`, `func`), blocks, `do`, literals, variables, parentheses,
 the unary and binary operators, the comparisons, `not`/`and`/`or`, `assert`,
-tuples, `if`, `while`, and assignment to a plain variable.
+tuples, `if`, `while`, assignment to a plain variable, and **calls**.
 
-Everything else is handed to the machine: calls, `force`, `@`, `do goto`,
-`do within`, `do ?`, `!`, `return`, `switch`, `for`, objects, arrays, indexing,
+Everything else is handed to the machine: `force`, `@`, `do goto`, `do within`,
+`do ?`, `!`, `return`, `switch`, `for`, objects, arrays, indexing, `.field`,
 annotations, and the module, actor, import and object declarations.
 
-Two of those exclusions are not laziness:
+### Calls
+
+The callee is not examined here. `call_cont` is the machine's own dispatch --
+a closure, a primitive, a dynamic value, an actor method, or two symbols
+composing into a third -- and what it leaves behind says what to do next. A
+closure pushes a real `Call3` frame and points `cont` at the body, which is the
+case worth recursing into; everything else the machine finishes.
+
+Pushing the *real* frame is what makes `return` work. `return_` scans the actual
+stack for a `Call3`, so it finds this call's own, pops it, and writes the value
+-- and the recursive evaluator notices that the stack came back to exactly this
+call's level and takes the answer. Nothing about non-local exit is reimplemented.
+
+Only ordinary closures are entered, so `call_function`'s context convention is
+the only one in play. `call_function_def` saves the *callee's* context in the
+frame where `call_function` saves the caller's; they disagree in the repo today,
+and delegating actor methods keeps that unobservable rather than resolving it
+here.
+
+### Two exclusions that are not laziness
 
 - **Indexing.** The `Idx2` frame arm looks *underneath itself* for an `Assign1`
   frame, to decide whether `a[i]` is a read or an assignment target. A recursive
   evaluator has no frame there to find, so `a[i] := v` would read the element and
   assign to that. `Assign` is in the set only for a plain variable target.
-- **Calls.** Including them means choosing between `call_function`'s context
-  convention and `call_function_def`'s, which disagree in the code today and are
-  unobservable while both go through the machine. It also makes Rust stack depth
-  track user recursion rather than syntax depth.
+- **`force`.** Entering a thunk body is the machine's own `enter_thunk_body`,
+  bracketed by `force_begin`/`force_end` across a frame, and a cache miss may
+  hand off to `repair_loop`, which drives the graph's realignment through the
+  stack. Delegating all of it is what makes the graph claim structural. It is
+  also, as measured below, the thing that now matters most.
 
 ## What it does not do yet
 
-**It does not speed up `mergeSort`.** Every function body is entered through a
-delegated call, so `do big { M.runAll() }` is one delegation and almost no
-recursive work.
+**It still does not speed up `mergeSort`, and now we know why.** It is not
+calls -- those are in the set. It is `force`. mergeSort is an adapton example:
+its whole computation happens inside a forced thunk, and a region stops at the
+edge of a force. The measurement below isolates that with a controlled pair.
 
 **It never engages in web-play.** A region evaluated on the Rust stack is
 atomic — there is no standing continuation to pause at. So when a step limit, a
@@ -94,40 +115,56 @@ inspectable one step at a time.
 
 | workload | steps | small (ms) | big (ms) | ratio | noise floor |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| binders (800 lets) | 5.6k | 1.55 | 1.04 | 0.67 | 0.91 |
-| nested (depth 200) | 1.2k | 0.12 | 0.07 | 0.62 | 0.94 |
-| mixed (5k iters) | 435k | 41.4 | 20.2 | 0.49 | 0.96 |
-| loop, 0 reads | 720k | 53.1 | 21.2 | **0.40** | 0.99 |
-| loop, 1 read | 880k | 69.4 | 32.9 | 0.47 | 0.97 |
-| loop, 4 reads | 1.36M | 110.9 | 72.5 | 0.65 | 1.01 |
-| loop, 16 reads | 3.28M | 291.6 | 212.9 | 0.73 | 1.02 |
-| loop, 1 call | 1.12M | 88.0 | 53.8 | 0.61 | 1.02 |
-| loop, 4 calls | 2.32M | 192.3 | 146.3 | 0.76 | 1.02 |
-| nested calls (5k) | 75k | 7.12 | 6.65 | *0.93* | 0.96 |
+| loop, 0 reads | 720k | 53.8 | 21.2 | **0.39** | 1.02 |
+| mixed (5k iters) | 435k | 44.0 | 18.8 | 0.43 | 0.96 |
+| loop, 1 call | 1.12M | 90.1 | 40.2 | 0.45 | 1.00 |
+| loop, 1 read | 880k | 72.8 | 33.4 | 0.46 | 0.94 |
+| loop, 4 calls | 2.32M | 193.0 | 92.8 | 0.48 | 1.01 |
+| **fib 22** | 1.49M | 136.8 | 65.8 | **0.48** | 1.03 |
+| switching loop (20k) | 1.21M | 105.3 | 55.3 | 0.53 | 0.97 |
+| binders (800 lets) | 5.6k | 1.71 | 1.05 | 0.62 | 0.84 |
+| loop, 4 reads | 1.36M | 112.7 | 71.9 | 0.64 | 1.05 |
+| loop, 16 reads | 3.28M | 311.5 | 220.0 | 0.71 | 0.94 |
+| nested (depth 200) | 1.2k | 0.11 | 0.08 | 0.72 | 1.01 |
+| nested calls (5k) | 75k | 7.65 | 6.44 | 0.84 | 0.91 |
+| **fib 22, in a force** | 1.49M | 139.2 | 130.6 | *0.94* | 0.99 |
+
+And `mergeSort` itself, loading the real module tree
+(`cargo bench -p fumola --bench do_big_mergesort`):
+
+| workload | steps | small (ms) | big (ms) | ratio | noise floor |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| scene, size 8 | 329k | 87.0 | 79.3 | 0.91 | 1.01 |
+| scene, size 16 | 732k | 187.2 | 183.9 | 0.98 | 1.07 |
+| scene, size 23 | 1.24M | 337.6 | 342.3 | 1.01 | 1.02 |
+| scene, size 44 | 2.46M | 708.3 | 692.0 | 0.98 | 1.04 |
 
 Ratio below 1.00 means the region was faster. The noise floor is the same
 program in the same mode timed again, so it absorbs warm-up; a ratio no further
 from 1.00 than the floor beside it is not a result.
 
-Two rows carry the argument.
+One pair carries the argument. **`fib 22` at 0.48 and `fib 22, in a force` at
+0.94** are the same computation, to within eight steps — the second is the first
+wrapped in `force (thunk { .. })`. Reachable, a region halves it; behind a
+force, a region does nothing at all.
 
-**`loop, 0 reads` at 0.40**: a loop whose every node is in the recursive set
-runs in two fifths of the time, at an identical step count. That is the
-continuation cost, and it is not a rounding error — it is most of the work.
+That is the whole explanation for the mergeSort table. Its computation happens
+inside a force, so a region never reaches it. Nothing about mergeSort is
+unusual; it is an adapton example doing what adapton examples do.
 
-**`nested calls (5k)` at 0.93, floor 0.96**: an expression that is one
-delegation and nothing else shows no effect. Handing a node back costs nothing
-measurable, which is what makes the middle rows readable.
+The rest is consistent with that reading. A loop the evaluator runs entirely
+takes two fifths of the time at an identical step count — the continuation cost,
+and most of the work. Adding delegated array reads walks the ratio back toward
+1.00 (0.46 → 0.64 → 0.71 at one, four and sixteen reads per iteration), because
+delegation returns that share of the work to the machine.
 
-The middle rows are the instrument: one loop, held fixed, with a rising share of
-it handed back. The ratio climbs monotonically from 0.40 to 0.76 as the
-delegated share grows, and the control says where it is heading. So the speedup
-is not a property of the benchmark — it tracks exactly how much of the program
-the recursive evaluator actually ran, which is the answer #122 asked for.
+Calls, which the previous cut delegated, moved from 0.61 to 0.45 at one per
+iteration and from 0.76 to 0.48 at four. That is the measured worth of this
+change.
 
-The read of this for the next step: array indexing and calls are where the
-remaining time is, and both are excluded for stated reasons rather than for want
-of effort.
+The read of this for the next step: **`force` is where the remaining time is**,
+and it is the hardest thing in the file to bring in, because it is the one
+bracket the delegation design was built to avoid touching.
 
 ## The two loud failures
 
@@ -144,11 +181,17 @@ in Rust frames is gone. Resuming anyway would give a wrong answer and no error.
 ## Depth
 
 The machine's stack is on the heap and grows until memory does not. This one is
-bounded by the native stack, about a megabyte under wasm, and a stack overflow
-is not catchable: it aborts natively and traps in wasm. So depth is spent rather
-than risked — past `MAX_DEPTH` nested forms the node is handed to the machine,
-the same demotion any unsupported form gets.
+the native stack, and running out of it is not catchable: it aborts natively and
+traps in wasm. So depth is spent rather than risked — past the budget a node is
+handed to the machine, the same demotion any unsupported form gets.
 
-Unreachable as the set stands, since calls are delegated and `while` iterates
-rather than recurses. It is there for the sets that come later, where it stops
-being a formality.
+The budget is **bytes, not syntax nodes**. Counting nodes was the first attempt
+and does not work: a debug build's frames are several times a release build's,
+so one constant leaves headroom in one and overflows the other. A cap of 256
+nested forms overflowed a 2 MiB test thread in debug while being far too
+cautious in release. `stack_spent` reads the distance from a local taken at the
+region boundary, which is the quantity that actually matters.
+
+This stopped being a formality when calls joined the set: depth now tracks the
+user's recursion rather than the syntax. `recursion_past_the_depth_budget`
+checks that crossing it changes nothing but the time.
