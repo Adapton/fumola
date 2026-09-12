@@ -324,19 +324,26 @@
         .links .what { margin-bottom: 0.15rem; }
       }
 
-      /* ---- The floating outline, left gutter ------------------------------
-         `main` is 45rem centred, so on a wide viewport the space either side
-         of it is already empty. The outline moves into that space and nothing
-         else moves: no change to main's width, margin or padding. Below the
-         width where the gutter can hold it, it is simply not there -- the
-         breakpoint is about whether there is room beside the column, which is
-         why it is min-width on the whole layout rather than the 34rem
-         content breakpoint further up.
+      /* ---- The outline ----------------------------------------------------
+         Three layouts, and the outline is reachable in all of them.
 
-         The list of sections is built from the document (see buildOutline),
-         not written out here. A new section with an id joins the outline by
-         existing. The page list below it is hand-written, because it is the
-         one thing a page cannot know: where its siblings are. */
+         Wide (78rem and up): `main` is 45rem centred, so the space either side
+         is already empty. The outline sits in it and nothing else moves -- no
+         change to main's width, margin or padding.
+
+         Sidebar (48rem to 78rem): the gutter can no longer hold the outline
+         beside a centred column, but the viewport can still hold the two side
+         by side. The outline keeps its place and the column starts where the
+         outline ends; the page stops being centred and becomes two columns.
+         48rem is 768px, which is a tablet held upright, and every desktop
+         window worth the name is wider than it. The step across 78rem is
+         1.5rem of column movement -- a centred column starts at 16.5rem there,
+         a two-column one at 15rem -- so the breakpoint is not a jump.
+
+         Below 48rem there is no room for two columns: 15rem of outline would
+         leave 33rem, and that is not a column. So the outline stops being
+         beside the page and becomes the whole of it, behind the button at the
+         top left. Hidden until asked for, then everything. */
       .outline {
         display: none;
         position: fixed;
@@ -347,17 +354,71 @@
         padding: 5rem 1rem 3rem 1.5rem;
         overflow-y: auto;
         overscroll-behavior: contain;
+        background: var(--bg);
         font-size: 0.8rem;
         line-height: 1.45;
-        z-index: 5;
-      }
-      /* 45rem of column + 15rem of outline each side, and a little air. */
-      @media (min-width: 78rem) {
-        .outline { display: block; }
+        z-index: 15;
       }
       /* The scrollbar is noise beside body text; the outline still scrolls. */
       .outline { scrollbar-width: none; }
       .outline::-webkit-scrollbar { display: none; }
+
+      /* Opened on a narrow screen: the whole viewport, not a column in it. */
+      .outline.is-open {
+        display: block;
+        width: auto;
+        right: 0;
+        padding: 4.25rem 1.5rem 3rem 1.5rem;
+        font-size: 0.95rem;
+        line-height: 1.6;
+      }
+      .outline.is-open .outline-label { font-size: 0.72rem; }
+      .outline.is-open a,
+      .outline.is-open .outline-pages .here { padding: 0.45rem 0.8rem; }
+      body.outline-open { overflow: hidden; }
+
+      @media (min-width: 48rem) {
+        .outline { display: block; }
+        /* margin-right stays auto, so the column takes the width it needs and
+           leaves the remainder on the right rather than stretching to it. */
+        main { margin-left: 15rem; }
+      }
+      @media (min-width: 78rem) {
+        main { margin-left: auto; }
+      }
+
+      /* ---- The button that opens it ---------------------------------------
+         Top left, over the page, and only where the outline is not already
+         beside the page. main's padding-top is 5rem, so it sits above the
+         first line of content rather than on it -- including the breadcrumb
+         the subpages start with. */
+      .outline-toggle {
+        display: flex;
+        position: fixed;
+        top: 0.75rem;
+        left: 0.75rem;
+        z-index: 20;
+        width: 2.5rem;
+        height: 2.5rem;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        border-radius: 5px;
+        color: var(--fg);
+        cursor: pointer;
+      }
+      .outline-toggle:hover { border-color: #3a3a40; }
+      .outline-toggle:focus-visible { outline: 1px solid var(--eff); outline-offset: 2px; }
+      .outline-toggle svg { width: 1.15rem; height: 1.15rem; display: block; }
+      .outline-toggle .bars { display: block; }
+      .outline-toggle .ex { display: none; }
+      .outline-toggle[aria-expanded="true"] .bars { display: none; }
+      .outline-toggle[aria-expanded="true"] .ex { display: block; }
+      @media (min-width: 48rem) {
+        .outline-toggle { display: none; }
+      }
 
       .outline-label {
         font: 400 0.66rem/1.6 var(--mono);
@@ -386,6 +447,7 @@
       .outline a:hover { color: var(--fg); border-bottom: none; }
       /* The h3s under a section, one step in and a shade quieter. */
       .outline li.sub a { padding-left: 1.5rem; font-size: 0.76rem; }
+      .outline.is-open li.sub a { padding-left: 2rem; font-size: 0.88rem; }
 
       /* Where the reader is. aria-current carries it for a screen reader;
          the colour and the rule carry it for everyone else. */
@@ -405,12 +467,6 @@
         border-left: 1px solid var(--eff);
         margin-left: -1px;
       }
-      .outline-pages .ext::after {
-        content: "\2197";
-        margin-left: 0.4ch;
-        color: var(--dim);
-        font-size: 0.9em;
-      }
 
       /* An in-page jump lands under a fixed outline that does not overlap the
          column, so this is only about not pinning the heading to the very top
@@ -422,6 +478,15 @@
     </style>
   </head>
   <body>
+    <button class="outline-toggle" id="outline-toggle" type="button"
+            aria-controls="outline" aria-expanded="false" aria-label="Open page outline">
+      <svg class="bars" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M2 4h12M2 8h12M2 12h12"/>
+      </svg>
+      <svg class="ex" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
     <nav class="outline" id="outline" aria-label="Page outline">
       <p class="outline-label">Pages</p>
       <ul class="outline-pages">
@@ -1615,6 +1680,43 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
         window.addEventListener("scroll", onScroll, { passive: true });
         window.addEventListener("resize", onScroll, { passive: true });
         mark();
+
+        // ---- Opening it on a narrow screen --------------------------------
+        // Below the width where the outline sits beside the page it is the
+        // page instead: the button at the top left, and the whole viewport
+        // when it is pressed. Escape closes it, so does choosing a section,
+        // and so does widening the window past the breakpoint -- the open
+        // class describes a full-screen overlay and would be wrong applied to
+        // a sidebar.
+        const toggle = document.getElementById("outline-toggle");
+        if (toggle) {
+          const SIDEBAR = window.matchMedia("(min-width: 48rem)");
+          const setOpen = (open) => {
+            nav.classList.toggle("is-open", open);
+            document.body.classList.toggle("outline-open", open);
+            toggle.setAttribute("aria-expanded", open ? "true" : "false");
+            toggle.setAttribute("aria-label", open ? "Close page outline" : "Open page outline");
+            if (open) nav.scrollTop = 0;
+          };
+          const close = () => {
+            if (!nav.classList.contains("is-open")) return;
+            setOpen(false);
+            toggle.focus();
+          };
+          toggle.addEventListener("click", () => {
+            setOpen(!nav.classList.contains("is-open"));
+          });
+          // A link is a jump within this page, so the overlay has done its job.
+          nav.addEventListener("click", (e) => {
+            if (e.target.closest("a") && nav.classList.contains("is-open")) setOpen(false);
+          });
+          document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") close();
+          });
+          const onBreakpoint = () => { if (SIDEBAR.matches) setOpen(false); };
+          if (SIDEBAR.addEventListener) SIDEBAR.addEventListener("change", onBreakpoint);
+          else SIDEBAR.addListener(onBreakpoint);
+        }
       })();
     </script>
   </body>
