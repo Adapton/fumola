@@ -86,7 +86,7 @@ fn time_min(source: &str) -> (Duration, usize) {
 
 /// A long run of `let` bindings, each reading the ones before it.
 ///
-/// The binder is the unit of cost here: every `let` is a `Let` frame pushed and
+/// The binder is the unit of cost: every `let` is a `Let` frame pushed and
 /// popped, and every variable read is a step of its own.
 fn binders(n: usize) -> String {
     let mut s = String::from("let x0 = 1; ");
@@ -97,10 +97,7 @@ fn binders(n: usize) -> String {
     s
 }
 
-/// One expression, nested to depth `n`.
-///
-/// This is the shape the Rust stack is supposed to be good at and the heap
-/// stack is supposed to pay for: depth without breadth.
+/// One expression, nested to depth `n`: depth without breadth.
 fn nested(n: usize) -> String {
     let mut s = String::from("1");
     for i in 0..n {
@@ -109,39 +106,47 @@ fn nested(n: usize) -> String {
     s
 }
 
-/// A `while` loop over two mutable variables.
+/// A `while` loop whose body does `reads` array reads and `calls` calls per
+/// iteration, on top of the arithmetic that is always there.
 ///
-/// The loop never touches the Rust stack -- it is a Rust `loop` -- so this
-/// measures the per-iteration cost of the frames the machine would have built
-/// and this evaluator does not.
-fn while_loop(n: usize) -> String {
+/// This is the instrument. The loop, the binders, the arithmetic and the
+/// assignments are all in the recursive set; every array read and every call is
+/// handed back to the machine. Holding the loop fixed and raising the delegated
+/// share is what separates "big-step is faster" from "big-step is faster at the
+/// things it actually does".
+fn loop_with(iters: usize, reads: usize, calls: usize) -> String {
+    let mut body = String::from("s := s + i");
+    for k in 0..reads {
+        body.push_str(&format!(" + a[{}]", k % 16));
+    }
+    for _ in 0..calls {
+        body.push_str(" + f(i)");
+    }
     format!(
-        "var i = 0; var s = 0; while (i < {}) {{ s := s + i * 2; i := i + 1 }}; s",
-        n
+        "func f(x : Nat) : Nat {{ x + 1 }}; \
+         let a = [var {}]; \
+         var i = 0; var s = 0; \
+         while (i < {}) {{ {}; i := i + 1 }}; s",
+        (0..16).map(|i| i.to_string()).collect::<Vec<_>>().join(", "),
+        iters,
+        body,
     )
 }
 
-/// Building and reading an array, in a loop.
+/// Calls nested inside calls, with no loop and no binders around them.
 ///
-/// Delegated, node for node. Array construction is not in the recursive set,
-/// and indexing cannot be: the `Idx2` frame arm looks underneath itself for an
-/// `Assign1` frame to decide whether it is a read or an assignment target, and
-/// a recursive evaluator has no frame there to find. So this is the workload
-/// that says what a region is *not* worth yet.
-fn arrays(n: usize) -> String {
-    format!(
-        "let a = [var {}]; var i = 0; var s = 0; \
-         while (i < {}) {{ s := s + a[i % {}]; i := i + 1 }}; s",
-        (0..16)
-            .map(|i| i.to_string())
-            .collect::<Vec<_>>()
-            .join(", "),
-        n,
-        16
-    )
+/// The outermost node is a `Call`, so the whole expression is one delegation
+/// and the recursive evaluator does nothing at all. This is the control: it
+/// measures what handing a node back costs, and the answer should be nothing.
+fn nested_calls(n: usize) -> String {
+    let mut s = String::from("0");
+    for _ in 0..n {
+        s = format!("f({})", s);
+    }
+    format!("func f(x : Nat) : Nat {{ x + 1 }}; {}", s)
 }
 
-/// Binders and nesting together, inside a loop -- the shape real code has.
+/// The shape real code has: binders and nesting inside a loop.
 fn mixed(n: usize) -> String {
     format!(
         "var i = 0; var total = 0; \
@@ -167,26 +172,46 @@ fn main() {
             source: nested(200),
         },
         Workload {
-            name: "while loop (20k)",
-            recursive: Recursive::Yes,
-            source: while_loop(20_000),
-        },
-        Workload {
             name: "mixed (5k iters)",
             recursive: Recursive::Yes,
             source: mixed(5_000),
         },
+        // The series. One loop, a rising delegated share.
         Workload {
-            name: "arrays (20k reads)",
-            recursive: Recursive::No,
-            source: arrays(20_000),
+            name: "loop, 0 reads",
+            recursive: Recursive::Yes,
+            source: loop_with(20_000, 0, 0),
         },
         Workload {
-            name: "calls (10k)",
+            name: "loop, 1 read",
+            recursive: Recursive::Partly,
+            source: loop_with(20_000, 1, 0),
+        },
+        Workload {
+            name: "loop, 4 reads",
+            recursive: Recursive::Partly,
+            source: loop_with(20_000, 4, 0),
+        },
+        Workload {
+            name: "loop, 16 reads",
+            recursive: Recursive::Partly,
+            source: loop_with(20_000, 16, 0),
+        },
+        Workload {
+            name: "loop, 1 call",
+            recursive: Recursive::Partly,
+            source: loop_with(20_000, 0, 1),
+        },
+        Workload {
+            name: "loop, 4 calls",
+            recursive: Recursive::Partly,
+            source: loop_with(20_000, 0, 4),
+        },
+        // The control: one delegation, nothing else.
+        Workload {
+            name: "nested calls (5k)",
             recursive: Recursive::No,
-            source: "func f(x : Nat) : Nat { x + 1 }; var i = 0; var s = 0; \
-                     while (i < 10000) { s := f(s); i := i + 1 }; s"
-                .to_string(),
+            source: nested_calls(5_000),
         },
     ];
 

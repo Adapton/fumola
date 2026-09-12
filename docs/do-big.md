@@ -72,8 +72,7 @@ Two of those exclusions are not laziness:
 
 **It does not speed up `mergeSort`.** Every function body is entered through a
 delegated call, so `do big { M.runAll() }` is one delegation and almost no
-recursive work. `cargo bench -p fumola --bench do_big` reports the spread,
-with a noise floor beside each figure.
+recursive work.
 
 **It never engages in web-play.** A region evaluated on the Rust stack is
 atomic — there is no standing continuation to pause at. So when a step limit, a
@@ -88,6 +87,47 @@ which is [#68](https://github.com/Adapton/fumola/issues/68)'s symptom
 reintroduced by the feature meant to help. It also buys a debugging story: run a
 misbehaving `do big` under `--step-limit` and it becomes `do { .. }` exactly,
 inspectable one step at a time.
+
+## What it is worth, measured
+
+`cargo bench -p fumola --bench do_big`, release, one machine:
+
+| workload | steps | small (ms) | big (ms) | ratio | noise floor |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| binders (800 lets) | 5.6k | 1.55 | 1.04 | 0.67 | 0.91 |
+| nested (depth 200) | 1.2k | 0.12 | 0.07 | 0.62 | 0.94 |
+| mixed (5k iters) | 435k | 41.4 | 20.2 | 0.49 | 0.96 |
+| loop, 0 reads | 720k | 53.1 | 21.2 | **0.40** | 0.99 |
+| loop, 1 read | 880k | 69.4 | 32.9 | 0.47 | 0.97 |
+| loop, 4 reads | 1.36M | 110.9 | 72.5 | 0.65 | 1.01 |
+| loop, 16 reads | 3.28M | 291.6 | 212.9 | 0.73 | 1.02 |
+| loop, 1 call | 1.12M | 88.0 | 53.8 | 0.61 | 1.02 |
+| loop, 4 calls | 2.32M | 192.3 | 146.3 | 0.76 | 1.02 |
+| nested calls (5k) | 75k | 7.12 | 6.65 | *0.93* | 0.96 |
+
+Ratio below 1.00 means the region was faster. The noise floor is the same
+program in the same mode timed again, so it absorbs warm-up; a ratio no further
+from 1.00 than the floor beside it is not a result.
+
+Two rows carry the argument.
+
+**`loop, 0 reads` at 0.40**: a loop whose every node is in the recursive set
+runs in two fifths of the time, at an identical step count. That is the
+continuation cost, and it is not a rounding error — it is most of the work.
+
+**`nested calls (5k)` at 0.93, floor 0.96**: an expression that is one
+delegation and nothing else shows no effect. Handing a node back costs nothing
+measurable, which is what makes the middle rows readable.
+
+The middle rows are the instrument: one loop, held fixed, with a rising share of
+it handed back. The ratio climbs monotonically from 0.40 to 0.76 as the
+delegated share grows, and the control says where it is heading. So the speedup
+is not a property of the benchmark — it tracks exactly how much of the program
+the recursive evaluator actually ran, which is the answer #122 asked for.
+
+The read of this for the next step: array indexing and calls are where the
+remaining time is, and both are excluded for stated reasons rather than for want
+of effort.
 
 ## The two loud failures
 
