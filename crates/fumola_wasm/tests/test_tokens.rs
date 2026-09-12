@@ -169,3 +169,20 @@ fn the_library_is_readable() {
         serde_json::from_str(&fumola_module_source("fumola/nope")).unwrap();
     assert_eq!(missing["ok"], false);
 }
+
+/// An evaluation mode is coloured as part of its form.
+///
+/// `big` is an ordinary identifier to the parser -- reserving it would take
+/// `` `big `` away from symbols, and symbols are how a program names cells. It
+/// is a keyword only here, the way `space` and `time` are, so that a reader
+/// sees one form rather than a call.
+#[test]
+fn an_evaluation_mode_is_a_keyword() {
+    let got = kinds("do big { 1 }");
+    let keywords: Vec<&str> = got
+        .iter()
+        .filter(|(k, _)| k == "keyword")
+        .map(|(_, t)| t.as_str())
+        .collect();
+    assert_eq!(keywords, vec!["do", "big"]);
+}

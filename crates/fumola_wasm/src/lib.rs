@@ -1150,6 +1150,10 @@ const HIGHLIGHT_KEYWORDS: &[&str] = &[
     "module", "let", "return", "import", "type", "public", "force", "func",
     "thunk", "switch", "case", "prim", "if", "else", "var", "for", "in",
     "with", "within", "do", "assert", "goto", "space", "time", "debug_show",
+    // Evaluation modes. Ordinary identifiers to the parser, the way `space` and
+    // `time` above are, and coloured here for the same reason: a reader who sees
+    // `do big {` should see one form, not a call.
+    "big", "small",
 ];
 
 fn token_kind(token: &fumola_syntax::lexer_types::Token, text: &str) -> &'static str {
