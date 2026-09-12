@@ -166,6 +166,37 @@ The read of this for the next step: **`force` is where the remaining time is**,
 and it is the hardest thing in the file to bring in, because it is the one
 bracket the delegation design was built to avoid touching.
 
+### The same, in wasm
+
+Everything above is native, release, x86_64. #122 is about the playground,
+which is wasm, and #68's figures are wasm -- so the measurement is repeated
+there. `./tools/measure-do-big-wasm.sh` builds the runtime the playground
+ships, generates node bindings beside it, and runs the same programs through
+`fumola_eval_top`, which has no step budget and so lets a region engage. Step
+counts are read back through `fumola_steps_taken` -- added for exactly this --
+and asserted equal before any time is printed.
+
+| workload | steps | small (ms) | big (ms) | ratio | noise floor |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| loop, 0 reads | 800k | 110.1 | 45.3 | **0.41** | 1.00 |
+| fib 22 | 1.49M | 245.7 | 131.6 | **0.54** | 1.05 |
+| fib 22, in a force | 1.49M | 191.7 | 239.7 | *1.25* | *1.39* |
+| scene, size 8 | 329k | 218.0 | 213.4 | 0.98 | 0.97 |
+| scene, size 16 | 732k | 516.0 | 512.7 | 0.99 | 1.03 |
+| scene, size 23 | 1.24M | 912.4 | 903.9 | 0.99 | 1.03 |
+| scene, size 44 | 2.46M | 2925.2 | 2708.2 | 0.93 | 0.93 |
+
+The reachable rows transfer: 0.41 against 0.39 native, 0.54 against 0.48. The
+mergeSort rows are flat on both targets, and every step count is
+byte-identical to the native run -- 329125, 732492, 1240073, 2462583 -- which
+is a cross-target check of the evaluator in its own right. The absolute times
+agree with #68 (2.9 s at size 44, against its 2.5 s).
+
+The `fib 22, in a force` row is **not a result** here. Its floor is 1.39: the
+same program in the same mode came back 39% slower the second time, which is
+#68's memory behaviour showing up as timing noise in a fresh wasm heap. It is
+kept in the table because a floor that wide is exactly what the floor is for.
+
 ## The two loud failures
 
 `do frobnicate { 1 }` is `UnknownEvalMode`. The mode is an ordinary identifier,
