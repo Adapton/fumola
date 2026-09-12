@@ -23,6 +23,14 @@ jobs:
       - name: Test the site assembly
         run: ./tools/assemble-site.test.sh
 
+      # Also before the build, and for the same reason. Every panic macro an
+      # evaluating program could reach became an Interruption, so that a host
+      # embedding the VM has one error path rather than two; a new `todo!()`
+      # would read as an ordinary note to self and land unremarked. See
+      # docs/panic-audit.md, and #118, #120 and #121.
+      - name: Refuse a panic macro reachable from evaluation
+        run: ./tools/check-no-panics.sh
+
       - name: Install latest nightly
         uses: actions-rs/toolchain@v1
         with:

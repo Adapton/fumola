@@ -36,6 +36,13 @@ assertions are its own tests).
 | `unimplemented!` | 2 | 0 |
 | `.unwrap()` / `.expect()` | 115 | 71 |
 
+Zero is now enforced: `tools/check-no-panics.sh` runs in `rust.yml` before the
+Rust build, over the same roots and with the same three exclusions, and refuses
+a pull request that reintroduces one. It strips comments before matching, so a
+macro *named* in prose -- as several are in this very file -- does not read as
+a macro *called* in code, and it self-tests its own matcher so that it cannot
+quietly stop catching things.
+
 Counts are over `crates/*/src`, excluding `check.rs`, `prelude.rs` and
 `module_path.rs` (test-only, see above) and excluding commented-out lines. The
 71 remaining unwraps are accounted for below: each is either not reachable from
