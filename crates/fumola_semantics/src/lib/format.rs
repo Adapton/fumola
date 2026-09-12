@@ -634,10 +634,23 @@ impl ToDoc for Exp {
             Array(m, es) => array(m, es),
             Index(e, idx) => e.doc().append("[").append(idx.doc()).append("]"),
             Function(f) => f.doc(),
+            // The argument is juxtaposed, not parenthesized. The commented-out
+            // line below is where the separator used to come from; when the
+            // printer stopped wrapping the argument in parens, nothing took
+            // over the job of holding it apart from the function, and `f x`
+            // printed as `fx` -- one identifier, which re-parses as a
+            // different program rather than as a call.
+            //
+            // An unconditional space costs `f(x)` printing as `f (x)`. This
+            // printer already drops the spaces around `=` and inside braces,
+            // so it is not aiming at input-shaped output; a space that knows
+            // when the argument is parenthesized would be more code with more
+            // ways to be wrong.
             Call(e, b, a) => e
                 .doc()
                 .append(b.as_ref().map(bind).unwrap_or(RcDoc::nil()))
                 //.append(enclose("(", a.doc(), ")"))
+                .append(RcDoc::space())
                 .append(a.doc()),
             Block(decs) => block(decs),
             Do(e) => kwd("do").append(e.doc()),
@@ -714,8 +727,11 @@ impl ToDoc for Exp {
                 match (bases, fields) {
                     (None, None) => RcDoc::nil(),
                     (None, Some(fields)) => vector(&fields.vec, ";"),
-                    (Some(bases), None) => vector(&bases.vec, "and"),
-                    (Some(bases), Some(fields)) => vector(&bases.vec, "and")
+                    // `vector`'s separator is glued to the item on its left,
+                    // which suits punctuation and not a keyword: without the
+                    // leading space, `x and y` prints as `xand y`.
+                    (Some(bases), None) => vector(&bases.vec, " and"),
+                    (Some(bases), Some(fields)) => vector(&bases.vec, " and")
                         .append(kwd(" with"))
                         .append(vector(&fields.vec, ";")),
                 },
