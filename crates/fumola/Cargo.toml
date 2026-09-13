@@ -1,13 +1,13 @@
 [package]
 name = "fumola"
-version = "0.0.29"
+version = "0.0.311"
 authors = ["Matthew Hammer", "Ryan Vandersmith"]
 edition = "2021"
 license = "Apache-2.0"
 description = "Fumola Programming Language"
 readme = "README.md"
 documentation = "https://docs.rs/fumola"
-repository = "https://github.com/Adapton/fumola.rs"
+repository = "https://github.com/Adapton/fumola"
 categories = ["wasm"]
 keywords = ["wasm", "fumola", "adapton"]
 include = ["src", "Cargo.toml", "LICENSE", "README.md"]
@@ -17,9 +17,9 @@ incremental = true
 debug = true
 
 [dependencies]
-fumola_syntax = { path = "../fumola_syntax" }
-fumola_semantics = { path = "../fumola_semantics" }
-fumola_parser = { path = "../fumola_parser" }
+fumola_syntax = { version = "0.0.311", path = "../fumola_syntax" }
+fumola_semantics = { version = "0.0.311", path = "../fumola_semantics" }
+fumola_parser = { version = "0.0.311", path = "../fumola_parser" }
 lalrpop = { version = "0.22.2", features = ["lexer"] }
 lalrpop-util = { version = "0.22.2", features = ["lexer"] }
 regex = "1.6.0"

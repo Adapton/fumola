@@ -1,10 +1,13 @@
 [package]
 name = "fumola_wasm"
-version = "0.0.29"
+version = "0.0.311"
 authors = ["Matthew Hammer"]
 edition = "2021"
 license = "Apache-2.0"
 description = "wasm-bindgen bindings exposing incremental Fumola instances to JavaScript"
+# Its artifact is the wasm bundle fumola.org serves, built by wasm-pack, not a
+# crate anyone depends on. Not published; flip this if the name is worth claiming.
+publish = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -13,10 +16,10 @@ build = "build.rs"
 
 [dependencies]
 # The REPL feature pulls in rustyline -> fs2, which does not build for wasm32.
-fumola = { path = "../fumola", default-features = false }
-fumola_semantics = { path = "../fumola_semantics" }
+fumola = { version = "0.0.311", path = "../fumola", default-features = false }
+fumola_semantics = { version = "0.0.311", path = "../fumola_semantics" }
 wasm-bindgen = "0.2"
 serde_json = "1.0"
 num-traits = "0.2"
 num-bigint = "0.4"
-fumola_syntax = { path = "../fumola_syntax" }
+fumola_syntax = { version = "0.0.311", path = "../fumola_syntax" }

@@ -1,19 +1,19 @@
 [package]
 name = "fumola_semantics"
-version = "0.0.29"
+version = "0.0.311"
 authors = ["Matthew Hammer", "Ryan Vandersmith"]
 edition = "2024"
 license = "Apache-2.0"
 description = "A library for parsing and running Fumola in Rust"
 readme = "README.md"
 documentation = "https://docs.rs/fumola"
-repository = "https://github.com/Adapton/fumola.rs"
+repository = "https://github.com/Adapton/fumola"
 categories = ["wasm"]
 keywords = ["internet-computer", "fumola", "wasm"]
 include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
-fumola_syntax = { version = "0.0.29", path = "../fumola_syntax" }
+fumola_syntax = { version = "0.0.311", path = "../fumola_syntax" }
 regex = "1.6.0"
 env_logger = "0.10.0"
 log = "0.4.17"
