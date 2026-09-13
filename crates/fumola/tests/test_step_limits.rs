@@ -121,3 +121,70 @@ fn a_short_program_finishes_in_one_chunk() {
     let want = plain.eval("3").expect("three");
     assert_eq!(format!("{:?}", v), format!("{:?}", want));
 }
+
+/// A limit outranks `do big`.
+///
+/// A region evaluated on the Rust stack is atomic: there is no standing
+/// continuation to pause at. So when a limit is set, the region is not entered
+/// at all -- it runs one step at a time instead, by the same `exp_conts` call
+/// `do { .. }` makes. That is why this is an equality and not an approximation:
+/// the degraded path is not *like* the small-step path, it is that path.
+///
+/// The consequence is worth stating where it can be checked: `do big` is inert
+/// in the playground, whose chunked runner sets a budget on every call.
+#[test]
+fn a_limit_makes_a_big_region_small() {
+    let body = "var i = 0; var n = 0; while (i < 200) { n += i; i += 1 }; n";
+
+    let mut plain = State::empty();
+    let mut big = State::empty();
+
+    let plain_answer = plain
+        .eval_limited(&format!("do {{ {} }}", body), 100_000)
+        .expect("the plain region finished");
+    let big_answer = big
+        .eval_limited(&format!("do big {{ {} }}", body), 100_000)
+        .expect("the big region finished");
+
+    assert_eq!(
+        format!("{:?}", plain_answer),
+        format!("{:?}", big_answer),
+        "a limited `do big` disagreed with a limited `do`"
+    );
+    assert_eq!(
+        plain.steps_taken(),
+        big.steps_taken(),
+        "a limited `do big` did not take the steps a limited `do` takes"
+    );
+}
+
+/// And it still pauses and resumes the way any other program does.
+#[test]
+fn a_big_region_pauses_and_resumes() {
+    let program = "do big { var i = 0; var n = 0; while (i < 400) { n += i; i += 1 }; n }";
+
+    let mut whole = State::empty();
+    let direct = whole.eval(program).expect("unlimited eval");
+
+    let mut chunked = State::empty();
+    let mut answer = None;
+    match chunked.eval_limited(program, 50) {
+        Ok(v) => answer = Some(v),
+        Err(e) => assert!(paused(&e), "expected a pause, got {:?}", e),
+    }
+    let mut rounds = 0;
+    while answer.is_none() {
+        rounds += 1;
+        assert!(rounds < 10_000, "resumed {} times without finishing", rounds);
+        match chunked.resume_limited(50) {
+            Ok(v) => answer = Some(v),
+            Err(e) => assert!(paused(&e), "expected a pause, got {:?}", e),
+        }
+    }
+    assert!(rounds > 1, "one chunk finished it; the limit did nothing");
+    assert_eq!(
+        format!("{:?}", answer.unwrap()),
+        format!("{:?}", direct),
+        "a chunked `do big` disagreed with the whole run"
+    );
+}

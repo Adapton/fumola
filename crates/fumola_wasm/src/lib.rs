@@ -388,6 +388,23 @@ pub fn fumola_drop(id: FumolaInstanceId) {
     MODES.with(|m| m.borrow_mut().remove(&id));
 }
 
+/// How many steps this runtime has taken, over its whole life.
+///
+/// Exposed so that a measurement can check itself. Comparing the time two
+/// evaluation modes take is only meaningful if they did the same work, and the
+/// step count is how that is established -- but the chunked entry points are no
+/// use for it, since setting a budget is exactly what makes a `do big` region
+/// decline to run. So the count has to be readable after an unlimited eval.
+#[wasm_bindgen]
+pub fn fumola_steps_taken(id: FumolaInstanceId) -> usize {
+    INSTANCES.with(|m| {
+        m.borrow()
+            .get(&id)
+            .map(|state| state.steps_taken())
+            .unwrap_or(0)
+    })
+}
+
 /// How many runtimes sigma currently holds. Exposed for tests and debugging.
 #[wasm_bindgen]
 pub fn fumola_instance_count() -> usize {
@@ -1150,6 +1167,10 @@ const HIGHLIGHT_KEYWORDS: &[&str] = &[
     "module", "let", "return", "import", "type", "public", "force", "func",
     "thunk", "switch", "case", "prim", "if", "else", "var", "for", "in",
     "with", "within", "do", "assert", "goto", "space", "time", "debug_show",
+    // Evaluation modes. Ordinary identifiers to the parser, the way `space` and
+    // `time` above are, and coloured here for the same reason: a reader who sees
+    // `do big {` should see one form, not a call.
+    "big", "small",
 ];
 
 fn token_kind(token: &fumola_syntax::lexer_types::Token, text: &str) -> &'static str {

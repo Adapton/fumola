@@ -76,3 +76,13 @@ required-features = ["repl"]
 name = "benchmark"
 harness = false
 path = "benches/benchmark.rs"
+
+[[bench]]
+name = "do_big"
+harness = false
+path = "benches/do_big.rs"
+
+[[bench]]
+name = "do_big_mergesort"
+harness = false
+path = "benches/do_big_mergesort.rs"

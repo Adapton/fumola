@@ -6,8 +6,8 @@ use crate::vm_types::{
     stack::{FieldContext, Frame, FrameCont},
 };
 use fumola_syntax::ast::{
-    AdaptonNav as AdaptonNavAst, AdaptonNav_, AdaptonNavDim, Dec, Dec_, Delim, Exp, Exp_,
-    ExpField_, Id, IdPos_, Literal, Pat, Pat_, Source, Type,
+    AdaptonNav as AdaptonNavAst, AdaptonNav_, AdaptonNavDim, Dec, Dec_, Delim, EvalMode, Exp,
+    Exp_, ExpField_, Id, IdPos_, Literal, Pat, Pat_, Source, Type,
 };
 use fumola_syntax::shared::{FastClone, Share};
 use im_rc::{HashMap, Vector, vector};
@@ -232,6 +232,7 @@ pub fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interrupti
             source,
         ),
         Do(e) => exp_conts(active, FrameCont::Do, e),
+        DoMode(m, e) => Err(Interruption::EnterEvalMode(m.0.clone(), e.fast_clone())),
         Assert(e) => exp_conts(active, FrameCont::Assert, e),
         Object((bases, fields)) => object_step(active, bases, fields),
         Tuple(es) => tuple_step(active, &es.vec),
@@ -322,7 +323,7 @@ pub fn exp_step<A: Active>(active: &mut A, exp: Exp_) -> Result<Step, Interrupti
 }
 
 // To advance the active Motoko state by a single step, after all limits are checked.
-fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
+pub(crate) fn active_step_<A: Active>(active: &mut A) -> Result<Step, Interruption> {
     active_trace(active);
     let cont = active.cont().clone();
     match cont {
@@ -707,20 +708,133 @@ fn check_for_breakpoint<A: ActiveBorrow>(active: &A, limits: &Limits) -> Option<
     }
 }
 
-fn check_for_redex<A: ActiveBorrow>(active: &A, limits: &Limits) -> Result<usize, Interruption> {
-    let mut redex_bump = 0;
+/// Whether the step about to run retires a redex.
+///
+/// Split out of `check_for_redex` so that the big-step evaluator can charge the
+/// same count without a `Limits` to check it against. A region is never entered
+/// when a limit is set, so it has nothing to check and still has to count.
+pub(crate) fn redex_bump<A: ActiveBorrow>(active: &A) -> Result<usize, Interruption> {
     if let Cont::Value_(v) = active.cont() {
         if stack_cont_has_redex(active, v)? {
-            redex_bump = 1;
-            if let Some(redex_limit) = limits.redex {
-                if active.counts().redex >= redex_limit {
-                    // if =, adding 1 will exceed limit, so do not.
-                    return Err(Interruption::Limit(Limit::Redex));
-                }
+            return Ok(1);
+        }
+    }
+    Ok(0)
+}
+
+fn check_for_redex<A: ActiveBorrow>(active: &A, limits: &Limits) -> Result<usize, Interruption> {
+    let bump = redex_bump(active)?;
+    if bump == 1 {
+        if let Some(redex_limit) = limits.redex {
+            if active.counts().redex >= redex_limit {
+                // if =, adding 1 will exceed limit, so do not.
+                return Err(Interruption::Limit(Limit::Redex));
             }
         }
     }
-    Ok(redex_bump)
+    Ok(bump)
+}
+
+/// Enter a `do <mode> { .. }` region, or decline to.
+///
+/// A region evaluated on the Rust stack is atomic: there is no standing
+/// continuation to pause at, so a host that asked to be able to pause outranks
+/// the optimization and the region runs one step at a time instead. Nothing has
+/// been evaluated when that decision is made, so declining costs nothing and
+/// restores nothing -- it is the same `exp_conts` call the `Do` arm makes, so
+/// the value, the counts, the graph and the error text are identical by
+/// identity rather than by argument.
+fn enter_eval_mode<A: Active>(
+    active: &mut A,
+    limits: &Limits,
+    mode: EvalMode,
+    e: &Exp_,
+) -> Result<Step, Interruption> {
+    let can_pause =
+        limits.step.is_some() || limits.redex.is_some() || !limits.breakpoints.is_empty();
+    enter_eval_mode_(active, can_pause, mode, e)
+}
+
+/// Enter a region that is already inside one.
+///
+/// The limit decision was made at the outer boundary; an inner region cannot
+/// reach a different answer, because the outer one is already atomic.
+pub(crate) fn enter_eval_mode_unlimited<A: Active>(
+    active: &mut A,
+    mode: EvalMode,
+    e: &Exp_,
+) -> Result<Step, Interruption> {
+    enter_eval_mode_(active, false, mode, e)
+}
+
+fn enter_eval_mode_<A: Active>(
+    active: &mut A,
+    can_pause: bool,
+    mode: EvalMode,
+    e: &Exp_,
+) -> Result<Step, Interruption> {
+    match &mode {
+        EvalMode::Named(id) if id.0.id_ref().as_str() == "small" => {
+            exp_conts(active, FrameCont::Do, e)
+        }
+        EvalMode::Named(id) if id.0.id_ref().as_str() == "big" => {
+            if can_pause {
+                log::debug!(
+                    "do big: a limit or a breakpoint is set, so this block runs one step at a time"
+                );
+                return exp_conts(active, FrameCont::Do, e);
+            }
+            enter_big(active, e)
+        }
+        EvalMode::Named(id) => Err(Interruption::UnknownEvalMode(id.0.id(), id.1.clone())),
+    }
+}
+
+fn enter_big<A: Active>(active: &mut A, e: &Exp_) -> Result<Step, Interruption> {
+    // The region's own frame, pushed by the call the `Do` arm makes, so the two
+    // modes are indistinguishable up to this point. It gives `return_` and
+    // `bang_null` a real stack to scan past, puts the region in the standing
+    // stack for an error report, and restores env, context and cont_prim_type
+    // for free when its pass-through arm pops it.
+    exp_conts(active, FrameCont::Do, e)?;
+    let watermark = active.stack().len();
+    match crate::vm_big::eval_region(active, e, watermark) {
+        Ok(v) => {
+            // Raw, not dereferenced: the machine's next step applies the
+            // implicit-deref rule against the `Do` frame it is about to pop.
+            *active.cont() = Cont::Value_(v);
+            Ok(Step {})
+        }
+        // A non-local exit already wrote stack, env, context and cont on its way
+        // out of the region. There is nothing left to say.
+        Err(crate::vm_big::Ctl::Escaped) => Ok(Step {}),
+        // Entering the region is itself a step, and `active_step` charges it
+        // only for a step that returns. The small-step reading of this program
+        // always takes it -- pushing the `Do` frame cannot fail -- so a region
+        // that fails part-way has to account for it here, or the two readings
+        // differ by one on every failure.
+        Err(crate::vm_big::Ctl::Interrupt(i)) => {
+            active.counts().step += 1;
+            if resumes_elsewhere(&i) {
+                Err(Interruption::BigStepEscape(Box::new(i)))
+            } else {
+                Err(i)
+            }
+        }
+    }
+}
+
+/// The interruptions a host answers by running the standing continuation.
+///
+/// Taken from what actually resumes -- `Core::step`'s `Send` and `Response`
+/// handlers, and the CLI's out-of-band module read -- rather than from
+/// `Interruption::is_recoverable`, which has no callers. A `Breakpoint` or a
+/// `Limit` cannot appear here: a region is not entered when either is possible.
+fn resumes_elsewhere(i: &Interruption) -> bool {
+    matches!(
+        i,
+        Interruption::Send(..) | Interruption::Response(_) | Interruption::ModuleFileNotFound(_)
+    )
 }
 
 pub fn active_step<A: Active>(active: &mut A, limits: &Limits) -> Result<Step, Interruption> {
@@ -734,7 +848,10 @@ pub fn active_step<A: Active>(active: &mut A, limits: &Limits) -> Result<Step, I
         }
     }
     let redex_bump = check_for_redex(active, limits)?;
-    let ret = active_step_(active)?;
+    let ret = match active_step_(active) {
+        Err(Interruption::EnterEvalMode(mode, e)) => enter_eval_mode(active, limits, mode, &e)?,
+        other => other?,
+    };
     active.counts().step += 1;
     active.counts().redex += redex_bump;
     Ok(ret)

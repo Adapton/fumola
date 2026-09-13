@@ -270,6 +270,10 @@ fn test_do_block() {
     assert_("do { let x = 0; x }");
     assert_("let y = do { let x = 0; x }; y");
     assert_("var x = do { var y = 0; x }; x");
+    // A named evaluation mode round-trips, which pins the grammar rule and the
+    // formatter arm against each other in one line.
+    assert_("do big { let x = 0; x }");
+    assert_("do small { let x = 0; x }");
 }
 
 #[test]

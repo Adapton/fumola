@@ -2,7 +2,7 @@
 //use std::collections::HashMap;
 // use crate::ast_utils::Syntax;
 use crate::parser_utils::{dec_node_into_exp, get_one};
-use fumola_syntax::ast::{into_adapton_nav_dim, Attr_, Attr, Attrs, BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, AdaptonNav, AdaptonNav_, NodeData, Source, SourceKnown, Id, Id_, IdPos, IdPos_, Unquote, Unquote_, ToId, Pat, Pat_, PatField, PatField_, Exp, ExpObjectBody, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, CasesPos, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFieldsPos, ProjIndex, QuotedAst};
+use fumola_syntax::ast::{into_adapton_nav_dim, Attr_, Attr, Attrs, EvalMode, EvalMode_, BinAnnotWasHoisted, hoist_right_type_annotation as hrta, Class, Node, AdaptonNav, AdaptonNav_, NodeData, Source, SourceKnown, Id, Id_, IdPos, IdPos_, Unquote, Unquote_, ToId, Pat, Pat_, PatField, PatField_, Exp, ExpObjectBody, Exp_, ExpField, Function, ObjSort, Type, Type_, TypeField, TypeField_, TypeBind, TypeBind_, BindSort, TypeTag, TypeTag_, ValTypeField, TypePath, TypePath_, PrimType, Literal, Case, Case_, CasesPos, Decs, Dec, Dec_, UnOp, BinOp, RelOp, Delim, Mut, SortPat, Sugar, Vis, Vis_, Stab, Stab_, DecField, DecField_, DecFieldsPos, ProjIndex, QuotedAst};
 use fumola_syntax::ast::PrimFunction;
 // use crate::lexer_types::Token;
 use line_col::LineColLookup;
@@ -372,6 +372,7 @@ ExpNonDec<B>: Exp = {
     "do" "?" <e:BlockPos_> => Exp::DoOpt(e),
     "do" <an:AdaptonNav_> <e:BlockPos_> => Exp::DoAdaptonNav(vector!(an), e),
     "do" "@" <e1:ExpNullary_<Ob>> <e2:ExpNest_> => Exp::DoAdaptonPutForceThunk(e1,e2),
+    "do" <m:EvalMode_> <e:BlockPos_> => Exp::DoMode(m, e),
     "assert" <e:ExpNest_> => Exp::Assert(e),
     "label" <id:Id_> <t:(":" <Type_>)?> <e:ExpNest_> => Exp::Label(id, t, e),
     "debug" <e:ExpNest_> => Exp::Debug(e),
@@ -380,6 +381,19 @@ ExpNonDec<B>: Exp = {
     "thunk" <e:Block_> => Exp::Thunk(e),
     "force" <e:ExpNullary_<Ob>> => Exp::Force(e),
     "@" <e:ExpNullary_<Ob>> => Exp::GetAdaptonPointer(e),
+}
+
+#[inline]
+EvalMode_: EvalMode_ = Node<EvalMode>;
+
+// The mode is an ordinary identifier, not a terminal. A quoted "big" here
+// would outrank the identifier regex everywhere, reserving the word in every
+// position -- including `` `big ``, and symbols are how a program names cells
+// in the graph. `goto` and `within` above are terminals, but their dimension
+// words are not, for the same reason; `into_adapton_nav_dim` resolves those
+// afterwards, and `enter_eval_mode` resolves this one.
+EvalMode: EvalMode = {
+    <id:IdPos_> => EvalMode::Named(id),
 }
 
 #[inline]

@@ -248,6 +248,7 @@ impl QuotedClose for Exp {
             )),
             Exp::Block(b) => Ok(Block(b.quoted_close(env)?)),
             Exp::Do(e) => Ok(Do(e.quoted_close(env)?)),
+            Exp::DoMode(m, e) => Ok(DoMode(m.clone(), e.quoted_close(env)?)),
             Exp::Not(..) => nyi!(line!(), "a negation inside a quotation"),
             Exp::And(..) => nyi!(line!(), "an and expression inside a quotation"),
             Exp::Or(..) => nyi!(line!(), "an or expression inside a quotation"),

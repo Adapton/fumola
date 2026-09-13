@@ -975,6 +975,25 @@ pub enum Interruption {
     Unknown,
     Impossible(CoreSource, Option<String>),
     AdaptonError(crate::adapton::Error),
+    /// A VM-internal signal: `do <mode> { .. }` was reached and the decision
+    /// about how to run it has to be made a frame up.
+    ///
+    /// `exp_step` has no `&Limits` and `active_step` does, so the request
+    /// travels as an interruption to where the limits are. `active_step`
+    /// catches it unconditionally, so it never reaches `Core::run` and never
+    /// triggers `unwind_scratch`. This is the shape `Interruption::Send`
+    /// already uses: raised deep in `vm_stack_cont`, caught in `Core::step`.
+    EnterEvalMode(fumola_syntax::ast::EvalMode, Exp_),
+    /// `do <id> { .. }` named an evaluation mode the VM does not have.
+    UnknownEvalMode(Id, Source),
+    /// An interruption that a host would ordinarily resume arose inside a
+    /// region that a recursive evaluator was running.
+    ///
+    /// Resuming means running the standing continuation, and the part of that
+    /// continuation which lived in Rust frames is gone by the time anyone sees
+    /// this. Resuming anyway would give a wrong answer and no error, so this
+    /// does not resume. The original is inside.
+    BigStepEscape(Box<Interruption>),
     Other(String),
 }
 
@@ -1042,6 +1061,16 @@ impl std::fmt::Display for Interruption {
                 )
             }
             NoMatchingCase => write!(f, "no case matched the value being switched on"),
+            EnterEvalMode(..) => write!(
+                f,
+                "a request to enter an evaluation mode escaped the step that raised it"
+            ),
+            UnknownEvalMode(id, _) => write!(f, "there is no evaluation mode named {}", id.as_str()),
+            BigStepEscape(i) => write!(
+                f,
+                "{}, inside a block that is not evaluated one step at a time, so it cannot be resumed into",
+                i
+            ),
             ValueError(e) => write!(f, "a value could not be converted: {:?}", e),
             EvalInitError(e) => write!(f, "the VM was not ready to evaluate: {:?}", e),
             UnboundIdentifer(id) => write!(f, "{} is not bound here", id.as_str()),

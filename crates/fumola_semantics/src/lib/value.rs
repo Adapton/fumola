@@ -482,6 +482,10 @@ impl Value {
                 None => Ok(Value::Unit),
             },
             Do(e) => Value::from_exp(&e.0),
+            // A mode names how the block runs, not what it means, so a region is a
+            // literal value exactly when its body is. Not compiler-forced: the
+            // catch-all below would have absorbed this silently.
+            DoMode(_, e) => Value::from_exp(&e.0),
             Block(decs) => Value::from_decs(decs),
             _ => Err(ValueError::NotAValue),
         }
