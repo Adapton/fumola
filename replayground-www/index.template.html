@@ -121,6 +121,10 @@
          because it is the one hue no door kind already owns. */
       --absent:     #f06ecb;
       --absent-dim: #8d3f78;
+      /* Realignment. A signaled edge takes the absent-chip magenta -- both
+         mean "this needs looking at" -- and repair takes the brown. */
+      --signaled:   #f06ecb;
+      --repair:     #e6b775;
 
       /* interaction */
       --hover:  #252b36;
@@ -486,6 +490,18 @@
     .action-force    { color: var(--purple); }
     .action-get      { color: var(--blue-dark); }
 
+    /* The event log names each event's kind; the realignment kinds are coloured
+       the way the 3D view colours what they do. */
+    .ev-type { color: var(--text-dim); }
+    .ev-signalingBegin, .ev-signalingEnd, .ev-edgeSignaled { color: var(--signaled); }
+    .ev-repairBegin, .ev-repairEnd, .ev-edgeAligned { color: var(--repair); }
+    .ev-removeEdge { color: var(--text-faint); text-decoration: line-through; }
+    .realign-legend .player-caption { margin-right: 0.6em; }
+    .swatch { display: inline-block; width: 0.6em; height: 0.6em; border-radius: 2px; margin-right: 0.3em; vertical-align: -0.05em; }
+    .swatch-signaled { background: var(--signaled); }
+    .swatch-repair   { background: var(--repair); box-shadow: 0 0 4px var(--repair); }
+    .swatch-removed  { background: var(--text-faint); opacity: 0.35; }
+
     /* ---- long text, clamped until asked ---------------------------------
        Thunk bodies and values run to hundreds of characters. Left to run
        they made a single outline row taller than the pane. Two lines by
@@ -753,6 +769,13 @@
           <input id="futureDim" class="dim-slider" type="range" min="0" max="100" value="0" step="5"
                  aria-label="dim objects whose moment is still ahead">
           <span id="futureDimReadout" class="player-caption dim-readout">0%</span>
+        </div>
+
+        <div id="realignLegend" class="player-group realign-legend" hidden
+             title="Realignment, when the history has one. An edge the edit signaled turns magenta until a repair realigns it; a node under repair holds a warm glow; an edge a re-evaluation dropped fades to a ghost.">
+          <span class="player-caption"><span class="swatch swatch-signaled"></span>signaled</span>
+          <span class="player-caption"><span class="swatch swatch-repair"></span>repairing</span>
+          <span class="player-caption"><span class="swatch swatch-removed"></span>removed</span>
         </div>
       </div>
 
@@ -1088,6 +1111,62 @@
       touchedAt(rev.metaTime, rev.edgeId);
     }
 
+    // ---- realignment ----------------------------------------------------------
+    //
+    // A history that edits after a demand has a second half the first never
+    // had: the edit *signals* the edges that observed the old contents, and the
+    // next demand *repairs* -- checks each signaled edge, realigns it or drops
+    // the thunk's whole trace and re-evaluates. The runtime writes both
+    // traversals into the events, bracketed like a force, and the scene has to
+    // show them as a state of the graph at a moment, not as a flash: an edge
+    // is aligned, then signaled, then aligned again or removed, and a node is
+    // under repair between a begin and an end.
+    //
+    //   edgeStateChanges  edgeId -> [{metaTime, state}, ...] in order,
+    //                     state one of "signaled" | "aligned" | "removed"
+    //   repairSpans       space  -> [{begin, end, outcome}, ...]
+    //
+    // Every one of these moments is also a moment the cursor lights up.
+
+    const edgeStateChanges = new Map();
+    const repairSpans = new Map();
+    const openRepairs = new Map();
+    for (const ev of data.events) {
+      switch (ev.type) {
+        case "edgeSignaled":
+          pushInto(edgeStateChanges, ev.edgeId, { metaTime: ev.metaTime, state: "signaled" });
+          touchedAt(ev.metaTime, ev.edgeId);
+          break;
+        case "edgeAligned":
+          pushInto(edgeStateChanges, ev.edgeId, { metaTime: ev.metaTime, state: "aligned" });
+          touchedAt(ev.metaTime, ev.edgeId);
+          break;
+        case "removeEdge":
+          pushInto(edgeStateChanges, ev.edgeId, { metaTime: ev.metaTime, state: "removed" });
+          touchedAt(ev.metaTime, ev.edgeId);
+          break;
+        case "signalingBegin":
+        case "signalingEnd":
+          touchedAt(ev.metaTime, spaceOf(ev.nodeId));
+          break;
+        case "repairBegin":
+          openRepairs.set(spaceOf(ev.nodeId), ev.metaTime);
+          touchedAt(ev.metaTime, spaceOf(ev.nodeId));
+          break;
+        case "repairEnd": {
+          const space = spaceOf(ev.nodeId);
+          const begin = openRepairs.get(space) ?? ev.metaTime;
+          openRepairs.delete(space);
+          pushInto(repairSpans, space, { begin, end: ev.metaTime, outcome: ev.outcome });
+          touchedAt(ev.metaTime, space);
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    const hasRealignment = edgeStateChanges.size > 0 || repairSpans.size > 0;
+
     const maxMetaTime = data.events.reduce((m, e) => Math.max(m, e.metaTime), 1);
 
     /// The moment a label first appears, so "grow with time" knows when to
@@ -1232,6 +1311,14 @@
       forceBegin: (ev) => edgeIdChip(ev.edgeId),
       forceEnd:   (ev) => edgeIdChip(ev.edgeId),
       updateEdge: (ev) => edgeIdChip(ev.edgeId),
+      removeEdge: (ev) => edgeIdChip(ev.edgeId),
+      // Realignment: the two bracketed traversals and their per-edge steps.
+      signalingBegin: (ev) => nodeIdChip(ev.nodeId),
+      signalingEnd:   (ev) => nodeIdChip(ev.nodeId),
+      edgeSignaled:   (ev) => edgeIdChip(ev.edgeId),
+      repairBegin:    (ev) => nodeIdChip(ev.nodeId),
+      repairEnd:      (ev) => nodeIdChip(ev.nodeId),
+      edgeAligned:    (ev) => edgeIdChip(ev.edgeId),
     };
 
     function renderEvents() {
@@ -1244,12 +1331,14 @@
         // moment lands on where it starts rather than where it ends.
         row.appendChild(metaTimeChip(ev.metaTime, ev.metaTime !== lastMetaTime));
         lastMetaTime = ev.metaTime;
-        row.appendChild(document.createTextNode(" " + ev.type + " "));
+        row.appendChild(span("ev-type ev-" + ev.type, " " + ev.type + " "));
         const subject = EVENT_SUBJECT[ev.type];
         if (subject) row.appendChild(subject(ev));
         else console.error("unknown event type", ev);
         if (ev.cacheHit)  row.appendChild(span("door-label", "cache hit"));
         if (ev.cacheMiss) row.appendChild(span("door-label", "cache miss"));
+        // How a repair ended: the thunk realigned, or was re-evaluated.
+        if (ev.outcome)   row.appendChild(span("door-label", ev.outcome));
         into.appendChild(row);
       }
     }
@@ -1762,7 +1851,11 @@
       const cone = (along = 0, backwards = false, color = tint) => {
         const mesh = new THREE.Mesh(
           new THREE.ConeGeometry(0.12, 0.12, 12),
-          new THREE.MeshStandardMaterial({ color, emissive: "white", emissiveIntensity: GLOW.off }));
+          // Transparent from the start, like the shaft: a realignment can
+          // ghost this edge later, and opacity is cheap where `transparent`
+          // is a shader recompile.
+          new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 1,
+            emissive: "white", emissiveIntensity: GLOW.off }));
         mesh.position.copy(headPos).addScaledVector(dir, along);
         mesh.quaternion.copy(aim);
         if (backwards) mesh.rotateX(Math.PI);
@@ -1772,7 +1865,8 @@
       const innerShaft = (color) => {
         const inner = new THREE.Mesh(
           new THREE.CylinderGeometry(0.03, 0.03, shaftLength, 12),
-          new THREE.MeshStandardMaterial({ color, emissive: "white", emissiveIntensity: GLOW.off }));
+          new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 1,
+            emissive: "white", emissiveIntensity: GLOW.off }));
         inner.position.copy(mid);
         inner.quaternion.copy(aim);
         addMesh(label, inner);
@@ -2014,7 +2108,9 @@
           // second mesh of a pair finds the colour already set.
           if (material.userData.dimFactor !== factor) {
             material.userData.dimFactor = factor;
-            material.color.copy(material.userData.baseColor).multiplyScalar(factor);
+            material.color
+              .copy(material.userData.stateColor ?? material.userData.baseColor)
+              .multiplyScalar(factor);
           }
           mesh.visible = factor > 0.004;
         }
@@ -2042,6 +2138,86 @@
           if (!mesh.material.emissive) continue;   // unlit text planes
           setGlow(mesh, GLOW.on);
           fading.add(mesh);
+        }
+      }
+
+      applyRealignment(t);
+    }
+
+    // ---- realignment, as the scene stands at a moment ------------------------
+    //
+    // The flashes above are what a moment *did*; this is what the graph *is*
+    // at that moment, so it reads the same scrubbing backwards as forwards.
+    // An edge's state is the last transition at or before the cursor; a node
+    // is under repair while the cursor is inside one of its spans.
+
+    const REALIGN = {
+      signaled: new THREE.Color(0xf06ecb),   // --signaled, the absent-chip magenta
+      repair:   new THREE.Color(0xe6b775),   // --repair, held as the emissive colour
+      ghost:    0.10,                        // the opacity of a removed edge
+    };
+
+    const edgeStateAt = (changes, t) => {
+      let state = "aligned";
+      for (const change of changes) {
+        if (change.metaTime > t) break;
+        state = change.state;
+      }
+      return state;
+    };
+
+    function applyRealignment(t) {
+      if (!hasRealignment) return;
+
+      for (const [edgeId, changes] of edgeStateChanges) {
+        const state = edgeStateAt(changes, t);
+        const meshes = meshesByLabel.get(edgeId);
+        if (!meshes) continue;
+        for (const mesh of meshes) {
+          const material = mesh.material;
+          if (material.userData.alignState === state) continue;
+          material.userData.alignState = state;
+          if (material.userData.builtOpacity === undefined) {
+            material.userData.builtOpacity = material.opacity;
+          }
+          // Colour says signaled; the dimmer keeps its own factor on top.
+          material.userData.stateColor =
+            state === "signaled" ? REALIGN.signaled : material.userData.baseColor;
+          material.color
+            .copy(material.userData.stateColor)
+            .multiplyScalar(material.userData.dimFactor ?? 1);
+          // Opacity says removed: the edge stays where it was, as a ghost,
+          // because the history keeps it even though the live graph does not.
+          material.opacity = state === "removed"
+            ? Math.min(material.userData.builtOpacity, REALIGN.ghost)
+            : material.userData.builtOpacity;
+        }
+      }
+
+      for (const [space, spans] of repairSpans) {
+        const active = spans.some((span) => span.begin <= t && t <= span.end);
+        const meshes = meshesByLabel.get(space);
+        if (!meshes) continue;
+        for (const mesh of meshes) {
+          const material = mesh.material;
+          if (!material.emissive) continue;
+          const was = material.userData.repairing === true;
+          if (active && !was) {
+            // Held, not flashed: the glow lasts as long as the repair does.
+            material.userData.repairing = true;
+            material.emissive.copy(REALIGN.repair);
+            material.emissiveIntensity = GLOW.on;
+            fading.delete(mesh);
+          } else if (!active && was) {
+            material.userData.repairing = false;
+            material.emissive.setHex(0xffffff);
+            fading.add(mesh);
+          } else if (active) {
+            // A flash on this moment would have reset the colour to white.
+            material.emissive.copy(REALIGN.repair);
+            material.emissiveIntensity = GLOW.on;
+            fading.delete(mesh);
+          }
         }
       }
     }
@@ -2139,6 +2315,7 @@
 
     function loadScene() {
       buildSceneObjects();
+      $("realignLegend").hidden = !hasRealignment;
       buildPointerDoors();
       buildEdgeDoors();
       renderOutline();
@@ -2172,6 +2349,7 @@
       playerState,
       openDoors, chipIndex, detailIndex,
       nodeRevisions, edgeRevisions, labelsAtMetaTime, bornAt,
+      edgeStateChanges, repairSpans, edgeStateAt,
       meshesByLabel, labelByMesh, pickable,
       scene, camera, renderer, controls,
       openDoor, closeDoor, closeAllDoors, seekTo, lookAtLabel,
