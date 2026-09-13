@@ -34,7 +34,12 @@
 //! graph, so graph equality says nothing about them.
 
 use crate::value::{Closed, ClosedFunction, Value, Value_};
-use crate::vm_types::{Active, Cont, Interruption, Step, def::CtxId, stack::FrameCont};
+use crate::adapton::AdaptonState;
+use crate::vm_types::{
+    Active, Cont, Interruption, Step,
+    def::CtxId,
+    stack::{Frame, FrameCont},
+};
 use fumola_syntax::ast::{Dec, Dec_, Exp, Exp_, Pat, PrimType, Source};
 use fumola_syntax::shared::{FastClone, Share};
 use im_rc::Vector;
@@ -58,6 +63,12 @@ pub enum Ctl {
 impl From<Interruption> for Ctl {
     fn from(i: Interruption) -> Ctl {
         Ctl::Interrupt(i)
+    }
+}
+
+impl From<crate::adapton::Error> for Ctl {
+    fn from(e: crate::adapton::Error) -> Ctl {
+        Ctl::Interrupt(e.into())
     }
 }
 
@@ -633,7 +644,7 @@ fn eval_exp_no_deref<A: Active>(
                     // a pointer is dereferenced before it pops, and charged
                     // against `Call3`, which retires nothing.
                     let v = deref_value(active, v, 0)?;
-                    pop_call3(active)?;
+                    pop_frame(active)?;
                     bump(active, 0);
                     Ok(v)
                 }
@@ -651,19 +662,173 @@ fn eval_exp_no_deref<A: Active>(
             }
         }
 
+        // Force1 => true, as are the three frames the force path pushes beneath
+        // it. The reduction is `force_value`, which says why this arm does not
+        // reuse the machine the way `Call` does.
+        Force(e1) => {
+            let amb = ambient(active);
+            bump(active, 0);
+            let v = sub(active, &amb, e1, depth, w, 1)?;
+            restore(active, &amb);
+            force_value(active, v, depth, w)
+        }
+
         _ => delegate(active, e, region),
     }
 }
 
-/// Pop a frame this evaluator pushed through the machine, restoring what its
-/// arm would have restored.
-fn pop_call3<A: Active>(active: &mut A) -> Result<(), Ctl> {
+/// Which frame a forced body runs under, and so what closes it.
+#[derive(Clone, Copy, PartialEq)]
+enum Forced {
+    /// A bare `thunk { .. }`: `ForceThunk`, whose arm passes the value on.
+    Thunk,
+    /// A pointer into the graph: `ForceAdaptonPointer`, whose arm calls
+    /// `force_end`.
+    Pointer,
+}
+
+/// The `Force1` frame arm.
+///
+/// `Call` reuses the machine's reduction and recurses into what it leaves in
+/// `cont`. That does not work here, and the reason is worth stating. The
+/// machine's `enter_thunk_body` tail-calls `exp_step` on the body, so by the
+/// time it returns the body's first step is already taken and the machine is in
+/// a state this evaluator cannot resume from. So the control flow of
+/// `force_pointer`, `enter_thunk_body` and `repair_loop` is mirrored below --
+/// some fifty lines, each naming the function it mirrors. What is *not*
+/// duplicated is anything that touches the graph: `force_begin`, `force_end`,
+/// `repair_step` and `repair_resume` are the adapton state's own methods,
+/// called in the order the machine calls them, and the frames pushed are the
+/// frames the machine pushes.
+///
+/// That same folding sets the step accounting. A force that enters a body is
+/// one machine step *including* the body's first descend, which the body's own
+/// arm here charges -- so the force contributes only its redex, (0, 1). A force
+/// that ends in a value -- a cache hit, an aligned node -- is a whole step,
+/// (1, 1).
+fn force_value<A: Active>(
+    active: &mut A,
+    v: Value_,
+    depth: usize,
+    region: Region,
+) -> Result<Value_, Ctl> {
+    match &*v {
+        Value::AdaptonPointer(p) => force_pointer(active, p.clone(), depth, region),
+        Value::Thunk(tb) => forced_body(active, tb.clone(), Forced::Thunk, depth, region),
+        _ => Err(Ctl::Interrupt(type_mismatch_!(file!(), line!()))),
+    }
+}
+
+/// `vm_stack_cont::force_pointer`.
+fn force_pointer<A: Active>(
+    active: &mut A,
+    p: crate::adapton::Pointer,
+    depth: usize,
+    region: Region,
+) -> Result<Value_, Ctl> {
+    use crate::adapton::ForceBeginResult;
+    match active.adapton().force_begin(p)? {
+        ForceBeginResult::CacheHit(_, v) => {
+            bump(active, 1);
+            Ok(v)
+        }
+        ForceBeginResult::CacheMiss(tb) => forced_body(active, tb, Forced::Pointer, depth, region),
+        ForceBeginResult::Repair => repair(active, depth, region),
+    }
+}
+
+/// `vm_stack_cont::enter_thunk_body` and the `Force1` arm's thunk branch, then
+/// the `ForceAdaptonPointer` or `ForceThunk` arm that closes what they opened.
+fn forced_body<A: Active>(
+    active: &mut A,
+    tb: crate::value::ThunkBody,
+    forced: Forced,
+    depth: usize,
+    region: Region,
+) -> Result<Value_, Ctl> {
+    // The frame, exactly as the machine pushes it.
+    let env = active.env().fast_clone();
+    let context = active.defs().active_ctx.clone();
+    active.stack().push_front(Frame {
+        context,
+        env,
+        cont: match forced {
+            Forced::Thunk => FrameCont::ForceThunk,
+            Forced::Pointer => FrameCont::ForceAdaptonPointer,
+        },
+        cont_prim_type: None,
+        source: Source::Evaluation,
+    });
+    *active.env() = tb.env;
+    *active.ctx_id() = tb.ctx;
+    let here = active.stack().len();
+    // The step that entered the body is the body's first descend, which the
+    // body's own arm charges. What is left is the redex it retired.
+    active.counts().redex += 1;
+    // On `Escaped` there is nothing to close: `return_` or `bang_null` has
+    // already popped this frame on its way past, and did not call `force_end`
+    // -- which is exactly what the machine does.
+    let v = eval_exp_no_deref(active, &tb.content, depth, region.at(here))?;
+    // Neither force frame keeps a pointer, and both retire a redex.
+    let v = deref_value(active, v, 1)?;
+    pop_frame(active)?;
+    if forced == Forced::Pointer {
+        active.adapton().force_end(v.fast_clone())?;
+    }
+    bump(active, 1);
+    Ok(v)
+}
+
+/// `vm_stack_cont::repair_loop`, with the `RepairForced` arm folded into the
+/// loop at the point where the machine's version returns to it.
+///
+/// Repair is the graph walking a thunk's trace and asking the VM for help
+/// when a force edge has to be checked. Each `repair_step` belongs to whichever
+/// machine step is in progress -- the `Force1` step, or a `RepairForced` pop --
+/// and that step is charged by whichever branch ends it: a value, (1, 1), or a
+/// body entry, (0, 1) plus the body's own first step.
+fn repair<A: Active>(active: &mut A, depth: usize, region: Region) -> Result<Value_, Ctl> {
+    use crate::adapton::RepairStep;
+    loop {
+        match active.adapton().repair_step()? {
+            RepairStep::Aligned(_, v) => {
+                bump(active, 1);
+                return Ok(v);
+            }
+            RepairStep::Force(target) => {
+                let env = active.env().fast_clone();
+                let context = active.defs().active_ctx.clone();
+                active.stack().push_front(Frame {
+                    context,
+                    env,
+                    cont: FrameCont::RepairForced,
+                    cont_prim_type: None,
+                    source: Source::Evaluation,
+                });
+                let v = force_pointer(active, target, depth, region)?;
+                // The `RepairForced` arm: dereference against it, hand the value
+                // to the repair frame, and take the next repair step -- which is
+                // the next turn of this loop.
+                let v = deref_value(active, v, 1)?;
+                pop_frame(active)?;
+                active.adapton().repair_resume(v)?;
+            }
+            RepairStep::Reevaluate(tb) => {
+                return forced_body(active, tb, Forced::Pointer, depth, region);
+            }
+        }
+    }
+}
+
+/// Pop a frame this evaluator pushed, restoring what its arm would have
+/// restored.
+fn pop_frame<A: Active>(active: &mut A) -> Result<(), Ctl> {
     let frame = match active.stack().pop_front() {
         Some(f) => f,
         None => {
             return Err(Ctl::Interrupt(impossible_!(
                 line!(),
-                "the call frame this evaluator pushed is gone"
+                "a frame this evaluator pushed is gone"
             )));
         }
     };
