@@ -516,7 +516,7 @@
           This host also serves the Fumola runtime compiled to WebAssembly
           &mdash; <code>fumola_wasm.js</code> and
           <code>fumola_wasm_bg.wasm</code>, in this directory. It is what the
-          <a href="#hazel">Hazel Fumola livelit</a> can load, and what the
+          <a href="#hazel">Hazel integration</a> can load, and what the
           <a href="#try">box below</a> is running.
         </p>
         <p class="masthead-note">
@@ -781,7 +781,8 @@
         <p>
           Take <em>a named thunk</em>, change the <code>21</code>, and run it
           again. Same name, same thunk, re-forced &mdash; which is exactly what
-          a Hazel livelit does to itself as you edit it.
+          <a href="#hazel">a Fumola program inside Hazel</a> does to itself as
+          you edit it.
         </p>
         <p>
           This box is deliberately small. The
@@ -838,12 +839,46 @@
           expand to the expression they stand for.
         </p>
         <p>
-          The experimental integration puts Fumola behind three of them. It is
-          not on Hazel's default branch; it lives on
-          <a href="https://github.com/hazelgrove/hazel/tree/fumola-livelit-mvp"><code>fumola-livelit-mvp</code></a>,
-          and that branch has a
-          <a href="https://hazel.org/build/fumola-livelit-mvp/">live build</a>
-          you can open.
+          The two languages are close relatives &mdash; both ML-family, both
+          with variants and records and thunks, both having made evaluation
+          order a design question rather than an accident &mdash; and they hold
+          opposite halves of the same idea. Hazel has <em>liveness</em>: a cell
+          shows a value while the formula is half-written. Fumola has
+          <em>dependency</em>: a cell knows who read it, and a change reaches
+          exactly those readers. Hazel re-runs and forgets; Fumola remembers and
+          cannot show anyone. That is why putting them together is interesting
+          rather than redundant.
+        </p>
+        <p>
+          Fumola has now been integrated into Hazel <strong>twice</strong>, and
+          the difference between the two attempts is the most useful thing this
+          work has produced. <strong>Livelits came first</strong>, and settled
+          the question that had to be settled first: whether a Fumola program
+          can run inside a live document at all, and hand its result back as a
+          value the surrounding Hazel program can use. It can.
+          <strong>Tiles came second</strong>, and moved the Fumola program out
+          of a string and into Hazel's own grammar. That is the one to build
+          on.
+        </p>
+        <p>
+          Both routes are in one build, beside a third embedded sub-language
+          &mdash; the core logic of the Blackboard proof assistant &mdash; on
+          the branch
+          <a href="https://github.com/hazelgrove/hazel/tree/experimental-lang-integration"><code>experimental-lang-integration</code></a>
+          (<a href="https://github.com/hazelgrove/hazel/pull/2536">#2536</a>).
+          It is not on Hazel's default branch and is not headed there soon
+          &mdash; it exists to be played with &mdash; but it has a
+          <a href="https://hazel.org/build/experimental-lang-integration/"><strong>live build</strong></a>
+          that stays up. Thirty-five documentation slides ship in it, live and
+          editable in place; twenty-five are on the three embedded languages
+          &mdash; nine on the livelit route, ten on tiles, six on Blackboard.
+        </p>
+
+        <h3 id="hazel-livelits">First &mdash; livelits, and what they proved<a class="anchor" href="#hazel-livelits" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          This route puts Fumola behind four builtin livelits. A program is a
+          string in the livelit's model; Hazel hands it to Fumola's own parser
+          and gets a value back.
         </p>
         <pre><code><span class="c"># declare a runtime, and the Adapton semantics it runs #</span>
 <span class="k">let</span> <span class="v">rt</span> : <span class="t">Int</span> = <span class="d">^fumola_new</span>(<span class="n">7</span>, <span class="t">Graphical</span>) <span class="k">in</span>
@@ -858,7 +893,8 @@
 
 <span class="d">^^probe_table</span>(<span class="v">events</span>);</code></pre>
         <p>
-          The three do different jobs, and the split follows the archivist/editor distinction.
+          They do different jobs, and the split follows the
+          <a href="#modes">archivist/editor</a> distinction.
           <code>^fumola_put_force</code> wraps its program as
           <code>force(`n := thunk { … })</code>, so it runs on a forceful stack
           &mdash; archivist mode, where the tracked operations live. That
@@ -868,30 +904,163 @@
           <code>^fumola_eval</code> runs its program at the top level with no
           thunk around it &mdash; editor mode, which is where <code>peek</code>,
           <code>reset</code> and the graph introspection belong.
-          <code>^fumola_new</code> declares which semantics a runtime runs.
+          <code>^fumola_with</code> is the one that takes a Hazel value as
+          input, spliced in as a fixed binder. <code>^fumola_new</code>
+          declares which semantics a runtime runs.
         </p>
         <p>
-          A livelit expands to a Hazel value, so Fumola's values have to cross:
-          numbers, floats, booleans, tuples, records as labeled tuples,
-          variants, arrays as lists, options, symbols as their text. A pointer
-          crosses as a reference that carries what it points at, so it can be
-          used as the value while still showing which cell that value came
-          from. Values whose meaning depends on the runtime &mdash; a thunk, a
-          function &mdash; cross opaque, carrying the source Fumola prints for
-          them, and <code>force</code> is what turns one into something Hazel
-          does have a value for.
+          What this route buys is <strong>the whole language</strong>: the
+          string reaches Fumola's real parser, so every form Fumola has works
+          on day one. What it costs is <strong>the whole editor</strong>. The
+          program is opaque text, edited through a one-line HTML text field
+          rather than through Hazel's edit actions &mdash; no tiles, no
+          structure, no highlighting. A half-written <code>thunk {</code> is not
+          something the editor can help you finish; it is a parse error
+          reported after the fact, with nowhere in particular to put it. And
+          there is exactly one input slot, in exactly one of the four.
+        </p>
+
+        <h3 id="hazel-tiles">Then &mdash; tiles, and the program as a term<a class="anchor" href="#hazel-tiles" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          The second route makes Fumola a <strong>sort in Hazel's tile
+          grammar</strong>, the way Hazel already holds its own syntax. The
+          program is not a string that happens to be Fumola; it is a term, with
+          tiles in the editor and a printed string only at the last moment, on
+          the way to the runtime.
+        </p>
+        <pre><code><span class="c"># a Fumola program, in tiles, inside a Hazel expression #</span>
+<span class="k">let</span> <span class="v">answer</span> = <span class="k">fumola</span> <span class="t">$graphical</span> <span class="k">as</span> <span class="v">store</span> <span class="k">in</span>
+  { <span class="k">let</span> <span class="v">cell</span> = <span class="sy">`myCell`</span> <span class="eff">:=</span> <span class="n">333</span>;
+    <span class="k">let</span> <span class="v">t</span> = <span class="sy">`myThunk`</span> <span class="eff">:=</span> <span class="k">thunk</span> { <span class="eff">@</span> <span class="v">cell</span> };
+    <span class="v">force</span>(<span class="v">t</span>) }
+<span class="k">end</span> <span class="k">in</span>
+
+<span class="v">answer</span></code></pre>
+        <p>
+          Read the form as three parts. <code>store</code> names the Fumola VM
+          <em>instance</em> the program runs against; <code>$graphical</code> is
+          the <a href="#modes">semantics</a> that instance runs; between
+          <code>in</code> and <code>end</code> is the program. The instance is
+          named in text the programmer wrote, deliberately: the adapton store is
+          the whole point, so the thing that survives an edit has to be
+          something you can say out loud and point at. Two programs that name
+          the same instance share a store. The alternative &mdash; deriving the
+          key from the Hazel node's own id &mdash; starts a fresh store whenever
+          that id changes, which is to say on exactly the edits worth watching.
+        </p>
+        <p>
+          Everything that follows comes from the program being a term rather
+          than a string. Unmatched delimiters are the editor's business, not a
+          parse error after the fact. Errors have locations, because every node
+          carries an id. The cursor inspector can name any form you stand on. A
+          program can be built by inserting structure, not only by typing
+          characters that happen to lex. And the escape works both ways:
+          <code>hazel … end</code> is a production of the Fumola grammar, so a
+          Hazel expression can stand anywhere a Fumola term can, as often as the
+          program likes.
+        </p>
+        <p>
+          The mode default moved, too, and that is a small sign the route is the
+          right one. The livelit integration started its runtimes
+          <em>simple</em>, inverting Fumola's own default, because two
+          incremental systems nested in each other was an unknown and simple has
+          no graph to get wrong. The tiles route defaults to
+          <strong>graphical</strong>, as Fumola does &mdash; the conservative
+          choice turned out not to be needed.
+        </p>
+
+        <h3 id="hazel-panel">And then &mdash; watching the store<a class="anchor" href="#hazel-panel" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          Once Hazel can see inside the program, it can also show what the
+          program did. The build carries a panel for the instance the cursor is
+          in, with three views of one history: <strong>Nodes</strong>, the cells
+          and thunks the store holds; <strong>Edges</strong>, what passed
+          between them, each carrying the action that made it &mdash; a force
+          edge carries both the thunk and its answer, not just a count;
+          and <strong>Events</strong>, the same story in order, with the Begin
+          and End of every force and the moment each edge was realigned.
+        </p>
+        <p>
+          Most of the edges in a live notebook have <code>@here</code> for a
+          source &mdash; the editor putting values in, rather than the program
+          computing. The panel names that the <em>prime mover</em> and will dim
+          or hide it, which leaves only what the program itself did. Node ids
+          link to the edges they name, a pointer can be followed to the node it
+          named at the moment it named it, and a reset empties the store and
+          rebuilds it, with a choice of which semantics to come back as.
+        </p>
+        <p>
+          The <a href="#hazel-livelits">first route</a> can dump the same
+          history &mdash; the code above does exactly that, as a table. What it
+          cannot do is be <em>about the instance the cursor is in</em>, because
+          on that route the cursor cannot be inside the program. A panel that
+          follows you as you edit needs the editor to know where you are
+          standing, and that is the thing only tiles give it.
+        </p>
+
+        <h3 id="hazel-bet">The bet<a class="anchor" href="#hazel-bet" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          Today the two routes genuinely trade against each other, and it is
+          worth saying so plainly: roughly half of Fumola's grammar does not
+          have tiles yet &mdash; <code>if</code>, <code>switch</code>,
+          <code>func</code>, arrays, six of the fourteen binary operators, most
+          patterns &mdash; and the statics stop at the <code>hazel … end</code>
+          boundary, so a Hazel expression inside a Fumola program gets no type
+          and no completion. The livelit route has none of those gaps, because
+          it never looks inside.
+        </p>
+        <p>
+          But those gaps are unfinished work, and what the livelit route gives
+          up is not. Two things are permanent about it. A program held as an
+          opaque string cannot be given structure later &mdash; that is the one
+          decision you cannot walk back. And, less obviously, <strong>a livelit
+          runs at the wrong time</strong>: a livelit expands during
+          <em>elaboration</em>, while a <code>fumola … end</code> form runs
+          during <em>evaluation</em>. In a pure setting those are
+          indistinguishable. With a store they are plainly different times, and
+          it is the reason a livelit can measure the elaborator and cannot see
+          the evaluator at all.
+        </p>
+        <p>
+          That matters because of what this integration turned out to be
+          <em>for</em>. Watching what an edit actually re-runs, standing on a
+          node and asking what it knows, keeping a series of samples that
+          outlives the evaluation that produced them &mdash; all of it needs the
+          program to run when the program runs, and needs the editor to see
+          inside it. So tiles is the path. The livelit deck stays, as the record
+          of what the boundary had to prove before any of the rest was worth
+          attempting.
         </p>
         <details class="aside">
-          <summary>footnote: two layers meeting</summary>
+          <summary>footnote: two layers meeting, and what the instance turned out to measure</summary>
           <p>
-          Two incremental systems meet here, and how they compose is the open
-          question: Hazel re-evaluating a program as it is edited, Adapton
-          repairing a graph underneath it. So the Hazel integration inverts
-          Fumola's default and starts a runtime <em>simple</em>, with graphical
-          asked for by name. That is a conservative choice for the design phase
-          this work is in rather than a settled one &mdash; the intent is for
-          Hazel to default to graphical too, once the composed semantics is
-          understood.
+          Two incremental systems meet here, and how they compose is still the
+          open question: Hazel re-evaluating a program as it is edited, Adapton
+          repairing a graph underneath it. Three disciplines are written down
+          as candidates, and the preferred one is the least invasive: that the
+          composition is a discipline on the Fumola program &mdash; the
+          archivist operations are already idempotent, so being re-run
+          arbitrarily is safe &mdash; rather than a change to Hazel's
+          evaluator. Preferring it is not establishing it.
+        </p>
+          <p>
+          It also inverted what the work is for. A Fumola instance is the first
+          state reachable from a Hazel program that Hazel's evaluator does not
+          control, which makes it the first thing that can count the evaluator's
+          own effects. A Hazel probe tells you what your program computed; a
+          Fumola instance tells you what Hazel did. Incremental computing was
+          supposed to be the payload, and turned out to be the microscope.
+        </p>
+          <p>
+          Both halves of that are written up as design notes against Hazel's own
+          repository, in
+          <a href="https://github.com/hazelgrove/hazel/pull/2565">pull request #2565</a>:
+          <em>Notebook semantics</em>, the instrument pointed at Hazel's
+          evaluator &mdash; what actually runs when you edit, and the two
+          milestones that would turn the observations into a measurement &mdash;
+          and <em>Programmable probes</em>, the same instrument pointed at a
+          user's own program. Both are proposals, and both are careful to say
+          which of their numbers are demonstrations rather than measurements.
         </p>
         </details>
       </section>
@@ -971,7 +1140,8 @@
             <span class="pub-authors">Cyrus Omar, David Moon, Andrew Blinn, Ian Voysey, Nick Collins, Ravi Chugh</span>
             <span class="pub-venue">PLDI 2021 &middot; pp. 511&ndash;525 &middot; doi:10.1145/3453483.3454059</span>
             <span class="pub-why">
-              Livelits: the graphical literals a Fumola program is embedded in.
+              Livelits: the graphical literals the <a href="#hazel-livelits">first
+              Fumola integration</a> was built out of.
             </span>
           </li>
         </ul>
@@ -1124,17 +1294,22 @@
         <p>
           <a href="#hazel">Hazel</a> is the one where the program is editable
           and still means something while you are halfway through typing it.
-          That is the missing half of both earlier views, and it works today: a
-          livelit runs Fumola as you type and hands the result back as a Hazel
-          value. What is missing now is the picture. The event log arrives as a
-          table, not as a graph, and nothing yet draws a type the way the 2018
-          interface did.
+          That is the missing half of both earlier views, and it works today:
+          Fumola runs as you type and hands the result back as a Hazel value.
+          Since the <a href="#hazel-tiles">tiles route</a>, the store is
+          legible while you edit it, too &mdash; the
+          <a href="#hazel-panel">panel</a> gives the nodes, the edges and the
+          events as three views of one history, and a node id is a link you can
+          follow.
         </p>
 
         <p>
-          So: the first had the types and not the editing, the second has the
-          graph and not the editing, the third has the editing and not yet the
-          picture. 
+          What is still missing is the <em>drawing</em>. Three views of a graph
+          are not a graph; nothing here yet lays a run out in space the way the
+          replayground does, and nothing draws a type the way the 2018 interface
+          did. So: the first had the types and not the editing, the second has
+          the picture and not the editing, the third has the editing and the
+          store in readable form, and wants the picture next.
         </p>
 
         <details class="aside">
@@ -1254,18 +1429,43 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
           </li>
           <li>
             <span class="what">hazel branch</span>
-            <span class="desc"><a href="https://hazel.org/build/fumola-livelit-mvp/">The Hazel integration, running</a>
-            <small>Open the Fumola chapters from the documentation cards.</small></span>
+            <span class="desc"><a href="https://hazel.org/build/experimental-lang-integration/">The Hazel integration, running</a>
+            <small>Both Fumola routes in one live build, and Blackboard beside them. Open the decks from the documentation slides.</small></span>
           </li>
           <li>
             <span class="what">&nbsp;</span>
-            <span class="desc"><a href="https://github.com/hazelgrove/hazel/blob/fumola-livelit-mvp/docs/livelits.md">docs/livelits.md</a>
-            <small>What the three livelits are, what crosses the boundary, and what is not settled.</small></span>
+            <span class="desc"><a href="https://github.com/hazelgrove/hazel/blob/experimental-lang-integration/docs/experimental-language-integrations.md">docs/experimental-language-integrations.md</a>
+            <small>The design document for that branch &mdash; what three sub-languages in one tile grammar cost, and the two Fumola routes compared claim by claim.</small></span>
           </li>
           <li>
             <span class="what">&nbsp;</span>
-            <span class="desc"><a href="https://github.com/hazelgrove/hazel/tree/fumola-livelit-mvp/hazel-programs/docs/reference">The Fumola chapters</a>
-            <small>A tour of Fumola as Hazel sees it, in eight cards of increasing complexity &mdash; values, symbols, cells, thunks, input, runtimes, then two worked examples from this repo. Source for the cards in the live build.</small></span>
+            <span class="desc"><a href="https://github.com/hazelgrove/hazel/blob/experimental-lang-integration/docs/fumola-tiles-design.md">docs/fumola-tiles-design.md</a>
+            <small>The tiles route: what you author instead of a parser, and why the obligation moves from parsing to printing.</small></span>
+          </li>
+          <li>
+            <span class="what">&nbsp;</span>
+            <span class="desc"><a href="https://github.com/hazelgrove/hazel/tree/experimental-lang-integration/src/language/fumola">src/language/fumola</a>
+            <small>The Hazel side of the tiles route &mdash; the grammar, the printer, the run path and the adapton history the panel reads.</small></span>
+          </li>
+          <li>
+            <span class="what">&nbsp;</span>
+            <span class="desc"><a href="https://github.com/hazelgrove/hazel/tree/experimental-lang-integration/hazel-programs/docs/fumola-tiles">The tiles deck</a>
+            <small>Ten slides: the form itself, instance and mode, a level tree, Hazel inside Fumola, the round trip, self-inspection. Source for the slides in the live build.</small></span>
+          </li>
+          <li>
+            <span class="what">&nbsp;</span>
+            <span class="desc"><a href="https://github.com/hazelgrove/hazel/pull/2565">Notebook semantics, and programmable probes</a>
+            <small>Two design notes on what the integration turned out to be for: what actually runs when you edit, and Fumola instances as probes that survive the edit. Proposals, not results.</small></span>
+          </li>
+          <li>
+            <span class="what">&nbsp;</span>
+            <span class="desc"><a href="https://github.com/hazelgrove/hazel/blob/experimental-lang-integration/docs/livelits.md">docs/livelits.md</a>
+            <small>The first route: what the four livelits are, what crosses the boundary, and what is not settled.</small></span>
+          </li>
+          <li>
+            <span class="what">&nbsp;</span>
+            <span class="desc"><a href="https://github.com/hazelgrove/hazel/tree/experimental-lang-integration/hazel-programs/docs/reference">The livelit chapters</a>
+            <small>A tour of Fumola as Hazel first saw it, in nine slides of increasing complexity &mdash; values, symbols, cells, thunks, input, runtimes, then two worked examples from this repo.</small></span>
           </li>
           <li>
             <span class="what">crates/fumola_wasm</span>
