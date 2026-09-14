@@ -157,6 +157,20 @@ pub trait CacheState {
 }
 
 impl State {
+    /// Which strategy this instance is running.
+    ///
+    /// Not stored: the inner state IS one or the other, so asking which
+    /// variant it is cannot drift from the truth the way a remembered copy
+    /// could. `reset` replaces the inner state, so the answer moves with it.
+    pub fn strategy(&self) -> Strategy {
+        match self.inner {
+            InnerState::Simple(_) => Strategy::Simple,
+            InnerState::Graphical(_) => Strategy::Graphical,
+        }
+    }
+}
+
+impl State {
     fn put_reserved_symbol(&mut self, symbol: ReservedSymbol, value: Value_) -> Res<()> {
         match symbol {
             ReservedSymbol::SettingsForceBeginAlwaysMisses => {

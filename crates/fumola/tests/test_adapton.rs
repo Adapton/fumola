@@ -46,6 +46,24 @@ fn force_simple_cache_hit() {
     )
 }
 
+/// `adaptonReset` takes a mode; `adaptonMode` answers with the one in force.
+/// The pair matters because they can disagree with whatever a caller last
+/// asked for: a reset moves the mode, and anything remembering its own last
+/// request would still be holding the old one.
+#[test]
+fn mode_answers_the_strategy_in_force() {
+    // Graphical is the default an instance starts in.
+    assert__("prim \"adaptonMode\" ()", "#graphical");
+    assert__("prim \"adaptonReset\"(#simple); prim \"adaptonMode\" ()", "#simple");
+    assert__(
+        "prim \"adaptonReset\"(#simple); prim \"adaptonReset\"(#graphical); prim \"adaptonMode\" ()",
+        "#graphical",
+    );
+    // `Adapton.mode()` is not exercised here: this harness binds no library,
+    // so `Adapton` is unbound in it. The wasm runtime binds it at the top of
+    // every instance, which is where that wrapper is reached from.
+}
+
 #[test]
 fn peek_cell_some_result() {
     assert__("prim \"adaptonReset\"(#simple); let p = 1 := thunk { }; force(p); let node = (prim \"adaptonPeekCell\" p)!; switch(node){ case(#thunk_(t)){t.result} }", "?()");

@@ -1046,6 +1046,8 @@ pub fn source_from_decs(decs: &im_rc::Vector<Dec_>) -> Source {
 pub enum PrimFunction {
     AdaptonReset,
     AdaptonNow,
+    /// Which strategy this instance is running: `#simple` or `#graphical`.
+    AdaptonMode,
     AdaptonHere,
     AdaptonSpace,
     AdaptonTime,
@@ -1080,6 +1082,7 @@ impl PrimFunction {
         use PrimFunction::*;
         Ok(match name.as_str() {
             "\"adaptonNow\"" => AdaptonNow,
+            "\"adaptonMode\"" => AdaptonMode,
             "\"adaptonReset\"" => AdaptonReset,
             "\"adaptonHere\"" => AdaptonHere,
             "\"adaptonTime\"" => AdaptonTime,
