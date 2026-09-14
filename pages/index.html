@@ -839,6 +839,17 @@
           expand to the expression they stand for.
         </p>
         <p>
+          The two languages are close relatives &mdash; both ML-family, both
+          with variants and records and thunks, both having made evaluation
+          order a design question rather than an accident &mdash; and they hold
+          opposite halves of the same idea. Hazel has <em>liveness</em>: a cell
+          shows a value while the formula is half-written. Fumola has
+          <em>dependency</em>: a cell knows who read it, and a change reaches
+          exactly those readers. Hazel re-runs and forgets; Fumola remembers and
+          cannot show anyone. That is why putting them together is interesting
+          rather than redundant.
+        </p>
+        <p>
           Fumola has now been integrated into Hazel <strong>twice</strong>, and
           the difference between the two attempts is the most useful thing this
           work has produced. <strong>Livelits came first</strong>, and settled
@@ -933,7 +944,9 @@
           named in text the programmer wrote, deliberately: the adapton store is
           the whole point, so the thing that survives an edit has to be
           something you can say out loud and point at. Two programs that name
-          the same instance share a store.
+          the same instance share a store. The alternative &mdash; deriving the
+          key from the Hazel node's own id &mdash; starts a fresh store whenever
+          that id changes, which is to say on exactly the edits worth watching.
         </p>
         <p>
           Everything that follows comes from the program being a term rather
@@ -997,26 +1010,38 @@
           it never looks inside.
         </p>
         <p>
-          But those gaps are unfinished work, and the thing the livelit route
-          gives up is not. A program held as an opaque string cannot be given
-          structure later; that is the one decision you cannot walk back. And
-          everything this integration has turned out to be <em>for</em> &mdash;
-          watching what an edit actually re-runs, standing on a node and asking
-          what it knows, naming the instance a store lives in &mdash; needs the
-          editor to see inside the program. So tiles is the path. The livelit
-          deck stays, as the record of what the boundary had to prove before
-          any of the rest was worth attempting.
+          But those gaps are unfinished work, and what the livelit route gives
+          up is not. Two things are permanent about it. A program held as an
+          opaque string cannot be given structure later &mdash; that is the one
+          decision you cannot walk back. And, less obviously, <strong>a livelit
+          runs at the wrong time</strong>: a livelit expands during
+          <em>elaboration</em>, while a <code>fumola … end</code> form runs
+          during <em>evaluation</em>. In a pure setting those are
+          indistinguishable. With a store they are plainly different times, and
+          it is the reason a livelit can measure the elaborator and cannot see
+          the evaluator at all.
+        </p>
+        <p>
+          That matters because of what this integration turned out to be
+          <em>for</em>. Watching what an edit actually re-runs, standing on a
+          node and asking what it knows, keeping a series of samples that
+          outlives the evaluation that produced them &mdash; all of it needs the
+          program to run when the program runs, and needs the editor to see
+          inside it. So tiles is the path. The livelit deck stays, as the record
+          of what the boundary had to prove before any of the rest was worth
+          attempting.
         </p>
         <details class="aside">
           <summary>footnote: two layers meeting, and what the instance turned out to measure</summary>
           <p>
           Two incremental systems meet here, and how they compose is still the
           open question: Hazel re-evaluating a program as it is edited, Adapton
-          repairing a graph underneath it. The current guess is that the
+          repairing a graph underneath it. Three disciplines are written down
+          as candidates, and the preferred one is the least invasive: that the
           composition is a discipline on the Fumola program &mdash; the
           archivist operations are already idempotent, so being re-run
           arbitrarily is safe &mdash; rather than a change to Hazel's
-          evaluator. That is a guess, not a result.
+          evaluator. Preferring it is not establishing it.
         </p>
           <p>
           It also inverted what the work is for. A Fumola instance is the first
@@ -1025,6 +1050,17 @@
           own effects. A Hazel probe tells you what your program computed; a
           Fumola instance tells you what Hazel did. Incremental computing was
           supposed to be the payload, and turned out to be the microscope.
+        </p>
+          <p>
+          Both halves of that are written up as design notes against Hazel's own
+          repository, in
+          <a href="https://github.com/hazelgrove/hazel/pull/2565">pull request #2565</a>:
+          <em>Notebook semantics</em>, the instrument pointed at Hazel's
+          evaluator &mdash; what actually runs when you edit, and the two
+          milestones that would turn the observations into a measurement &mdash;
+          and <em>Programmable probes</em>, the same instrument pointed at a
+          user's own program. Both are proposals, and both are careful to say
+          which of their numbers are demonstrations rather than measurements.
         </p>
         </details>
       </section>
@@ -1415,6 +1451,11 @@ fumola_eval_top(id, <span class="st">"`x := 41; get(`x) + 1"</span>);
             <span class="what">&nbsp;</span>
             <span class="desc"><a href="https://github.com/hazelgrove/hazel/tree/experimental-lang-integration/hazel-programs/docs/fumola-tiles">The tiles deck</a>
             <small>Ten slides: the form itself, instance and mode, a level tree, Hazel inside Fumola, the round trip, self-inspection. Source for the slides in the live build.</small></span>
+          </li>
+          <li>
+            <span class="what">&nbsp;</span>
+            <span class="desc"><a href="https://github.com/hazelgrove/hazel/pull/2565">Notebook semantics, and programmable probes</a>
+            <small>Two design notes on what the integration turned out to be for: what actually runs when you edit, and Fumola instances as probes that survive the edit. Proposals, not results.</small></span>
           </li>
           <li>
             <span class="what">&nbsp;</span>
