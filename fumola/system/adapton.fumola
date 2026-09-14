@@ -425,6 +425,17 @@ module {
         prim "adaptonNow" ()
     };
 
+    /// Which strategy this instance is running.
+    ///
+    /// The counterpart of `reset`, which takes a mode: this answers with the
+    /// one in force, spelled the same way. A layer outside the instance -- an
+    /// editor showing what it is looking at -- could not ask before, and what
+    /// it last SET is a different question, since a reset moves the mode
+    /// without telling whoever is watching.
+    public func mode() : { #simple; #graphical } {
+        prim "adaptonMode" ()
+    };
+
     public func here() : Space {
         prim "adaptonHere" ()
     };

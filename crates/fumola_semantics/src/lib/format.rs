@@ -312,6 +312,7 @@ impl ToDoc for PrimFunction {
         match self {
             PrimFunction::AdaptonReset => str("\"adaptonReset\""),
             PrimFunction::AdaptonNow => str("\"adaptonNow\""),
+            PrimFunction::AdaptonMode => str("\"adaptonMode\""),
             PrimFunction::AdaptonHere => str("\"adaptonHere\""),
             PrimFunction::AdaptonSpace => str("\"adaptonSpace\""),
             PrimFunction::AdaptonTime => str("\"adaptonTime\""),

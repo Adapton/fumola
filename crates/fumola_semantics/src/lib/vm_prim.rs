@@ -231,6 +231,20 @@ pub fn call_prim_function<A: Active>(
             *active.cont() = cont_value(Value::AdaptonTime(active.adapton().now()));
             Ok(Step {})
         }
+        // The counterpart of `adaptonReset`, which TAKES a mode: this one
+        // answers with the mode the instance is actually running, in the same
+        // `#simple` / `#graphical` spelling that reset accepts. A reader
+        // outside the instance had no way to ask before, and remembering what
+        // it last SET is a different question -- a reset moves the mode
+        // without telling whoever is watching.
+        AdaptonMode => {
+            let tag = match active.adapton().strategy() {
+                crate::adapton::Strategy::Simple => "simple",
+                crate::adapton::Strategy::Graphical => "graphical",
+            };
+            *active.cont() = cont_value(Value::Variant(fumola_syntax::ast::Id::new(tag.to_string()), None));
+            Ok(Step {})
+        }
         AdaptonHere => {
             *active.cont() = cont_value(Value::AdaptonSpace(active.adapton().here()));
             Ok(Step {})
