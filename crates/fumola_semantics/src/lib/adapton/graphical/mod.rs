@@ -293,7 +293,7 @@ pub struct Edge {
     pub target: NodeId,
     pub action: Action,
     pub meta_times: (MetaTime, MetaTime),
-    pub align: Align,
+    pub status: Align,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -484,7 +484,7 @@ impl GraphicalState {
             action,
             meta_times: MetaTime::pair(meta_time_begin, meta_time),
             // Every edge is made aligned: it records what it observed just now.
-            align: Align::Aligned,
+            status: Align::Aligned,
         };
         self.history.edges.push_back(EdgeHistoryItem {
             meta_time: self.meta_time.clone(),
@@ -533,7 +533,7 @@ impl GraphicalState {
                 // A completed force records the result it just saw, so the edge is aligned
                 // whatever it was before -- this is how a repair's re-force of a target
                 // realigns the edge it was checking.
-                align: Align::Aligned,
+                status: Align::Aligned,
             },
         );
         Ok(())
@@ -680,17 +680,17 @@ impl GraphicalState {
 
     /// Set an edge's status, and say so in the history: an `EdgeSignaled` or `EdgeAligned`
     /// event, and the edge as it now stands.
-    fn set_align(&mut self, edge_id: &EdgeId, align: Align) {
+    fn set_status(&mut self, edge_id: &EdgeId, status: Align) {
         let edge = match self.edges.get(edge_id) {
             Some(edge) => edge.clone(),
             None => return,
         };
         let edge = Edge {
-            align: align.clone(),
+            status: status.clone(),
             ..edge
         };
         self.edges = self.edges.update(edge_id.clone(), edge.clone());
-        let event = match align {
+        let event = match status {
             Align::Signaled => Event::EdgeSignaled(edge_id.clone()),
             Align::Aligned => Event::EdgeAligned(edge_id.clone()),
         };
@@ -838,7 +838,7 @@ impl GraphicalState {
                     Some(edge) => edge.clone(),
                     None => continue,
                 };
-                if edge.align == Align::Signaled {
+                if edge.status == Align::Signaled {
                     continue; // DT-alreadyDirty
                 }
                 let misaligned = match &edge.action {
@@ -849,7 +849,7 @@ impl GraphicalState {
                 if !misaligned {
                     continue;
                 }
-                self.set_align(id, Align::Signaled); // DT-cleanIntoDirty ...
+                self.set_status(id, Align::Signaled); // DT-cleanIntoDirty ...
                 counts.edges_signaled += 1;
                 // ... whose recursive premise dirties the `forces` into the edge's source.
                 work.push(((edge.source.0.clone(), edge.source.1.clone()), true));
@@ -1100,7 +1100,7 @@ impl CacheState for GraphicalState {
                 let signaled = tc.trace.iter().any(|id| {
                     self.edges
                         .get(id)
-                        .map_or(false, |e| e.align == Align::Signaled)
+                        .map_or(false, |e| e.status == Align::Signaled)
                 });
                 if !signaled {
                     counts.force_begin_cache_hit += 1;
@@ -1200,7 +1200,7 @@ impl CacheState for GraphicalState {
                 Some(edge) => edge.clone(),
                 None => return Err(Error::Internal(line!())),
             };
-            if edge.align == Align::Aligned {
+            if edge.status == Align::Aligned {
                 rf.index += 1; // CT-alreadyClean; also every Put edge, which signaling never marks
                 continue;
             }
@@ -1216,7 +1216,7 @@ impl CacheState for GraphicalState {
                         target.get_value()?
                     };
                     if current == seen {
-                        self.set_align(&edge_id, Align::Aligned); // line 12 equal: CT-dirtyIntoClean
+                        self.set_status(&edge_id, Align::Aligned); // line 12 equal: CT-dirtyIntoClean
                         counts.edges_aligned += 1;
                         rf.index += 1;
                     } else {
@@ -1284,7 +1284,7 @@ impl CacheState for GraphicalState {
         };
         let (edge_id, seen) = rf.awaiting.take().ok_or(Error::Internal(line!()))?;
         if value == seen {
-            self.set_align(&edge_id, Align::Aligned);
+            self.set_status(&edge_id, Align::Aligned);
             counts.edges_aligned += 1;
             rf.index += 1;
         } else {

@@ -98,7 +98,7 @@ impl PeekValue for Edge {
                 ("target", self.target.into_value_()),
                 ("action", self.action.into_value_()),
                 ("metaTimes", self.meta_times.into_value_()),
-                ("align", self.align.into_value_()),
+                ("status", self.status.into_value_()),
             ]
             .iter(),
         )
