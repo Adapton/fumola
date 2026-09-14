@@ -118,7 +118,7 @@ module {
             target : NodeId;
             action : Action;
             metaTimes : MetaTimes;
-            align : Align;
+            status : Align;
         };
 
         public type Action = {
