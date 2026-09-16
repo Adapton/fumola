@@ -64,6 +64,22 @@ pages() { # pages <dir> [vendor marker]
   printf 'woff2 %s\n' "${2:-v1}" > "$1/vendor/katex/fonts/KaTeX.woff2"
 }
 
+# A Hazel branch build, standing in for the eleven megabytes fetched out of
+# hazelgrove/build: an entry point, a script, a nested asset, and the
+# provenance file the fetcher writes beside them.
+hazel_build() { # hazel_build <dir> <marker>
+  mkdir -p "$1/img"
+  printf '<html>hazel %s</html>\n' "$2" > "$1/index.html"
+  printf '// hazel.js %s\n' "$2" > "$1/hazel.js"
+  printf 'svg %s\n' "$2" > "$1/img/hazelnut.svg"
+  printf '{"source_commit": "%s"}\n' "$2" > "$1/build.json"
+}
+
+hosted() { # hosted <site>
+  python3 -c 'import json,sys; print(" ".join(b["branch"] for b in json.load(sys.stdin)))' \
+    < "$1/hazel.json"
+}
+
 vendor_of() { python3 -c 'import json,sys; m=json.load(sys.stdin); print(m.get("vendor",""))' < "$1/runtime.json"; }
 
 hash_of() { python3 -c 'import json,sys; print(json.load(sys.stdin)["hash"])' < "$1/runtime.json"; }
@@ -185,6 +201,70 @@ check "and it is the NEW bytes, not a stale copy left by the prune" "same" \
             "$WORK/pages2/vendor/katex/katex.min.css" && echo same || echo differ)"
 
 echo
+echo "hosted Hazel builds"
+DEMO=experimental-lang-integration
+hazel_build "$WORK/hz1" one
+bindings "$WORK/bh1" hzone
+"$ASSEMBLE" --bindings "$WORK/bh1" --pages "$WORK/pages" --out "$WORK/h1" \
+  --hazel "$DEMO=$WORK/hz1" --commit ffff111 >/dev/null
+check_file "the hosted build's entry point"  "$WORK/h1/hazel/$DEMO/index.html"
+check_file "and an asset below it"           "$WORK/h1/hazel/$DEMO/img/hazelnut.svg"
+check "the index names the branch"     "$DEMO"             "$(hosted "$WORK/h1")"
+check "the index gives the path to it" "/hazel/$DEMO/" \
+  "$(python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["path"])' < "$WORK/h1/hazel.json")"
+check "and keeps the provenance the fetcher wrote" "one" \
+  "$(python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["source_commit"])' < "$WORK/h1/hazel.json")"
+check_absent "no index when nothing is hosted" "$WORK/s1/hazel.json"
+
+# The regression this whole mechanism exists for: force_orphan replaces
+# gh-pages wholesale, so a publish triggered by a Rust-only merge to main --
+# which knows nothing about Hazel and passes no --hazel -- must not take the
+# live build down with it.
+bindings "$WORK/bh2" hztwo
+"$ASSEMBLE" --bindings "$WORK/bh2" --pages "$WORK/pages" --out "$WORK/h2" \
+  --previous "$WORK/h1" --commit ffff222 >/dev/null
+check_file "a publish that never mentions Hazel keeps the build" \
+  "$WORK/h2/hazel/$DEMO/index.html"
+check "and the index still names it" "$DEMO" "$(hosted "$WORK/h2")"
+check "and the bytes are the ones published before" "same" \
+  "$(cmp -s "$WORK/h2/hazel/$DEMO/hazel.js" "$WORK/hz1/hazel.js" && echo same || echo differ)"
+
+# A refresh replaces the directory rather than copying over it: a file the
+# Hazel build stopped emitting has to stop being served.
+hazel_build "$WORK/hz2" two
+rm "$WORK/hz2/img/hazelnut.svg"
+"$ASSEMBLE" --bindings "$WORK/bh2" --pages "$WORK/pages" --out "$WORK/h3" \
+  --previous "$WORK/h2" --hazel "$DEMO=$WORK/hz2" --commit ffff333 >/dev/null
+check "a refreshed build has the new bytes" "same" \
+  "$(cmp -s "$WORK/h3/hazel/$DEMO/hazel.js" "$WORK/hz2/hazel.js" && echo same || echo differ)"
+check_absent "and a file it stopped emitting is gone" \
+  "$WORK/h3/hazel/$DEMO/img/hazelnut.svg"
+check "and the index carries the new provenance" "two" \
+  "$(python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["source_commit"])' < "$WORK/h3/hazel.json")"
+
+# Branch names contain slashes -- integration/livelits is a real one -- so a
+# hosted build is not always one path segment deep.
+"$ASSEMBLE" --bindings "$WORK/bh2" --pages "$WORK/pages" --out "$WORK/h4" \
+  --previous "$WORK/h3" --hazel "integration/livelits=$WORK/hz1" --commit ffff444 >/dev/null
+check_file "a branch name with a slash nests" "$WORK/h4/hazel/integration/livelits/index.html"
+check "and both builds are indexed" "$DEMO integration/livelits" "$(hosted "$WORK/h4")"
+
+"$ASSEMBLE" --bindings "$WORK/bh2" --pages "$WORK/pages" --out "$WORK/h5" \
+  --previous "$WORK/h4" --hazel-drop "$DEMO" --commit ffff555 >/dev/null
+check_absent "a dropped build is gone"     "$WORK/h5/hazel/$DEMO"
+check_file "the one beside it stays"       "$WORK/h5/hazel/integration/livelits/index.html"
+check "and the index follows" "integration/livelits" "$(hosted "$WORK/h5")"
+
+# An unlabelled build is indexed rather than invisible: the index is how the
+# page finds what is hosted, and a build missing from it is a dead link.
+mkdir -p "$WORK/hzbare"
+echo '<html>bare</html>' > "$WORK/hzbare/index.html"
+"$ASSEMBLE" --bindings "$WORK/bh2" --pages "$WORK/pages" --out "$WORK/h6" \
+  --hazel "bare=$WORK/hzbare" --commit ffff666 >/dev/null
+check_file "an unlabelled build gets a stand-in" "$WORK/h6/hazel/bare/build.json"
+check "and is indexed anyway" "bare" "$(hosted "$WORK/h6")"
+
+echo
 echo "refusals"
 set +e
 out="$("$ASSEMBLE" --bindings "$WORK/b1" --pages "$WORK/pages" --out "$WORK/s1" 2>&1)"; rc=$?
@@ -215,6 +295,45 @@ set +e
 "$ASSEMBLE" --bindings "$WORK/b1" --pages "$WORK/dirtypages" --out "$WORK/s11" >/dev/null 2>&1; rc=$?
 set -e
 check "refuses for the binary as well as the glue" "1" "$rc"
+
+# The branch name reaches this script from a workflow input and is used in a
+# path and in `rm -rf`, so a name that escapes /hazel/ must not assemble.
+for bad in "../evil" "/etc" "a/../../evil"; do
+  set +e
+  "$ASSEMBLE" --bindings "$WORK/b1" --pages "$WORK/pages" --out "$WORK/sbad" \
+    --hazel "$bad=$WORK/hz1" >/dev/null 2>&1; rc=$?
+  set -e
+  check "refuses the branch name '$bad'" "2" "$rc"
+  check_absent "and assembles nothing for it" "$WORK/sbad"
+done
+set +e
+"$ASSEMBLE" --bindings "$WORK/b1" --pages "$WORK/pages" --out "$WORK/sbad" \
+  --hazel-drop "../evil" >/dev/null 2>&1; rc=$?
+set -e
+check "refuses an escaping name to drop as well" "2" "$rc"
+set +e
+"$ASSEMBLE" --bindings "$WORK/b1" --pages "$WORK/pages" --out "$WORK/sbad" \
+  --hazel "no-equals-sign" >/dev/null 2>&1; rc=$?
+set -e
+check "refuses --hazel without NAME=DIR" "2" "$rc"
+set +e
+out="$("$ASSEMBLE" --bindings "$WORK/b1" --pages "$WORK/pages" --out "$WORK/sbad" \
+  --hazel "demo=$WORK/never-fetched" 2>&1)"; rc=$?
+set -e
+check "refuses when the build to host is missing" "1" "$rc"
+
+# A hazel/ directory checked into pages/ would land under the copies rather
+# than over them, so it is refused for the reason a stray runtime is.
+mkdir -p "$WORK/hazelpages"
+cp -r "$WORK/pages/." "$WORK/hazelpages/"
+mkdir -p "$WORK/hazelpages/hazel"
+echo '<html>stray</html>' > "$WORK/hazelpages/hazel/index.html"
+set +e
+out="$("$ASSEMBLE" --bindings "$WORK/b1" --pages "$WORK/hazelpages" --out "$WORK/s12" 2>&1)"; rc=$?
+set -e
+check "refuses a hazel/ directory in the pages tree" "1" "$rc"
+check "and says which path it objected to" "yes" \
+  "$(grep -q "would collide with the hosted Hazel builds" <<< "$out" && echo yes || echo no)"
 
 echo
 echo "$passed passed, $failed failed"

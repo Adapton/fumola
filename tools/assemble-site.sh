@@ -16,6 +16,7 @@
 # Usage:
 #   assemble-site.sh --bindings DIR --pages DIR --out DIR
 #                    [--previous DIR] [--commit SHA] [--keep N]
+#                    [--hazel NAME=DIR]... [--hazel-drop NAME]...
 #
 #   --bindings  wasm-bindgen output: fumola_wasm.js and fumola_wasm_bg.wasm
 #   --pages     the checked-in pages/ tree, copied over the site as-is
@@ -24,9 +25,15 @@
 #               forward. Omitted on a first publish.
 #   --commit    source commit, recorded in the manifest for provenance
 #   --keep      how many versions to retain, newest first (default 10)
+#   --hazel     a built Hazel branch to host at /hazel/NAME/, given as
+#               NAME=DIR. Repeatable. Replaces a copy carried forward from
+#               --previous rather than merging into it.
+#   --hazel-drop  stop hosting NAME. Repeatable. The only way to remove one:
+#               a carried-forward build otherwise outlives every deploy.
 set -euo pipefail
 
 BINDINGS="" PAGES="" OUT="" PREVIOUS="" COMMIT="" KEEP=10
+HAZEL=() HAZEL_DROP=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -36,6 +43,8 @@ while [ $# -gt 0 ]; do
     --previous) PREVIOUS="$2"; shift 2 ;;
     --commit)   COMMIT="$2";   shift 2 ;;
     --keep)     KEEP="$2";     shift 2 ;;
+    --hazel)      HAZEL+=("$2");      shift 2 ;;
+    --hazel-drop) HAZEL_DROP+=("$2"); shift 2 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -45,6 +54,33 @@ for required in BINDINGS PAGES OUT; do
     echo "--${required,,} is required" >&2
     exit 2
   fi
+done
+
+# A hosted build is named by its Hazel branch, and that name arrives from a
+# workflow input before being used as a path and passed to `rm -rf`. So it is
+# checked rather than trusted. Branch names legitimately contain slashes --
+# `integration/livelits` is one -- which is what makes `..` worth ruling out
+# explicitly rather than assuming a single path segment.
+check_hazel_name() {
+  if [[ ! "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] || [[ "$1" =~ (^|/)\.\.(/|$) ]]; then
+    echo "not a usable Hazel branch name: '$1'" >&2
+    exit 2
+  fi
+}
+
+for entry in ${HAZEL[@]+"${HAZEL[@]}"}; do
+  if [[ "$entry" != *=* ]]; then
+    echo "--hazel wants NAME=DIR, got '$entry'" >&2
+    exit 2
+  fi
+  check_hazel_name "${entry%%=*}"
+  if [ ! -d "${entry#*=}" ]; then
+    echo "--hazel ${entry%%=*}: ${entry#*=} is not a directory" >&2
+    exit 1
+  fi
+done
+for name in ${HAZEL_DROP[@]+"${HAZEL_DROP[@]}"}; do
+  check_hazel_name "$name"
 done
 
 GLUE="$BINDINGS/fumola_wasm.js"
@@ -77,6 +113,16 @@ for stray in fumola_wasm.js fumola_wasm_bg.wasm; do
     exit 1
   fi
 done
+
+# The same, for the hosted Hazel builds. /hazel/ is assembled from what was
+# published before plus what this run fetched; a directory of that name in the
+# pages tree is a different repo's build output checked in by accident, and it
+# would land underneath the copies below with nothing to say so.
+if [ -e "$PAGES/hazel" ]; then
+  echo "$PAGES/hazel would collide with the hosted Hazel builds." >&2
+  echo "Those are fetched per deploy, not page content -- remove it and run again." >&2
+  exit 1
+fi
 
 # The pair is hashed together, never separately. wasm-bindgen generates the
 # glue and the binary as a matched set, and Hazel's loader passes both URLs
@@ -128,6 +174,30 @@ if [ -n "$PREVIOUS" ] && [ -d "$PREVIOUS/vendor" ]; then
   mkdir -p "$OUT/vendor"
   find "$PREVIOUS/vendor" -mindepth 1 -maxdepth 1 -type d -exec cp -r {} "$OUT/vendor/" \;
 fi
+
+# Hosted Hazel builds, carried forward for the reason the versions are, only
+# more sharply: a build arrives here by workflow_dispatch, while the deploy
+# that would drop it is a push to main that has nothing to do with Hazel.
+# Without this, merging a Rust-only PR quietly unpublishes the live build the
+# front page links to, and the first sign of it is a 404 in someone else's
+# browser. The whole gh-pages branch is replaced on every publish
+# (force_orphan), so "leave it alone" is not available -- carrying it is.
+if [ -n "$PREVIOUS" ] && [ -d "$PREVIOUS/hazel" ]; then
+  mkdir -p "$OUT/hazel"
+  cp -r "$PREVIOUS/hazel/." "$OUT/hazel/"
+  echo "carried forward $(find "$OUT/hazel" -type f -name build.json | wc -l) hosted Hazel build(s)"
+fi
+
+# A carried build outlives every deploy, so removing one has to be something
+# you can ask for. Silently idempotent: the point is the end state.
+for name in ${HAZEL_DROP[@]+"${HAZEL_DROP[@]}"}; do
+  if [ -d "$OUT/hazel/$name" ]; then
+    echo "dropping hosted Hazel build $name"
+    rm -rf "${OUT:?}/hazel/$name"
+  else
+    echo "not hosted, nothing to drop: $name"
+  fi
+done
 
 # This build's version. Overwritten rather than skipped when the hash is
 # already present: a rebuild of identical content is identical, so this is a
@@ -234,6 +304,60 @@ print("\n".join(v.get("vendor", "") for v in json.load(sys.stdin) if v.get("vend
   done
 fi
 
+# The fetched builds, placed after the pages for the reason the hashed vendor
+# set is: page content cannot shadow them. Replaced whole rather than copied
+# over, so a file the Hazel build stopped emitting does not live on here.
+#
+# No runtime pair is copied in beside them, deliberately. A build served from
+# this origin finds the runtime through /runtime.json, which names a
+# content-addressed directory and is therefore immune to the ten-minute cache
+# Pages puts on everything; a pair sitting at a stable path under the build
+# would be the one load path that can go stale, and stale glue with a fresh
+# binary does not load at all. Same-origin is the win here, not colocation.
+for entry in ${HAZEL[@]+"${HAZEL[@]}"}; do
+  name="${entry%%=*}"
+  dir="${entry#*=}"
+  rm -rf "${OUT:?}/hazel/$name"
+  mkdir -p "$OUT/hazel/$name"
+  cp -r "$dir/." "$OUT/hazel/$name/"
+  # Provenance travels inside the directory rather than in a file beside it,
+  # so carrying a build forward carries what it is along with it. The fetcher
+  # writes this; a stand-in keeps an unlabelled build out of the index rather
+  # than merely undocumented.
+  if [ ! -f "$OUT/hazel/$name/build.json" ]; then
+    printf '{\n  "branch": "%s",\n  "copied": "%s"\n}\n' \
+      "$name" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$OUT/hazel/$name/build.json"
+  fi
+  echo "hosting Hazel build $name from $dir"
+done
+
+# What is hosted, derived from the assembled directory rather than from what
+# this run was asked to place: a carried-forward build and a freshly fetched
+# one are then indistinguishable in the index, which is the point -- the file
+# describes the site, not the run that produced it.
+if [ -d "$OUT/hazel" ]; then
+  python3 - "$OUT/hazel" > "$OUT/hazel.json" <<'PY'
+import json, os, sys
+root = sys.argv[1]
+builds = []
+for dirpath, dirnames, filenames in os.walk(root):
+    if "build.json" not in filenames:
+        continue
+    dirnames[:] = []  # a build is a leaf; never index one nested inside another
+    name = os.path.relpath(dirpath, root)
+    try:
+        with open(os.path.join(dirpath, "build.json")) as f:
+            meta = json.load(f)
+    except (OSError, ValueError):
+        meta = {}
+    meta["branch"] = name
+    meta["path"] = "/hazel/%s/" % name
+    builds.append(meta)
+builds.sort(key=lambda b: b["branch"])
+print(json.dumps(builds, indent=2))
+PY
+fi
+
 # What the guard above protects, checked rather than assumed. The stable pair
 # is the fallback path, so a mistake here is invisible until something old asks
 # for it; and the ordering that makes it possible is three copies apart from
@@ -255,3 +379,9 @@ echo "assembled $OUT"
 echo "  version $HASH  (commit ${COMMIT:-unknown})"
 echo "  retaining $(python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' < "$OUT/versions.json") version(s), keep=$KEEP"
 echo "  vendor  ${VENDOR_HASH:-none}"
+if [ -f "$OUT/hazel.json" ]; then
+  echo "  hazel   $(python3 -c '
+import json, sys
+names = [b["branch"] for b in json.load(sys.stdin)]
+print(", ".join(names) if names else "none")' < "$OUT/hazel.json")"
+fi

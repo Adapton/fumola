@@ -15,6 +15,20 @@ on:
   # publishing before then needs the branch added to the push trigger above,
   # temporarily.
   workflow_dispatch:
+    inputs:
+      hazel_branches:
+        description: >-
+          Hazel branches to host at /hazel/<branch>/, space separated.
+          Blank uses the default set below; "none" fetches nothing and keeps
+          whatever is already published.
+        required: false
+        default: ""
+      hazel_drop:
+        description: >-
+          Hazel branches to stop hosting, space separated. A hosted build is
+          carried across every deploy, so this is the only way to remove one.
+        required: false
+        default: ""
 
 concurrency:
   group: wasm-pages
@@ -97,26 +111,124 @@ jobs:
           ref: gh-pages
           path: previous
 
+      # The Hazel builds this site hosts at /hazel/<branch>/, copied out of
+      # hazelgrove/build -- the repo hazel.org is itself served from -- rather
+      # than built here. Building Hazel needs an OCaml toolchain and a
+      # js_of_ocaml release link, and what that would produce is the artifact
+      # that repo already holds. It is 5.6 GB, so the clone is blobless and
+      # sparse: one branch directory is ~11 MB and arrives in about four
+      # seconds.
+      #
+      # Fetched on every deploy, not only on a dispatch that asks. The page
+      # links to these builds, so the alternative is a window after each merge
+      # to main where the copy is whatever was last dispatched -- and the
+      # fetch is cheap enough that keeping it current costs nothing worth
+      # counting. A branch that has gone from hazelgrove/build is a warning
+      # and not a failure: the carried-forward copy stays published, which is
+      # better than a deploy this repo cannot make because another repo moved.
+      - name: Fetch the Hazel builds to host
+        env:
+          # Blank on a push, which is every deploy following a merge to main.
+          REQUESTED: ${{ github.event.inputs.hazel_branches }}
+          # The set the front page links to. One line, so hosting another
+          # branch is a one-line diff and is reviewed like page content.
+          DEFAULTS: experimental-lang-integration
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          explicit=true
+          branches="${REQUESTED:-}"
+          if [ -z "$branches" ]; then
+            explicit=false
+            branches="$DEFAULTS"
+          fi
+          if [ "$branches" = "none" ]; then
+            echo "fetching no Hazel builds; whatever is published is carried forward"
+            echo "HAZEL_HOSTED=" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/hazelgrove/build.git hazel-build
+          # Each path is one branch's directory, written there by Hazel's own
+          # deploy job (hazelgrove/hazel .github/workflows/deploy.yml).
+          git -C hazel-build sparse-checkout set $branches
+
+          hosted=""
+          for branch in $branches; do
+            if [ ! -d "hazel-build/$branch" ]; then
+              echo "::warning::hazelgrove/build has no directory for $branch"
+              if [ "$explicit" = true ]; then
+                echo "$branch was asked for by name, so this is an error" >&2
+                exit 1
+              fi
+              continue
+            fi
+
+            # Provenance for the copy. The commit that last touched the path
+            # is the deploy that built it, so its date is the age of the demo
+            # -- the question a live link actually raises. The Hazel-side
+            # commit is not recoverable here: Hazel's deploy job commits as
+            # "github-deploy-action-<branch>" and records its own sha nowhere
+            # in the build.
+            read -r sha when < <(
+              gh api "repos/hazelgrove/build/commits?path=$branch&per_page=1" \
+                --jq '.[0] | "\(.sha) \(.commit.committer.date)"' 2>/dev/null || echo " "
+            )
+            # jq interpolates a missing commit as the string "null", which
+            # would be recorded as though it were provenance.
+            [ "${sha:-null}" != "null" ] || sha=unknown
+            [ "${when:-null}" != "null" ] || when=unknown
+            cat > "hazel-build/$branch/build.json" <<JSON
+          {
+            "branch": "$branch",
+            "source": "hazelgrove/build",
+            "source_commit": "${sha:-unknown}",
+            "source_deployed": "${when:-unknown}",
+            "copied": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          JSON
+            echo "$branch: $(du -sh "hazel-build/$branch" | cut -f1), deployed ${when:-unknown}"
+            hosted="${hosted:+$hosted }$branch"
+          done
+          echo "HAZEL_HOSTED=$hosted" >> "$GITHUB_ENV"
+
       # The assembly is a script rather than steps here because this decides
       # what every browser receives, Hazel's livelits included, and a workflow
       # can only be tested by publishing. tools/assemble-site.test.sh covers
       # it against scratch directories. See #69.
       - name: Assemble the site
+        env:
+          HAZEL_DROP: ${{ github.event.inputs.hazel_drop }}
         run: |
+          set -euo pipefail
           if [ -d previous ]; then
             previous_arg=(--previous previous)
           else
             echo "no published site yet; this is a first publish"
             previous_arg=()
           fi
+          # Rebuilt from the branch list rather than passed between steps as a
+          # command line: the fetch step decides what was hosted, and this
+          # decides how to say so.
+          hazel_args=()
+          for branch in ${HAZEL_HOSTED:-}; do
+            hazel_args+=(--hazel "$branch=hazel-build/$branch")
+          done
+          for branch in ${HAZEL_DROP:-}; do
+            hazel_args+=(--hazel-drop "$branch")
+          done
           ./tools/assemble-site.sh \
             --bindings bindings \
             --pages pages \
             --out site \
             --commit "${{ github.sha }}" \
             --keep 10 \
-            "${previous_arg[@]}"
+            "${previous_arg[@]}" \
+            ${hazel_args[@]+"${hazel_args[@]}"}
           cat site/runtime.json
+          if [ -f site/hazel.json ]; then cat site/hazel.json; fi
 
       # The pages are checked in rather than written here: they explain
       # Fumola and load the runtime published beside them, which is a
