@@ -1,0 +1,10 @@
+[
+  {
+    "branch": "experimental-lang-integration",
+    "source": "hazelgrove/build",
+    "source_commit": "ee11c9d62dbf080a8ea337e35eb860edfcd7d408",
+    "source_deployed": "2026-09-15T02:44:21Z",
+    "copied": "2026-09-17T16:27:22Z",
+    "path": "/hazel/experimental-lang-integration/"
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "hash": "0194f0ab578e12e9",
+  "commit": "39cdcb61b783285760cdfb91fa88062c024e9465",
+  "built": "2026-09-17T16:27:23Z",
+  "js": "/v/0194f0ab578e12e9/fumola_wasm.js",
+  "wasm": "/v/0194f0ab578e12e9/fumola_wasm_bg.wasm",
+  "vendor": "/vendor/abe7615d10f27c95"
+}
