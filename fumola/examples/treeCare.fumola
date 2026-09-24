@@ -1,0 +1,146 @@
+/// Layout for Hazel's tree-care livelit.
+///
+/// The livelit's view walks a binary tree and emits SVG: two lines per fork,
+/// a glyph per leaf, a circle per scar. That walk is the expensive part and
+/// the drawing is a thin wrapper around it, so the walk is what moves here
+/// and the wrapper stays in Hazel.
+///
+/// What crosses the boundary is plain data. A `Draw` carries coordinates and
+/// tags, never a function, because a function has no written Fumola form and
+/// cannot make the trip -- which is also why the click handlers stay on the
+/// Hazel side, reconstructed from the `path` each limb carries.
+///
+/// Tags are lower case here and arrive in Hazel capitalised: `#leaf` is
+/// Hazel's `Leaf`. Only the first letter moves, so a tag that already begins
+/// upper case does not survive the round trip.
+module {
+
+  public type Season = { #fall; #winter; #spring; #summer };
+  public type LeafShape = { #oak; #maple; #elm; #aspen };
+  public type BarkType = { #smooth; #rough; #aspen };
+
+  /// A walk from the root. What a click sends back as Trim.
+  public type Step = { #l; #r };
+
+  public type Tree = {
+    #leaf : LeafShape;
+    #branch : (BarkType, Tree, Tree);
+    #scar : (BarkType, Int)
+  };
+
+  /// One thing to draw, in the order it should be drawn. Tuples rather than
+  /// records so the crossing keeps a fixed shape: a Fumola record arrives as
+  /// a Hazel labeled tuple with its fields in name order, which is one more
+  /// thing to keep in step than positions are.
+  public type Draw = {
+    /// x1, y1, x2, y2, bark, stroke width, the path that reaches this fork
+    #limb : (Int, Int, Int, Int, BarkType, Int, [Step]);
+    /// shape, x, y
+    #leafAt : (LeafShape, Int, Int);
+    /// bark, seasons left before it heals, x, y
+    #scarAt : (BarkType, Int, Int, Int)
+  };
+
+  /// Nearer the root is thicker, to a floor of one.
+  func thickness(d : Int) : Int {
+    if (d >= 5) { 1 } else { 6 - d }
+  };
+
+  /// The whole picture, as data.
+  ///
+  /// `dx` shrinks by three quarters per level rather than halving: halving
+  /// pinches the canopy shut into a spire, since by the sixth fork the
+  /// siblings are a pixel apart.
+  public func layout(
+    t : Tree,
+    x : Int,
+    y : Int,
+    dx : Int,
+    dy : Int,
+    path : [Step],
+    d : Int
+  ) : [Draw] {
+    switch (t) {
+      case (#leaf(s)) [#leafAt((s, x, y))];
+      case (#scar(b, n)) [#scarAt((b, n, x, y))];
+      case (#branch(b, l, r)) {
+        let cy = y - dy;
+        let lx = x - dx;
+        let rx = x + dx;
+        let w = thickness(d);
+        let ndx = dx * 3 / 4;
+        /// `#` is append. The Hazel tiles spell it `++`, because Hazel
+        /// delimits a comment with the same hash -- the same substitution
+        /// that turns Fumola's `#tag` into the tiles' `$tag`.
+        [#limb((x, y, lx, cy, b, w, path)),
+         #limb((x, y, rx, cy, b, w, path))]
+        # layout(l, lx, cy, ndx, dy, path # [#l], d + 1)
+        # layout(r, rx, cy, ndx, dy, path # [#r], d + 1)
+      }
+    }
+  };
+
+  /// What the Hazel slide starts with, so a caller can say `root(tree)` and
+  /// not repeat the canvas geometry. 260x170 viewBox, trunk at the bottom.
+  public func root(t : Tree) : [Draw] {
+    layout(t, 130, 150, 34, 20, [], 0)
+  };
+
+  #[test]
+  public func testLeafIsOneThing() {
+    let out = root(#leaf(#oak));
+    assert (out.size() == 1)
+  };
+
+  #[test]
+  public func testScarIsOneThing() {
+    let out = root(#scar(#smooth, 2));
+    assert (out.size() == 1)
+  };
+
+  /// A fork is two limbs plus whatever its children draw, so a tree with one
+  /// fork and two leaves is four things. This is the shape the cost follows:
+  /// every level doubles the leaves, and every leaf is a thing to draw.
+  #[test]
+  public func testForkIsFour() {
+    let out = root(#branch(#smooth, #leaf(#oak), #leaf(#elm)));
+    assert (out.size() == 4)
+  };
+
+  /// Two levels: 2 limbs at the root, then each child fork adds 2 limbs and
+  /// 2 leaves. 2 + 4 + 4 = 10.
+  #[test]
+  public func testTwoLevels() {
+    let fork = #branch(#rough, #leaf(#maple), #leaf(#aspen));
+    let out = root(#branch(#smooth, fork, fork));
+    assert (out.size() == 10)
+  };
+
+  /// The path is what a click sends back, so it has to name the fork it
+  /// reaches. Both limbs of the root carry the empty path; a limb one level
+  /// down carries a single step.
+  #[test]
+  public func testPathsDescend() {
+    let fork = #branch(#rough, #leaf(#maple), #leaf(#elm));
+    let out = root(#branch(#smooth, fork, #leaf(#oak)));
+    switch (out[0]) {
+      case (#limb(_, _, _, _, _, _, p)) assert (p.size() == 0);
+      case (_) assert false
+    };
+    switch (out[2]) {
+      case (#limb(_, _, _, _, _, _, p)) assert (p.size() == 1);
+      case (_) assert false
+    }
+  };
+
+  /// Nearer the root is thicker, and it bottoms out rather than going to
+  /// zero or negative.
+  #[test]
+  public func testThickness() {
+    assert (thickness(0) == 6);
+    assert (thickness(4) == 2);
+    assert (thickness(5) == 1);
+    assert (thickness(9) == 1)
+  };
+
+}
