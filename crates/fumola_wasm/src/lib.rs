@@ -26,7 +26,7 @@ use std::collections::HashMap;
 
 use fumola::state::State;
 use fumola_semantics::adapton::{Space, Time};
-use fumola_semantics::format::format_one_line;
+use fumola_semantics::format::{format_one_line, format_pretty};
 use fumola_semantics::value::Value;
 use fumola_semantics::Interruption;
 use fumola_syntax::ast::Id;
@@ -254,6 +254,26 @@ pub fn fumola_symbol_of(source: &str) -> String {
             serde_json::json!({ "ok": true, "source": rendered }).to_string()
         }
         Err(message) => error_json(&message),
+    }
+}
+
+/// Lay out a program's source text as Fumola's own printer does, at `width`
+/// columns: the text is parsed and printed back.
+///
+/// A host that builds programs as text -- Hazel prints one from tiles -- has
+/// them on one line. This gives it the line breaks and indentation the
+/// printer chooses, so the program reads as Fumola would write it. Nothing is
+/// evaluated and no instance is touched.
+///
+/// `{ "ok": true, "source": .. }`, or a `syntax` error when the text does not
+/// parse.
+#[wasm_bindgen]
+pub fn fumola_format(source: &str, width: usize) -> String {
+    match fumola::check::parse(source) {
+        Ok(prog) => {
+            serde_json::json!({ "ok": true, "source": format_pretty(&prog, width) }).to_string()
+        }
+        Err(e) => error_of(&fumola::Error::SyntaxErrorCode(e)),
     }
 }
 
