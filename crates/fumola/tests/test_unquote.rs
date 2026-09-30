@@ -31,12 +31,13 @@ fn unquote_quoted_object_composition() {
     assert_("~(`{} # `{x=1; y=2} # `{z=3})", "{z=3; y=2; x=1}");
 }
 
-#[ignore]
 #[test]
 fn quoted_case() {
     assert_is_value("`{case _ 0}");
 }
 
+// Still ignored: `switch 0 ~cases` is outside any quotation, so the unquote
+// reaches the evaluator standing (vm_step.rs), which does not substitute it.
 #[ignore]
 #[test]
 fn switch_on_quoted_case_composition() {
