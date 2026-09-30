@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Fumola — press</title>
-    <meta name="description" content="Writing about Fumola from outside its own repository: the Week in Hazel issues that have covered the Adapton runtime and its Hazel integration.">
+    <title>Fumola — Hazel integration</title>
+    <meta name="description" content="Fumola programs inside Hazel documents: the current ^fumola_wip livelit, with its editor and archivist roles and watch pane, and the earlier livelit, tiles and panel work that led to it.">
     <style>
       :root {
         --bg:      #000000;
@@ -471,74 +471,307 @@
       <p class="outline-label">Pages</p>
       <ul class="outline-pages">
         <li><a href="/">Home</a></li>
-        <li><span class="here">Press</span></li>
+        <li><a href="/press/">Press</a></li>
         <li><a href="/alignment/">Alignment</a></li>
         <li><a href="/web-play/">Web play</a></li>
-        <li><a href="/hazel-integration/">Fumola-Hazel integration</a></li>
+        <li><span class="here">Fumola-Hazel integration</span></li>
         <li><a href="https://adapton.org/">adapton.org</a></li>
       </ul>
       <p class="outline-label">On this page</p>
       <ul id="outline-list"></ul>
     </nav>
     <main>
-      <p class="back"><a href="/">fumola</a> / press</p>
+      <p class="back"><a href="/">fumola</a> / hazel integration</p>
       <header>
-        <h1>press</h1>
+        <h1>Fumola in Hazel</h1>
         <p class="tagline">
-          Writing about <a href="/">Fumola</a> from outside this repository.
-          The papers the language is built on are
-          <a href="/#publications">on the homepage</a>; this page is the other
-          direction &mdash; what other people have said about it.
+          Fumola programs running inside <a href="https://hazel.org">Hazel</a>
+          documents: first the current design, then the earlier attempts that
+          led to it.
         </p>
       </header>
 
-      <!-- Adding a mention: a new row at the TOP of .issues, newest first.
-           Number, date range, the section's own heading as the link text, and
-           a sentence or two on what it actually said. Link to the section
-           anchor (#fumola), not the issue root, so the link lands on the part
-           this page is about. Keep the note to a sentence or two: at a year
-           of weekly issues this list is the page, and a paragraph each would
-           make it unreadable. If a mention is substantial enough to deserve
-           more than that, it wants its own section below, not a longer row. -->
-      <section id="week-in-hazel">
-        <h2>Week in Hazel<a class="anchor" href="#week-in-hazel" aria-label="Copy link to this heading">#</a></h2>
+      <section id="latest">
+        <h2>The latest: one livelit<a class="anchor" href="#latest" aria-label="Copy link to this heading">#</a></h2>
         <p>
-          <a href="https://andrewblinn.com/hazel/weekly/">Week in Hazel</a> is a
-          weekly digest for the Hazel community, published by
-          <a href="https://andrewblinn.com/">Andrew Blinn</a>. Its masthead
-          says the content is generated from the Hazel repository and GitHub
-          data, with the reporting, writing and illustrations all AI-produced.
+          The current integration is one builtin livelit,
+          <code>^fumola_wip</code>. It combines the best parts of the three
+          earlier steps described <a href="#history">below</a>: a livelit's
+          place in the document, a Fumola program written as Hazel tiles, and
+          a live view of the instance beside the code.
         </p>
         <p>
-          Issue numbers follow reporting weeks rather than publication order,
-          so the series also runs backwards: issues with negative numbers are
-          earlier weeks reconstructed after the fact. Those predate the Fumola
-          work and do not mention it. Listed here are the issues that do,
-          newest first.
+          It lives on the Hazel branch
+          <a href="https://github.com/hazelgrove/hazel/tree/remote-splices"><code>remote-splices</code></a>
+          (<a href="https://github.com/hazelgrove/hazel/pull/2616">#2616</a>), which has a
+          <a href="https://hazel.org/build/remote-splices/?slide=livelits-advanced-fumola-a-work-in-progress"><strong>live build</strong></a>
+          that opens on the slide shown here: Documentation &rsaquo; Livelits
+          &rsaquo; Advanced &rsaquo; <em>Fumola, a Work in Progress</em>. The
+          name says what it is. It is a prototype, and editing tiles inside a
+          livelit is slow today: every keystroke costs a full view and update.
         </p>
 
-        <ol class="issues">
+        <h3 id="the-slide">The slide<a class="anchor" href="#the-slide" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          The slide has two uses of the livelit, sharing one Fumola instance.
+          In the program's text they read as below; in the editor each one is
+          drawn as its GUI.
+        </p>
+        <pre><code><span class="k">let</span> <span class="v">n</span> = <span class="n">20</span> <span class="k">in</span>
+<span class="k">let</span> <span class="v">result</span> = <span class="d">^^livelit</span>(<span class="d">^fumola_wip</span>((
+  instance = <span class="st">"myInstance"</span>, name = <span class="st">"myLivelit"</span>, editor = <span class="t">false</span>,
+  bind_input = <span class="t">true</span>, tiles = <span class="t">true</span>, input = (<span class="v">n</span> * <span class="n">2</span>),
+  code = (<span class="k">fumola</span> <span class="t">$graphical</span> <span class="k">as</span> <span class="v">myInstance</span> <span class="k">in</span>
+    <span class="k">let</span> <span class="v">halve</span>  = <span class="sy">`halve`</span>  <span class="eff">:=</span> <span class="k">thunk</span> { (<span class="eff">@</span> <span class="v">input</span>) / <span class="n">2</span> };
+    <span class="k">let</span> <span class="v">double</span> = <span class="sy">`double`</span> <span class="eff">:=</span> <span class="k">thunk</span> { (<span class="k">force</span> <span class="v">halve</span>) * <span class="n">2</span> };
+    <span class="k">force</span> <span class="v">double</span>
+  <span class="k">end</span>)))) <span class="k">in</span>
+<span class="k">let</span> <span class="v">events</span> = <span class="d">^^livelit</span>(<span class="d">^fumola_wip</span>((
+  instance = <span class="st">"myInstance"</span>, name = <span class="st">""</span>, editor = <span class="t">true</span>,
+  bind_input = <span class="t">false</span>, tiles = <span class="t">true</span>, input = (<span class="n">0</span>),
+  code = (<span class="k">fumola</span> <span class="t">$graphical</span> <span class="k">as</span> <span class="v">myInstance</span> <span class="k">in</span>
+    (<span class="k">prim</span> <span class="st">"adaptonPeekHistory"</span> ()).events
+  <span class="k">end</span>)))) <span class="k">in</span>
+(<span class="v">result</span>, <span class="v">events</span>)</code></pre>
+        <p>
+          The first use is an archivist computing with its input. The second is
+          the editor of the same instance, reading back the events the first
+          one caused. The result is <code>(40, [&hellip;])</code>: the
+          computation's answer, and the instance's history as a Hazel list.
+        </p>
+
+        <h3 id="the-head-row">The head row<a class="anchor" href="#the-head-row" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          Each use starts with one row: <code>instance [myInstance]&nbsp;&nbsp;editor | archivist [myLivelit]&nbsp;&nbsp;tiles</code>.
+        </p>
+        <ul>
           <li>
-            <span class="issue-no">001</span>
-            <span>
-              <a class="issue-title" href="https://andrewblinn.com/hazel/weekly/issues/001/#fumola">Two languages. One notebook.</a>
-              <span class="issue-date">September 4&ndash;10, 2026</span>
-              <span class="issue-note">
-                Reads the <a href="/#hazel">Hazel integration</a> the way the
-                homepage does &mdash; a Hazel document naming an external
-                runtime, livelits that share a store by naming the same
-                instance, named thunks giving successive edits an identity
-                inside it, and the <a href="/#modes">two modes</a>, simple by
-                default and graphical recording nodes, dependencies and events
-                as groundwork for a repair the examples do not yet exercise.
-                It ends on the gap rather than the demo: the translation
-                fixtures check the expected formats, but the evaluator suite
-                skips the four live forms, so those tests can stay green while
-                the published runtime changes underneath them.
-              </span>
-            </span>
+            <strong>instance</strong> names the Fumola VM instance the code runs
+            against. Uses that name the same instance share its store.
           </li>
-        </ol>
+          <li>
+            <strong>editor | archivist</strong> picks which of Fumola's
+            <a href="/#modes">two modes</a> the code runs in. Exactly one is
+            on. The archivist's name field shows only while the archivist is
+            on.
+          </li>
+          <li>
+            <strong>tiles</strong> switches the code between Fumola tiles and a
+            string. Code that cannot be converted, tiles with a hole in them or
+            text that does not parse, stays as it is.
+          </li>
+        </ul>
+
+        <h3 id="archivist">The archivist<a class="anchor" href="#archivist" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          As the archivist, the code runs inside a force, in a thunk named by
+          the archivist's name, so what it reads and writes is recorded. Every
+          cell it owns is named under that name:
+        </p>
+        <ul>
+          <li><code>`myLivelit(`input)</code>: written from Hazel. This is the <strong>In</strong> wire.</li>
+          <li><code>`myLivelit(`compute)</code>: the thunk the code runs in. It is reused across edits, so an edit keeps the thunk's history.</li>
+          <li><code>`myLivelit(`output)</code>: the code's result, read back. This is the <strong>Out</strong> wire, and what the livelit expands to.</li>
+        </ul>
+        <p>
+          The input is a splice, so it can name a Hazel variable bound outside
+          the livelit, like <code>n</code> above. It crosses into Fumola as a
+          <code>hazel &hellip; end</code> escape, evaluated when the program
+          runs, where <code>n</code> is in scope.
+        </p>
+        <p>
+          <strong>The code's <code>input</code> is the cell, not the value in
+          it.</strong> The code reads it with <code>@ input</code>, wherever and
+          whenever it chooses, and each read is an edge of its own. In the
+          slide, the computation never reads the input itself. It makes two
+          sub-thunks. <code>halve</code> reads the input cell, inside itself,
+          and halves it. <code>double</code> is given <code>halve</code>
+          unforced, forces it, and doubles the result. The watch pane's Outline
+          shows that structure: <code>double</code> forcing <code>halve</code>,
+          and <code>halve</code> reading <code>`myLivelit(`input)</code>. With
+          <code>n = 20</code> the input is 40, halved to 20, and doubled back
+          to 40.
+        </p>
+        <p>
+          Left empty, the archivist's name defaults to <code>hazel_</code>
+          followed by the id of the Hazel term the use is, with underscores
+          for the id's hyphens, since a Fumola name cannot hold a hyphen. The
+          default is written into the use's model once, so it stays the same
+          when the document is reloaded.
+        </p>
+
+        <h3 id="editor">The editor<a class="anchor" href="#editor" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          As the editor, the code runs at the top level of the instance, with
+          no force around it. It needs no name and owns no cells, and its value
+          is what the livelit expands to. <code>peek</code>, <code>reset</code>
+          and the graph introspection belong here.
+        </p>
+        <p>
+          The editor's input is optional, with a checkbox beside the role
+          switch. Ticked, <code>input</code> is bound to the Hazel value.
+          Unticked, as in the slide's second use, <code>input</code> is not
+          bound at all. That use asks the instance for its history and returns
+          the events, which cross back into Hazel as data: a list of
+          <code>(event = &hellip;, metaTime = &hellip;)</code> records, the same
+          events the Events tab shows. It runs after the archivist, so the
+          archivist's run is in them.
+        </p>
+
+        <h3 id="watch-pane">The watch pane<a class="anchor" href="#watch-pane" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          Below the head row, each use takes the full width of the notebook. On
+          the left are the In wire, the code, and the Out wire. The Out wire
+          shows the last run's value, or the runtime's error when the run
+          failed. On the right is the watch pane for the instance, with six
+          tabs:
+        </p>
+        <ul>
+          <li><strong>Program</strong>: the Fumola text the last run sent, printed from the tiles. Its parentheses show how the tiles grouped the code, which may not be how it reads.</li>
+          <li><strong>Outline</strong>: the runs' forces as trees, drawn the way <a href="/web-play/">web play</a> draws them.</li>
+          <li><strong>Printed</strong>: what the last run printed.</li>
+          <li><strong>Events</strong>, <strong>Nodes</strong> and <strong>Edges</strong>: the instance's history, as in the panel described <a href="#watching-the-store">below</a>.</li>
+        </ul>
+
+        <h3 id="not-yet">What is not done yet<a class="anchor" href="#not-yet" aria-label="Copy link to this heading">#</a></h3>
+        <ul>
+          <li><strong>Editing is slow.</strong> Every keystroke in the tiles costs a full livelit view and update.</li>
+          <li><strong>The Outline covers the whole instance,</strong> not just this use: after a rename, the old name's tree is still there. An outline of one moment would fix it, and needs new prims from the runtime.</li>
+          <li><strong>The Program tab shows one long line.</strong> <a href="https://github.com/Adapton/fumola/pull/143">#143</a> adds a formatter to the runtime for it to use.</li>
+          <li><strong>The editor's input is a value, not a cell.</strong> The editor owns no cells, so there is no name to put one under.</li>
+        </ul>
+      </section>
+
+      <section id="history">
+        <h2>How we got here<a class="anchor" href="#history" aria-label="Copy link to this heading">#</a></h2>
+        <p>
+          The earlier work came in three steps, and each settled a question
+          the next could build on. All three are in one build, beside a third embedded sub-language (the core
+          logic of the Blackboard proof assistant), on the branch
+          <a href="https://github.com/hazelgrove/hazel/tree/experimental-lang-integration"><code>experimental-lang-integration</code></a>
+          (<a href="https://github.com/hazelgrove/hazel/pull/2536">#2536</a>).
+          It has a <a href="/hazel/experimental-lang-integration/">live build</a>
+          served from this site.
+        </p>
+
+        <h3 id="first-livelits">First: livelits, and what they proved<a class="anchor" href="#first-livelits" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          The first route put Fumola behind four builtin livelits. A program
+          was a string in the livelit's model, and Hazel handed it to Fumola's
+          own parser and got a value back.
+        </p>
+        <pre><code><span class="c"># declare a runtime, and the Adapton semantics it runs #</span>
+<span class="k">let</span> <span class="v">rt</span> : <span class="t">Int</span> = <span class="d">^fumola_new</span>(<span class="n">7</span>, <span class="t">Graphical</span>) <span class="k">in</span>
+
+<span class="c"># run a program as a named thunk, and use its result as a Hazel value #</span>
+<span class="k">let</span> <span class="v">answer</span> : <span class="t">Int</span> =
+  <span class="d">^fumola_put_force</span>(<span class="n">7</span>, <span class="st">"`gcd"</span>, <span class="st">"Gcd.gcd(12, 18)"</span>) <span class="k">in</span>
+
+<span class="c"># read the graph the run left behind, as a table of records #</span>
+<span class="k">let</span> <span class="v">events</span> : [<span class="t">EventRow</span>] =
+  <span class="d">^fumola_eval</span>(<span class="n">7</span>, <span class="st">"Adapton.peekEvents()"</span>) <span class="k">in</span>
+
+<span class="d">^^probe_table</span>(<span class="v">events</span>);</code></pre>
+        <p>
+          The split followed Fumola's two modes. <code>^fumola_put_force</code>
+          wrapped its program as <code>force(`n := thunk { &hellip; })</code>,
+          so it ran as the archivist, and editing the program re-forced the
+          <em>same</em> name, reusing the thunk's history.
+          <code>^fumola_eval</code> ran its program at the top level, as the
+          editor. <code>^fumola_with</code> took a Hazel value as input, and
+          <code>^fumola_new</code> declared which semantics a runtime ran.
+        </p>
+        <p>
+          It proved the thing that had to be proved first: a Fumola program
+          can run inside a live document and hand its result back as a value
+          the surrounding Hazel program can use. Because the string reached
+          Fumola's real parser, every form Fumola has worked from day one. The
+          cost was the editor: the program was opaque text in a one-line field,
+          with no tiles, no structure and no highlighting. And there was one
+          input slot, in one of the four livelits.
+        </p>
+        <p>
+          <code>^fumola_wip</code> keeps the two modes, now as a switch in one
+          livelit rather than a choice between two, and gives both of them an
+          input.
+        </p>
+
+        <h3 id="then-tiles">Then: tiles, and the program as a term<a class="anchor" href="#then-tiles" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          The second route made Fumola a <strong>sort in Hazel's tile
+          grammar</strong>. The program was no longer a string that happened
+          to be Fumola. It was a term, with tiles in the editor, printed to a
+          string only on the way to the runtime.
+        </p>
+        <pre><code><span class="k">let</span> <span class="v">answer</span> = <span class="k">fumola</span> <span class="t">$graphical</span> <span class="k">as</span> <span class="v">store</span> <span class="k">in</span>
+  { <span class="k">let</span> <span class="v">cell</span> = <span class="sy">`myCell`</span> <span class="eff">:=</span> <span class="n">333</span>;
+    <span class="k">let</span> <span class="v">t</span> = <span class="sy">`myThunk`</span> <span class="eff">:=</span> <span class="k">thunk</span> { <span class="eff">@</span> <span class="v">cell</span> };
+    <span class="v">force</span>(<span class="v">t</span>) }
+<span class="k">end</span> <span class="k">in</span>
+
+<span class="v">answer</span></code></pre>
+        <p>
+          <code>store</code> names the instance, <code>$graphical</code> is the
+          semantics it runs, and the program sits between <code>in</code> and
+          <code>end</code>. The instance is named in text the programmer wrote,
+          on purpose: deriving it from the Hazel node's id would start a fresh
+          store whenever that id changed, which is on exactly the edits worth
+          watching. Because the program was a term, unmatched delimiters became
+          the editor's business, errors had locations, and a Hazel expression
+          could stand anywhere in the program as <code>hazel &hellip; end</code>.
+          This route also made graphical the default, as it is in Fumola.
+        </p>
+        <p>
+          <code>^fumola_wip</code>'s code field is exactly this form: a
+          <code>fumola &hellip; end</code> tile, in a splice.
+        </p>
+
+        <h3 id="watching-the-store">And then: watching the store<a class="anchor" href="#watching-the-store" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          Once Hazel could see inside the program, it could show what the
+          program did. That build has a panel for the instance the cursor is
+          in, with three views of one history. <strong>Nodes</strong> are the
+          cells and thunks the store holds. <strong>Edges</strong> are what
+          passed between them, each with the action that made it.
+          <strong>Events</strong> tell the same story in order, with the Begin
+          and End of every force.
+        </p>
+        <p>
+          Most edges in a live notebook come from <code>@here</code>, the
+          editor putting values in rather than the program computing. The panel
+          can dim or hide those, leaving only what the program itself did, and
+          a reset empties the store and rebuilds it in either semantics.
+        </p>
+        <p>
+          <code>^fumola_wip</code> draws this same panel inside the livelit,
+          for its own instance, beside the code: the watch pane's Events, Nodes
+          and Edges tabs.
+        </p>
+
+        <h3 id="the-bet">The bet, and how it came out<a class="anchor" href="#the-bet" aria-label="Copy link to this heading">#</a></h3>
+        <p>
+          The earlier write-up ended on a bet: that tiles were the path, and
+          livelits a dead end. It gave two reasons. A program held as an opaque
+          string cannot be given structure later. And a livelit runs at the
+          wrong time: it expands during <em>elaboration</em>, while a
+          <code>fumola &hellip; end</code> form runs during
+          <em>evaluation</em>, and with a store those are different times.
+        </p>
+        <p>
+          <code>^fumola_wip</code> is a livelit that avoids both. Its program is
+          not a string but a tiles splice. And what it expands to is a
+          <code>fumola &hellip; end</code> term, so the program runs during
+          evaluation, like any other. The livelit supplies the GUI and the
+          wires, and the Fumola program is still a term. So the bet was right
+          about tiles, but wrong that a livelit has to give them up.
+        </p>
+        <p>
+          The step in between was <strong>remote refs</strong>
+          (<a href="https://github.com/hazelgrove/hazel/pull/2616">#2616</a>):
+          splices that a Fumola instance reads from and writes to. The In and
+          Out wires follow that design: an In ref carries a Hazel value into a Fumola
+          cell, and an Out ref brings a cell back.
+        </p>
       </section>
     </main>
     <script type="module">
