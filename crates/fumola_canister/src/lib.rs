@@ -5,7 +5,7 @@
 //! append-only action log. This canister keeps both, answering the same
 //! operations two ways:
 //!
-//! - as Candid methods, for `dfx canister call`;
+//! - as Candid methods, for `icp canister call`;
 //! - over HTTP, through the replica's gateway, so Hazel's front end can
 //!   use plain `fetch` and needs no IC agent library.
 //!
