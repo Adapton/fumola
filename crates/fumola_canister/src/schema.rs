@@ -50,6 +50,10 @@ pub enum Ty {
     Enum,
     /// A named type, built once: how a type refers to itself.
     Lazy(fn() -> &'static Ty),
+    /// A part whose type is not written down here: kept as the generic
+    /// `#atom` / `#list` value (`sexp::to_value`), so the record around it
+    /// can still be typed.
+    Any,
 }
 
 fn capitalized(a: &str) -> bool {
@@ -118,7 +122,15 @@ pub fn decode(ty: &Ty, s: &Sexp) -> Option<Value_> {
             _ => return None,
         }
         .into(),
-        Ty::Int => Value::Int(atom(s)?.parse::<BigInt>().ok()?).into(),
+        // A non-negative int is a Nat, as Fumola's own numeric literals are,
+        // so a program can compare it with one: Nat 16 is not Int 16.
+        Ty::Int => {
+            let i = atom(s)?.parse::<BigInt>().ok()?;
+            match i.to_biguint() {
+                Some(n) => Value::Nat(n).into(),
+                None => Value::Int(i).into(),
+            }
+        }
         Ty::Text => Value::Text(atom(s)?.into()).into(),
         Ty::Option(t) => match items(s)?.as_slice() {
             [] => Value::Null.into(),
@@ -191,6 +203,7 @@ pub fn decode(ty: &Ty, s: &Sexp) -> Option<Value_> {
             Value::Object(obj).into()
         }
         Ty::Enum => decode_enum(s)?,
+        Ty::Any => crate::sexp::to_value(s),
         Ty::Lazy(f) => decode(f(), s)?,
         Ty::Variant(ctors) => match s {
             Sexp::Atom(a) => match ctors.iter().find(|(n, arg)| n == a && arg.is_none()) {
@@ -256,6 +269,7 @@ pub fn encode(ty: &Ty, v: &Value) -> Option<Sexp> {
             Sexp::List(out)
         }
         (Ty::Enum, v) => encode_enum(v)?,
+        (Ty::Any, v) => crate::sexp::from_value(v)?,
         (Ty::Lazy(f), v) => encode(f(), v)?,
         (Ty::Variant(ctors), Value::Variant(tag, arg)) => {
             let name = tag.string.as_str();
@@ -517,16 +531,79 @@ pub fn roster() -> Ty {
     list(r(vec![("r_id", Ty::Text), ("r_pieces", Ty::Int)]))
 }
 
+// ---- A document's editor state, and the deck's index ------------------------
+
+/// `ScratchModel.Scratchpad.kind_persistent` (src/web/view/ScratchModel.re),
+/// saved under `doc:<slide name>`: a slide's editor and its agent chat. The
+/// chat (`Agent.Persistent.t`), a derivation exercise, and the stepper's
+/// step tree are kept generic (`Any`); the editor around them is typed.
+pub fn doc_state() -> Ty {
+    // Editor.Model.persistent, which CodeEditable persists; the zipper is
+    // saved as text (PersistentZipper.t), the program itself as items
+    let editor = r(vec![
+        ("root", Ty::Enum),
+        (
+            "zipper",
+            r(vec![("zipper", Ty::Text), ("backup_text", Ty::Text)]),
+        ),
+    ]);
+    // StepperView.Model.persistent; its root is StepperBase.persistent_step
+    let stepper = r(vec![("root", Ty::Any)]);
+    // EvalResult.Model.persistent, with Theorems.Model.persistent: an
+    // Id.Map of theorems, each a stepper view
+    let result = r(vec![
+        ("stepper", opt(stepper)),
+        (
+            "theorems",
+            r(vec![(
+                "thm_map",
+                list(Ty::Tuple(vec![
+                    Ty::Text,
+                    r(vec![("stepper_view", r(vec![("root", Ty::Any)]))]),
+                ])),
+            )]),
+        ),
+    ]);
+    // CellEditor.Model.persistent
+    let cell = r(vec![("editor", editor), ("result", result)]);
+    Ty::Variant(vec![
+        (
+            "CodePersist",
+            Some(r(vec![("editor", opt(cell)), ("agent", Ty::Any)])),
+        ),
+        ("DrvPersist", Some(Ty::Any)),
+    ])
+}
+
+/// `ScratchPersist.slide_meta`, saved under `doc:_meta`: which slide is
+/// current and the deck's slide names, in order.
+pub fn slide_meta() -> Ty {
+    r(vec![
+        ("current", Ty::Int),
+        ("names", list(Ty::Text)),
+        ("known_defaults", list(Ty::Text)),
+    ])
+}
+
 /// The schema for a Hazel key, if the canister knows its type.
 pub fn for_key(key: &str) -> Option<&'static Ty> {
     static SETTINGS: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
     static ROSTER: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
+    static DOC: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
+    static META: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
     if key == "SETTINGS" {
         Some(SETTINGS.get_or_init(settings))
     } else if key.contains(":items:item:") {
         Some(segment())
     } else if key.ends_with(":items:roster") {
         Some(ROSTER.get_or_init(roster))
+    } else if key == "doc:_meta" {
+        Some(META.get_or_init(slide_meta))
+    } else if key.starts_with("doc:") {
+        // Any other doc: key may be a slide's state, `doc:<slide name>`; a
+        // slide name can hold anything, so the schema itself decides: a
+        // value that does not decode is stored generically, as ever.
+        Some(DOC.get_or_init(doc_state))
     } else {
         None
     }
@@ -583,6 +660,23 @@ mod tests {
             let s = parse(item).unwrap();
             assert!(decode_exact(segment(), &s).is_some(), "{}", item);
         }
+    }
+
+    #[test]
+    fn a_slides_editor_state_decodes_and_prints_back() {
+        // The Parameters slide's state as Hazel saved it.
+        let saved = include_str!("../tests/doc-parameters.sexp").trim_end();
+        let s = parse(saved).unwrap();
+        let v = decode_exact(&doc_state(), &s).expect("the slide's state decodes");
+        assert_eq!(print(&encode(&doc_state(), &v).unwrap()), saved);
+    }
+
+    #[test]
+    fn a_doc_value_that_is_not_a_slide_is_not_decoded() {
+        // A caret, saved as `0 0`, is not even an S-expression; pins and
+        // probes are other types. None of them decodes as a slide.
+        assert!(decode_exact(&doc_state(), &parse("((a b))").unwrap()).is_none());
+        assert!(decode_exact(&doc_state(), &parse("()").unwrap()).is_none());
     }
 
     #[test]
