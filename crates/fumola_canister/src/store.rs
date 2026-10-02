@@ -68,7 +68,7 @@ impl Store {
         // generic S-expression value, else the text.
         let structured: Value_ = match sexp::parse(value) {
             Some(s) => schema::for_key(key)
-                .and_then(|ty| schema::decode_exact(&ty, &s))
+                .and_then(|ty| schema::decode_exact(ty, &s))
                 .unwrap_or_else(|| sexp::to_value(&s)),
             None => Value::Text(value.into()).into(),
         };
@@ -88,7 +88,7 @@ impl Store {
         let cell = self.cells.get(key)?.clone();
         self.fumola.semantic_state.define("hazelCell", cell);
         let v = self.run("@ hazelCell").ok()?;
-        if let Some(s) = schema::for_key(key).and_then(|ty| schema::encode(&ty, &v)) {
+        if let Some(s) = schema::for_key(key).and_then(|ty| schema::encode(ty, &v)) {
             return Some(sexp::print(&s));
         }
         match sexp::from_value(&v) {

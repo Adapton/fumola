@@ -37,7 +37,59 @@ pub enum Ty {
     List(Box<Ty>),
     Tuple(Vec<Ty>),
     Record(Vec<(&'static str, Ty)>),
+    /// A record whose fields may be left out when they hold their default,
+    /// written as an S-expression (`[@sexp.default d] [@sexp_drop_default]`):
+    /// a field with `Some(d)` decodes to `d` when absent, and is left out
+    /// when encoding gives exactly `d`.
+    Fields(Vec<(&'static str, Ty, Option<&'static str>)>),
     Variant(Vec<(&'static str, Option<Ty>)>),
+    /// Any constructor, by name: `Ctor` is `#Ctor`, `(Ctor x)` is `#Ctor(x)`,
+    /// `(Ctor x y)` is `#Ctor((x, y))`, the arguments open enums too. For a
+    /// type with too many constructors to copy (Hazel's form families), or
+    /// one that grows often; Fumola's variants need no declaration.
+    Enum,
+    /// A named type, built once: how a type refers to itself.
+    Lazy(fn() -> &'static Ty),
+}
+
+fn capitalized(a: &str) -> bool {
+    a.chars().next().map_or(false, |c| c.is_ascii_uppercase())
+}
+
+fn decode_enum(s: &Sexp) -> Option<Value_> {
+    Some(match s {
+        Sexp::Atom(a) if capitalized(a) => Value::Variant(id(a), None).into(),
+        Sexp::List(xs) => match xs.as_slice() {
+            [Sexp::Atom(c), arg] if capitalized(c) => {
+                Value::Variant(id(c), Some(decode_enum(arg)?)).into()
+            }
+            [Sexp::Atom(c), args @ ..] if capitalized(c) && args.len() >= 2 => {
+                let vals: Option<Vector<Value_>> = args.iter().map(decode_enum).collect();
+                Value::Variant(id(c), Some(Value::Tuple(vals?).into())).into()
+            }
+            _ => return None,
+        },
+        _ => return None,
+    })
+}
+
+fn encode_enum(v: &Value) -> Option<Sexp> {
+    match v {
+        Value::Variant(tag, None) => Some(Sexp::Atom(tag.string.to_string())),
+        Value::Variant(tag, Some(arg)) => {
+            let mut out = vec![Sexp::Atom(tag.string.to_string())];
+            match &**arg {
+                Value::Tuple(xs) if xs.len() >= 2 => {
+                    for x in xs.iter() {
+                        out.push(encode_enum(x)?);
+                    }
+                }
+                other => out.push(encode_enum(other)?),
+            }
+            Some(Sexp::List(out))
+        }
+        _ => None,
+    }
 }
 
 fn id(s: &str) -> Id {
@@ -108,6 +160,38 @@ pub fn decode(ty: &Ty, s: &Sexp) -> Option<Value_> {
             }
             Value::Object(obj).into()
         }
+        Ty::Fields(fields) => {
+            let xs = items(s)?;
+            let mut j = 0;
+            let mut obj = HashMap::new();
+            for (name, t, default) in fields {
+                let present = match xs.get(j).and_then(items).map(|kv| kv.as_slice()) {
+                    Some([k, v]) if atom(k) == Some(*name) => Some(v),
+                    _ => None,
+                };
+                let val = match (present, default) {
+                    (Some(v), _) => {
+                        j += 1;
+                        decode(t, v)?
+                    }
+                    (None, Some(d)) => decode(t, &crate::sexp::parse(d)?)?,
+                    (None, None) => return None,
+                };
+                obj.insert(
+                    id(name),
+                    FieldValue {
+                        mut_: Mut::Const,
+                        val,
+                    },
+                );
+            }
+            if j != xs.len() {
+                return None;
+            }
+            Value::Object(obj).into()
+        }
+        Ty::Enum => decode_enum(s)?,
+        Ty::Lazy(f) => decode(f(), s)?,
         Ty::Variant(ctors) => match s {
             Sexp::Atom(a) => match ctors.iter().find(|(n, arg)| n == a && arg.is_none()) {
                 Some((n, _)) => Value::Variant(id(n), None).into(),
@@ -158,6 +242,21 @@ pub fn encode(ty: &Ty, v: &Value) -> Option<Sexp> {
                 })
                 .collect::<Option<Vec<_>>>()?,
         ),
+        (Ty::Fields(fields), Value::Object(obj)) if obj.len() == fields.len() => {
+            let mut out = Vec::new();
+            for (name, t, default) in fields {
+                let e = encode(t, &obj.get(&id(name))?.val)?;
+                if let Some(d) = default {
+                    if crate::sexp::parse(d).as_ref() == Some(&e) {
+                        continue;
+                    }
+                }
+                out.push(Sexp::List(vec![Sexp::Atom(name.to_string()), e]));
+            }
+            Sexp::List(out)
+        }
+        (Ty::Enum, v) => encode_enum(v)?,
+        (Ty::Lazy(f), v) => encode(f(), v)?,
         (Ty::Variant(ctors), Value::Variant(tag, arg)) => {
             let name = tag.string.as_str();
             match (ctors.iter().find(|(n, _)| *n == name)?, arg) {
@@ -346,11 +445,90 @@ pub fn settings() -> Ty {
     r(fields)
 }
 
+// ---- A document's items ---------------------------------------------------
+
+/// `Base.segment` (src/haz3lcore/tiles/Base.re): a list of pieces, the
+/// program text Hazel saves one top-level item at a time (ItemPersist).
+pub fn segment() -> &'static Ty {
+    static T: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
+    T.get_or_init(|| list(piece()))
+}
+
+fn piece() -> Ty {
+    let seg = || Ty::Lazy(segment);
+    // Base.tile: sort, shards and children are left out at their defaults,
+    // "the complete arity-1 tile, the common case".
+    let tile = Ty::Fields(vec![
+        ("id", Ty::Text, None),
+        (
+            "form",
+            // Form.t; a family is one of FormId's many constructors
+            Ty::Variant(vec![
+                ("Compound", Some(Ty::Enum)),
+                ("Tok", Some(Ty::Text)),
+                ("TokInfix", Some(Ty::Text)),
+            ]),
+            None,
+        ),
+        // Language.Sort.t: Exp, Pat, ..., Drv(DrvSort.t)
+        ("sort", Ty::Enum, Some("Exp")),
+        ("shards", list(Ty::Int), Some("(0)")),
+        ("children", list(seg()), Some("()")),
+    ]);
+    // Grout.t
+    let grout = r(vec![
+        ("id", Ty::Text),
+        ("shape", nullary(&["Convex", "Concave"])),
+    ]);
+    // Language.Secondary.t
+    let secondary = r(vec![
+        ("id", Ty::Text),
+        (
+            "content",
+            Ty::Variant(vec![
+                ("Whitespace", Some(Ty::Text)),
+                ("Comment", Some(Ty::Text)),
+            ]),
+        ),
+    ]);
+    // ProjectorCore.t(segment): placement and show_syntax have defaults on
+    // reading but are always written
+    let projector = r(vec![
+        ("id", Ty::Text),
+        ("kind", Ty::Enum),
+        ("syntax", seg()),
+        ("model", Ty::Text),
+        ("placement", Ty::Enum),
+        ("show_syntax", Ty::Bool),
+    ]);
+    // Base.splice
+    let splice = r(vec![("id", Ty::Text), ("content", seg())]);
+    Ty::Variant(vec![
+        ("Tile", Some(tile)),
+        ("Grout", Some(grout)),
+        ("Secondary", Some(secondary)),
+        ("Projector", Some(projector)),
+        ("Splice", Some(splice)),
+    ])
+}
+
+/// `ItemPersist.roster`: which items a document has, in order.
+pub fn roster() -> Ty {
+    list(r(vec![("r_id", Ty::Text), ("r_pieces", Ty::Int)]))
+}
+
 /// The schema for a Hazel key, if the canister knows its type.
-pub fn for_key(key: &str) -> Option<Ty> {
-    match key {
-        "SETTINGS" => Some(settings()),
-        _ => None,
+pub fn for_key(key: &str) -> Option<&'static Ty> {
+    static SETTINGS: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
+    static ROSTER: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
+    if key == "SETTINGS" {
+        Some(SETTINGS.get_or_init(settings))
+    } else if key.contains(":items:item:") {
+        Some(segment())
+    } else if key.ends_with(":items:roster") {
+        Some(ROSTER.get_or_init(roster))
+    } else {
+        None
     }
 }
 
@@ -384,6 +562,27 @@ mod tests {
         let s = parse(&with_values).unwrap();
         let v = decode_exact(&settings(), &s).expect("decodes");
         assert_eq!(print(&encode(&settings(), &v).unwrap()), with_values);
+    }
+
+    #[test]
+    fn an_item_decodes_into_pieces_and_prints_back() {
+        // The smallest item of the Kids' Choice slide, as Hazel saved it.
+        let item = include_str!("../tests/item.sexp").trim_end();
+        let s = parse(item).unwrap();
+        let v = decode_exact(segment(), &s).expect("the item decodes");
+        assert_eq!(print(&encode(segment(), &v).unwrap()), item);
+    }
+
+    #[test]
+    fn form_families_with_arguments_are_open_enums() {
+        for item in [
+            "((Tile((id a)(form(Compound(SInt Plus)))(sort(Drv Exp))(shards(0 1))(children(())))))",
+            "((Grout((id g)(shape Concave)))(Splice((id s)(content()))))",
+            "((Projector((id p)(kind Livelit)(syntax((Tile((id t)(form(Tok x))))))(model\"\")(placement Inline)(show_syntax false))))",
+        ] {
+            let s = parse(item).unwrap();
+            assert!(decode_exact(segment(), &s).is_some(), "{}", item);
+        }
     }
 
     #[test]
