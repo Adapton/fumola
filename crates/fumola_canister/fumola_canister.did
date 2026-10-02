@@ -1,0 +1,37 @@
+// Hazel's state, kept as cells in an Adapton DCG, with Fumola linked in.
+type Write = variant {
+  Put : record { key : text; value : text };
+  Remove : record { key : text };
+};
+type HttpRequest = record {
+  method : text;
+  url : text;
+  headers : vec record { text; text };
+  body : blob;
+  certificate_version : opt nat16;
+};
+type HttpUpdateRequest = record {
+  method : text;
+  url : text;
+  headers : vec record { text; text };
+  body : blob;
+};
+type HttpResponse = record {
+  status_code : nat16;
+  headers : vec record { text; text };
+  body : blob;
+  upgrade : opt bool;
+};
+service : {
+  kv_all : () -> (vec record { text; text }) query;
+  kv_get : (text) -> (opt text) query;
+  kv_apply : (vec Write) -> (nat64);
+  kv_clear : () -> ();
+  cells : () -> (text) query;
+  log_add : (text, text) -> ();
+  log_all : () -> (vec text) query;
+  log_clear : () -> ();
+  eval : (text) -> (text);
+  http_request : (HttpRequest) -> (HttpResponse) query;
+  http_request_update : (HttpUpdateRequest) -> (HttpResponse);
+}

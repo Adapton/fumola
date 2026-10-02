@@ -6,6 +6,7 @@ members = [
     "crates/fumola_parser",
     "crates/fumola",
     "crates/fumola_wasm",
+    "crates/fumola_canister",
    #"crates/fumola_proc_macro",
 ]
 
