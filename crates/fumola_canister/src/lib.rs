@@ -9,11 +9,13 @@
 //! - over HTTP, through the replica's gateway, so Hazel's front end can
 //!   use plain `fetch` and needs no IC agent library.
 //!
-//! Stage 1 stores Hazel's text as it is, each value in a cell of an Adapton
-//! DCG (see `store`): a save is a Fumola put, a read forces the cell. `eval`
-//! runs a Fumola program in the same state, so it can read those cells.
-//! Storing the state as Fumola values, rather than text, is stage 2.
+//! Each value lives in a cell of an Adapton DCG (see `store`): a save is a
+//! Fumola put, a read forces the cell. Stage 2: the cell holds the value as
+//! a Fumola value, not its text -- Hazel saves S-expressions, stored as
+//! `#atom` / `#list` values (see `sexp`) and printed back on a read. `eval`
+//! runs a Fumola program in the same state, so it can walk those values.
 
+mod sexp;
 mod store;
 use store::Store;
 
@@ -212,16 +214,31 @@ fn http_request(req: HttpRequest) -> HttpResponse {
             json(serde_json::Value::Object(all).to_string())
         }
         ("GET", "/log") => json(serde_json::to_string(&log_all()).unwrap_or_default()),
-        ("GET", "/") | ("GET", "/health") => response(
+        ("GET", "/index") => {
+            let index: serde_json::Map<String, serde_json::Value> = KV.with(|kv| {
+                kv.borrow()
+                    .index()
+                    .into_iter()
+                    .map(|(k, n)| (k, serde_json::Value::from(n)))
+                    .collect()
+            });
+            json(serde_json::Value::Object(index).to_string())
+        }
+        ("GET", "/") | ("GET", "/health") => {
+            let shapes = KV.with(|kv| kv.borrow_mut().shapes());
+            response(
             200,
             "text/plain",
             format!(
-                "fumola_canister: {} keys in {} DCG cells, {} log entries",
+                "fumola_canister: {} keys in {} DCG cells ({} as values, {} as text), {} log entries",
                 KV.with(|kv| kv.borrow().keys().len()),
                 cells(),
+                shapes.0,
+                shapes.1,
                 LOG.with(|log| log.borrow().len())
             ),
-        ),
+            )
+        }
         ("POST", _) => HttpResponse {
             upgrade: Some(true),
             ..response(200, "text/plain", String::new())

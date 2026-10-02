@@ -1,5 +1,10 @@
 //! Hazel's key-value table, kept as cells in an Adapton DCG.
 //!
+//! Stage 2: a cell holds the saved value as a Fumola value, not its text.
+//! Hazel saves S-expressions, which `sexp` turns into `#atom` / `#list`
+//! values on the way in and prints back on the way out; a value that is not
+//! one S-expression is kept as a `Text`.
+//!
 //! One Fumola interpreter state lives for the canister's life. Each Hazel
 //! key gets a number, the first time it is saved, and its value lives in the
 //! cell named `` `hazel(N) ``: a save is `` `hazel(N) := hazelValue ``, run in
@@ -15,6 +20,7 @@
 //! key-to-text pairs (`snapshot`) and replays them as puts (`restore`); the
 //! cells' histories are not kept.
 
+use crate::sexp;
 use fumola::state::State;
 use fumola_semantics::value::{Value, Value_};
 use std::collections::BTreeMap;
@@ -57,10 +63,18 @@ impl Store {
 
     pub fn put(&mut self, key: &str, value: &str) -> Result<(), String> {
         let n = self.number_of(key);
+        let structured: Value_ = match sexp::parse(value) {
+            Some(s) => sexp::to_value(&s),
+            None => Value::Text(value.into()).into(),
+        };
+        self.fumola.semantic_state.define("hazelValue", structured);
+        let cell = self.run(&format!("`hazel({}) := hazelValue", n))?;
+        // Bound by number too, so a program can read any of Hazel's cells,
+        // not only the last one read: `@ hazelCell3`. GET /index maps keys
+        // to numbers.
         self.fumola
             .semantic_state
-            .define("hazelValue", Value::Text(value.into()));
-        let cell = self.run(&format!("`hazel({}) := hazelValue", n))?;
+            .define(format!("hazelCell{}", n), cell.clone());
         self.cells.insert(key.to_string(), cell);
         Ok(())
     }
@@ -69,9 +83,12 @@ impl Store {
         let cell = self.cells.get(key)?.clone();
         self.fumola.semantic_state.define("hazelCell", cell);
         match self.run("@ hazelCell") {
-            Ok(v) => match &*v {
-                Value::Text(t) => Some(t.to_string()),
-                _ => None,
+            Ok(v) => match sexp::from_value(&v) {
+                Some(s) => Some(sexp::print(&s)),
+                None => match &*v {
+                    Value::Text(t) => Some(t.to_string()),
+                    _ => None,
+                },
             },
             Err(_) => None,
         }
@@ -86,6 +103,14 @@ impl Store {
         self.cells.clear();
     }
 
+    /// Each key's cell number: `` `hazel(N) `` names its cell.
+    pub fn index(&self) -> Vec<(String, u64)> {
+        self.cells
+            .keys()
+            .filter_map(|k| self.index.get(k).map(|n| (k.clone(), *n)))
+            .collect()
+    }
+
     pub fn keys(&self) -> Vec<String> {
         self.cells.keys().cloned().collect()
     }
@@ -95,6 +120,29 @@ impl Store {
         keys.into_iter()
             .filter_map(|k| self.get(&k).map(|v| (k, v)))
             .collect()
+    }
+
+    /// How many values are stored as S-expression values, and how many as
+    /// plain text.
+    pub fn shapes(&mut self) -> (usize, usize) {
+        let keys = self.keys();
+        let mut values = 0;
+        let mut texts = 0;
+        for k in keys {
+            let cell = match self.cells.get(&k) {
+                Some(c) => c.clone(),
+                None => continue,
+            };
+            self.fumola.semantic_state.define("hazelCell", cell);
+            if let Ok(v) = self.run("@ hazelCell") {
+                if sexp::from_value(&v).is_some() {
+                    values += 1;
+                } else {
+                    texts += 1;
+                }
+            }
+        }
+        (values, texts)
     }
 
     /// How many cells the DCG has made, versions included.
@@ -152,8 +200,49 @@ mod tests {
         // A read binds the cell as hazelCell; a program can then build on it.
         assert_eq!(s.get("k").as_deref(), Some("hello"));
         assert_eq!(
-            s.eval("let t = `view := thunk { @ hazelCell }; force t"),
+            s.eval(
+                "let t = `view := thunk { switch (@ hazelCell) { case (#atom(x)) { x }; case _ { \"?\" } } }; force t"
+            ),
             "\"hello\""
+        );
+    }
+
+    #[test]
+    fn a_sexp_is_stored_as_a_value_and_printed_back() {
+        let mut s = Store::new();
+        s.put("MODE", "Documentation").unwrap();
+        s.put("SETTINGS", "((theme Dark)(probes(\"a b\" c)))")
+            .unwrap();
+        s.put("NOTE", "not ( a sexp").unwrap();
+        assert_eq!(s.get("MODE").as_deref(), Some("Documentation"));
+        // Printed as Sexplib prints it: no space after a quoted atom.
+        assert_eq!(
+            s.get("SETTINGS").as_deref(),
+            Some("((theme Dark)(probes(\"a b\"c)))")
+        );
+        assert_eq!(s.get("NOTE").as_deref(), Some("not ( a sexp"));
+        // A program walks the structure: the settings list has two entries,
+        // and the theme is the second atom of the first.
+        s.get("SETTINGS");
+        assert_eq!(
+            s.eval(
+                "switch (@ hazelCell) { case (#list(xs)) { switch (xs[0]) { \
+                 case (#list(kv)) { switch (kv[1]) { case (#atom(t)) { (xs.size(), t) }; \
+                 case _ { (0, \"?\") } } }; case _ { (0, \"?\") } } }; case _ { (0, \"?\") } }"
+            ),
+            "(2, \"Dark\")"
+        );
+    }
+
+    #[test]
+    fn a_program_reads_any_cell_by_number() {
+        let mut s = Store::new();
+        s.put("MODE", "Documentation").unwrap();
+        s.put("SETTINGS", "((a 1)(b 2)(c 3))").unwrap();
+        assert_eq!(s.shapes(), (2, 0));
+        assert_eq!(
+            s.eval("switch (@ hazelCell1) { case (#list(xs)) { xs.size() }; case _ { 0 } }"),
+            "3"
         );
     }
 
