@@ -15,6 +15,7 @@ fumola = { path = "../fumola", default-features = false }
 fumola_semantics = { path = "../fumola_semantics" }
 fumola_syntax = { path = "../fumola_syntax" }
 im-rc = "15.1.0"
+num-bigint = "0.4"
 candid = "0.10"
 ic-cdk = "0.18"
 serde = { version = "1.0", features = ["derive"] }

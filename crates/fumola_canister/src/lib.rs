@@ -15,6 +15,7 @@
 //! `#atom` / `#list` values (see `sexp`) and printed back on a read. `eval`
 //! runs a Fumola program in the same state, so it can walk those values.
 
+mod schema;
 mod sexp;
 mod store;
 use store::Store;
@@ -230,11 +231,12 @@ fn http_request(req: HttpRequest) -> HttpResponse {
             200,
             "text/plain",
             format!(
-                "fumola_canister: {} keys in {} DCG cells ({} as values, {} as text), {} log entries",
+                "fumola_canister: {} keys in {} DCG cells ({} as Hazel's types, {} as sexp values, {} as text), {} log entries",
                 KV.with(|kv| kv.borrow().keys().len()),
                 cells(),
                 shapes.0,
                 shapes.1,
+                shapes.2,
                 LOG.with(|log| log.borrow().len())
             ),
             )

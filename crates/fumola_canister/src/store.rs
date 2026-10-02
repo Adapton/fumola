@@ -20,6 +20,7 @@
 //! key-to-text pairs (`snapshot`) and replays them as puts (`restore`); the
 //! cells' histories are not kept.
 
+use crate::schema;
 use crate::sexp;
 use fumola::state::State;
 use fumola_semantics::value::{Value, Value_};
@@ -63,8 +64,12 @@ impl Store {
 
     pub fn put(&mut self, key: &str, value: &str) -> Result<(), String> {
         let n = self.number_of(key);
+        // Hazel's own datatype where the canister knows it (schema), else a
+        // generic S-expression value, else the text.
         let structured: Value_ = match sexp::parse(value) {
-            Some(s) => sexp::to_value(&s),
+            Some(s) => schema::for_key(key)
+                .and_then(|ty| schema::decode_exact(&ty, &s))
+                .unwrap_or_else(|| sexp::to_value(&s)),
             None => Value::Text(value.into()).into(),
         };
         self.fumola.semantic_state.define("hazelValue", structured);
@@ -82,15 +87,16 @@ impl Store {
     pub fn get(&mut self, key: &str) -> Option<String> {
         let cell = self.cells.get(key)?.clone();
         self.fumola.semantic_state.define("hazelCell", cell);
-        match self.run("@ hazelCell") {
-            Ok(v) => match sexp::from_value(&v) {
-                Some(s) => Some(sexp::print(&s)),
-                None => match &*v {
-                    Value::Text(t) => Some(t.to_string()),
-                    _ => None,
-                },
+        let v = self.run("@ hazelCell").ok()?;
+        if let Some(s) = schema::for_key(key).and_then(|ty| schema::encode(&ty, &v)) {
+            return Some(sexp::print(&s));
+        }
+        match sexp::from_value(&v) {
+            Some(s) => Some(sexp::print(&s)),
+            None => match &*v {
+                Value::Text(t) => Some(t.to_string()),
+                _ => None,
             },
-            Err(_) => None,
         }
     }
 
@@ -122,10 +128,11 @@ impl Store {
             .collect()
     }
 
-    /// How many values are stored as S-expression values, and how many as
-    /// plain text.
-    pub fn shapes(&mut self) -> (usize, usize) {
+    /// How many values are stored as Hazel's own datatypes, how many as
+    /// generic S-expression values, and how many as plain text.
+    pub fn shapes(&mut self) -> (usize, usize, usize) {
         let keys = self.keys();
+        let mut typed = 0;
         let mut values = 0;
         let mut texts = 0;
         for k in keys {
@@ -135,14 +142,19 @@ impl Store {
             };
             self.fumola.semantic_state.define("hazelCell", cell);
             if let Ok(v) = self.run("@ hazelCell") {
-                if sexp::from_value(&v).is_some() {
+                if schema::for_key(&k)
+                    .and_then(|ty| schema::encode(&ty, &v))
+                    .is_some()
+                {
+                    typed += 1;
+                } else if sexp::from_value(&v).is_some() {
                     values += 1;
                 } else {
                     texts += 1;
                 }
             }
         }
-        (values, texts)
+        (typed, values, texts)
     }
 
     /// How many cells the DCG has made, versions included.
@@ -239,10 +251,24 @@ mod tests {
         let mut s = Store::new();
         s.put("MODE", "Documentation").unwrap();
         s.put("SETTINGS", "((a 1)(b 2)(c 3))").unwrap();
-        assert_eq!(s.shapes(), (2, 0));
+        assert_eq!(s.shapes(), (0, 2, 0));
         assert_eq!(
             s.eval("switch (@ hazelCell1) { case (#list(xs)) { xs.size() }; case _ { 0 } }"),
             "3"
+        );
+    }
+
+    #[test]
+    fn settings_are_stored_as_hazels_own_record() {
+        let mut s = Store::new();
+        let saved = include_str!("../tests/settings.sexp").trim_end();
+        s.put("SETTINGS", saved).unwrap();
+        assert_eq!(s.get("SETTINGS").as_deref(), Some(saved));
+        assert_eq!(s.shapes(), (1, 0, 0));
+        // A program reads fields by name.
+        assert_eq!(
+            s.eval("let v = @ hazelCell0; (v.core.format_shortcut, v.sidebar.panel, v.agent_globals.api_key, v.quiver)"),
+            "(#Spaces, #TaskReference, null, true)"
         );
     }
 
