@@ -585,18 +585,70 @@ pub fn slide_meta() -> Ty {
     ])
 }
 
+// ---- A slide's probes, pins, view and collapsed rows ----------------------
+
+/// `Refractors.RefractorList.t` (src/haz3lcore/zipper/Refractors.re), saved
+/// under `doc:<slide>:probes`: the slide's manual probes, each by the id of
+/// the term it is anchored to. A probe's model is a string to Hazel too (a
+/// projector's own serialization), so it stays `Text`.
+pub fn probes() -> Ty {
+    list(Ty::Tuple(vec![
+        Ty::Text,
+        r(vec![("kind", Ty::Enum), ("model", Ty::Text)]),
+    ]))
+}
+
+/// `OutlineTree.path`: an outline row, as the labels of the rows down to it,
+/// each with its index among same-labeled siblings.
+fn outline_path() -> Ty {
+    list(r(vec![("s_label", Ty::Text), ("s_occ", Ty::Int)]))
+}
+
+/// `ScratchPersist.pins_file`, saved under `doc:<slide>:pins`: the outline
+/// rows pinned open, and whether each runs.
+pub fn pins() -> Ty {
+    list(r(vec![("pin_path", outline_path()), ("pin_run", Ty::Bool)]))
+}
+
+/// `ScratchPersist.view_file`, saved under `doc:<slide>:view`: the row the
+/// outline is zoomed to, and whether the slide is parked.
+pub fn view() -> Ty {
+    r(vec![
+        ("vf_zoom", opt(outline_path())),
+        ("vf_parked", Ty::Bool),
+    ])
+}
+
+/// `ScratchPersist.collapse_file`, saved under `doc:<slide>:collapse`: the
+/// outline rows collapsed.
+pub fn collapse() -> Ty {
+    list(outline_path())
+}
+
 /// The schema for a Hazel key, if the canister knows its type.
 pub fn for_key(key: &str) -> Option<&'static Ty> {
     static SETTINGS: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
     static ROSTER: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
     static DOC: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
     static META: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
+    static PROBES: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
+    static PINS: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
+    static VIEW: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
+    static COLLAPSE: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
     if key == "SETTINGS" {
         Some(SETTINGS.get_or_init(settings))
     } else if key.contains(":items:item:") {
         Some(segment())
     } else if key.ends_with(":items:roster") {
         Some(ROSTER.get_or_init(roster))
+    } else if key.starts_with("doc:") && key.ends_with(":probes") {
+        Some(PROBES.get_or_init(probes))
+    } else if key.starts_with("doc:") && key.ends_with(":pins") {
+        Some(PINS.get_or_init(pins))
+    } else if key.starts_with("doc:") && key.ends_with(":view") {
+        Some(VIEW.get_or_init(view))
+    } else if key.starts_with("doc:") && key.ends_with(":collapse") {
+        Some(COLLAPSE.get_or_init(collapse))
     } else if key == "doc:_meta" {
         Some(META.get_or_init(slide_meta))
     } else if key.starts_with("doc:") {
@@ -677,6 +729,28 @@ mod tests {
         // probes are other types. None of them decodes as a slide.
         assert!(decode_exact(&doc_state(), &parse("((a b))").unwrap()).is_none());
         assert!(decode_exact(&doc_state(), &parse("()").unwrap()).is_none());
+    }
+
+    fn round_trips(ty: &Ty, saved: &str) {
+        let s = parse(saved).unwrap();
+        let v = decode_exact(ty, &s).unwrap_or_else(|| panic!("does not decode: {}", saved));
+        assert_eq!(print(&encode(ty, &v).unwrap()), saved);
+    }
+
+    #[test]
+    fn probes_pins_views_and_collapses_print_back() {
+        // Kids' Choice's probes as Hazel saved them: one probe, its model
+        // a nested S-expression in a string.
+        round_trips(&probes(), "((22e20000-0000-4000-8e52-a8afd7996918((kind Probe)(model\"((active_renderer())(drawer_mode false)(dropdown_redraw 0)(auto_rich false)(rich_off false))\"))))");
+        round_trips(&probes(), "()");
+        round_trips(&pins(), "()");
+        round_trips(&pins(), "(((pin_path(((s_label face)(s_occ 0))((s_label ^kid_face)(s_occ 1))((s_label\"two words\")(s_occ 0))))(pin_run true)))");
+        round_trips(&view(), "((vf_zoom())(vf_parked false))");
+        round_trips(
+            &view(),
+            "((vf_zoom((((s_label head)(s_occ 0)))))(vf_parked true))",
+        );
+        round_trips(&collapse(), "((((s_label tests)(s_occ 2))))");
     }
 
     #[test]
