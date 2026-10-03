@@ -251,7 +251,8 @@ mod tests {
         let mut s = Store::new();
         s.put("MODE", "Documentation").unwrap();
         s.put("SETTINGS", "((a 1)(b 2)(c 3))").unwrap();
-        assert_eq!(s.shapes(), (0, 2, 0));
+        // MODE is one of Hazel's types; this made-up SETTINGS is not.
+        assert_eq!(s.shapes(), (1, 1, 0));
         assert_eq!(
             s.eval("switch (@ hazelCell1) { case (#list(xs)) { xs.size() }; case _ { 0 } }"),
             "3"

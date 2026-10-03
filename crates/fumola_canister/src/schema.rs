@@ -678,6 +678,48 @@ pub fn collapse() -> Ty {
     list(outline_path())
 }
 
+// ---- The editor mode and the ExplainThis model -----------------------------
+
+/// `Editors.Model.mode` (src/web/app/editors/Editors.re), saved under `MODE`:
+/// which of Hazel's modes is open. Hazel reads a legacy `Derivations` as
+/// `Scratch`; that value is not one of these, so it is stored generically.
+pub fn mode() -> Ty {
+    nullary(&["Scratch", "Documentation", "Exercises", "Config", "Tutorial"])
+}
+
+/// `ExplainThisModel.feedback_option`.
+fn feedback() -> Ty {
+    nullary(&["ThumbsUp", "ThumbsDown"])
+}
+
+/// `ExplainThisModel.t` (src/web/app/explainthis/ExplainThisModel.re), saved
+/// under `ExplainThisModel`: the reader's thumbs on explanations and
+/// examples, and which form of each group is selected. Form, group and
+/// example ids (`ExplainThisForm.form_id`, `example_id`) are open enums: some
+/// carry a pattern form or an operator, `(FunctionExp Var)`, and the families
+/// grow with the language.
+pub fn explain_this() -> Ty {
+    r(vec![
+        ("specificity_open", Ty::Bool),
+        (
+            "forms",
+            list(r(vec![
+                ("group", Ty::Enum),
+                ("form", Ty::Enum),
+                ("explanation_feedback", opt(feedback())),
+                (
+                    "examples",
+                    list(r(vec![("sub_id", Ty::Enum), ("feedback", feedback())])),
+                ),
+            ])),
+        ),
+        (
+            "groups",
+            list(r(vec![("group", Ty::Enum), ("selected", Ty::Enum)])),
+        ),
+    ])
+}
+
 // ---- The agent chat --------------------------------------------------------
 
 /// `OpenRouter.Message.Model.t`: a message as sent to the API.
@@ -826,6 +868,14 @@ pub fn agent() -> &'static Ty {
 }
 
 /// The schema for a Hazel key, if the canister knows its type.
+/// What follows a slide key's namespace. Documentation saves under `doc:`
+/// and Scratch under `scratch:`, through the same `ScratchMode.Persist`, so
+/// one set of schemas serves both.
+fn slide_key(key: &str) -> Option<&str> {
+    key.strip_prefix("doc:")
+        .or_else(|| key.strip_prefix("scratch:"))
+}
+
 pub fn for_key(key: &str) -> Option<&'static Ty> {
     static SETTINGS: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
     static ROSTER: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
@@ -835,29 +885,37 @@ pub fn for_key(key: &str) -> Option<&'static Ty> {
     static PINS: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
     static VIEW: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
     static COLLAPSE: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
+    static MODE: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
+    static EXPLAIN_THIS: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
     if key == "SETTINGS" {
         Some(SETTINGS.get_or_init(settings))
+    } else if key == "MODE" {
+        Some(MODE.get_or_init(mode))
+    } else if key == "ExplainThisModel" {
+        Some(EXPLAIN_THIS.get_or_init(explain_this))
     } else if key.contains(":items:item:") {
         Some(segment())
     } else if key.ends_with(":items:roster") {
         Some(ROSTER.get_or_init(roster))
-    } else if key.starts_with("doc:") && key.ends_with(":agent") {
-        Some(agent())
-    } else if key.starts_with("doc:") && key.ends_with(":probes") {
-        Some(PROBES.get_or_init(probes))
-    } else if key.starts_with("doc:") && key.ends_with(":pins") {
-        Some(PINS.get_or_init(pins))
-    } else if key.starts_with("doc:") && key.ends_with(":view") {
-        Some(VIEW.get_or_init(view))
-    } else if key.starts_with("doc:") && key.ends_with(":collapse") {
-        Some(COLLAPSE.get_or_init(collapse))
-    } else if key == "doc:_meta" {
-        Some(META.get_or_init(slide_meta))
-    } else if key.starts_with("doc:") {
-        // Any other doc: key may be a slide's state, `doc:<slide name>`; a
-        // slide name can hold anything, so the schema itself decides: a
-        // value that does not decode is stored generically, as ever.
-        Some(DOC.get_or_init(doc_state))
+    } else if let Some(rest) = slide_key(key) {
+        if rest.ends_with(":agent") {
+            Some(agent())
+        } else if rest.ends_with(":probes") {
+            Some(PROBES.get_or_init(probes))
+        } else if rest.ends_with(":pins") {
+            Some(PINS.get_or_init(pins))
+        } else if rest.ends_with(":view") {
+            Some(VIEW.get_or_init(view))
+        } else if rest.ends_with(":collapse") {
+            Some(COLLAPSE.get_or_init(collapse))
+        } else if rest == "_meta" {
+            Some(META.get_or_init(slide_meta))
+        } else {
+            // Any other key may be a slide's state, `doc:<slide name>`; a
+            // slide name can hold anything, so the schema itself decides: a
+            // value that does not decode is stored generically, as ever.
+            Some(DOC.get_or_init(doc_state))
+        }
     } else {
         None
     }
@@ -963,6 +1021,35 @@ mod tests {
         assert_eq!(ocaml_float(1e20), "1E+20");
         assert_eq!(ocaml_float(1.0 / 3.0), "0.33333333333333331");
         assert_eq!(ocaml_float(2.0), "2");
+    }
+
+    #[test]
+    fn the_mode_and_the_explainthis_model_print_back() {
+        round_trips(&mode(), "Documentation");
+        assert!(decode_exact(&mode(), &parse("Derivations").unwrap()).is_none());
+        round_trips(&explain_this(), "((specificity_open false)(forms())(groups()))");
+        // Ids with arguments, nested: a pattern form, an operator, an example.
+        round_trips(
+            &explain_this(),
+            "((specificity_open true)(forms(((group(FunctionExp Var))(form(FunctionExp Base))\
+             (explanation_feedback(ThumbsUp))(examples(((sub_id(List Cons1))(feedback ThumbsDown)))))\
+             ((group(BinOpExp(Int Plus)))(form(BinOpExp(Int Plus)))(explanation_feedback())(examples()))))\
+             (groups(((group(FunctionExp Var))(selected(FunctionExp Base))))))",
+        );
+    }
+
+    #[test]
+    fn scratch_slides_use_the_same_schemas_as_documentation() {
+        for suffix in ["", ":agent", ":probes", ":pins", ":view", ":collapse"] {
+            let doc = for_key(&format!("doc:Scratchpad 1{}", suffix)).map(|t| t as *const Ty);
+            let scratch = for_key(&format!("scratch:Scratchpad 1{}", suffix)).map(|t| t as *const Ty);
+            assert!(scratch.is_some() && scratch == doc, "{}", suffix);
+        }
+        round_trips(
+            for_key("scratch:_meta").unwrap(),
+            "((current 0)(names(\"Scratchpad 1\"))(known_defaults()))",
+        );
+        round_trips(for_key("scratch:Scratchpad 1:view").unwrap(), "((vf_zoom())(vf_parked false))");
     }
 
     #[test]
