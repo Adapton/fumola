@@ -32,6 +32,8 @@ use num_bigint::BigInt;
 pub enum Ty {
     Bool,
     Int,
+    /// An OCaml float, printed back as Sexplib prints it (`ocaml_float`).
+    Float,
     Text,
     Option(Box<Ty>),
     List(Box<Ty>),
@@ -54,6 +56,55 @@ pub enum Ty {
     /// `#atom` / `#list` value (`sexp::to_value`), so the record around it
     /// can still be typed.
     Any,
+}
+
+/// OCaml's `%.<p>G`: the shorter of fixed and exponent notation, at `p`
+/// significant digits, trailing zeros dropped, exponent as `E+NN`.
+fn format_g(x: f64, p: usize) -> String {
+    if x == 0.0 {
+        return if x.is_sign_negative() {
+            "-0".into()
+        } else {
+            "0".into()
+        };
+    }
+    if x.is_nan() {
+        return "NAN".into();
+    }
+    if x.is_infinite() {
+        return if x < 0.0 { "-INF".into() } else { "INF".into() };
+    }
+    let sci = format!("{:.*e}", p - 1, x);
+    let (mant, exp) = sci.split_once('e').unwrap_or((&sci, "0"));
+    let exp: i32 = exp.parse().unwrap_or(0);
+    let trim = |s: &str| -> String {
+        if s.contains('.') {
+            s.trim_end_matches('0').trim_end_matches('.').to_string()
+        } else {
+            s.to_string()
+        }
+    };
+    if exp < -4 || exp >= p as i32 {
+        format!(
+            "{}E{}{:02}",
+            trim(mant),
+            if exp < 0 { '-' } else { '+' },
+            exp.abs()
+        )
+    } else {
+        trim(&format!("{:.*}", (p as i32 - 1 - exp).max(0) as usize, x))
+    }
+}
+
+/// How Sexplib prints a float: `%.15G` if that reads back as the same
+/// float, else `%.17G`.
+pub fn ocaml_float(x: f64) -> String {
+    let short = format_g(x, 15);
+    if short.parse::<f64>().ok() == Some(x) {
+        short
+    } else {
+        format_g(x, 17)
+    }
 }
 
 fn capitalized(a: &str) -> bool {
@@ -131,6 +182,7 @@ pub fn decode(ty: &Ty, s: &Sexp) -> Option<Value_> {
                 None => Value::Int(i).into(),
             }
         }
+        Ty::Float => Value::Float(atom(s)?.parse::<f64>().ok()?.into()).into(),
         Ty::Text => Value::Text(atom(s)?.into()).into(),
         Ty::Option(t) => match items(s)?.as_slice() {
             [] => Value::Null.into(),
@@ -229,6 +281,7 @@ pub fn encode(ty: &Ty, v: &Value) -> Option<Sexp> {
         (Ty::Bool, Value::Bool(b)) => Sexp::Atom(b.to_string()),
         (Ty::Int, Value::Int(i)) => Sexp::Atom(i.to_string()),
         (Ty::Int, Value::Nat(n)) => Sexp::Atom(n.to_string()),
+        (Ty::Float, Value::Float(f)) => Sexp::Atom(ocaml_float(f.0)),
         (Ty::Text, Value::Text(t)) => Sexp::Atom(t.to_string()),
         (Ty::Option(_), Value::Null) => Sexp::List(vec![]),
         (Ty::Option(t), Value::Option(x)) => Sexp::List(vec![encode(t, x)?]),
@@ -569,7 +622,7 @@ pub fn doc_state() -> Ty {
     Ty::Variant(vec![
         (
             "CodePersist",
-            Some(r(vec![("editor", opt(cell)), ("agent", Ty::Any)])),
+            Some(r(vec![("editor", opt(cell)), ("agent", Ty::Lazy(agent))])),
         ),
         ("DrvPersist", Some(Ty::Any)),
     ])
@@ -625,6 +678,153 @@ pub fn collapse() -> Ty {
     list(outline_path())
 }
 
+// ---- The agent chat --------------------------------------------------------
+
+/// `OpenRouter.Message.Model.t`: a message as sent to the API.
+fn api_message() -> Ty {
+    r(vec![
+        (
+            "role",
+            Ty::Variant(vec![
+                ("System", None),
+                ("Developer", None),
+                ("User", None),
+                ("Assistant", None),
+                ("Tool", Some(Ty::Any)),
+            ]),
+        ),
+        ("content", Ty::Text),
+        ("tool_calls", list(Ty::Any)),
+        ("cache_anchor", Ty::Bool),
+    ])
+}
+
+/// `Message.Model.role`, with its `system_kind`.
+fn message_role() -> Ty {
+    let system_kind = Ty::Variant(vec![
+        ("ApiFailure", None),
+        ("DeveloperNotes", None),
+        ("Prompt", None),
+        ("Context", None),
+        ("RetryNote", None),
+        ("ResponseCancelled", None),
+        ("SlashCommandOutput", Some(Ty::Any)),
+        ("CompactionSummary", Some(Ty::Text)),
+    ]);
+    Ty::Variant(vec![
+        ("Agent", Some(opt(Ty::Any))),
+        ("ToolResult", Some(Ty::Any)),
+        ("User", None),
+        ("System", Some(system_kind)),
+    ])
+}
+
+/// `Message.Model.t`; the reasoning fields have defaults but are written.
+fn message() -> Ty {
+    r(vec![
+        ("id", Ty::Text),
+        ("content", Ty::Text),
+        ("timestamp", Ty::Float),
+        ("role", message_role()),
+        ("api_message", opt(api_message())),
+        ("children", list(Ty::Text)),
+        ("current_child", opt(Ty::Text)),
+        ("reasoning", opt(Ty::Text)),
+        ("reasoning_duration_ms", opt(Ty::Int)),
+    ])
+}
+
+/// `AgentModel.Model.t` (src/web/view/agentCore/AgentModel.re), which is
+/// `Agent.Persistent.t`: saved under `doc:<slide>:agent` and inside each
+/// slide's state. Its chats, messages, workbench and prompting are typed;
+/// the deep unions -- a tool result, an LLM usage report, a slash command's
+/// output, a tool call, a workbench task, a tool's JSON -- are kept generic.
+pub fn agent() -> &'static Ty {
+    static T: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
+    T.get_or_init(|| {
+        // AgentWorkbench.Model.t; a task is deep, so the task_dict is generic
+        let workbench = r(vec![
+            ("active_task", opt(Ty::Text)),
+            ("task_dict", Ty::Any),
+            (
+                "t_ui",
+                r(vec![
+                    ("active_view", nullary(&["Chat", "Todos"])),
+                    ("display_task", opt(Ty::Text)),
+                    ("show_archive", Ty::Bool),
+                ]),
+            ),
+        ]);
+        // Chat.Model.t
+        let chat = r(vec![
+            ("id", Ty::Text),
+            ("title", Ty::Text),
+            ("message_map", list(Ty::Tuple(vec![Ty::Text, message()]))),
+            ("root", Ty::Text),
+            ("agent_view", r(vec![("expanded_paths", list(Ty::Text))])),
+            ("agent_workbench", workbench),
+            ("context", opt(message())),
+            ("created_at", Ty::Float),
+            (
+                "current_view",
+                nullary(&[
+                    "Messages",
+                    "Workbench",
+                    "AgentEditorView",
+                    "StaticErrors",
+                    "Prompt",
+                    "DeveloperNotes",
+                    "Tools",
+                ]),
+            ),
+            ("pending_send_queue", list(Ty::Text)),
+        ]);
+        // ChatSystem.Model.t
+        let chat_system = r(vec![
+            ("chat_map", list(Ty::Tuple(vec![Ty::Text, chat]))),
+            ("current", Ty::Text),
+            (
+                "ui",
+                r(vec![
+                    ("active_screen", nullary(&["Chat", "History"])),
+                    ("current_text_box_content", Ty::Text),
+                    (
+                        "slash_menu",
+                        opt(r(vec![("filter", Ty::Text), ("selected_index", Ty::Int)])),
+                    ),
+                ]),
+            ),
+        ]);
+        r(vec![
+            ("chat_system", chat_system),
+            (
+                "prompting",
+                r(vec![
+                    ("system_prompt", Ty::Text),
+                    ("dev_notes", Ty::Text),
+                    ("tools", list(Ty::Any)),
+                    ("disabled_tool_names", list(Ty::Text)),
+                ]),
+            ),
+            ("active_timeline_node", opt(Ty::Int)),
+            ("awaiting_response", opt(Ty::Text)),
+            ("restore_editor_state", opt(Ty::Lazy(segment))),
+            ("last_empty_retry_attempt", opt(Ty::Int)),
+            ("last_active_task_nudge_attempt", opt(Ty::Int)),
+            ("tools_view_expanded", list(Ty::Text)),
+            ("compaction_in_progress", opt(Ty::Text)),
+            ("compaction_method_override", opt(Ty::Text)),
+            ("main_llm_seq", Ty::Int),
+            ("compaction_llm_seq", Ty::Int),
+            ("pending_ignore_main_reply_seq", opt(Ty::Int)),
+            ("pending_ignore_compaction_reply_seq", opt(Ty::Int)),
+            ("pending_dispatch_send", opt(Ty::Text)),
+            ("pending_assistant_content", Ty::Text),
+            ("pending_assistant_reasoning", Ty::Text),
+        ])
+    })
+}
+
 /// The schema for a Hazel key, if the canister knows its type.
 pub fn for_key(key: &str) -> Option<&'static Ty> {
     static SETTINGS: std::sync::OnceLock<Ty> = std::sync::OnceLock::new();
@@ -641,6 +841,8 @@ pub fn for_key(key: &str) -> Option<&'static Ty> {
         Some(segment())
     } else if key.ends_with(":items:roster") {
         Some(ROSTER.get_or_init(roster))
+    } else if key.starts_with("doc:") && key.ends_with(":agent") {
+        Some(agent())
     } else if key.starts_with("doc:") && key.ends_with(":probes") {
         Some(PROBES.get_or_init(probes))
     } else if key.starts_with("doc:") && key.ends_with(":pins") {
@@ -751,6 +953,25 @@ mod tests {
             "((vf_zoom((((s_label head)(s_occ 0)))))(vf_parked true))",
         );
         round_trips(&collapse(), "((((s_label tests)(s_occ 2))))");
+    }
+
+    #[test]
+    fn floats_print_as_sexplib_prints_them() {
+        assert_eq!(ocaml_float(1790969258449.0), "1790969258449");
+        assert_eq!(ocaml_float(0.1), "0.1");
+        assert_eq!(ocaml_float(1.5), "1.5");
+        assert_eq!(ocaml_float(1e20), "1E+20");
+        assert_eq!(ocaml_float(1.0 / 3.0), "0.33333333333333331");
+        assert_eq!(ocaml_float(2.0), "2");
+    }
+
+    #[test]
+    fn the_agent_chat_decodes_and_prints_back() {
+        // Kids' Choice's agent chat, saved alone and inside the slide's state.
+        let saved = include_str!("../tests/agent.sexp").trim_end();
+        round_trips(agent(), saved);
+        let doc = include_str!("../tests/doc-kids.sexp").trim_end();
+        round_trips(&doc_state(), doc);
     }
 
     #[test]
