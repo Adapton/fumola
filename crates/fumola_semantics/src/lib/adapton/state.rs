@@ -196,7 +196,8 @@ impl State {
             InnerState::Graphical(g) => {
                 out.push(("pointers", g.pointer_count));
                 out.push(("spaces", g.space_time.len() as u64));
-                out.push(("times", g.time_space.len() as u64));
+                // No "times": the graphical store does not keep time_space
+                // up to date, so its length would read 0 in a busy store.
                 out.push(("versions", g.version_count));
                 out.push(("thunk_versions", self.counts.thunk_cells));
                 out.push(("value_versions", self.counts.non_thunk_cells));
