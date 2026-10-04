@@ -31,6 +31,7 @@ export! {
     fn fumola_realize(id: FumolaInstanceId) -> bool;
     fn fumola_ensure_mode(id: FumolaInstanceId, mode: &str) -> String;
     fn fumola_mode(id: FumolaInstanceId) -> String;
+    fn fumola_drop(id: FumolaInstanceId);
     fn fumola_steps_taken(id: FumolaInstanceId) -> usize;
     fn fumola_instance_count() -> usize;
     fn fumola_eval(id: FumolaInstanceId, thunk_name: &str, program_text: &str) -> String;

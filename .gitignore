@@ -30,3 +30,4 @@ Cargo.lock
 /pages/fumola_wasm.js
 /pages/fumola_wasm_bg.wasm
 /pages/web-play/rt/
+/bindings/
