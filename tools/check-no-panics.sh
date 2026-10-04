@@ -28,7 +28,7 @@ MACROS='panic!|unreachable!|todo!|unimplemented!'
 # `module_path.rs` is assertions all the way down.
 EXCLUDED='crates/fumola/src/lib/check.rs|crates/fumola/src/lib/prelude.rs|crates/fumola_semantics/src/lib/module_path.rs'
 
-ROOTS="crates/fumola/src crates/fumola_semantics/src crates/fumola_syntax/src crates/fumola_wasm/src"
+ROOTS="crates/fumola/src crates/fumola_semantics/src crates/fumola_syntax/src crates/fumola_wasm_common/src crates/fumola_wasm_browser/src"
 
 # Comments are stripped before matching, so that a macro *named* in prose does
 # not read as a macro *called* in code. The audit's own doc comments say

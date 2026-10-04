@@ -1,0 +1,14 @@
+[package]
+name = "fumola_wasm_browser"
+version = "0.0.29"
+authors = ["Matthew Hammer"]
+edition = "2021"
+license = "Apache-2.0"
+description = "Fumola's runtime for JavaScript: fumola_wasm_common exported with wasm-bindgen"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+fumola_wasm_common = { path = "../fumola_wasm_common" }
+wasm-bindgen = "0.2"

@@ -5,7 +5,7 @@
 //! depends on: the pieces reach the same answer as one call, and the step
 //! count it is shown rises rather than restarting.
 
-use fumola_wasm::*;
+use fumola_wasm_common::*;
 
 fn parse(s: &str) -> serde_json::Value {
     serde_json::from_str(&s).expect("reply should be json")

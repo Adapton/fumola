@@ -14,6 +14,9 @@ crate-type = ["cdylib"]
 fumola = { path = "../fumola", default-features = false }
 fumola_semantics = { path = "../fumola_semantics" }
 fumola_syntax = { path = "../fumola_syntax" }
+# Answers /eval.json in the browser runtime's JSON, so Hazel reads a
+# remote result as it reads a local one.
+fumola_wasm_common = { path = "../fumola_wasm_common" }
 im-rc = "15.1.0"
 num-bigint = "0.4"
 ordered-float = "3"

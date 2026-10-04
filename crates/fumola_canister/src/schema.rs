@@ -684,7 +684,13 @@ pub fn collapse() -> Ty {
 /// which of Hazel's modes is open. Hazel reads a legacy `Derivations` as
 /// `Scratch`; that value is not one of these, so it is stored generically.
 pub fn mode() -> Ty {
-    nullary(&["Scratch", "Documentation", "Exercises", "Config", "Tutorial"])
+    nullary(&[
+        "Scratch",
+        "Documentation",
+        "Exercises",
+        "Config",
+        "Tutorial",
+    ])
 }
 
 /// `ExplainThisModel.feedback_option`.
@@ -1027,7 +1033,10 @@ mod tests {
     fn the_mode_and_the_explainthis_model_print_back() {
         round_trips(&mode(), "Documentation");
         assert!(decode_exact(&mode(), &parse("Derivations").unwrap()).is_none());
-        round_trips(&explain_this(), "((specificity_open false)(forms())(groups()))");
+        round_trips(
+            &explain_this(),
+            "((specificity_open false)(forms())(groups()))",
+        );
         // Ids with arguments, nested: a pattern form, an operator, an example.
         round_trips(
             &explain_this(),
@@ -1042,14 +1051,18 @@ mod tests {
     fn scratch_slides_use_the_same_schemas_as_documentation() {
         for suffix in ["", ":agent", ":probes", ":pins", ":view", ":collapse"] {
             let doc = for_key(&format!("doc:Scratchpad 1{}", suffix)).map(|t| t as *const Ty);
-            let scratch = for_key(&format!("scratch:Scratchpad 1{}", suffix)).map(|t| t as *const Ty);
+            let scratch =
+                for_key(&format!("scratch:Scratchpad 1{}", suffix)).map(|t| t as *const Ty);
             assert!(scratch.is_some() && scratch == doc, "{}", suffix);
         }
         round_trips(
             for_key("scratch:_meta").unwrap(),
             "((current 0)(names(\"Scratchpad 1\"))(known_defaults()))",
         );
-        round_trips(for_key("scratch:Scratchpad 1:view").unwrap(), "((vf_zoom())(vf_parked false))");
+        round_trips(
+            for_key("scratch:Scratchpad 1:view").unwrap(),
+            "((vf_zoom())(vf_parked false))",
+        );
     }
 
     #[test]

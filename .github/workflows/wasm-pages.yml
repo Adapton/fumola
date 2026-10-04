@@ -89,13 +89,16 @@ jobs:
       # --no-default-features drops the repl feature, whose rustyline
       # dependency pulls in fs2, which does not build for wasm32.
       - name: Build
-        run: cargo build --release --target wasm32-unknown-unknown -p fumola_wasm --no-default-features
+        run: cargo build --release --target wasm32-unknown-unknown -p fumola_wasm_browser --no-default-features
 
       - name: Generate bindings
         run: |
           mkdir -p bindings
-          wasm-bindgen --target web --out-dir bindings \
-            target/wasm32-unknown-unknown/release/fumola_wasm.wasm
+          # --out-name keeps the published names fumola_wasm.js and
+          # fumola_wasm_bg.wasm, which every Hazel build loads, now that the
+          # crate is fumola_wasm_browser.
+          wasm-bindgen --target web --out-dir bindings --out-name fumola_wasm \
+            target/wasm32-unknown-unknown/release/fumola_wasm_browser.wasm
           rm -f bindings/*.d.ts
           ls -la bindings
 

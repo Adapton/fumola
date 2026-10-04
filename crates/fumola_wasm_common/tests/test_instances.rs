@@ -2,7 +2,7 @@
 //!
 //! These run natively; nothing here needs a browser or a wasm host.
 
-use fumola_wasm::*;
+use fumola_wasm_common::*;
 
 fn eval_ok(id: FumolaInstanceId, src: &str) -> serde_json::Value {
     let raw = fumola_eval(id, "`topLevel", src);

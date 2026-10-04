@@ -15,11 +15,12 @@
 //! `#atom` / `#list` values (see `sexp`) and printed back on a read. `eval`
 //! runs a Fumola program in the same state, so it can walk those values.
 
+mod instances;
 mod schema;
 mod sexp;
 mod store;
-use store::{Store, DEFAULT_SPACE};
 use std::collections::BTreeMap;
+use store::{Store, DEFAULT_SPACE};
 
 use candid::{CandidType, Deserialize};
 use serde_bytes::ByteBuf;
@@ -86,7 +87,8 @@ fn log_clear_space(space: &str) {
 fn valid_space(s: &str) -> bool {
     !s.is_empty()
         && s.len() <= 64
-        && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
 // ---- Candid interface ------------------------------------------------------
@@ -182,8 +184,8 @@ fn post_upgrade() {
     let (kv, log) = match ic_cdk::storage::stable_restore::<Snapshot>() {
         Ok((_, kv, log)) => (kv, log),
         Err(_) => {
-            let (kv, log): SnapshotV1 = ic_cdk::storage::stable_restore()
-                .expect("restoring state from stable memory");
+            let (kv, log): SnapshotV1 =
+                ic_cdk::storage::stable_restore().expect("restoring state from stable memory");
             (
                 vec![(DEFAULT_SPACE.to_string(), kv)],
                 vec![(DEFAULT_SPACE.to_string(), log)],
@@ -203,6 +205,9 @@ fn post_upgrade() {
 //   GET  /log       the log's values, oldest first, as a JSON list
 //   POST /log       append {"key","value"}
 //   POST /eval      run the body as a Fumola program
+//   POST /eval.json the same, answered as Fumola's browser runtime answers
+//   POST /i/<name>/<op>  run a browser-runtime op (eval_top, ensure_mode,
+//                   reset, ...) on a named instance; GET /i lists them
 //   GET  /spaces    every space holding keys, with how many, as JSON
 //
 // Each path but /eval and /spaces is in a SPACE: `/s/<space>/kv`,
@@ -316,6 +321,9 @@ fn http_request(req: HttpRequest) -> HttpResponse {
             ..response(200, "text/plain", String::new())
         };
     }
+    if req.method == "GET" && path == "/i" {
+        return json(serde_json::json!(instances::names()).to_string());
+    }
     if req.method == "GET" && path == "/spaces" {
         let all: serde_json::Map<String, serde_json::Value> = spaces()
             .into_iter()
@@ -383,6 +391,20 @@ fn http_request_update(req: HttpUpdateRequest) -> HttpResponse {
     let body = String::from_utf8_lossy(&req.body).to_string();
     if req.method == "POST" && path == "/eval" {
         return response(200, "text/plain", eval_text(&body));
+    }
+    if req.method == "POST" && path == "/eval.json" {
+        return json(KV.with(|kv| kv.borrow_mut().eval_json(&body)));
+    }
+    if let Some(rest) = path.strip_prefix("/i/") {
+        return match rest.split_once('/') {
+            Some((name, op)) if instances::valid_name(name) => {
+                match instances::call(name, op, &body) {
+                    Some(answer) => json(answer),
+                    None => not_found(&path),
+                }
+            }
+            _ => not_found(&path),
+        };
     }
     let (space, within) = match route(&path) {
         Some(r) => r,

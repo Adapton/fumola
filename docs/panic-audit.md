@@ -20,7 +20,7 @@ values and quotation (`value`, `quoted`), the Adapton engine (`adapton/`),
 the pretty printer (`format`, reached from `debugShow` and from
 `Value::portable_hash`), the syntax the evaluator walks (`fumola_syntax::ast`),
 and the two host surfaces that call all of it (`crates/fumola/src/bin`,
-`crates/fumola_wasm/src`).
+`crates/fumola_wasm/src`, since split into `fumola_wasm_common` and `fumola_wasm_browser`).
 
 Not covered: `#[cfg(test)]` code, `crates/fumola/src/lib/check.rs` (assertion
 helpers, whose job is to fail loudly), and `module_path.rs` (all of its

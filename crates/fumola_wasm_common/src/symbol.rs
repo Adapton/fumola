@@ -136,7 +136,10 @@ fn check_name(name: &str) -> Result<(), String> {
     }
     for c in chars {
         if !(c.is_ascii_alphanumeric() || c == '_') {
-            return Err(format!("symbol name contains `{}`, which is not allowed", c));
+            return Err(format!(
+                "symbol name contains `{}`, which is not allowed",
+                c
+            ));
         }
     }
     Ok(())

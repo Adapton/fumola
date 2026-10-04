@@ -7,7 +7,7 @@
 //! about, and the answer runs to megabytes that would then live in the store
 //! for as long as the instance does.
 
-use fumola_wasm::*;
+use fumola_wasm_common::*;
 
 fn reply(raw: String) -> serde_json::Value {
     serde_json::from_str(&raw).expect("reply is JSON")

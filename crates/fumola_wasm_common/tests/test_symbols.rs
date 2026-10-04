@@ -4,8 +4,8 @@
 //! rendered to source and fed back through Fumola denotes the same name. Those
 //! tests go through a real instance rather than asserting on strings.
 
-use fumola_wasm::symbol::{symbol_from_json, symbol_to_json, symbol_to_source};
-use fumola_wasm::*;
+use fumola_wasm_common::symbol::{symbol_from_json, symbol_to_json, symbol_to_source};
+use fumola_wasm_common::*;
 use serde_json::json;
 
 fn to_source(j: serde_json::Value) -> Result<String, String> {

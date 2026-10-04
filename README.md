@@ -62,7 +62,7 @@ cargo run -- eval 'import G "fumola/examples/gcd"; G.gcd(12, 18)' \
 ```
 
 > **Note.** `get`, `peek` and `pointer` are *not* CLI builtins. They are prelude
-> helpers that the `fumola_wasm` crate defines for its JavaScript hosts, over
+> helpers that the `fumola_wasm_common` crate defines for its JavaScript hosts, over
 > `@` and `prim "adaptonPointer"`. In the CLI, `:=`, `thunk` and `force` work
 > directly; the browser console on the site above is the easiest place to try
 > the full set.
@@ -84,7 +84,7 @@ To see log output from a failing Rust test:
 RUST_LOG=trace cargo test -- --nocapture
 ```
 
-`cargo test` also covers the JavaScript boundary — `crates/fumola_wasm/tests/`
+`cargo test` also covers the JavaScript boundary — `crates/fumola_wasm_common/tests/`
 has `test_instances.rs`, `test_structures.rs` and `test_symbols.rs`.
 
 ## Using Fumola from JavaScript
@@ -111,9 +111,9 @@ To build the pair yourself:
 
 ```bash
 rustup target add wasm32-unknown-unknown
-cargo build --release --target wasm32-unknown-unknown -p fumola_wasm --no-default-features
-wasm-bindgen --target web --out-dir site \
-  target/wasm32-unknown-unknown/release/fumola_wasm.wasm
+cargo build --release --target wasm32-unknown-unknown -p fumola_wasm_browser --no-default-features
+wasm-bindgen --target web --out-dir site --out-name fumola_wasm \
+  target/wasm32-unknown-unknown/release/fumola_wasm_browser.wasm
 ```
 
 `--no-default-features` drops the `repl` feature, whose `rustyline` dependency
@@ -145,7 +145,9 @@ FUMOLA_REPO=/path/to/fumola ./scripts/build-fumola-wasm.sh
 | `crates/fumola_syntax` | AST and lexer |
 | `crates/fumola_parser` | the `lalrpop` grammar |
 | `crates/fumola_semantics` | the VM, and `adapton/` — `simple.rs` and `graphical/`, behind one `AdaptonState` trait |
-| `crates/fumola_wasm` | the JavaScript boundary: instance store, value translation |
+| `crates/fumola_wasm_common` | the runtime a host embeds: instance store, runs, value translation, tokens, the module library |
+| `crates/fumola_wasm_browser` | that runtime exported to JavaScript with `wasm-bindgen`, nothing more |
+| `crates/fumola_canister` | the same runtime on the Internet Computer, over HTTP: Hazel's storage spaces and named instances |
 | `crates/fumola_proc_macro` | compile-time Fumola expressions in Rust |
 | `fumola/` | the Fumola library: `collections/`, `examples/`, `system/adapton` |
 | `scripts/` | runnable examples, each exercised by CI |

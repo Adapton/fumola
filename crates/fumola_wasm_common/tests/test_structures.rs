@@ -3,7 +3,7 @@
 //! The point is that a Fumola tuple arrives as a *tuple*, not as a wrapper
 //! Hazel has to take apart.
 
-use fumola_wasm::*;
+use fumola_wasm_common::*;
 use serde_json::json;
 
 fn eval_value(id: FumolaInstanceId, src: &str) -> serde_json::Value {

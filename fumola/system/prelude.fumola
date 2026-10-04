@@ -9,7 +9,7 @@ import Prim "prim";
 /// that a program can write `get(`x)` rather than `Adapton.get(`x)`.
 ///
 /// A host embedding Fumola is expected to bind these at the top level of
-/// an instance; `crates/fumola_wasm` does exactly that.
+/// an instance; `crates/fumola_wasm_common` does exactly that.
 ///
 /// ----------------------------------------------------------------------------
 module {

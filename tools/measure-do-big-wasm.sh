@@ -41,10 +41,10 @@ fi
 
 # --no-default-features drops the repl feature, whose rustyline dependency
 # pulls in fs2, which does not build for wasm32.
-cargo build --release --target wasm32-unknown-unknown -p fumola_wasm --no-default-features
+cargo build --release --target wasm32-unknown-unknown -p fumola_wasm_browser --no-default-features
 
 out=$(mktemp -d)
-"$bindgen" --target nodejs --out-dir "$out" \
-    target/wasm32-unknown-unknown/release/fumola_wasm.wasm
+"$bindgen" --target nodejs --out-dir "$out" --out-name fumola_wasm \
+    target/wasm32-unknown-unknown/release/fumola_wasm_browser.wasm
 cp tools/measure-do-big-wasm.js "$out/"
 cd "$out" && node measure-do-big-wasm.js

@@ -1,6 +1,6 @@
 //! Tokens for syntax highlighting, and access to the library's source.
 
-use fumola_wasm::{fumola_module_source, fumola_modules, fumola_tokens};
+use fumola_wasm_common::{fumola_module_source, fumola_modules, fumola_tokens};
 
 /// (kind, the text that span actually covers) for each token.
 fn kinds(src: &str) -> Vec<(String, String)> {

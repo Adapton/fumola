@@ -1,7 +1,7 @@
 //! The prelude: which module it is, what it exports, and how a host binds it.
 //!
 //! Two hosts bind these names at the top level of a runtime -- the CLI in
-//! `bin/fumola.rs`, and `fumola_wasm` for its JavaScript hosts -- and they had
+//! `bin/fumola.rs`, and `fumola_wasm_common` for its JavaScript and canister hosts -- and they had
 //! each kept their own list. The lists drifted the moment `print` was added to
 //! `fumola/system/prelude.fumola`: the browser bound it and the CLI did not,
 //! so `print("hello")` worked in one and was an unbound identifier in the

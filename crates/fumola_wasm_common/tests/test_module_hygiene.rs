@@ -20,7 +20,7 @@
 //! -- `fumola test` reported 28 passed on the very function that crashed when
 //! a program called it.
 
-use fumola_wasm::*;
+use fumola_wasm_common::*;
 
 fn eval_top(id: FumolaInstanceId, src: &str) -> serde_json::Value {
     serde_json::from_str(&fumola_eval_top(id, src)).expect("eval returned invalid JSON")

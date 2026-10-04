@@ -209,6 +209,13 @@ impl Store {
         }
     }
 
+    /// Run a program as `eval` does, and answer as Fumola's browser runtime
+    /// does -- through the same function, so the JSON, the rollback of a
+    /// failed run, and what it printed are all the browser's.
+    pub fn eval_json(&mut self, program: &str) -> String {
+        fumola_wasm_common::eval_state(&mut self.fumola, program, fumola_wasm_common::Effects::Keep)
+    }
+
     /// Every space's key-to-text pairs, for an upgrade.
     pub fn snapshot(&mut self) -> Vec<(String, Vec<(String, String)>)> {
         let spaces: Vec<String> = self.spaces().into_iter().map(|(s, _)| s).collect();
@@ -234,6 +241,24 @@ impl Store {
 mod tests {
     use super::*;
     const D: &str = DEFAULT_SPACE;
+
+    #[test]
+    fn eval_json_answers_as_the_browser_runtime_does() {
+        let mut s = Store::new();
+        let v: serde_json::Value = serde_json::from_str(&s.eval_json("(1 + 2, \"a\")")).unwrap();
+        assert_eq!(v["ok"], true);
+        assert_eq!(v["tag"], "Tuple");
+        assert_eq!(
+            v["value"][0],
+            serde_json::json!({"tag": "Int", "value": "3"})
+        );
+        assert_eq!(
+            v["value"][1],
+            serde_json::json!({"tag": "String", "value": "a"})
+        );
+        let e: serde_json::Value = serde_json::from_str(&s.eval_json("1 +")).unwrap();
+        assert_eq!(e["ok"], false);
+    }
 
     #[test]
     fn a_save_is_a_cell_and_a_read_forces_it() {
