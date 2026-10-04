@@ -26,12 +26,23 @@ use fumola::state::State;
 use fumola_semantics::value::{Value, Value_};
 use std::collections::BTreeMap;
 
+/// A front end's stored keys live in a SPACE: the canister holds many, one
+/// per front end or per shared document set, and a key is only a key within
+/// its space. Cell numbers are global, so `` `hazel(N) `` names one cell in
+/// the one DCG whatever its space, and a Fumola program reads any space's
+/// cells the same way.
+pub type Space = str;
+
+/// The space Hazel's own front end uses, and where the canister's paths
+/// without a space (`/kv`, `/log`, the Candid methods) read and write.
+pub const DEFAULT_SPACE: &str = "hazel";
+
 pub struct Store {
     fumola: State,
-    /// Each key's number, in the order keys were first saved.
-    index: BTreeMap<String, u64>,
+    /// Each (space, key)'s number, in the order keys were first saved.
+    index: BTreeMap<(String, String), u64>,
     /// The reference each put answered, which is how a read finds the cell.
-    cells: BTreeMap<String, Value_>,
+    cells: BTreeMap<(String, String), Value_>,
     next: u64,
 }
 
@@ -52,18 +63,19 @@ impl Store {
         self.fumola.eval(program).map_err(|e| format!("{:?}", e))
     }
 
-    fn number_of(&mut self, key: &str) -> u64 {
-        if let Some(n) = self.index.get(key) {
+    fn number_of(&mut self, space: &Space, key: &str) -> u64 {
+        let k = (space.to_string(), key.to_string());
+        if let Some(n) = self.index.get(&k) {
             return *n;
         }
         let n = self.next;
         self.next += 1;
-        self.index.insert(key.to_string(), n);
+        self.index.insert(k, n);
         n
     }
 
-    pub fn put(&mut self, key: &str, value: &str) -> Result<(), String> {
-        let n = self.number_of(key);
+    pub fn put(&mut self, space: &Space, key: &str, value: &str) -> Result<(), String> {
+        let n = self.number_of(space, key);
         // Hazel's own datatype where the canister knows it (schema), else a
         // generic S-expression value, else the text.
         let structured: Value_ = match sexp::parse(value) {
@@ -80,12 +92,16 @@ impl Store {
         self.fumola
             .semantic_state
             .define(format!("hazelCell{}", n), cell.clone());
-        self.cells.insert(key.to_string(), cell);
+        self.cells
+            .insert((space.to_string(), key.to_string()), cell);
         Ok(())
     }
 
-    pub fn get(&mut self, key: &str) -> Option<String> {
-        let cell = self.cells.get(key)?.clone();
+    pub fn get(&mut self, space: &Space, key: &str) -> Option<String> {
+        let cell = self
+            .cells
+            .get(&(space.to_string(), key.to_string()))?
+            .clone();
         self.fumola.semantic_state.define("hazelCell", cell);
         let v = self.run("@ hazelCell").ok()?;
         if let Some(s) = schema::for_key(key).and_then(|ty| schema::encode(ty, &v)) {
@@ -101,37 +117,57 @@ impl Store {
     }
 
     /// The key keeps its number, so a later save reuses the same cell name.
-    pub fn remove(&mut self, key: &str) {
-        self.cells.remove(key);
+    pub fn remove(&mut self, space: &Space, key: &str) {
+        self.cells.remove(&(space.to_string(), key.to_string()));
     }
 
-    pub fn clear(&mut self) {
-        self.cells.clear();
+    /// Empties one space; the others are untouched.
+    pub fn clear(&mut self, space: &Space) {
+        self.cells.retain(|(s, _), _| s != space);
     }
 
-    /// Each key's cell number: `` `hazel(N) `` names its cell.
-    pub fn index(&self) -> Vec<(String, u64)> {
+    /// Each key's cell number in [space]: `` `hazel(N) `` names its cell.
+    pub fn index(&self, space: &Space) -> Vec<(String, u64)> {
         self.cells
             .keys()
-            .filter_map(|k| self.index.get(k).map(|n| (k.clone(), *n)))
+            .filter(|(s, _)| s == space)
+            .filter_map(|k| self.index.get(k).map(|n| (k.1.clone(), *n)))
             .collect()
     }
 
-    pub fn keys(&self) -> Vec<String> {
-        self.cells.keys().cloned().collect()
+    pub fn keys(&self, space: &Space) -> Vec<String> {
+        self.cells
+            .keys()
+            .filter(|(s, _)| s == space)
+            .map(|(_, k)| k.clone())
+            .collect()
     }
 
-    pub fn all(&mut self) -> Vec<(String, String)> {
-        let keys = self.keys();
+    pub fn all(&mut self, space: &Space) -> Vec<(String, String)> {
+        let keys = self.keys(space);
         keys.into_iter()
-            .filter_map(|k| self.get(&k).map(|v| (k, v)))
+            .filter_map(|k| self.get(space, &k).map(|v| (k, v)))
             .collect()
+    }
+
+    /// Every space holding a key, with how many it holds.
+    pub fn spaces(&self) -> Vec<(String, usize)> {
+        let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+        for (s, _) in self.cells.keys() {
+            *counts.entry(s.clone()).or_insert(0) += 1;
+        }
+        counts.into_iter().collect()
+    }
+
+    /// How many keys there are, over every space.
+    pub fn key_count(&self) -> usize {
+        self.cells.len()
     }
 
     /// How many values are stored as Hazel's own datatypes, how many as
     /// generic S-expression values, and how many as plain text.
     pub fn shapes(&mut self) -> (usize, usize, usize) {
-        let keys = self.keys();
+        let keys: Vec<(String, String)> = self.cells.keys().cloned().collect();
         let mut typed = 0;
         let mut values = 0;
         let mut texts = 0;
@@ -142,7 +178,7 @@ impl Store {
             };
             self.fumola.semantic_state.define("hazelCell", cell);
             if let Ok(v) = self.run("@ hazelCell") {
-                if schema::for_key(&k)
+                if schema::for_key(&k.1)
                     .and_then(|ty| schema::encode(&ty, &v))
                     .is_some()
                 {
@@ -173,13 +209,23 @@ impl Store {
         }
     }
 
-    pub fn snapshot(&mut self) -> Vec<(String, String)> {
-        self.all()
+    /// Every space's key-to-text pairs, for an upgrade.
+    pub fn snapshot(&mut self) -> Vec<(String, Vec<(String, String)>)> {
+        let spaces: Vec<String> = self.spaces().into_iter().map(|(s, _)| s).collect();
+        spaces
+            .into_iter()
+            .map(|s| {
+                let pairs = self.all(&s);
+                (s, pairs)
+            })
+            .collect()
     }
 
-    pub fn restore(&mut self, pairs: Vec<(String, String)>) {
-        for (k, v) in pairs {
-            let _ = self.put(&k, &v);
+    pub fn restore(&mut self, spaces: Vec<(String, Vec<(String, String)>)>) {
+        for (s, pairs) in spaces {
+            for (k, v) in pairs {
+                let _ = self.put(&s, &k, &v);
+            }
         }
     }
 }
@@ -187,20 +233,21 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const D: &str = DEFAULT_SPACE;
 
     #[test]
     fn a_save_is_a_cell_and_a_read_forces_it() {
         let mut s = Store::new();
-        s.put("settings", "{\"a\": \"quote\\\" and newline\\n\"}")
+        s.put(D, "settings", "{\"a\": \"quote\\\" and newline\\n\"}")
             .unwrap();
         assert_eq!(
-            s.get("settings").as_deref(),
+            s.get(D, "settings").as_deref(),
             Some("{\"a\": \"quote\\\" and newline\\n\"}")
         );
-        s.put("settings", "two").unwrap();
-        assert_eq!(s.get("settings").as_deref(), Some("two"));
-        s.put("editors/a b", "x").unwrap();
-        assert_eq!(s.all().len(), 2);
+        s.put(D, "settings", "two").unwrap();
+        assert_eq!(s.get(D, "settings").as_deref(), Some("two"));
+        s.put(D, "editors/a b", "x").unwrap();
+        assert_eq!(s.all(D).len(), 2);
         // Two keys, three puts: the second put to `settings` is a version.
         assert_eq!(s.cell_count(), "3");
     }
@@ -208,9 +255,9 @@ mod tests {
     #[test]
     fn a_fumola_program_reads_hazel_cells() {
         let mut s = Store::new();
-        s.put("k", "hello").unwrap();
+        s.put(D, "k", "hello").unwrap();
         // A read binds the cell as hazelCell; a program can then build on it.
-        assert_eq!(s.get("k").as_deref(), Some("hello"));
+        assert_eq!(s.get(D, "k").as_deref(), Some("hello"));
         assert_eq!(
             s.eval(
                 "let t = `view := thunk { switch (@ hazelCell) { case (#atom(x)) { x }; case _ { \"?\" } } }; force t"
@@ -222,20 +269,20 @@ mod tests {
     #[test]
     fn a_sexp_is_stored_as_a_value_and_printed_back() {
         let mut s = Store::new();
-        s.put("MODE", "Documentation").unwrap();
-        s.put("SETTINGS", "((theme Dark)(probes(\"a b\" c)))")
+        s.put(D, "MODE", "Documentation").unwrap();
+        s.put(D, "SETTINGS", "((theme Dark)(probes(\"a b\" c)))")
             .unwrap();
-        s.put("NOTE", "not ( a sexp").unwrap();
-        assert_eq!(s.get("MODE").as_deref(), Some("Documentation"));
+        s.put(D, "NOTE", "not ( a sexp").unwrap();
+        assert_eq!(s.get(D, "MODE").as_deref(), Some("Documentation"));
         // Printed as Sexplib prints it: no space after a quoted atom.
         assert_eq!(
-            s.get("SETTINGS").as_deref(),
+            s.get(D, "SETTINGS").as_deref(),
             Some("((theme Dark)(probes(\"a b\"c)))")
         );
-        assert_eq!(s.get("NOTE").as_deref(), Some("not ( a sexp"));
+        assert_eq!(s.get(D, "NOTE").as_deref(), Some("not ( a sexp"));
         // A program walks the structure: the settings list has two entries,
         // and the theme is the second atom of the first.
-        s.get("SETTINGS");
+        s.get(D, "SETTINGS");
         assert_eq!(
             s.eval(
                 "switch (@ hazelCell) { case (#list(xs)) { switch (xs[0]) { \
@@ -249,8 +296,8 @@ mod tests {
     #[test]
     fn a_program_reads_any_cell_by_number() {
         let mut s = Store::new();
-        s.put("MODE", "Documentation").unwrap();
-        s.put("SETTINGS", "((a 1)(b 2)(c 3))").unwrap();
+        s.put(D, "MODE", "Documentation").unwrap();
+        s.put(D, "SETTINGS", "((a 1)(b 2)(c 3))").unwrap();
         // MODE is one of Hazel's types; this made-up SETTINGS is not.
         assert_eq!(s.shapes(), (1, 1, 0));
         assert_eq!(
@@ -263,8 +310,8 @@ mod tests {
     fn settings_are_stored_as_hazels_own_record() {
         let mut s = Store::new();
         let saved = include_str!("../tests/settings.sexp").trim_end();
-        s.put("SETTINGS", saved).unwrap();
-        assert_eq!(s.get("SETTINGS").as_deref(), Some(saved));
+        s.put(D, "SETTINGS", saved).unwrap();
+        assert_eq!(s.get(D, "SETTINGS").as_deref(), Some(saved));
         assert_eq!(s.shapes(), (1, 0, 0));
         // A program reads fields by name.
         assert_eq!(
@@ -276,10 +323,32 @@ mod tests {
     #[test]
     fn remove_then_save_reuses_the_name() {
         let mut s = Store::new();
-        s.put("k", "1").unwrap();
-        s.remove("k");
-        assert_eq!(s.get("k"), None);
-        s.put("k", "2").unwrap();
-        assert_eq!(s.get("k").as_deref(), Some("2"));
+        s.put(D, "k", "1").unwrap();
+        s.remove(D, "k");
+        assert_eq!(s.get(D, "k"), None);
+        s.put(D, "k", "2").unwrap();
+        assert_eq!(s.get(D, "k").as_deref(), Some("2"));
+    }
+
+    #[test]
+    fn spaces_hold_the_same_key_apart() {
+        let mut s = Store::new();
+        s.put("alice", "MODE", "Scratch").unwrap();
+        s.put("bob", "MODE", "Documentation").unwrap();
+        assert_eq!(s.get("alice", "MODE").as_deref(), Some("Scratch"));
+        assert_eq!(s.get("bob", "MODE").as_deref(), Some("Documentation"));
+        assert_eq!(s.get(D, "MODE"), None);
+        // each its own cell, numbered globally
+        assert_eq!(s.index("alice"), vec![("MODE".to_string(), 0)]);
+        assert_eq!(s.index("bob"), vec![("MODE".to_string(), 1)]);
+        s.clear("alice");
+        assert_eq!(s.get("alice", "MODE"), None);
+        assert_eq!(s.get("bob", "MODE").as_deref(), Some("Documentation"));
+        assert_eq!(s.spaces(), vec![("bob".to_string(), 1)]);
+        // an upgrade carries every space
+        let snap = s.snapshot();
+        let mut t = Store::new();
+        t.restore(snap);
+        assert_eq!(t.get("bob", "MODE").as_deref(), Some("Documentation"));
     }
 }

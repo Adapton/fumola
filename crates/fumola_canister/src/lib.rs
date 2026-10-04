@@ -18,7 +18,8 @@
 mod schema;
 mod sexp;
 mod store;
-use store::Store;
+use store::{Store, DEFAULT_SPACE};
+use std::collections::BTreeMap;
 
 use candid::{CandidType, Deserialize};
 use serde_bytes::ByteBuf;
@@ -26,7 +27,8 @@ use std::cell::RefCell;
 
 thread_local! {
     static KV: RefCell<Store> = RefCell::new(Store::new());
-    static LOG: RefCell<Vec<(String, String)>> = RefCell::new(Vec::new());
+    /// Each space's action log, oldest first.
+    static LOG: RefCell<BTreeMap<String, Vec<(String, String)>>> = RefCell::new(BTreeMap::new());
 }
 
 /// One write in a batch: Hazel's `kv_batch` groups its writes, and sends
@@ -38,43 +40,89 @@ pub enum Write {
     Remove { key: String },
 }
 
-fn apply(writes: Vec<Write>) -> usize {
+fn apply(space: &str, writes: Vec<Write>) -> usize {
     KV.with(|kv| {
         let mut kv = kv.borrow_mut();
         for w in &writes {
             match w {
                 Write::Put { key, value } => {
-                    if let Err(e) = kv.put(key, value) {
-                        ic_cdk::println!("put {} failed: {}", key, e);
+                    if let Err(e) = kv.put(space, key, value) {
+                        ic_cdk::println!("put {}/{} failed: {}", space, key, e);
                     }
                 }
-                Write::Remove { key } => kv.remove(key),
+                Write::Remove { key } => kv.remove(space, key),
             }
         }
     });
     writes.len()
 }
 
+fn log_of(space: &str) -> Vec<String> {
+    LOG.with(|log| {
+        log.borrow()
+            .get(space)
+            .map(|es| es.iter().map(|(_, v)| v.clone()).collect())
+            .unwrap_or_default()
+    })
+}
+
+fn log_push(space: &str, key: String, value: String) {
+    LOG.with(|log| {
+        log.borrow_mut()
+            .entry(space.to_string())
+            .or_default()
+            .push((key, value))
+    });
+}
+
+fn log_clear_space(space: &str) {
+    LOG.with(|log| {
+        log.borrow_mut().remove(space);
+    });
+}
+
+/// A space's name: what a front end opts in under. Letters, digits, `-`
+/// and `_`, up to 64 of them, so it reads cleanly in a path.
+fn valid_space(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 64
+        && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
 // ---- Candid interface ------------------------------------------------------
+
+// The methods without a space act on Hazel's own, DEFAULT_SPACE.
 
 #[ic_cdk::query]
 fn kv_all() -> Vec<(String, String)> {
-    KV.with(|kv| kv.borrow_mut().all())
+    KV.with(|kv| kv.borrow_mut().all(DEFAULT_SPACE))
 }
 
 #[ic_cdk::query]
 fn kv_get(key: String) -> Option<String> {
-    KV.with(|kv| kv.borrow_mut().get(&key))
+    KV.with(|kv| kv.borrow_mut().get(DEFAULT_SPACE, &key))
 }
 
 #[ic_cdk::update]
 fn kv_apply(writes: Vec<Write>) -> u64 {
-    apply(writes) as u64
+    apply(DEFAULT_SPACE, writes) as u64
 }
 
 #[ic_cdk::update]
 fn kv_clear() {
-    KV.with(|kv| kv.borrow_mut().clear());
+    KV.with(|kv| kv.borrow_mut().clear(DEFAULT_SPACE));
+}
+
+/// Every space holding keys, with how many.
+#[ic_cdk::query]
+fn spaces() -> Vec<(String, u64)> {
+    KV.with(|kv| {
+        kv.borrow()
+            .spaces()
+            .into_iter()
+            .map(|(s, n)| (s, n as u64))
+            .collect()
+    })
 }
 
 /// How many cells the DCG holds, counting each put's version.
@@ -85,17 +133,17 @@ fn cells() -> String {
 
 #[ic_cdk::update]
 fn log_add(key: String, value: String) {
-    LOG.with(|log| log.borrow_mut().push((key, value)));
+    log_push(DEFAULT_SPACE, key, value);
 }
 
 #[ic_cdk::query]
 fn log_all() -> Vec<String> {
-    LOG.with(|log| log.borrow().iter().map(|(_, v)| v.clone()).collect())
+    log_of(DEFAULT_SPACE)
 }
 
 #[ic_cdk::update]
 fn log_clear() {
-    LOG.with(|log| log.borrow_mut().clear());
+    log_clear_space(DEFAULT_SPACE);
 }
 
 /// Run a Fumola program in the store's state and answer its value, printed
@@ -111,19 +159,39 @@ fn eval_text(program: &str) -> String {
 
 // ---- Upgrades --------------------------------------------------------------
 
+/// The upgrade snapshot: a version, then each space's keys and log.
+type Snapshot = (
+    u32,
+    Vec<(String, Vec<(String, String)>)>,
+    Vec<(String, Vec<(String, String)>)>,
+);
+/// Before spaces: one key table and one log, now DEFAULT_SPACE's.
+type SnapshotV1 = (Vec<(String, String)>, Vec<(String, String)>);
+
 #[ic_cdk::pre_upgrade]
 fn pre_upgrade() {
     let kv = KV.with(|kv| kv.borrow_mut().snapshot());
-    let log = LOG.with(|log| log.borrow().clone());
-    ic_cdk::storage::stable_save((kv, log)).expect("saving state to stable memory");
+    let log: Vec<(String, Vec<(String, String)>)> =
+        LOG.with(|log| log.borrow().clone().into_iter().collect());
+    let snap: Snapshot = (2, kv, log);
+    ic_cdk::storage::stable_save(snap).expect("saving state to stable memory");
 }
 
 #[ic_cdk::post_upgrade]
 fn post_upgrade() {
-    let (kv, log): (Vec<(String, String)>, Vec<(String, String)>) =
-        ic_cdk::storage::stable_restore().expect("restoring state from stable memory");
+    let (kv, log) = match ic_cdk::storage::stable_restore::<Snapshot>() {
+        Ok((_, kv, log)) => (kv, log),
+        Err(_) => {
+            let (kv, log): SnapshotV1 = ic_cdk::storage::stable_restore()
+                .expect("restoring state from stable memory");
+            (
+                vec![(DEFAULT_SPACE.to_string(), kv)],
+                vec![(DEFAULT_SPACE.to_string(), log)],
+            )
+        }
+    };
     KV.with(|k| k.borrow_mut().restore(kv));
-    LOG.with(|l| *l.borrow_mut() = log);
+    LOG.with(|l| *l.borrow_mut() = log.into_iter().collect());
 }
 
 // ---- HTTP ------------------------------------------------------------------
@@ -135,6 +203,12 @@ fn post_upgrade() {
 //   GET  /log       the log's values, oldest first, as a JSON list
 //   POST /log       append {"key","value"}
 //   POST /eval      run the body as a Fumola program
+//   GET  /spaces    every space holding keys, with how many, as JSON
+//
+// Each path but /eval and /spaces is in a SPACE: `/s/<space>/kv`,
+// `/s/<space>/log` and so on are that space's, and the paths without
+// `/s/` are Hazel's own space, DEFAULT_SPACE, as before spaces. A front
+// end opts in to a space by naming it (window.hazelBackend in Hazel).
 //
 // A GET is a query. A POST is answered by the query with `upgrade`, which
 // has the gateway call `http_request_update`, where it is applied. Every
@@ -199,26 +273,76 @@ fn not_found(path: &str) -> HttpResponse {
     response(404, "text/plain", format!("no such path: {}", path))
 }
 
+/// A request's space and the path within it: `/s/<space>/kv` is `kv` in
+/// that space, and a path without `/s/` is in DEFAULT_SPACE, as before
+/// spaces. None for a space name that is not a valid one.
+fn route(path: &str) -> Option<(String, String)> {
+    match path.strip_prefix("/s/") {
+        Some(rest) => {
+            let (space, within) = match rest.split_once('/') {
+                Some((s, w)) => (s, format!("/{}", w)),
+                None => (rest, "/".to_string()),
+            };
+            if valid_space(space) {
+                Some((space.to_string(), within))
+            } else {
+                None
+            }
+        }
+        None => Some((DEFAULT_SPACE.to_string(), path.to_string())),
+    }
+}
+
+fn bad_space(path: &str) -> HttpResponse {
+    response(
+        400,
+        "text/plain",
+        format!(
+            "no such space in {}: a space is letters, digits, - and _, up to 64",
+            path
+        ),
+    )
+}
+
 #[ic_cdk::query]
 fn http_request(req: HttpRequest) -> HttpResponse {
     let path = path_of(&req.url);
-    match (req.method.as_str(), path) {
-        ("OPTIONS", _) => response(204, "text/plain", String::new()),
+    if req.method == "OPTIONS" {
+        return response(204, "text/plain", String::new());
+    }
+    if req.method == "POST" {
+        return HttpResponse {
+            upgrade: Some(true),
+            ..response(200, "text/plain", String::new())
+        };
+    }
+    if req.method == "GET" && path == "/spaces" {
+        let all: serde_json::Map<String, serde_json::Value> = spaces()
+            .into_iter()
+            .map(|(s, n)| (s, serde_json::Value::from(n)))
+            .collect();
+        return json(serde_json::Value::Object(all).to_string());
+    }
+    let (space, within) = match route(path) {
+        Some(r) => r,
+        None => return bad_space(path),
+    };
+    match (req.method.as_str(), within.as_str()) {
         ("GET", "/kv") => {
             let all: serde_json::Map<String, serde_json::Value> = KV.with(|kv| {
                 kv.borrow_mut()
-                    .all()
+                    .all(&space)
                     .into_iter()
                     .map(|(k, v)| (k, serde_json::Value::String(v)))
                     .collect()
             });
             json(serde_json::Value::Object(all).to_string())
         }
-        ("GET", "/log") => json(serde_json::to_string(&log_all()).unwrap_or_default()),
+        ("GET", "/log") => json(serde_json::to_string(&log_of(&space)).unwrap_or_default()),
         ("GET", "/index") => {
             let index: serde_json::Map<String, serde_json::Value> = KV.with(|kv| {
                 kv.borrow()
-                    .index()
+                    .index(&space)
                     .into_iter()
                     .map(|(k, n)| (k, serde_json::Value::from(n)))
                     .collect()
@@ -228,23 +352,21 @@ fn http_request(req: HttpRequest) -> HttpResponse {
         ("GET", "/") | ("GET", "/health") => {
             let shapes = KV.with(|kv| kv.borrow_mut().shapes());
             response(
-            200,
-            "text/plain",
-            format!(
-                "fumola_canister: {} keys in {} DCG cells ({} as Hazel's types, {} as sexp values, {} as text), {} log entries",
-                KV.with(|kv| kv.borrow().keys().len()),
-                cells(),
-                shapes.0,
-                shapes.1,
-                shapes.2,
-                LOG.with(|log| log.borrow().len())
-            ),
+                200,
+                "text/plain",
+                format!(
+                    "fumola_canister: {} keys in {} spaces, {} DCG cells ({} as Hazel's types, {} as sexp values, {} as text), {} log entries in this space ({})",
+                    KV.with(|kv| kv.borrow().key_count()),
+                    spaces().len(),
+                    cells(),
+                    shapes.0,
+                    shapes.1,
+                    shapes.2,
+                    log_of(&space).len(),
+                    space
+                ),
             )
         }
-        ("POST", _) => HttpResponse {
-            upgrade: Some(true),
-            ..response(200, "text/plain", String::new())
-        },
         _ => not_found(path),
     }
 }
@@ -259,27 +381,33 @@ struct LogEntry {
 fn http_request_update(req: HttpUpdateRequest) -> HttpResponse {
     let path = path_of(&req.url).to_string();
     let body = String::from_utf8_lossy(&req.body).to_string();
-    match (req.method.as_str(), path.as_str()) {
+    if req.method == "POST" && path == "/eval" {
+        return response(200, "text/plain", eval_text(&body));
+    }
+    let (space, within) = match route(&path) {
+        Some(r) => r,
+        None => return bad_space(&path),
+    };
+    match (req.method.as_str(), within.as_str()) {
         ("POST", "/kv") => match serde_json::from_str::<Vec<Write>>(&body) {
-            Ok(writes) => json(format!("{{\"applied\":{}}}", apply(writes))),
+            Ok(writes) => json(format!("{{\"applied\":{}}}", apply(&space, writes))),
             Err(e) => response(400, "text/plain", format!("bad writes: {}", e)),
         },
         ("POST", "/kv/clear") => {
-            kv_clear();
+            KV.with(|kv| kv.borrow_mut().clear(&space));
             json("{\"cleared\":true}".to_string())
         }
         ("POST", "/log") => match serde_json::from_str::<LogEntry>(&body) {
             Ok(entry) => {
-                log_add(entry.key, entry.value);
+                log_push(&space, entry.key, entry.value);
                 json("{\"logged\":true}".to_string())
             }
             Err(e) => response(400, "text/plain", format!("bad log entry: {}", e)),
         },
         ("POST", "/log/clear") => {
-            log_clear();
+            log_clear_space(&space);
             json("{\"cleared\":true}".to_string())
         }
-        ("POST", "/eval") => response(200, "text/plain", eval_text(&body)),
         _ => not_found(&path),
     }
 }
