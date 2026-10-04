@@ -201,6 +201,16 @@ impl Store {
         }
     }
 
+    /// The store's DCG stats (`fumola_wasm_common::stats_of_state`), with how
+    /// many keys and spaces it holds.
+    pub fn stats(&mut self) -> serde_json::Value {
+        let mut v = fumola_wasm_common::stats_of_state(&mut self.fumola);
+        v["keys"] = serde_json::json!(self.index.len());
+        // Hazel's spaces, not the DCG's (`stats.spaces`).
+        v["key_spaces"] = serde_json::json!(self.spaces().len());
+        v
+    }
+
     /// Run a Fumola program in the same state, so it can read Hazel's cells.
     pub fn eval(&mut self, program: &str) -> String {
         match self.run(program) {
@@ -214,6 +224,17 @@ impl Store {
     /// failed run, and what it printed are all the browser's.
     pub fn eval_json(&mut self, program: &str) -> String {
         fumola_wasm_common::eval_state(&mut self.fumola, program, fumola_wasm_common::Effects::Keep)
+    }
+
+    /// Run a program as `eval_json` does, but drop what it did: the store is
+    /// left as it was. For a view into the DCG (`STORE_INSTANCE`), which must
+    /// not change Hazel's saved data by being looked at.
+    pub fn eval_json_discard(&mut self, program: &str) -> String {
+        fumola_wasm_common::eval_state(
+            &mut self.fumola,
+            program,
+            fumola_wasm_common::Effects::Discard,
+        )
     }
 
     /// Every space's key-to-text pairs, for an upgrade.
@@ -375,5 +396,38 @@ mod tests {
         let mut t = Store::new();
         t.restore(snap);
         assert_eq!(t.get("bob", "MODE").as_deref(), Some("Documentation"));
+    }
+
+    #[test]
+    fn stats_tallies_agree_with_a_walk_of_the_dcg() {
+        let mut s = Store::new();
+        s.put("hazel", "a", "1").unwrap();
+        s.put("hazel", "b", "2").unwrap();
+        s.put("team", "a", "3").unwrap();
+        s.put("hazel", "a", "4").unwrap(); // a new version, not a new pointer
+        let adapton = &s.fumola.semantic_state.agent.adapton_state;
+        let walk = adapton.pointers();
+        let stats: std::collections::HashMap<_, _> = adapton.stats().into_iter().collect();
+        assert_eq!(stats["pointers"], walk.len() as u64);
+        assert_eq!(
+            stats["versions"],
+            walk.iter().map(|p| p.versions).sum::<u64>()
+        );
+        let v = s.stats();
+        assert_eq!(v["keys"], 3);
+        assert_eq!(v["key_spaces"], 2);
+        assert_eq!(v["mode"], "graphical");
+    }
+
+    #[test]
+    fn the_stats_prims_answer_in_fumola() {
+        let mut s = Store::new();
+        s.put("hazel", "a", "1").unwrap();
+        s.put("hazel", "a", "2").unwrap();
+        let n = s.eval("(prim \"adaptonStats\" ()).pointers");
+        let walk = s.fumola.semantic_state.agent.adapton_state.pointers().len();
+        assert_eq!(n, walk.to_string());
+        let list = s.eval("prim \"adaptonPointers\" ()");
+        assert!(list.contains("versions = 2"), "{}", list);
     }
 }

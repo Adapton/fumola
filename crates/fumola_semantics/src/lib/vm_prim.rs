@@ -7,7 +7,8 @@ use fumola_syntax::ast::{Inst, Literal, Pat};
 
 use crate::type_mismatch;
 use crate::vm_step::{cont_value, cont_value_, unit_step};
-use fumola_syntax::shared::FastClone;
+use fumola_syntax::shared::{FastClone, Share};
+use im_rc::Vector;
 use im_rc::HashMap;
 use std::collections::hash_map;
 use std::hash::{Hash, Hasher};
@@ -331,6 +332,43 @@ pub fn call_prim_function<A: Active>(
                 .as_ref()
                 .into_adapton_node_vals_or(type_mismatch_!(file!(), line!()))?;
             *active.cont() = cont_value(Value::Nat(node_vals.size().into()));
+            Ok(Step {})
+        }
+        // The store's own description of itself, for an admin view: counts, and
+        // the pointers they count. Both read the maps; neither changes them.
+        AdaptonStats => {
+            let stats = active.adapton().stats();
+            let fields: Vec<(&str, Value_)> = stats
+                .iter()
+                .map(|(name, n)| (*name, Value::Nat((*n).into()).share()))
+                .collect();
+            *active.cont() = cont_value(Value::object_from(fields.iter()));
+            Ok(Step {})
+        }
+        AdaptonPointers => {
+            let pointers = active.adapton().pointers();
+            let items: Vector<Value_> = pointers
+                .into_iter()
+                .map(|p| {
+                    // Names as printed text, so a list of these is a table on
+                    // any host: a space written as an expression has no other
+                    // translation, and a host that wants the structure can
+                    // read the cell by name.
+                    let text = |v: Value| -> Value_ {
+                        Value::Text(crate::format::format_one_line(&v).into()).share()
+                    };
+                    let kind = if p.thunk { "thunk" } else { "value" };
+                    let fields: Vec<(&str, Value_)> = vec![
+                        ("space", text(Value::AdaptonSpace(p.space))),
+                        ("time", text(Value::AdaptonTime(p.time))),
+                        ("versions", Value::Nat(p.versions.into()).share()),
+                        ("kind", Value::Text(kind.into()).share()),
+                        ("readers", Value::Nat(p.readers.into()).share()),
+                    ];
+                    Value::object_from(fields.iter()).share()
+                })
+                .collect();
+            *active.cont() = cont_value(Value::Array(fumola_syntax::ast::Mut::Const, items));
             Ok(Step {})
         }
         AdaptonNodeValsDiff => {

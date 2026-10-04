@@ -202,6 +202,13 @@ pub struct GraphicalState {
     // Imposes at worst O(1) logging overhead to any operation.
     // Eventually, offer a flag to toggle it off, for maximum performance.
     pub history: History,
+
+    /// Tallies of `space_time`, kept as it grows (`insert_version`) so that a
+    /// stats reader need not walk it: (space, time) names, and versions of them.
+    #[serde(default)]
+    pub pointer_count: u64,
+    #[serde(default)]
+    pub version_count: u64,
 }
 
 // PartialEq, Eq and Hash so that a history can be a `Value::AdaptonHistory` -- a value form
@@ -646,9 +653,18 @@ impl GraphicalState {
         let mut by_meta = HashMap::new();
         by_meta.insert(self.meta_time.clone(), node);
         let by_time = match self.space_time.get(pointer) {
-            Some(by_time) => by_time.update_with(time.clone(), by_meta, |old, new| old.union(new)),
-            None => HashMap::new().update(time.clone(), by_meta),
+            Some(by_time) => {
+                if !by_time.contains_key(time) {
+                    self.pointer_count += 1;
+                }
+                by_time.update_with(time.clone(), by_meta, |old, new| old.union(new))
+            }
+            None => {
+                self.pointer_count += 1;
+                HashMap::new().update(time.clone(), by_meta)
+            }
         };
+        self.version_count += 1;
         self.space_time = self.space_time.update(pointer.clone(), by_time);
         (pointer.clone(), time.clone(), self.meta_time.clone())
     }
@@ -950,6 +966,8 @@ impl CacheState for GraphicalState {
             time: Time::Now,
             current_node: Self::root_node(),
             history: History::new(),
+            pointer_count: 0,
+            version_count: 0,
         }
     }
 

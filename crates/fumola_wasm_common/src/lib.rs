@@ -404,6 +404,61 @@ pub fn fumola_steps_taken(id: FumolaInstanceId) -> usize {
     })
 }
 
+/// The bytes of linear memory this module has, which every instance in it
+/// shares: wasm grows memory and never returns it, so this is the high water
+/// mark. None off wasm (native tests).
+pub fn heap_bytes() -> Option<u64> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        Some(core::arch::wasm32::memory_size(0) as u64 * 65536)
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        None
+    }
+}
+
+/// What a state's adapton store holds (`State::stats`, the counts it keeps as
+/// it runs), as a JSON object of named numbers. Reading it walks nothing.
+pub fn stats_of_state(state: &mut State) -> serde_json::Value {
+    let adapton = &state.semantic_state.agent.adapton_state;
+    let mut stats = serde_json::Map::new();
+    for (name, n) in adapton.stats() {
+        stats.insert(name.to_string(), serde_json::json!(n));
+    }
+    let mode = match adapton.strategy() {
+        fumola_semantics::adapton::Strategy::Simple => "simple",
+        fumola_semantics::adapton::Strategy::Graphical => "graphical",
+    };
+    serde_json::json!({
+        "mode": mode,
+        "steps": state.steps_taken(),
+        "stats": stats,
+    })
+}
+
+/// `id`'s stats (`stats_of_state`), with the module's heap size:
+/// `{"ok": true, "mode", "steps", "stats": {...}, "heap_bytes"}`, or
+/// `{"ok": false}` for no such instance.
+pub fn fumola_stats(id: FumolaInstanceId) -> String {
+    INSTANCES.with(|m| match m.borrow_mut().get_mut(&id) {
+        Some(state) => {
+            let mut v = stats_of_state(state);
+            v["ok"] = serde_json::json!(true);
+            v["heap_bytes"] = serde_json::json!(heap_bytes());
+            v.to_string()
+        }
+        None => serde_json::json!({"ok": false}).to_string(),
+    })
+}
+
+/// Every instance id sigma holds, ascending, as a JSON list.
+pub fn fumola_instances() -> String {
+    let mut ids: Vec<FumolaInstanceId> = INSTANCES.with(|m| m.borrow().keys().copied().collect());
+    ids.sort();
+    serde_json::json!(ids).to_string()
+}
+
 /// How many runtimes sigma currently holds. Exposed for tests and debugging.
 pub fn fumola_instance_count() -> usize {
     INSTANCES.with(|m| m.borrow().len())

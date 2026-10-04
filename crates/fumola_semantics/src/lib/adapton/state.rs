@@ -170,6 +170,124 @@ impl State {
     }
 }
 
+/// One pointer of the store, meta times folded together: its name, how many
+/// versions it has, whether its newest is a thunk, and how many edges read it.
+#[derive(Clone, Debug)]
+pub struct PointerSummary {
+    pub space: Space,
+    pub time: Time,
+    pub versions: u64,
+    pub thunk: bool,
+    pub readers: u64,
+}
+
+impl State {
+    /// What the store holds, as named counts, in a fixed order: the place to
+    /// add one more. Each is a tally the store keeps as it runs, or a map's
+    /// length, so asking costs O(1) whatever the store's size (the simple
+    /// store's pointers excepted: a pass over its spaces). `pointers` below is
+    /// the walk, for when the whole list is wanted.
+    ///
+    /// A POINTER is a (space, time) name, every meta time of it counted once:
+    /// the thing a program names. A VERSION is one meta time of a pointer.
+    pub fn stats(&self) -> Vec<(&'static str, u64)> {
+        let mut out: Vec<(&'static str, u64)> = Vec::new();
+        match &self.inner {
+            InnerState::Graphical(g) => {
+                out.push(("pointers", g.pointer_count));
+                out.push(("spaces", g.space_time.len() as u64));
+                out.push(("times", g.time_space.len() as u64));
+                out.push(("versions", g.version_count));
+                out.push(("thunk_versions", self.counts.thunk_cells));
+                out.push(("value_versions", self.counts.non_thunk_cells));
+                out.push(("edges", g.edges.len() as u64));
+                out.push(("pointers_read", g.edges_by_target.len() as u64));
+                out.push(("stack_depth", g.stack.len() as u64));
+                out.push(("history_events", g.history.events.len() as u64));
+                out.push(("history_nodes", g.history.nodes.len() as u64));
+                out.push(("history_edges", g.history.edges.len() as u64));
+                out.push((
+                    "meta_time",
+                    u64::try_from(&g.meta_time.0).unwrap_or(u64::MAX),
+                ));
+            }
+            InnerState::Simple(s) => {
+                // One version per pointer and no graph; a pass over the spaces,
+                // not the cells, counts the pointers.
+                let pointers: u64 = s.space_time.values().map(|m| m.len() as u64).sum();
+                out.push(("pointers", pointers));
+                out.push(("spaces", s.space_time.len() as u64));
+                out.push(("times", s.time_space.len() as u64));
+                out.push(("versions", pointers));
+                out.push(("thunk_versions", self.counts.thunk_cells));
+                out.push(("value_versions", self.counts.non_thunk_cells));
+                out.push(("edges", 0));
+                out.push(("pointers_read", 0));
+                out.push(("stack_depth", s.stack.len() as u64));
+            }
+        }
+        let c = &self.counts;
+        for (name, n) in [
+            ("ops_cells", c.cells),
+            ("ops_put", c.put),
+            ("ops_put_matched", c.put_matched),
+            ("ops_get", c.get),
+            ("ops_force_begin", c.force_begin),
+            ("ops_cache_hits", c.force_begin_cache_hit),
+            ("ops_cache_misses", c.force_begin_cache_miss),
+            ("ops_signalings", c.signalings),
+            ("ops_repairs", c.repairs),
+            ("ops_reevaluations", c.reevaluations),
+        ] {
+            out.push((name, n));
+        }
+        out
+    }
+
+    /// Every pointer, as `stats` counts them, in no particular order.
+    pub fn pointers(&self) -> Vec<PointerSummary> {
+        let mut out = Vec::new();
+        match &self.inner {
+            InnerState::Graphical(g) => {
+                for (space, by_time) in g.space_time.iter() {
+                    for (time, by_meta) in by_time.iter() {
+                        let thunk = matches!(
+                            by_meta.iter().max_by(|a, b| a.0.cmp(b.0)),
+                            Some((_, graphical::Node::Thunk(_)))
+                        );
+                        let readers = g
+                            .edges_by_target
+                            .get(&(space.clone(), time.clone()))
+                            .map(|v| v.len() as u64)
+                            .unwrap_or(0);
+                        out.push(PointerSummary {
+                            space: space.clone(),
+                            time: time.clone(),
+                            versions: by_meta.len() as u64,
+                            thunk,
+                            readers,
+                        });
+                    }
+                }
+            }
+            InnerState::Simple(s) => {
+                for (space, by_time) in s.space_time.iter() {
+                    for (time, cell) in by_time.iter() {
+                        out.push(PointerSummary {
+                            space: space.clone(),
+                            time: time.clone(),
+                            versions: 1,
+                            thunk: matches!(cell, simple::Cell::Thunk(_)),
+                            readers: 0,
+                        });
+                    }
+                }
+            }
+        }
+        out
+    }
+}
+
 impl State {
     fn put_reserved_symbol(&mut self, symbol: ReservedSymbol, value: Value_) -> Res<()> {
         match symbol {

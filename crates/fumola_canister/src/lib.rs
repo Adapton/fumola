@@ -159,6 +159,37 @@ fn eval_text(program: &str) -> String {
     KV.with(|kv| kv.borrow_mut().eval(program))
 }
 
+/// The instance name that is the store itself: `POST /i/hazelStore/<op>`
+/// runs in the DCG holding every space's keys, so a page can look inside it
+/// with the same remote livelit it runs any instance with. A view, not an
+/// editor: what a program does there is dropped (`eval_json_discard`), the
+/// mode is the store's and cannot be changed, and it cannot be reset --
+/// that is Reset Remote Hazel's job, a space at a time.
+pub const STORE_INSTANCE: &str = "hazelStore";
+
+fn store_instance_call(op: &str, body: &str) -> Option<String> {
+    Some(match op {
+        "eval_top" | "eval_scratch" => KV.with(|kv| kv.borrow_mut().eval_json_discard(body)),
+        "mode" => serde_json::json!({"ok": true, "mode": "graphical"}).to_string(),
+        "ensure_mode" if body.trim() == "graphical" => serde_json::json!({
+            "ok": true, "mode": "graphical", "created": false, "reset": false
+        })
+        .to_string(),
+        "ensure_mode" => serde_json::json!({
+            "ok": false,
+            "error": format!("{} is the store, which runs graphical semantics only", STORE_INSTANCE),
+        })
+        .to_string(),
+        "stats" => {
+            let mut v = KV.with(|kv| kv.borrow_mut().stats());
+            v["ok"] = serde_json::json!(true);
+            v["heap_bytes"] = serde_json::json!(fumola_wasm_common::heap_bytes());
+            v.to_string()
+        }
+        _ => return None,
+    })
+}
+
 // ---- Upgrades --------------------------------------------------------------
 
 /// The upgrade snapshot: a version, then each space's keys and log.
@@ -207,8 +238,11 @@ fn post_upgrade() {
 //   POST /eval      run the body as a Fumola program
 //   POST /eval.json the same, answered as Fumola's browser runtime answers
 //   POST /i/<name>/<op>  run a browser-runtime op (eval_top, ensure_mode,
-//                   reset, ...) on a named instance; GET /i lists them
+//                   reset, stats, ...) on a named instance; GET /i lists
+//                   them. /i/hazelStore/ is the store's own DCG, read-only
 //   GET  /spaces    every space holding keys, with how many, as JSON
+//   GET  /stats     the heap, the store's DCG and each instance, counted:
+//                   the tallies the DCG keeps, so this walks nothing
 //
 // Each path but /eval and /spaces is in a SPACE: `/s/<space>/kv`,
 // `/s/<space>/log` and so on are that space's, and the paths without
@@ -321,6 +355,19 @@ fn http_request(req: HttpRequest) -> HttpResponse {
             ..response(200, "text/plain", String::new())
         };
     }
+    if req.method == "GET" && path == "/stats" {
+        let instances: serde_json::Map<String, serde_json::Value> =
+            instances::stats().into_iter().collect();
+        let store = KV.with(|kv| kv.borrow_mut().stats());
+        return json(
+            serde_json::json!({
+                "heap_bytes": fumola_wasm_common::heap_bytes(),
+                "store": store,
+                "instances": instances,
+            })
+            .to_string(),
+        );
+    }
     if req.method == "GET" && path == "/i" {
         return json(serde_json::json!(instances::names()).to_string());
     }
@@ -397,6 +444,10 @@ fn http_request_update(req: HttpUpdateRequest) -> HttpResponse {
     }
     if let Some(rest) = path.strip_prefix("/i/") {
         return match rest.split_once('/') {
+            Some((STORE_INSTANCE, op)) => match store_instance_call(op, &body) {
+                Some(answer) => json(answer),
+                None => not_found(&path),
+            },
             Some((name, op)) if instances::valid_name(name) => {
                 match instances::call(name, op, &body) {
                     Some(answer) => json(answer),
@@ -435,3 +486,26 @@ fn http_request_update(req: HttpUpdateRequest) -> HttpResponse {
 }
 
 ic_cdk::export_candid!();
+
+#[cfg(test)]
+mod store_instance_tests {
+    use super::*;
+
+    #[test]
+    fn the_store_instance_reads_the_store_and_changes_nothing() {
+        KV.with(|kv| kv.borrow_mut().put(DEFAULT_SPACE, "k", "1").unwrap());
+        let v: serde_json::Value = serde_json::from_str(
+            &store_instance_call("eval_top", "(prim \"adaptonStats\" ()).pointers").unwrap(),
+        )
+        .unwrap();
+        assert_eq!(v["ok"], true, "{}", v);
+        // A put through the view is dropped with its branch.
+        store_instance_call("eval_top", "`hazel(0) := 99").unwrap();
+        let k = KV.with(|kv| kv.borrow_mut().get(DEFAULT_SPACE, "k"));
+        assert_eq!(k.as_deref(), Some("1"));
+        let m: serde_json::Value =
+            serde_json::from_str(&store_instance_call("ensure_mode", "simple").unwrap()).unwrap();
+        assert_eq!(m["ok"], false);
+        assert!(store_instance_call("reset", "").is_none());
+    }
+}

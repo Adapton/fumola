@@ -47,9 +47,24 @@ pub fn call(name: &str, op: &str, body: &str) -> Option<String> {
         "eval_scratch" => common::fumola_eval_scratch(id, body),
         "ensure_mode" => common::fumola_ensure_mode(id, body),
         "mode" => common::fumola_mode(id),
+        "stats" => common::fumola_stats(id),
         "get" => common::fumola_get(id, body),
         "reset" => serde_json::json!({ "reset": common::fumola_reset(id) }).to_string(),
         _ => return None,
+    })
+}
+
+/// Every instance's name and stats, for `GET /stats`.
+pub fn stats() -> Vec<(String, serde_json::Value)> {
+    NAMES.with(|n| {
+        n.borrow()
+            .iter()
+            .map(|(name, id)| {
+                let v: serde_json::Value = serde_json::from_str(&common::fumola_stats(*id))
+                    .unwrap_or(serde_json::Value::Null);
+                (name.clone(), v)
+            })
+            .collect()
     })
 }
 

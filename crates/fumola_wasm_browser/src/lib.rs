@@ -34,6 +34,8 @@ export! {
     fn fumola_drop(id: FumolaInstanceId);
     fn fumola_steps_taken(id: FumolaInstanceId) -> usize;
     fn fumola_instance_count() -> usize;
+    fn fumola_stats(id: FumolaInstanceId) -> String;
+    fn fumola_instances() -> String;
     fn fumola_eval(id: FumolaInstanceId, thunk_name: &str, program_text: &str) -> String;
     fn fumola_eval_top(id: FumolaInstanceId, program_text: &str) -> String;
     fn fumola_eval_scratch(id: FumolaInstanceId, program_text: &str) -> String;

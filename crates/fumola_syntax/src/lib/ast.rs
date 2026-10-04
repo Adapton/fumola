@@ -1059,6 +1059,10 @@ pub enum PrimFunction {
     AdaptonHistoryNodeVals,
     AdaptonNodeValsDiff,
     AdaptonNodeValsSize,
+    /// What the store holds, as an object of named counts (`State::stats`).
+    AdaptonStats,
+    /// Every pointer of the store, meta times folded together, as objects.
+    AdaptonPointers,
     AdaptonPoke,
     AtSignVar(String),
     DebugPrint,
@@ -1095,6 +1099,8 @@ impl PrimFunction {
             "\"adaptonHistoryNodeVals\"" => AdaptonHistoryNodeVals,
             "\"adaptonNodeValsDiff\"" => AdaptonNodeValsDiff,
             "\"adaptonNodeValsSize\"" => AdaptonNodeValsSize,
+            "\"adaptonStats\"" => AdaptonStats,
+            "\"adaptonPointers\"" => AdaptonPointers,
             "\"adaptonPoke\"" => AdaptonPoke,
             "\"print\"" => DebugPrint,
             "\"natToText\"" => NatToText,

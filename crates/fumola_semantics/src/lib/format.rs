@@ -335,6 +335,8 @@ impl ToDoc for PrimFunction {
             PrimFunction::AdaptonHistoryNodeVals => str("\"adaptonHistoryNodeVals\""),
             PrimFunction::AdaptonNodeValsDiff => str("\"adaptonNodeValsDiff\""),
             PrimFunction::AdaptonNodeValsSize => str("\"adaptonNodeValsSize\""),
+            PrimFunction::AdaptonStats => str("\"adaptonStats\""),
+            PrimFunction::AdaptonPointers => str("\"adaptonPointers\""),
             PrimFunction::AdaptonPoke => str("\"adaptonPoke\""),
             PrimFunction::ReifyCore => str("\"reifyCore\""),
             PrimFunction::ReflectCore => str("\"reflectCore\""),
