@@ -164,7 +164,8 @@ fn eval_text(program: &str) -> String {
 /// with the same remote livelit it runs any instance with. A view, not an
 /// editor: what a program does there is dropped (`eval_json_discard`), the
 /// mode is the store's and cannot be changed, and it cannot be reset --
-/// that is Reset Remote Hazel's job, a space at a time.
+/// that is Reset Remote Hazel's job, a space at a time. It can be re-inited
+/// (`reinit`): its DCG rebuilt from the values it holds, history dropped.
 pub const STORE_INSTANCE: &str = "hazelStore";
 
 fn store_instance_call(op: &str, body: &str) -> Option<String> {
@@ -180,6 +181,20 @@ fn store_instance_call(op: &str, body: &str) -> Option<String> {
             "error": format!("{} is the store, which runs graphical semantics only", STORE_INSTANCE),
         })
         .to_string(),
+        // Rebuild the store's DCG from the values it holds: nothing saved is
+        // lost, the history behind it is (Store::reinit).
+        "reinit" => KV.with(|kv| {
+            let mut kv = kv.borrow_mut();
+            let before = kv.stats();
+            match kv.reinit() {
+                Ok(keys) => serde_json::json!({
+                    "ok": true, "reinit": true, "keys": keys,
+                    "before": before, "after": kv.stats(),
+                }),
+                Err(e) => serde_json::json!({"ok": false, "error": e}),
+            }
+            .to_string()
+        }),
         "stats" => {
             let mut v = KV.with(|kv| kv.borrow_mut().stats());
             v["ok"] = serde_json::json!(true);
@@ -304,8 +319,31 @@ fn response(status_code: u16, content_type: &str, body: String) -> HttpResponse 
     }
 }
 
+/// The most a reply may carry. The IC refuses a reply payload over 2 MiB
+/// (ic0.msg_reply_data_append) by trapping, which the gateway turns into a
+/// bare 503 with nothing of the cause in it; the headers and the Candid
+/// framing need some of that, so a body stops a little short of it.
+const MAX_REPLY_BODY: usize = 2_000_000;
+
 fn json(body: String) -> HttpResponse {
+    if body.len() > MAX_REPLY_BODY {
+        return response(200, "application/json", too_large(body.len()));
+    }
     response(200, "application/json", body)
+}
+
+/// A refusal the page can read, in the shape a failed run answers with,
+/// for a reply the IC would not carry.
+fn too_large(len: usize) -> String {
+    serde_json::json!({
+        "ok": false,
+        "error": format!(
+            "the reply is {:.1} MB, and the Internet Computer carries at most 2 MB; \
+             for a history, ask adaptonPeekHistoryBrief instead",
+            len as f64 / 1_000_000.0
+        ),
+    })
+    .to_string()
 }
 
 fn not_found(path: &str) -> HttpResponse {
@@ -490,6 +528,16 @@ ic_cdk::export_candid!();
 #[cfg(test)]
 mod store_instance_tests {
     use super::*;
+
+    #[test]
+    fn a_reply_too_big_for_the_ic_is_refused_in_words() {
+        let r = json("x".repeat(MAX_REPLY_BODY + 1));
+        assert_eq!(r.status_code, 200);
+        let v: serde_json::Value = serde_json::from_slice(&r.body).unwrap();
+        assert_eq!(v["ok"], false);
+        assert!(v["error"].as_str().unwrap().contains("2 MB"));
+        assert_eq!(json("{}".to_string()).body.to_vec(), b"{}".to_vec());
+    }
 
     #[test]
     fn the_store_instance_reads_the_store_and_changes_nothing() {

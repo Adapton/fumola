@@ -249,6 +249,40 @@ impl Store {
             .collect()
     }
 
+    /// Rebuild the DCG from the values the store holds now, as an upgrade
+    /// does: every key in every space keeps its value and its number (the
+    /// index is kept, and the cells are put again in number order), and the
+    /// history behind them -- earlier versions, edges, events -- is dropped.
+    ///
+    /// Refused, with nothing changed, if any value does not read back: a
+    /// rebuild that silently left a key out would be a loss of saved data.
+    pub fn reinit(&mut self) -> Result<usize, String> {
+        let mut pairs: Vec<(u64, String, String, String)> = Vec::new();
+        for (space, kvs) in self.snapshot() {
+            for (key, value) in kvs {
+                let n = *self
+                    .index
+                    .get(&(space.clone(), key.clone()))
+                    .ok_or_else(|| format!("{}/{} has no number", space, key))?;
+                pairs.push((n, space.clone(), key, value));
+            }
+        }
+        if pairs.len() != self.cells.len() {
+            return Err(format!(
+                "only {} of {} values read back; nothing was rebuilt",
+                pairs.len(),
+                self.cells.len()
+            ));
+        }
+        pairs.sort_by_key(|(n, _, _, _)| *n);
+        self.fumola = State::empty();
+        self.cells.clear();
+        for (_, space, key, value) in &pairs {
+            self.put(space, key, value)?;
+        }
+        Ok(pairs.len())
+    }
+
     pub fn restore(&mut self, spaces: Vec<(String, Vec<(String, String)>)>) {
         for (s, pairs) in spaces {
             for (k, v) in pairs {
@@ -262,6 +296,31 @@ impl Store {
 mod tests {
     use super::*;
     const D: &str = DEFAULT_SPACE;
+
+    #[test]
+    fn reinit_keeps_every_value_and_number_and_drops_the_history() {
+        let mut s = Store::new();
+        s.put(D, "a", "1").unwrap();
+        s.put(D, "b", "(x y)").unwrap();
+        s.put("team", "a", "\"t\"").unwrap();
+        s.put(D, "a", "2").unwrap(); // a second version of a
+        let before = s.stats();
+        let values = s.snapshot();
+        let numbers = (s.index(D), s.index("team"));
+        assert_eq!(s.reinit(), Ok(3));
+        let after = s.stats();
+        // Every value reads back as it did before, in every space.
+        assert_eq!(s.snapshot(), values);
+        assert_eq!(s.get(D, "a").as_deref(), Some("2"));
+        assert_eq!((s.index(D), s.index("team")), numbers);
+        let (b, a) = (&before["stats"], &after["stats"]);
+        assert_eq!(a["pointers"], b["pointers"]);
+        assert_eq!(b["versions"], serde_json::json!(4));
+        assert_eq!(a["versions"], serde_json::json!(3));
+        // A program still reads a cell by its number.
+        let v: serde_json::Value = serde_json::from_str(&s.eval_json("@ hazelCell0")).unwrap();
+        assert_eq!(v["ok"], true);
+    }
 
     #[test]
     fn eval_json_answers_as_the_browser_runtime_does() {
