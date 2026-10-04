@@ -304,6 +304,17 @@ pub fn call_prim_function<A: Active>(
                 type_mismatch!(file!(), line!())
             }
         }
+        AdaptonPeekHistoryBrief => {
+            let max: usize = match args.as_ref() {
+                Value::Nat(n) => usize::try_from(n).unwrap_or(usize::MAX),
+                _ => type_mismatch!(file!(), line!()),
+            };
+            let history = active.adapton().history()?.brief(max);
+            *active.cont() = cont_value_(
+                crate::adapton::peek_value::PeekValue::into_value_(history),
+            );
+            Ok(Step {})
+        }
         AdaptonPeekHistory => {
             let events_value = active.adapton().peek_events()?;
             *active.cont() = cont_value_(events_value);

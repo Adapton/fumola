@@ -1063,6 +1063,9 @@ pub enum PrimFunction {
     AdaptonStats,
     /// Every pointer of the store, meta times folded together, as objects.
     AdaptonPointers,
+    /// The history, as adaptonPeekHistory, with each value longer than the
+    /// argument (characters, printed) cut short: `History::brief`.
+    AdaptonPeekHistoryBrief,
     AdaptonPoke,
     AtSignVar(String),
     DebugPrint,
@@ -1101,6 +1104,7 @@ impl PrimFunction {
             "\"adaptonNodeValsSize\"" => AdaptonNodeValsSize,
             "\"adaptonStats\"" => AdaptonStats,
             "\"adaptonPointers\"" => AdaptonPointers,
+            "\"adaptonPeekHistoryBrief\"" => AdaptonPeekHistoryBrief,
             "\"adaptonPoke\"" => AdaptonPoke,
             "\"print\"" => DebugPrint,
             "\"natToText\"" => NatToText,

@@ -430,4 +430,31 @@ mod tests {
         let list = s.eval("prim \"adaptonPointers\" ()");
         assert!(list.contains("versions = 2"), "{}", list);
     }
+
+    #[test]
+    fn a_brief_history_keeps_its_shape_and_cuts_big_values() {
+        let mut s = Store::new();
+        let big = format!("(doc \"{}\")", "x".repeat(5000));
+        s.put("hazel", "a", &big).unwrap();
+        s.put("hazel", "b", "1").unwrap();
+        let full = s.eval_json("prim \"adaptonPeekHistory\" ()");
+        let brief = s.eval_json("prim \"adaptonPeekHistoryBrief\" (60)");
+        let full: serde_json::Value = serde_json::from_str(&full).unwrap();
+        let brief: serde_json::Value = serde_json::from_str(&brief).unwrap();
+        for part in ["events", "nodes", "edges"] {
+            assert_eq!(
+                full["value"][part]["value"].as_array().unwrap().len(),
+                brief["value"][part]["value"].as_array().unwrap().len(),
+                "{}",
+                part
+            );
+        }
+        let b = brief.to_string();
+        let f = full.to_string();
+        // The 5000-character value appears in a node and a put: cut, the
+        // history is a fraction of its size.
+        assert!(b.len() * 3 < f.len(), "{} of {}", b.len(), f.len());
+        assert!(b.contains("chars)"), "{}", b);
+    }
+
 }

@@ -221,6 +221,66 @@ pub struct History {
 }
 
 impl History {
+    /// This history with each value it holds -- a node's, a thunk's result, what a put,
+    /// a get or a force carried -- printed on one line and, when that runs past
+    /// `max_chars`, replaced by the start of the printing and its length, as text. The
+    /// events, nodes and edges themselves are all kept.
+    ///
+    /// For a reader across a wire: a store whose cells hold documents (the canister's,
+    /// holding Hazel's saved data) has a history of megabytes, mostly those values,
+    /// more than one HTTP reply can carry and more than a watch pane can draw.
+    pub fn brief(&self, max_chars: usize) -> History {
+        let brief = |v: &Value_| -> Value_ {
+            let printed = crate::format::format_one_line(&**v);
+            let n = printed.chars().count();
+            if n <= max_chars {
+                v.clone()
+            } else {
+                let start: String = printed.chars().take(max_chars).collect();
+                fumola_syntax::shared::Share::share(Value::Text(format!("{}... ({} chars)", start, n).into()))
+            }
+        };
+        let brief_node = |node: &Node| -> Node {
+            match node {
+                Node::NonThunk(v) => Node::NonThunk(brief(v)),
+                Node::Thunk(t) => Node::Thunk(ThunkNode {
+                    result: t.result.as_ref().map(|(m, v)| (m.clone(), brief(v))),
+                    ..t.clone()
+                }),
+            }
+        };
+        let brief_action = |a: &Action| -> Action {
+            match a {
+                Action::Put(v) => Action::Put(brief(v)),
+                Action::Get(v) => Action::Get(brief(v)),
+                Action::Force(body, v) => Action::Force(body.clone(), brief(v)),
+                Action::ForceBegin(body) => Action::ForceBegin(body.clone()),
+            }
+        };
+        History {
+            events: self.events.clone(),
+            nodes: self
+                .nodes
+                .iter()
+                .map(|item| NodeHistoryItem {
+                    node: brief_node(&item.node),
+                    ..item.clone()
+                })
+                .collect(),
+            edges: self
+                .edges
+                .iter()
+                .map(|item| EdgeHistoryItem {
+                    edge: Edge {
+                        action: brief_action(&item.edge.action),
+                        ..item.edge.clone()
+                    },
+                    ..item.clone()
+                })
+                .collect(),
+        }
+    }
+
     pub fn new() -> Self {
         History {
             events: Vector::new(),
