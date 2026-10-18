@@ -216,6 +216,18 @@ check "and keeps the provenance the fetcher wrote" "one" \
   "$(python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["source_commit"])' < "$WORK/h1/hazel.json")"
 check_absent "no index when nothing is hosted" "$WORK/s1/hazel.json"
 
+# (ticket 296) Every hosted Hazel loads the nav bar Matthew's pages share, as an
+# app (hidden until asked for), once: a fresh build, and one carried forward.
+hazel_build "$WORK/hzn" nav
+printf '<!doctype html><html><head><meta charset="utf-8"><title>hazel</title></head><body>hazel nav</body></html>\n' > "$WORK/hzn/index.html"
+"$ASSEMBLE" --bindings "$WORK/bh1" --pages "$WORK/pages" --out "$WORK/hn1" \
+  --hazel "$DEMO=$WORK/hzn" --commit ffff444 >/dev/null
+check "a hosted Hazel loads the nav bar" "1" "$(grep -o 'nav/nav.js' "$WORK/hn1/hazel/$DEMO/index.html" | wc -l)"
+check "as an app, hidden until asked for" "1" "$(grep -c '<meta name="nav" content="hidden">' "$WORK/hn1/hazel/$DEMO/index.html")"
+"$ASSEMBLE" --bindings "$WORK/bh1" --pages "$WORK/pages" --out "$WORK/hn2" \
+  --previous "$WORK/hn1" --commit ffff555 >/dev/null
+check "and once, carried forward" "1" "$(grep -o 'nav/nav.js' "$WORK/hn2/hazel/$DEMO/index.html" | wc -l)"
+
 # The regression this whole mechanism exists for: force_orphan replaces
 # gh-pages wholesale, so a publish triggered by a Rust-only merge to main --
 # which knows nothing about Hazel and passes no --hazel -- must not take the

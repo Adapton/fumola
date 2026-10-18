@@ -331,6 +331,15 @@ for entry in ${HAZEL[@]+"${HAZEL[@]}"}; do
   echo "hosting Hazel build $name from $dir"
 done
 
+# (ticket 296) The nav bar Matthew's pages share, on every hosted Hazel, new or carried forward: an app, so
+# hidden until asked for, keeping its own colours. Once only. How it fits together:
+# https://github.com/matthewhammer/matthewhammer.github.io/blob/master/nav/agent-instructions.md
+NAV='<!-- nav: begin --><meta name="theme-support" content="own"><meta name="nav" content="hidden"><script src="https://matthewhammer.org/nav/nav.js"></script><!-- nav: end -->'
+for page in "$OUT"/hazel/*/index.html; do
+  [ -f "$page" ] || continue
+  grep -q "nav/nav.js" "$page" || sed -i "0,/<head[^>]*>/s|<head[^>]*>|&$NAV|" "$page"
+done
+
 # What is hosted, derived from the assembled directory rather than from what
 # this run was asked to place: a carried-forward build and a freshly fetched
 # one are then indistinguishable in the index, which is the point -- the file
