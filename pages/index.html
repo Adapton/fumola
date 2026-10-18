@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8">
 <!-- nav: begin --><script src="https://matthewhammer.org/nav/nav.js"></script><!-- nav: end -->
+    <meta name="theme-support" content="data-theme">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Fumola</title>
     <meta name="description" content="Fumola: an experimental language whose execution model is Adapton. This host also serves the Fumola runtime, compiled to WebAssembly.">
@@ -26,10 +27,37 @@
         --str:     #c87e60;  /* string       */
         --var:     #f6ead2;  /* identifier   */
 
+        /* edges and links: a control's edge on hover, a link's underline and its hover, the run button's hover */
+        --edge:    #3a3a40;
+        --link-rule: #2b3f52;
+        --link-hover: #7db6e8;
+        --link-hover-rule: #4a7ba6;
+        --run-hover: #0d1620;
+
         /* Whatever the reader already has. Nothing is fetched. */
         --ui:   system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
                 "Liberation Mono", "DejaVu Sans Mono", monospace;
+      }
+
+      /* The same roles on a white page (the nav bar's ☀️ light, or ◐ auto on a system set to light), after the
+         Fumola theme's colours darkened to read on white, as VS Code's Light+ does its dark ones. The page is
+         dark otherwise: with ☾ dark, and with ◐ auto on a dark system. */
+      :root[data-theme="light"] {
+        --bg: #ffffff; --panel: #f5f5f7; --rule: #e1e1e6; --fg: #1d1d21; --dim: #6a6a72;
+        --green: #3b7a2a; --blue: #1f5fbf; --pink: #9a2f9c; --type: #6a3fb0; --sym: #7a4d80; --op: #4646ad;
+        --eff: #c0392b; --str: #a14d24; --var: #3b2f1a;
+        --edge: #c9c9d2; --link-rule: #b9cde6; --link-hover: #13478f; --link-hover-rule: #5a83bd; --run-hover: #eaf1fb;
+        color-scheme: light;
+      }
+      @media (prefers-color-scheme: light) {
+        :root:not([data-theme]) {
+          --bg: #ffffff; --panel: #f5f5f7; --rule: #e1e1e6; --fg: #1d1d21; --dim: #6a6a72;
+          --green: #3b7a2a; --blue: #1f5fbf; --pink: #9a2f9c; --type: #6a3fb0; --sym: #7a4d80; --op: #4646ad;
+          --eff: #c0392b; --str: #a14d24; --var: #3b2f1a;
+          --edge: #c9c9d2; --link-rule: #b9cde6; --link-hover: #13478f; --link-hover-rule: #5a83bd; --run-hover: #eaf1fb;
+          color-scheme: light;
+        }
       }
 
       * { box-sizing: border-box; }
@@ -96,7 +124,7 @@
         color: var(--var);
         text-decoration: none;
       }
-      .masthead-repo a:hover { border-color: #3a3a40; background: var(--panel); }
+      .masthead-repo a:hover { border-color: var(--edge); background: var(--panel); }
       .masthead-repo .what { margin-left: 0.6rem; }
 
       .masthead-note {
@@ -126,8 +154,8 @@
       p { margin: 0 0 1.05rem; }
       p:last-child { margin-bottom: 0; }
 
-      a { color: var(--blue); text-decoration: none; border-bottom: 1px solid #2b3f52; }
-      a:hover { color: #7db6e8; border-bottom-color: #4a7ba6; }
+      a { color: var(--blue); text-decoration: none; border-bottom: 1px solid var(--link-rule); }
+      a:hover { color: var(--link-hover); border-bottom-color: var(--link-hover-rule); }
 
       strong { font-weight: 600; color: var(--var); }
       em { color: var(--fg); }
@@ -240,10 +268,10 @@
         padding: 0.45rem 0.7rem;
         cursor: pointer;
       }
-      button:hover:not(:disabled) { border-color: #3a3a40; color: var(--var); }
+      button:hover:not(:disabled) { border-color: var(--edge); color: var(--var); }
       button:disabled { opacity: 0.4; cursor: default; }
-      button.run { color: var(--blue); border-color: #2b3f52; }
-      button.run:hover:not(:disabled) { background: #0d1620; }
+      button.run { color: var(--blue); border-color: var(--link-rule); }
+      button.run:hover:not(:disabled) { background: var(--run-hover); }
 
       textarea {
         display: block;
@@ -258,7 +286,7 @@
         padding: 0.9rem 1rem;
         tab-size: 2;
       }
-      textarea:focus { outline: none; border-color: #3a3a40; }
+      textarea:focus { outline: none; border-color: var(--edge); }
 
       .controls { display: flex; align-items: center; gap: 0.8rem; margin-top: 0.7rem; }
       .status { font: 400 0.8rem/1.4 var(--mono); color: var(--dim); }
@@ -410,7 +438,7 @@
         color: var(--fg);
         cursor: pointer;
       }
-      .outline-toggle:hover { border-color: #3a3a40; }
+      .outline-toggle:hover { border-color: var(--edge); }
       .outline-toggle:focus-visible { outline: 1px solid var(--eff); outline-offset: 2px; }
       .outline-toggle svg { width: 1.15rem; height: 1.15rem; display: block; }
       .outline-toggle .bars { display: block; }
