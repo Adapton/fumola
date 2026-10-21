@@ -18,8 +18,10 @@
 //! `test_adapton_graphical::test_events_do_big`, and the adapton programs at
 //! the end of this file.
 
+use fumola_semantics::adapton::AdaptonState;
+use fumola_semantics::adapton::graphical::History;
 use fumola_semantics::value::Value_;
-use fumola_semantics::vm_types::{ActiveBorrow, Core, Counts, Interruption, Limits};
+use fumola_semantics::vm_types::{Active, ActiveBorrow, Core, Counts, Interruption, Limits};
 
 /// The answer a program gave, whichever kind of answer it was.
 #[derive(Debug, PartialEq)]
@@ -28,7 +30,19 @@ enum Answer {
     Failed(String),
 }
 
-fn run(src: &str) -> (Answer, Counts) {
+/// Everything one run leaves behind that the two modes have to agree on.
+struct Outcome {
+    answer: Answer,
+    counts: Counts,
+    /// The graph's event history. Under the graphical strategy this is every
+    /// `force_begin`, `force_end`, edge and repair event in order, with its
+    /// meta-time; under the simple strategy it is empty. For the forms that run
+    /// recursively and touch the graph -- force, and repair under it -- this is
+    /// the oracle the counts cannot be.
+    history: Option<History>,
+}
+
+fn run(src: &str) -> Outcome {
     let prog = match fumola::check::parse(src) {
         Ok(p) => p,
         Err(e) => panic!("{} did not parse: {:?}", src, e),
@@ -38,36 +52,63 @@ fn run(src: &str) -> (Answer, Counts) {
         Ok(v) => Answer::Value(format!("{:?}", v)),
         // Compared by rendering: the point is that a region fails the way the
         // machine fails, in the same words, and `Interruption` is not `Eq`.
-        Err(i) => Answer::Failed(format!("{}", i)),
+        Err(i) => Answer::Failed(without_locator(&format!("{}", i))),
     };
-    (answer, core.counts().clone())
+    let counts = core.counts().clone();
+    let history = core.adapton().history().ok();
+    Outcome {
+        answer,
+        counts,
+        history,
+    }
+}
+
+/// A type mismatch says where in the VM the check was made -- `(at file:line)`.
+/// When a region makes that check it is made in `vm_big.rs`, and the message
+/// says so; making it name `vm_stack_cont.rs` instead would be a lie about
+/// where the code ran. So the locator is dropped before comparing, and what is
+/// asserted is that the two modes fail with the same *kind* of failure.
+fn without_locator(message: &str) -> String {
+    match message.rfind(" (at ") {
+        Some(i) if message.ends_with(')') => message[..i].to_string(),
+        _ => message.to_string(),
+    }
 }
 
 /// Assert that a body means the same thing under both modes.
 ///
 /// `do small { .. }` rather than a bare `do { .. }` so that the two programs
-/// differ by exactly one token, and the `Do` frame is in both.
+/// differ by exactly one token, and the `Do` frame is in both. The mode is
+/// padded to the same width -- `do big   {` -- so that every span in the body
+/// lands at the same offset in both programs. The graph's history embeds thunk
+/// bodies as syntax, positions included, and a two-character shift would make
+/// two identical graphs compare unequal.
 #[track_caller]
 fn agree(body: &str) -> (Answer, Counts) {
-    let (small_answer, small) = run(&format!("do small {{ {} }}", body));
-    let (big_answer, big) = run(&format!("do big {{ {} }}", body));
+    let small = run(&format!("do small {{ {} }}", body));
+    let big = run(&format!("do big   {{ {} }}", body));
 
     assert_eq!(
-        small_answer, big_answer,
+        small.answer, big.answer,
         "\n  the two modes disagree about what `{}` means",
         body
     );
     assert_eq!(
-        small.step, big.step,
+        small.counts.step, big.counts.step,
         "\n  `{}`: small-step took {} steps, big-step charged {}",
-        body, small.step, big.step
+        body, small.counts.step, big.counts.step
     );
     assert_eq!(
-        small.redex, big.redex,
+        small.counts.redex, big.counts.redex,
         "\n  `{}`: small-step retired {} redexes, big-step charged {}",
-        body, small.redex, big.redex
+        body, small.counts.redex, big.counts.redex
     );
-    (big_answer, big)
+    assert_eq!(
+        small.history, big.history,
+        "\n  `{}`: the two modes built different graphs",
+        body
+    );
+    (big.answer, big.counts)
 }
 
 /// The value a body evaluates to, for the tests that also want to pin it.
@@ -302,9 +343,11 @@ fn an_actor_send_inside_a_region_does_not_resume() {
 // The adapton corpus, unchanged inside a region.
 // ---------------------------------------------------------------------------
 
-/// Every adapton operation in these programs is delegated, so what is being
-/// checked is that the delegation boundary does not disturb the brackets --
-/// `force_begin`/`force_end`, the navigations, and repair.
+/// `force` now runs recursively; `@`, the puts, the navigations and scratch
+/// are still delegated. So these programs mix the two, and what is being
+/// checked -- value, counts, and the graph's event history -- is that the
+/// brackets `force_begin`/`force_end` open and close in the machine's order
+/// whichever side of the line they fall on.
 #[test]
 fn the_adapton_corpus_is_unchanged() {
     for strategy in ["#simple", "#graphical"] {
@@ -321,9 +364,10 @@ fn the_adapton_corpus_is_unchanged() {
 }
 
 /// Signalling, realignment and a cache hit in one program -- the place a
-/// re-entrant evaluator would most plausibly diverge. It cannot here, because
-/// repair is reached only from the machine's own force path, which a region
-/// never takes over.
+/// re-entrant evaluator would most plausibly diverge, and now it is reached:
+/// `force t` the second time finds a signaled edge, and `repair` in vm_big
+/// drives `repair_step`/`repair_resume` in the machine's order. The event
+/// history is what says the two agree.
 #[test]
 fn realignment_is_unchanged() {
     agree(
@@ -486,4 +530,142 @@ fn a_call_inside_a_force() {
          let t = `t := thunk { double(@ x) }; \
          let a = force t; x := 5; (a, force t)",
     );
+}
+
+
+// ---------------------------------------------------------------------------
+// Force, which the recursive evaluator now enters.
+// ---------------------------------------------------------------------------
+
+fn graphical(body: &str) -> String {
+    format!("prim \"adaptonReset\" (#graphical); {}", body)
+}
+
+/// A cache miss and then a cache hit, under both strategies.
+#[test]
+fn a_force_misses_then_hits() {
+    for strategy in ["#simple", "#graphical"] {
+        agree(&format!(
+            "prim \"adaptonReset\" ({}); let t = `t := thunk {{ 1 + 2 }}; (force t, force t)",
+            strategy
+        ));
+    }
+}
+
+/// A bare thunk, with no pointer into the graph.
+#[test]
+fn a_bare_thunk() {
+    agrees_on("force (thunk { 40 + 2 })", "42");
+    agrees_on("let t = thunk { 40 + 2 }; (force t, force t)", "(42, 42)")
+}
+
+/// Forces nested inside forces, so the `force_begin`/`force_end` brackets have
+/// to nest in the graph exactly as they do on the machine's stack.
+#[test]
+fn nested_forces() {
+    agree(&graphical(
+        "let a = `a := thunk { 1 }; \
+         let b = `b := thunk { (force a) + 10 }; \
+         let c = `c := thunk { (force b) + 100 }; \
+         (force c, force b, force a)",
+    ));
+}
+
+/// A thunk body that calls, so recursion into a call happens inside recursion
+/// into a force.
+#[test]
+fn a_call_inside_a_forced_thunk() {
+    agree(&graphical(
+        "func fib(n : Nat) : Nat { if (n < 2) n else fib(n - 1) + fib(n - 2) }; \
+         let t = `t := thunk { fib(12) }; force t",
+    ));
+}
+
+/// Repair, in its three shapes: a reader whose input changed, a reader whose
+/// input changed back to the same value, and a chain two forces deep.
+#[test]
+fn repair_in_three_shapes() {
+    // Signaled, misaligned: the reader is reevaluated.
+    agree(&graphical(
+        "let x = `x := 1; let t = `t := thunk { (@ x) + 1 }; \
+         let a = force t; x := 5; (a, force t)",
+    ));
+    // Signaled, aligned after the check: the input was written with the value
+    // it already had.
+    agree(&graphical(
+        "let x = `x := 1; let t = `t := thunk { (@ x) + 1 }; \
+         let a = force t; x := 1; (a, force t)",
+    ));
+    // A chain: repairing `u` means forcing `t`, which is itself signaled.
+    agree(&graphical(
+        "let x = `x := 1; \
+         let t = `t := thunk { (@ x) * 2 }; \
+         let u = `u := thunk { (force t) + 1 }; \
+         let a = force u; x := 10; (a, force u, force t)",
+    ));
+}
+
+/// A `return` from inside a forced thunk inside a call.
+///
+/// `return_` scans the real stack for a `Call3`, and on its way past the
+/// `ForceAdaptonPointer` frame it does not call `force_end` -- the force is
+/// simply abandoned. That is what the machine does, and a region has to do the
+/// same thing, which it does by propagating `Escaped` and closing nothing.
+#[test]
+fn a_return_inside_a_forced_thunk() {
+    agrees_on(
+        "func f() : Nat { force (thunk { return 5 }); 9 }; f()",
+        "5",
+    );
+    agree(&graphical(
+        "func f() : Nat { let t = `t := thunk { return 5 }; force t; 9 }; f()",
+    ));
+}
+
+/// A failure inside a forced thunk fails alike, and leaves the stack standing.
+#[test]
+fn a_failure_inside_a_forced_thunk_fails_alike() {
+    agree(&graphical("let t = `t := thunk { assert false; 1 }; force t"));
+    // Not `1 / 0`: on HEAD that panics inside num-bigint rather than raising
+    // `DivideByZero`, under either mode. A machine bug, filed separately.
+    agree(&graphical("let t = `t := thunk { nosuch + 1 }; force t"));
+}
+
+/// Forcing something that is not a thunk fails alike.
+#[test]
+fn forcing_a_non_thunk_fails_alike() {
+    agree("force 3");
+}
+
+/// A thunk that forces itself recursively, past the depth budget, so some of
+/// the forces run on the machine and some on the Rust stack -- and the graph
+/// must not be able to tell.
+#[test]
+fn deep_thunk_recursion_past_the_depth_budget() {
+    agree(&graphical(
+        "func down(n : Nat) : Nat { if (n == 0) 0 else 1 + (force (thunk { down(n - 1) })) }; \
+         down(300)",
+    ));
+}
+
+
+// ---------------------------------------------------------------------------
+// Failures raised by the recursive evaluator's own arms.
+// ---------------------------------------------------------------------------
+
+/// Each of these fails inside an arm this file mirrors, not inside a shared
+/// helper -- so the failure's kind is what is being pinned. The locator
+/// (`at file:line`) differs by design and is not compared.
+#[test]
+fn type_mismatches_in_mirrored_arms_fail_alike() {
+    agree("not 3");
+    agree("3 and true");
+    agree("true and 3");
+    agree("3 or true");
+    agree("false or 3");
+    agree("if 3 1 else 2");
+    agree("while 3 { }");
+    agree("var i = 0; while (i < 1) { i := i + 1; 5 }");
+    agree("assert 3");
+    agree("let (a, b) = 3; a");
 }

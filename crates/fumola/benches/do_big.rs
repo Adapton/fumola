@@ -168,6 +168,32 @@ fn fib_in_a_force(n: usize) -> String {
     )
 }
 
+/// The same recursion, with a `switch` at the top of the body.
+///
+/// `switch` is delegated, and it is the first form in nearly every function
+/// body in list and tree code -- so a delegated switch takes the whole
+/// recursion beneath it back to the machine. If this row reads like
+/// `fib 22, in a force` did, that is the next thing standing between a region
+/// and mergeSort.
+fn fib_via_switch(n: usize) -> String {
+    format!(
+        "func fib(n : Nat) : Nat {{ \
+           switch (if (n < 2) null else ?n) {{ case null n; case (?m) fib(m - 1) + fib(m - 2) }} \
+         }}; fib({})",
+        n
+    )
+}
+
+/// The same recursion, with a record built and projected in the body.
+fn fib_via_record(n: usize) -> String {
+    format!(
+        "func fib(n : Nat) : Nat {{ \
+           let r = {{ v = if (n < 2) n else fib(n - 1) + fib(n - 2) }}; r.v \
+         }}; fib({})",
+        n
+    )
+}
+
 /// A loop whose body switches, which is the shape list and tree code has.
 fn switching(n: usize) -> String {
     format!(
@@ -258,6 +284,16 @@ fn main() {
             name: "fib 22, in a force",
             recursive: Recursive::No,
             source: fib_in_a_force(22),
+        },
+        Workload {
+            name: "fib 22, via switch",
+            recursive: Recursive::Partly,
+            source: fib_via_switch(22),
+        },
+        Workload {
+            name: "fib 22, via record",
+            recursive: Recursive::Partly,
+            source: fib_via_record(22),
         },
         Workload {
             name: "switching loop (20k)",

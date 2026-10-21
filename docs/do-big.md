@@ -51,11 +51,13 @@ A region never takes any of them over.
 
 Binders (`let`, `var`, `func`), blocks, `do`, literals, variables, parentheses,
 the unary and binary operators, the comparisons, `not`/`and`/`or`, `assert`,
-tuples, `if`, `while`, assignment to a plain variable, and **calls**.
+tuples, `if`, `while`, assignment to a plain variable, **calls**, and **`force`**
+-- including the repair a force can set off.
 
-Everything else is handed to the machine: `force`, `@`, `do goto`, `do within`,
+Everything else is handed to the machine: `@`, the puts, `do goto`, `do within`,
 `do ?`, `!`, `return`, `switch`, `for`, objects, arrays, indexing, `.field`,
-annotations, and the module, actor, import and object declarations.
+annotations, `prim "adaptonScratch"`, and the module, actor, import and object
+declarations.
 
 ### Calls
 
@@ -76,24 +78,56 @@ frame where `call_function` saves the caller's; they disagree in the repo today,
 and delegating actor methods keeps that unobservable rather than resolving it
 here.
 
-### Two exclusions that are not laziness
+### Force
 
-- **Indexing.** The `Idx2` frame arm looks *underneath itself* for an `Assign1`
-  frame, to decide whether `a[i]` is a read or an assignment target. A recursive
-  evaluator has no frame there to find, so `a[i] := v` would read the element and
-  assign to that. `Assign` is in the set only for a plain variable target.
-- **`force`.** Entering a thunk body is the machine's own `enter_thunk_body`,
-  bracketed by `force_begin`/`force_end` across a frame, and a cache miss may
-  hand off to `repair_loop`, which drives the graph's realignment through the
-  stack. Delegating all of it is what makes the graph claim structural. It is
-  also, as measured below, the thing that now matters most.
+This is the one place the recursive evaluator mirrors machine control flow
+rather than calling it, and the reason is worth stating. `Call` reuses the
+machine's reduction because `call_function` stops with the body in `cont`. The
+force path does not: `enter_thunk_body` tail-calls `exp_step` on the thunk body,
+so by the time it returns the body's first step is already taken, and the
+machine is in a state the recursive evaluator cannot resume from.
+
+So `vm_big.rs` carries its own `force_value`, `force_pointer`, `forced_body` and
+`repair` -- some fifty lines, each naming the machine function it mirrors
+(`force_pointer`, `enter_thunk_body`, `repair_loop`, and the four frame arms).
+What is **not** duplicated is anything that touches the graph. `force_begin`,
+`force_end`, `repair_step` and `repair_resume` are the adapton state's own
+methods, called in the order the machine calls them, with the same arguments;
+the frames pushed are the frames the machine pushes, field for field. The graph
+keeps its own frame stack (`FrameKind`), so "which force is running" was never
+VM state to begin with. That is what the graph claim now rests on -- narrower
+than "the machine does all of it", and checked rather than assumed: the harness
+compares the graph's event history between the two modes for every program.
+
+The same folding sets the step accounting. A force that enters a body is *one*
+machine step that already includes the body's first descend, which the body's
+own arm charges -- so the force contributes only its redex, (0, 1). A force that
+ends in a value, a cache hit or an aligned node, is a whole step, (1, 1).
+
+Two things a force does not do, in either mode: a `return` or `!` that leaves a
+forced thunk pops its frame without `force_end` -- the machine's `return_` scans
+past it -- and the recursive version propagates `Escaped` and closes nothing,
+matching that exactly rather than fixing it. And a failure inside the body
+leaves the stack standing, as it always did.
+
+### One exclusion that is not laziness
+
+**Indexing.** The `Idx2` frame arm looks *underneath itself* for an `Assign1`
+frame, to decide whether `a[i]` is a read or an assignment target. A recursive
+evaluator has no frame there to find, so `a[i] := v` would read the element and
+assign to that. `Assign` is in the set only for a plain variable target.
 
 ## What it does not do yet
 
-**It still does not speed up `mergeSort`, and now we know why.** It is not
-calls -- those are in the set. It is `force`. mergeSort is an adapton example:
-its whole computation happens inside a forced thunk, and a region stops at the
-edge of a force. The measurement below isolates that with a controlled pair.
+**It speeds up `mergeSort` only a little, and the measurement says exactly
+why.** Calls and forces are both in the set now, and a region does reach
+mergeSort's work -- but nearly every function body in the list and tree code it
+is built from opens with a `switch` or a `.field` projection, and both are
+delegated. A delegated node takes its whole subtree back to the machine,
+recursive calls and all. So most of mergeSort still runs small-step in both
+modes, and the ratio sits at 0.91-0.95. The controlled pairs below show each
+swallower in turn: `force` before this change, `switch` and record projection
+now.
 
 **It never engages in web-play.** A region evaluated on the Rust stack is
 atomic — there is no standing continuation to pause at. So when a step limit, a
@@ -111,60 +145,71 @@ inspectable one step at a time.
 
 ## What it is worth, measured
 
-`cargo bench -p fumola --bench do_big`, release, one machine:
+`cargo bench -p fumola --bench do_big`, release, one machine, with calls and
+forces in the recursive set:
 
 | workload | steps | small (ms) | big (ms) | ratio | noise floor |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| loop, 0 reads | 720k | 53.8 | 21.2 | **0.39** | 1.02 |
-| mixed (5k iters) | 435k | 44.0 | 18.8 | 0.43 | 0.96 |
-| loop, 1 call | 1.12M | 90.1 | 40.2 | 0.45 | 1.00 |
-| loop, 1 read | 880k | 72.8 | 33.4 | 0.46 | 0.94 |
-| loop, 4 calls | 2.32M | 193.0 | 92.8 | 0.48 | 1.01 |
-| **fib 22** | 1.49M | 136.8 | 65.8 | **0.48** | 1.03 |
-| switching loop (20k) | 1.21M | 105.3 | 55.3 | 0.53 | 0.97 |
-| binders (800 lets) | 5.6k | 1.71 | 1.05 | 0.62 | 0.84 |
-| loop, 4 reads | 1.36M | 112.7 | 71.9 | 0.64 | 1.05 |
-| loop, 16 reads | 3.28M | 311.5 | 220.0 | 0.71 | 0.94 |
-| nested (depth 200) | 1.2k | 0.11 | 0.08 | 0.72 | 1.01 |
-| nested calls (5k) | 75k | 7.65 | 6.44 | 0.84 | 0.91 |
-| **fib 22, in a force** | 1.49M | 139.2 | 130.6 | *0.94* | 0.99 |
+| loop, 0 reads | 720k | 53.8 | 21.5 | **0.40** | 1.01 |
+| loop, 1 call | 1.12M | 92.9 | 39.6 | 0.43 | 0.98 |
+| **fib 22, in a force** | 1.49M | 139.8 | 66.4 | **0.47** | 1.00 |
+| fib 22 | 1.49M | 138.9 | 66.4 | 0.48 | 1.00 |
+| mixed (5k iters) | 435k | 41.6 | 19.9 | 0.48 | 1.00 |
+| loop, 4 calls | 2.32M | 194.0 | 93.5 | 0.48 | 1.01 |
+| loop, 1 read | 880k | 69.4 | 33.7 | 0.49 | 0.99 |
+| switching loop (20k) | 1.21M | 104.2 | 55.1 | 0.53 | 1.00 |
+| loop, 4 reads | 1.36M | 118.2 | 69.3 | 0.59 | 1.00 |
+| binders (800 lets) | 5.6k | 1.64 | 1.08 | 0.66 | 0.92 |
+| loop, 16 reads | 3.28M | 293.7 | 218.8 | 0.75 | 1.01 |
+| nested (depth 200) | 1.2k | 0.12 | 0.09 | 0.76 | 0.97 |
+| nested calls (5k) | 75k | 7.15 | 6.58 | 0.92 | 0.99 |
+| **fib 22, via record** | 1.89M | 204.6 | 190.9 | *0.93* | 1.01 |
+| **fib 22, via switch** | 1.83M | 174.8 | 164.9 | *0.94* | 1.02 |
 
 And `mergeSort` itself, loading the real module tree
 (`cargo bench -p fumola --bench do_big_mergesort`):
 
 | workload | steps | small (ms) | big (ms) | ratio | noise floor |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| scene, size 8 | 329k | 87.0 | 79.3 | 0.91 | 1.01 |
-| scene, size 16 | 732k | 187.2 | 183.9 | 0.98 | 1.07 |
-| scene, size 23 | 1.24M | 337.6 | 342.3 | 1.01 | 1.02 |
-| scene, size 44 | 2.46M | 708.3 | 692.0 | 0.98 | 1.04 |
+| scene, size 8 | 329k | 100.2 | 90.8 | 0.91 | 0.96 |
+| scene, size 16 | 732k | 206.9 | 190.8 | 0.92 | 1.03 |
+| scene, size 23 | 1.24M | 393.6 | 373.1 | 0.95 | 1.01 |
+| scene, size 44 | 2.46M | 820.9 | 743.8 | 0.91 | 0.97 |
 
 Ratio below 1.00 means the region was faster. The noise floor is the same
 program in the same mode timed again, so it absorbs warm-up; a ratio no further
 from 1.00 than the floor beside it is not a result.
 
-One pair carries the argument. **`fib 22` at 0.48 and `fib 22, in a force` at
-0.94** are the same computation, to within eight steps — the second is the first
-wrapped in `force (thunk { .. })`. Reachable, a region halves it; behind a
-force, a region does nothing at all.
+Three controlled pairs carry the argument, and they are the same computation
+each time -- `fib 22`, 1.49M to 1.9M steps -- differing only in one form around
+or at the top of it.
 
-That is the whole explanation for the mergeSort table. Its computation happens
-inside a force, so a region never reaches it. Nothing about mergeSort is
-unusual; it is an adapton example doing what adapton examples do.
+**`fib 22` at 0.48 and `fib 22, in a force` at 0.47.** Before forces were in
+the set the second read 0.94: the same work, unreachable behind a `force`. Now
+the two agree, which is the direct measurement that a region reaches through a
+force and does so at no cost.
+
+**`fib 22, via switch` at 0.94 and `via record` at 0.93.** The recursion is
+identical; the body opens with a `switch`, or builds a record and projects a
+field. Both forms are delegated, and a delegated node takes its whole subtree
+back to the machine -- so these read like `in a force` used to. They are the
+next swallowers, and they are what mergeSort is made of.
+
+**`mergeSort` at 0.91-0.95**, down from flat. Forces are reached; most of the
+work beneath them opens with a `switch` or a projection and is handed back.
+Every step count is unchanged from before forces were in the set (2462583 at
+size 44), which is the accounting rule holding across a much larger surface.
 
 The rest is consistent with that reading. A loop the evaluator runs entirely
-takes two fifths of the time at an identical step count — the continuation cost,
-and most of the work. Adding delegated array reads walks the ratio back toward
-1.00 (0.46 → 0.64 → 0.71 at one, four and sixteen reads per iteration), because
-delegation returns that share of the work to the machine.
+takes two fifths of the time at an identical step count. Adding delegated array
+reads walks the ratio back toward 1.00 (0.49 → 0.59 → 0.75 at one, four and
+sixteen reads per iteration).
 
-Calls, which the previous cut delegated, moved from 0.61 to 0.45 at one per
-iteration and from 0.76 to 0.48 at four. That is the measured worth of this
-change.
-
-The read of this for the next step: **`force` is where the remaining time is**,
-and it is the hardest thing in the file to bring in, because it is the one
-bracket the delegation design was built to avoid touching.
+The read of this for the next step: **`switch` and `Dot`/object literals are
+where the remaining time is.** `switch` needs `vm_match` and a case
+continuation; `Dot` is a long arm with no stack introspection, and object
+literals allocate. None is a graph bracket, so none carries the risk `force`
+did.
 
 ### The same, in wasm
 
@@ -178,24 +223,25 @@ and asserted equal before any time is printed.
 
 | workload | steps | small (ms) | big (ms) | ratio | noise floor |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| loop, 0 reads | 800k | 110.1 | 45.3 | **0.41** | 1.00 |
-| fib 22 | 1.49M | 245.7 | 131.6 | **0.54** | 1.05 |
-| fib 22, in a force | 1.49M | 191.7 | 239.7 | *1.25* | *1.39* |
-| scene, size 8 | 329k | 218.0 | 213.4 | 0.98 | 0.97 |
-| scene, size 16 | 732k | 516.0 | 512.7 | 0.99 | 1.03 |
-| scene, size 23 | 1.24M | 912.4 | 903.9 | 0.99 | 1.03 |
-| scene, size 44 | 2.46M | 2925.2 | 2708.2 | 0.93 | 0.93 |
+| loop, 0 reads | 800k | 90.1 | 39.7 | **0.44** | 0.91 |
+| fib 22 | 1.49M | 187.6 | 100.8 | **0.54** | 1.05 |
+| fib 22, in a force | 1.49M | 192.7 | 94.1 | **0.49** | 1.00 |
+| scene, size 8 | 329k | 234.1 | 231.0 | *0.99* | *0.95* |
+| scene, size 16 | 732k | 648.6 | 550.3 | *0.85* | *0.86* |
+| scene, size 23 | 1.24M | 1199.7 | 1030.3 | *0.86* | *0.88* |
+| scene, size 44 | 2.46M | 2025.4 | 1991.9 | *0.98* | *1.00* |
 
-The reachable rows transfer: 0.41 against 0.39 native, 0.54 against 0.48. The
-mergeSort rows are flat on both targets, and every step count is
-byte-identical to the native run -- 329125, 732492, 1240073, 2462583 -- which
-is a cross-target check of the evaluator in its own right. The absolute times
-agree with #68 (2.9 s at size 44, against its 2.5 s).
+The reachable rows transfer: 0.44 against 0.40 native, 0.54 against 0.48. And
+`fib 22, in a force` at 0.49 -- it read 1.25 inside a 1.39 floor before forces
+were in the set -- now agrees with `fib 22`, so a region reaches through a
+force in wasm as it does natively.
 
-The `fib 22, in a force` row is **not a result** here. Its floor is 1.39: the
-same program in the same mode came back 39% slower the second time, which is
-#68's memory behaviour showing up as timing noise in a fresh wasm heap. It is
-kept in the table because a floor that wide is exactly what the floor is for.
+The mergeSort rows are **not a result in wasm**, in either direction: every
+ratio sits inside its own floor. The floors are wide here -- the same program
+in the same mode came back 12-14% faster the second time at sizes 16 and 23 --
+which is #68's allocator behaviour in a fresh heap, and it is larger than the
+~8% effect native measured with tight floors. Consistent with native, not a
+confirmation of it. Every step count is byte-identical to the native run.
 
 ## The two loud failures
 
