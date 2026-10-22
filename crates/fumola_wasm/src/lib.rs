@@ -33,6 +33,7 @@ use fumola_syntax::ast::Id;
 use fumola_semantics::vm_types::{ActiveBorrow, Counts, LocalPointer, Pointer, ScheduleChoice};
 use wasm_bindgen::prelude::*;
 
+pub mod json_in;
 pub mod symbol;
 use symbol::{symbol_from_json, symbol_to_json, symbol_to_source};
 
@@ -483,14 +484,72 @@ enum Effects {
 /// performed from outside, and it leaves no trace of having looked.
 #[wasm_bindgen]
 pub fn fumola_eval_scratch(id: FumolaInstanceId, program_text: &str) -> String {
-    eval_against(id, program_text, Effects::Discard)
+    eval_against(id, program_text, Effects::Discard, &[])
+}
+
+/// Bind `name` at the top level of the runtime named by `id` to a value given
+/// as JSON, with no Fumola source in between: a host's values cross as values
+/// (`json_in` says how JSON reads). A later program sees `name` as it sees a
+/// top-level `let`. Answers `{"ok": true}`, or `ok: false` for an unknown
+/// instance, a name a program could not write, or JSON with no reading.
+#[wasm_bindgen]
+pub fn fumola_define_json(id: FumolaInstanceId, name: &str, json: &str) -> String {
+    if !json_in::is_identifier(name) {
+        return error_json(&format!("not a name a program can use: {:?}", name));
+    }
+    let value = match json_in::value_of_json_text(json) {
+        Ok(value) => value,
+        Err(message) => return error_json(&message),
+    };
+    INSTANCES.with(|m| match m.borrow_mut().get_mut(&id) {
+        Some(state) => {
+            state.semantic_state.define(name, value);
+            serde_json::json!({ "ok": true }).to_string()
+        }
+        None => error_json(&format!("no Fumola instance with id {}", id)),
+    })
+}
+
+/// `fumola_eval_top`, after binding each field of `bindings_json` (an object)
+/// as `fumola_define_json` binds a name: a call's arguments cross as values,
+/// and its text stays a few characters whatever their size, as in
+/// `fumola_eval_top_with(id, "world(g, e)", JSON.stringify({ g, e }))`. The
+/// bindings stay when the program succeeds, as its own top-level bindings do;
+/// when it fails, the instance is as it was before, bindings and all.
+#[wasm_bindgen]
+pub fn fumola_eval_top_with(
+    id: FumolaInstanceId,
+    program_text: &str,
+    bindings_json: &str,
+) -> String {
+    let fields = match serde_json::from_str::<serde_json::Value>(bindings_json) {
+        Ok(serde_json::Value::Object(fields)) => fields,
+        Ok(_) => return error_json("bindings must be a JSON object, a field for each name"),
+        Err(e) => return error_json(&format!("bindings are not JSON: {}", e)),
+    };
+    let mut bindings = Vec::with_capacity(fields.len());
+    for (name, json) in fields.iter() {
+        if !json_in::is_identifier(name) {
+            return error_json(&format!("not a name a program can use: {:?}", name));
+        }
+        match json_in::value_of_json(json) {
+            Ok(value) => bindings.push((name.as_str(), value)),
+            Err(message) => return error_json(&format!("{}: {}", name, message)),
+        }
+    }
+    eval_against(id, program_text, Effects::Keep, &bindings)
 }
 
 fn eval_in(id: FumolaInstanceId, program: &str) -> String {
-    eval_against(id, program, Effects::Keep)
+    eval_against(id, program, Effects::Keep, &[])
 }
 
-fn eval_against(id: FumolaInstanceId, program: &str, effects: Effects) -> String {
+fn eval_against(
+    id: FumolaInstanceId,
+    program: &str,
+    effects: Effects,
+    bindings: &[(&str, fumola_semantics::value::Value_)],
+) -> String {
     INSTANCES.with(|m| {
         let mut m = m.borrow_mut();
         let state = match m.get_mut(&id) {
@@ -512,6 +571,10 @@ fn eval_against(id: FumolaInstanceId, program: &str, effects: Effects) -> String
         // cost rather than what the instance has cost since it was made.
         let before = state.semantic_state.agent.counts.clone();
         let mut attempt = state.clone();
+        // On the copy, so a program that fails leaves no binding behind.
+        for (name, value) in bindings {
+            attempt.semantic_state.define(*name, value.clone());
+        }
         let outcome = attempt.eval(program);
         // Drained either way: a program that failed still printed whatever it
         // printed before it failed, and that is usually the interesting part.

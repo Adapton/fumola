@@ -107,6 +107,23 @@ reuses what the last run built. `fumola_eval` wraps your program as
 `fumola_eval_top` runs it at the top level instead. `fumola_ensure_mode(id, m)`
 picks the semantics — `"graphical"` keeps the DCG, `"simple"` does not.
 
+Values can come in as values rather than as source text.
+`fumola_define_json(id, name, json)` binds `name` at the top level to a JSON
+value, and `fumola_eval_top_with(id, text, bindings)` binds each field of a
+JSON object the same way and then evaluates `text`, so a call's arguments
+cross whatever their size and its text stays a few characters:
+
+```js
+fumola_eval_top_with(id, "find_at(cells, 0, cells.size(), c, r)",
+  JSON.stringify({ cells, c: 2, r: 3 }));
+```
+
+A number reads as a `Nat` (a whole number from 0 up), an `Int` (a whole
+number below 0) or a `Float`; text, booleans and `null` as themselves; an
+array as an array; an object as a record, except that one whose keys are
+`tag` and, optionally, `value` is a variant (`{"tag": "Way", "value": "E"}` is
+`#Way("E")`). The bindings of a program that fails are dropped with it.
+
 To build the pair yourself:
 
 ```bash
