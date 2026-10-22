@@ -1,0 +1,43 @@
+<title>Fumola — web play</title>
+<meta http-equiv="refresh" content="0; url=/web-play/">
+<link rel="canonical" href="https://fumola.org/web-play/">
+<style>
+  :root {
+    --bg: #14161a; --panel: #1a1d23; --fg: #d6d9de; --dim: #8b929e;
+    --rule: #2a2e37; --var: #9ecbff;
+    --ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+            "Liberation Mono", "DejaVu Sans Mono", monospace;
+  }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--fg);
+    font: 400 1rem/1.6 var(--ui);
+    display: flex; align-items: center; justify-content: center; padding: 2rem;
+  }
+  .card {
+    max-width: 34rem; background: var(--panel); border: 1px solid var(--rule);
+    border-radius: 4px; padding: 1.6rem 1.8rem;
+  }
+  h1 { margin: 0 0 0.8rem; font: 600 1.4rem/1.3 var(--ui); color: var(--var); }
+  p { margin: 0 0 0.8rem; color: var(--dim); }
+  a { color: var(--var); }
+  code { font: 400 0.9em var(--mono); color: var(--fg); }
+</style>
+
+<div class="card">
+  <h1>This moved to /web-play/</h1>
+  <p>
+    Taking you to <a href="/web-play/">fumola.org/web-play</a> now. If nothing
+    happens, follow that link.
+  </p>
+  <p>
+    <code>/web-repl/</code> keeps working, and will keep working: links to it
+    have been shared. It is only ever a redirect from here on.
+  </p>
+</div>
+
+<script>
+  // Carry a fragment across, so a deep link keeps pointing where it pointed.
+  location.replace("/web-play/" + location.search + location.hash);
+</script>

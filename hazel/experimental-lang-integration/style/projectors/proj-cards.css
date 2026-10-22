@@ -1,0 +1,216 @@
+/* CARD SPRITES */
+
+:root {
+  /* Sprite-atlas locked: background-position offsets are computed in
+     these px (CardProj.card_to_offset), so the cells cannot scale with
+     the text grid without also scaling the atlas (transform-based;
+     future work). ~2 rows tall at default zoom. */
+  --card-width: 35px;
+  --card-height: 47px;
+}
+
+/* Modal context: the .projector base style is position:absolute, so the modal
+   doesn't size to the card. Pin it to relative so the modal sizes to content
+   and the close button at right:-18px sits cleanly outside the cards. */
+.modal-backdrop.live-offside .modal:has(> .projector.card) {
+  background-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+.modal-backdrop.live-offside .modal > .projector.card {
+  position: relative;
+  padding: 0 24px 0 0;
+}
+.modal-backdrop.live-offside .modal > .projector.card .card-wrapper.show,
+.modal-backdrop.live-offside .modal > .projector.card .card-wrapper.flipped {
+  width: var(--card-width);
+  height: var(--card-height);
+}
+
+.code-deco:has(~ .projectors .projector.card.indicated) .indication {
+  display: none;
+}
+
+.projector.card {
+  perspective: 300px;
+  /* top-anchor the card so it dips below its line rather than centering
+     on it (branches with the tab-extent wrapper pin it via explicit
+     insets, so this only bites where the card-wrapper is a direct
+     flex child) */
+  align-items: flex-start;
+}
+
+.projector.card.selected > svg {
+  stroke-width: 0.5px;
+}
+
+.base .projector.card.selected .card-scene {
+  filter: brightness(0.71) sepia(1) hue-rotate(11deg) saturate(1.5);
+}
+.projector.card {
+  z-index: var(--projector-z); /* hack? to get above selection shard */
+}
+
+/* The tab-extent layer spans the full two-row footprint (inline
+   height); center the card composition inside it, clear of the
+   chevron end-caps. */
+.projector.card > .tab-extent {
+  position: absolute;
+  inset: 1px 0.4ch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Singleton */
+.projector.card > .tab-extent > .card-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+.projector.card .card-scene {
+  width: var(--card-width);
+  height: var(--card-height);
+  transition: transform 0.25s;
+  transform-style: preserve-3d;
+  position: relative;
+  cursor: pointer;
+}
+
+@keyframes flip-card {
+  0% {
+    transform: rotateY(180deg);
+  }
+  50% {
+    transform: rotateY(160deg);
+  }
+  75% {
+    transform: rotateY(70deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+.projector.card .flipped .card-scene {
+  transform: rotateY(180deg);
+  /* animation: flip-card 0.35s;
+  animation-direction: alternate-reverse; */
+}
+
+.card-sprite.back {
+  transform: rotateY(180deg);
+}
+
+.projector.card .card-sprite {
+  position: absolute;
+  backface-visibility: hidden;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  cursor: pointer;
+  width: var(--card-width);
+  height: var(--card-height);
+  image-rendering: pixelated;
+  background-image: url("../../img/cards-pixel-pattern.png");
+  filter: drop-shadow(-1px 0px 0px black) drop-shadow(0px -1px 0px black)
+    drop-shadow(1px 0px 0px black) drop-shadow(0px 1px 0px black);
+}
+
+.projector.card.Pat .card-sprite {
+  filter: drop-shadow(-1px 0px 0px var(--PAT))
+    drop-shadow(0px -1px 0px var(--PAT)) drop-shadow(1px 0px 0px var(--PAT))
+    drop-shadow(0px 1px 0px var(--PAT));
+}
+
+/* HAND */
+
+.card .hand {
+  /* width set inline by CardProj (fan pitch x cards); centered by the
+     tab-extent flex parent */
+  position: relative;
+  height: var(--card-height);
+}
+
+@keyframes rock-back-and-forth {
+  0% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(4deg);
+  }
+}
+
+.projector.card.indicated .hand .card-scene:hover {
+  animation: rock-back-and-forth 0.25s infinite;
+}
+
+.projector.card .hand .card-sprite {
+  transition: transform 0.1s ease-in-out;
+}
+
+.projector.card.indicated .hand .card-sprite:hover {
+  translate: 0px -9px;
+  filter: drop-shadow(-1px 0px 0px black) drop-shadow(0px -1px 0px black)
+    drop-shadow(1.5px 0px 0px black) drop-shadow(0px 1.5px 0px black)
+    drop-shadow(2px 2px 0px #6666);
+}
+.projector.card.indicated.Pat .hand .card-sprite:hover {
+  filter: drop-shadow(-1px 0px 0px var(--PAT))
+    drop-shadow(0px -1px 0px var(--PAT)) drop-shadow(1.5px 0px 0px var(--PAT))
+    drop-shadow(0px 1.5px 0px var(--PAT)) drop-shadow(2px 2px 0px #6666);
+}
+
+/* CHOOSER */
+
+.projector.card .chooser {
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+}
+.projector.card .card-wrapper:has(.choose) {
+  z-index: 10000 !important;
+}
+.projector.card:has(.chooser) {
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+.projector.card .chooser .card-wrapper:hover {
+  animation: rock-back-and-forth 0.25s infinite;
+}
+
+.projector.card .chooser .card-wrapper.indicated {
+  filter: invert(1);
+}
+.projector.card .chooser .card-wrapper:hover {
+  filter: invert(1);
+  translate: 0px -5px;
+}
+
+/* ---- the empty hand: a card-footprint silhouette ---- */
+.card-empty {
+  width: var(--card-width, 35px);
+  height: var(--card-height, 47px);
+  border: 1.5px dotted var(--BR2, #b09a6a);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  opacity: 0.75;
+}
+
+.card-empty-badge {
+  width: 17px;
+  height: 17px;
+  border: 1px solid var(--BR2, #b09a6a);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--BR3, #8a744a);
+}
