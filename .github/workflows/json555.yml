@@ -1,0 +1,55 @@
+# MEASURING ONLY (^ticket(555)): ^report(27)'s World rule with the map passed as source text against passed as JSON
+# (fumola_eval_top_with, from PR #148), Fumola's wasm build in node, on one runner, three rounds; the rows are the artifact.
+name: JSON values 555 (measuring only)
+on:
+  push:
+    branches: ["bench/555-json"]
+  workflow_dispatch:
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nightly with the wasm target
+        run: |
+          rustup toolchain install nightly --profile minimal
+          rustup default nightly
+          rustup target add wasm32-unknown-unknown
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            target
+          key: json555-${{ runner.os }}-${{ hashFiles('**/Cargo.toml') }}
+      - name: Install wasm-bindgen-cli (the version the crate resolves to)
+        run: |
+          set -euo pipefail
+          version=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "wasm-bindgen") | .version' | head -1)
+          test -n "$version"
+          if [ "$(wasm-bindgen --version 2>/dev/null | awk '{print $2}')" != "$version" ]; then
+            cargo install wasm-bindgen-cli --version "$version" --force
+          fi
+      - name: Test the JSON entry points natively
+        run: cargo test --release -p fumola_wasm --no-default-features --test test_json_values
+      - name: Build wasm
+        run: |
+          cargo build --release --target wasm32-unknown-unknown -p fumola_wasm --no-default-features
+          wasm-bindgen --target web --out-dir bindings target/wasm32-unknown-unknown/release/fumola_wasm.wasm
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run, three rounds
+        run: |
+          mkdir -p out
+          lscpu > out/lscpu.txt
+          for round in 1 2 3; do
+            node bench/555/measure.mjs "$PWD/bindings" bench/555/world.fum 3,4,8,16,32,64 out/world_json_$round.json
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: json555
+          path: out
