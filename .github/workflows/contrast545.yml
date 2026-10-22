@@ -1,0 +1,69 @@
+# MEASURING ONLY (^ticket(545)): Hazel and Fumola on the same small programs, on one runner. Fumola is built twice from
+# this commit, natively and as wasm, and both run the kernels through fumola_eval_top; Hazel's library (the best
+# performance build, trial/r25-best) runs them under node. Three rounds, interleaved; the rows are the artifact.
+name: Contrast 545 (measuring only)
+on:
+  push:
+    branches: ["bench/545-contrast"]
+  workflow_dispatch:
+jobs:
+  contrast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nightly with the wasm target
+        run: |
+          rustup toolchain install nightly --profile minimal
+          rustup default nightly
+          rustup target add wasm32-unknown-unknown
+          rustc --version
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            target
+          key: contrast545-${{ runner.os }}-${{ hashFiles('**/Cargo.toml') }}
+      - name: Install wasm-bindgen-cli (the version the crate resolves to)
+        run: |
+          set -euo pipefail
+          version=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "wasm-bindgen") | .version' | head -1)
+          test -n "$version"
+          if [ "$(wasm-bindgen --version 2>/dev/null | awk '{print $2}')" != "$version" ]; then
+            cargo install wasm-bindgen-cli --version "$version" --force
+          fi
+      - name: Build native (the kernels example)
+        run: cargo build --release -p fumola_wasm --no-default-features --example kernels
+      - name: Build wasm
+        run: |
+          cargo build --release --target wasm32-unknown-unknown -p fumola_wasm --no-default-features
+          wasm-bindgen --target web --out-dir bindings target/wasm32-unknown-unknown/release/fumola_wasm.wasm
+          sha256sum bindings/*
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Hazel's library (trial/r25-best)
+        run: |
+          mkdir -p hz
+          curl -fsSL -o hz/hazel-lib.js https://hazel.org/build/trial/r25-best/hazel-lib.js
+          sha256sum hz/hazel-lib.js
+      - name: The machine
+        run: |
+          lscpu | sed -n '1,20p'
+          node --version
+      - name: Run, three rounds, interleaved
+        run: |
+          mkdir -p out
+          for round in 1 2 3; do
+            ./target/release/examples/kernels bench/545/kernels.fum out/fumola_native_$round.json
+            node bench/545/kernels.mjs fumola "$PWD/bindings" out/fumola_wasm_$round.json
+            node --stack-size=8000 bench/545/kernels.mjs hazel "$PWD/hz/hazel-lib.js" out/hazel_best_$round.json 2>&1 | grep -v WARNING
+          done
+          lscpu > out/lscpu.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contrast545
+          path: out
