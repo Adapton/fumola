@@ -59,3 +59,11 @@ jobs:
           node bench/571/probe.mjs "$PWD/bindings" | tee probe.txt
           node bench/571/probe2.mjs "$PWD/bindings" | tee -a probe.txt
           cat probe.txt >> "$GITHUB_STEP_SUMMARY"
+      # (the build itself, for the game to pin: dress-up/vendor/fumola/<commit>/ takes these two files)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fumola-wasm
+          path: |
+            bindings/fumola_wasm.js
+            bindings/fumola_wasm_bg.wasm
+            probe.txt
