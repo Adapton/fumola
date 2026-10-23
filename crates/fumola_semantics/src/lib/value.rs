@@ -30,6 +30,49 @@ pub type Result<T = Value, E = ValueError> = std::result::Result<T, E>;
 #[derive(Clone, Debug)]
 pub struct Text(Vector<Rc<String>>);
 
+/// A text literal's characters, its escapes read: `\"`, `\\`, `\'`, `\n`, `\t`, `\r`,
+/// `\0` and `\u{...}`, the ones a printed text is written with (format.rs prints
+/// a Text with Rust's `{:?}`), so a printed text reads in as itself. Any other
+/// backslash stays as it was. The lexer already took a backslash and the
+/// character after it as part of the literal; only this step was missing.
+pub fn unescape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut cs = s.chars().peekable();
+    while let Some(c) = cs.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match cs.next() {
+            Some('"') => out.push('"'),
+            Some('\\') => out.push('\\'),
+            Some('\'') => out.push('\''),
+            Some('n') => out.push('\n'),
+            Some('t') => out.push('\t'),
+            Some('r') => out.push('\r'),
+            Some('0') => out.push('\0'),
+            Some('u') if cs.peek() == Some(&'{') => {
+                cs.next();
+                let hex: String = cs.by_ref().take_while(|c| *c != '}').collect();
+                match u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32) {
+                    Some(ch) => out.push(ch),
+                    None => {
+                        out.push_str("\\u{");
+                        out.push_str(&hex);
+                        out.push('}');
+                    }
+                }
+            }
+            Some(other) => {
+                out.push('\\');
+                out.push(other);
+            }
+            None => out.push('\\'),
+        }
+    }
+    out
+}
+
 impl Text {
     pub fn new(s: String) -> Text {
         Self(vector!(Rc::new(s)))
@@ -511,7 +554,7 @@ impl Value {
                 Value::Float(n.replace('_', "").parse().map_err(|_| ValueError::Float)?)
             }
             Literal::Char(s) => Char(s[1..s.len() - 1].parse().map_err(|_| ValueError::Char)?),
-            Literal::Text(s) => Text(crate::value::Text::from(s[1..s.len() - 1].to_string())),
+            Literal::Text(s) => Text(crate::value::Text::from(unescape(&s[1..s.len() - 1]))),
             Literal::Blob(v) => Blob(v.clone()),
         })
     }
