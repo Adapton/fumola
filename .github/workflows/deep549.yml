@@ -1,0 +1,85 @@
+# MEASURING ONLY (^ticket(549)): the deep-answers branch has no PR yet, so Fumola's own CI has not run on it, and
+# running it on the laptop is what crashed it (crash 46). Two jobs. `tests` runs rust.yml's steps on this commit.
+# `cost` builds main (cb2bcf5) and the branch (08e7e25) on one runner and times the mergeSort benchmark from each,
+# alternating, four rounds, since the branch gives Value its own Drop; the rows are the artifact.
+name: Deep answers 549 (measuring only)
+on:
+  push:
+    branches: ["bench/549-deep"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test the site assembly
+        run: ./tools/assemble-site.test.sh
+      - name: Refuse a panic macro reachable from evaluation
+        run: ./tools/check-no-panics.sh
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: rustfmt, clippy
+      - name: Build
+        run: cargo build --verbose
+      - name: Run Rust unit tests
+        run: cargo test --verbose
+      - name: Run Fumola unit tests
+        run: ./fumola-test.sh
+      - name: Run Fumola example scripts
+        run: ./fumola-scripts.sh
+
+  cost:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: branch
+      - uses: actions/checkout@v4
+        with:
+          ref: cb2bcf5a1a3716a31b8e498007b37fa4b2ba4ab3
+          path: main
+      - name: Install nightly
+        run: |
+          rustup toolchain install nightly --profile minimal
+          rustup default nightly
+          rustc --version
+      - name: Build the benchmark from each (bench profile)
+        run: |
+          set -euo pipefail
+          for side in main branch; do
+            exe=$(cd $side && cargo bench -p fumola --bench do_big_mergesort --no-run --message-format=json \
+              | jq -r 'select(.executable != null and .target.name == "do_big_mergesort") | .executable' | tail -1)
+            test -x "$exe"
+            cp "$exe" "$RUNNER_TEMP/$side-bench"
+            echo "$side: $(cd $side && git rev-parse HEAD) $(sha256sum "$exe" | cut -c1-16)"
+          done
+      - name: The machine
+        run: lscpu | sed -n '1,20p'
+      - name: Run, four rounds, alternating which goes first
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          lscpu > out/lscpu.txt
+          round=0
+          for pair in "main branch" "branch main" "main branch" "branch main"; do
+            round=$((round + 1))
+            for side in $pair; do
+              echo "== round $round, $side"
+              "$RUNNER_TEMP/$side-bench" | tee "out/${side}_${round}.txt"
+            done
+          done
+      - name: Summary
+        run: python3 branch/bench/549/summary.py out | tee out/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deep549
+          path: out
