@@ -1,0 +1,61 @@
+# MEASURING ONLY (^ticket(571)): the semantics fixes on semantics-571 have no PR yet, so Fumola's own CI has not run on them.
+# rust.yml's steps on this commit, then the wasm build and the trap probes (bench/571/probe*.mjs) run on it, to read the
+# answers each trap of ^report(28) gives now.
+name: Semantics 571 (measuring only)
+on:
+  push:
+    branches: ["bench/571-semantics"]
+  workflow_dispatch:
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test the site assembly
+        run: ./tools/assemble-site.test.sh
+      - name: Refuse a panic macro reachable from evaluation
+        run: ./tools/check-no-panics.sh
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: rustfmt, clippy
+      - name: Build
+        run: cargo build --verbose
+      - name: Run Rust unit tests
+        run: cargo test
+      - name: Run Fumola unit tests
+        run: ./fumola-test.sh
+      - name: Run Fumola example scripts
+        run: ./fumola-scripts.sh
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nightly with the wasm target
+        run: |
+          rustup toolchain install nightly --profile minimal
+          rustup default nightly
+          rustup target add wasm32-unknown-unknown
+      - name: Install wasm-bindgen-cli (the version the crate resolves to)
+        run: |
+          set -euo pipefail
+          version=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "wasm-bindgen") | .version' | head -1)
+          cargo install wasm-bindgen-cli --version "$version" --force
+      - name: Build wasm
+        run: |
+          cargo build --release --target wasm32-unknown-unknown -p fumola_wasm --no-default-features
+          wasm-bindgen --target web --out-dir bindings target/wasm32-unknown-unknown/release/fumola_wasm.wasm
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The traps, now
+        run: |
+          node bench/571/probe.mjs "$PWD/bindings" | tee probe.txt
+          node bench/571/probe2.mjs "$PWD/bindings" | tee -a probe.txt
+          cat probe.txt >> "$GITHUB_STEP_SUMMARY"
