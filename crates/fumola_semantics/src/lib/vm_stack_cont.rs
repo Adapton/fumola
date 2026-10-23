@@ -698,14 +698,14 @@ fn nonempty_stack_cont<A: Active>(active: &mut A, v: Value_) -> Result<Step, Int
             Ok(Step {})
         }
         GetAdaptonPointer => {
-            if let Value::AdaptonPointer(p) = v.get() {
-                let v = active.adapton().get_pointer(p)?;
+            if let Value::AdaptonPointer(p) = &*v {
+                let v = active.adapton().get_pointer(p.clone())?;
                 *active.cont() = Cont::Value_(v);
                 Ok(Step {})
-            } else if let Value::Symbol(s) = v.get() {
+            } else if let Value::Symbol(s) = &*v {
                 let v = active
                     .adapton()
-                    .get_pointer(crate::adapton::Space::Symbol(s))?;
+                    .get_pointer(crate::adapton::Space::Symbol(s.clone()))?;
                 *active.cont() = Cont::Value_(v);
                 Ok(Step {})
             } else {

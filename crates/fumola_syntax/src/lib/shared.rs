@@ -47,6 +47,14 @@ impl<T: Clone> Shared<T> {
     }
 }
 
+impl<T: ?Sized> Shared<T> {
+    /// The value itself, to change in place, when this is its only holder
+    /// (`Rc::get_mut`): how a value gives up its parts as it is dropped.
+    pub fn get_mut(&mut self) -> Option<&mut T> {
+        Rc::get_mut(&mut self.rc)
+    }
+}
+
 impl<T> Deref for Shared<T> {
     type Target = T;
 

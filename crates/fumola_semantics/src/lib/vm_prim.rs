@@ -494,7 +494,8 @@ mod collection {
                 let k = &args[1];
                 let v = &args[2];
                 let (hm, old) = {
-                    if let Value::Collection(Collection::HashMap(mut hm)) = hm.get() {
+                    if let Value::Collection(Collection::HashMap(hm)) = &**hm {
+                        let mut hm = hm.clone();
                         match hm.insert(k.fast_clone(), v.fast_clone()) {
                             None => (hm, Value::Null),
                             Some(old) => (hm, Value::Option(old)),
@@ -520,7 +521,7 @@ mod collection {
                 let hm = &args[0];
                 let k = &args[1];
                 let ret = {
-                    if let Value::Collection(Collection::HashMap(hm)) = hm.get() {
+                    if let Value::Collection(Collection::HashMap(hm)) = &**hm {
                         match hm.get(k) {
                             None => Value::Null,
                             Some(v) => Value::Option(v.fast_clone()),
@@ -542,7 +543,8 @@ mod collection {
                 let hm = &args[0];
                 let k = &args[1];
                 let (hm, old) = {
-                    if let Value::Collection(Collection::HashMap(mut hm)) = hm.get() {
+                    if let Value::Collection(Collection::HashMap(hm)) = &**hm {
+                        let mut hm = hm.clone();
                         match hm.remove(k) {
                             None => (hm, Value::Null),
                             Some(v) => (hm, Value::Option(v)),
