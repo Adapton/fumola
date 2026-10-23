@@ -52,14 +52,14 @@ pub fn values_eq(v1: &Value, v2: &Value) -> bool {
 
 /// The order `<`, `<=`, `>` and `>=` use: numbers by value, whatever kind
 /// (whole numbers exactly; a Float against either as floats), text by code
-/// point, symbols as before. None: no order between these two.
+/// point. None: no order between these two kinds. (Symbols are ordered in
+/// relop, where two that are not comparable answer false.)
 fn order(v1: &Value, v2: &Value) -> Option<Ordering> {
     use Value::*;
     match (v1, v2) {
         (Nat(_) | Int(_), Nat(_) | Int(_)) => Some(whole_of(v1)?.cmp(&whole_of(v2)?)),
         (Float(_) | Nat(_) | Int(_), Float(_) | Nat(_) | Int(_)) => float_of(v1)?.partial_cmp(&float_of(v2)?),
         (Text(t1), Text(t2)) => Some(t1.to_string().cmp(&t2.to_string())),
-        (Symbol(s1), Symbol(s2)) => s1.partial_cmp(s2),
         _ => None,
     }
 }
@@ -194,10 +194,15 @@ pub fn relop(
 ) -> Result<Value, Interruption> {
     use RelOp::*;
     use Value::*;
-    let ordered = |op: &str| -> Result<Ordering, Interruption> {
-        match order(&v1, &v2) {
-            Some(o) => Ok(o),
-            None => nyi!(line!(), "{:?} {} {:?}", v1, op, v2),
+    // (symbols by their partial order: two that are not comparable, distinct quoted ASTs, answer false to all four, which
+    // says they are independent in time; anything else without an order stops, as before)
+    let ordered = |op: &str| -> Result<Option<Ordering>, Interruption> {
+        match (&*v1, &*v2) {
+            (Symbol(s1), Symbol(s2)) => Ok(s1.partial_cmp(s2)),
+            _ => match order(&v1, &v2) {
+                Some(o) => Ok(Some(o)),
+                None => nyi!(line!(), "{:?} {} {:?}", v1, op, v2),
+            },
         }
     };
     Ok(Bool(match relop {
@@ -205,9 +210,9 @@ pub fn relop(
         Eq => values_eq(&v1, &v2),
         Neq => !values_eq(&v1, &v2),
         // (() against () keeps its old answer, false, for all four)
-        Lt => !matches!((&*v1, &*v2), (Unit, Unit)) && ordered("<")? == Ordering::Less,
-        Le => !matches!((&*v1, &*v2), (Unit, Unit)) && ordered("<=")? != Ordering::Greater,
-        Gt => !matches!((&*v1, &*v2), (Unit, Unit)) && ordered(">")? == Ordering::Greater,
-        Ge => !matches!((&*v1, &*v2), (Unit, Unit)) && ordered(">=")? != Ordering::Less,
+        Lt => !matches!((&*v1, &*v2), (Unit, Unit)) && ordered("<")? == Some(Ordering::Less),
+        Le => !matches!((&*v1, &*v2), (Unit, Unit)) && matches!(ordered("<=")?, Some(Ordering::Less | Ordering::Equal)),
+        Gt => !matches!((&*v1, &*v2), (Unit, Unit)) && ordered(">")? == Some(Ordering::Greater),
+        Ge => !matches!((&*v1, &*v2), (Unit, Unit)) && matches!(ordered(">=")?, Some(Ordering::Greater | Ordering::Equal)),
     }))
 }
