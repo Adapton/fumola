@@ -4,16 +4,70 @@ use crate::value::{Symbol, Value, Value_};
 use crate::vm_types::Interruption;
 use crate::{Shared, quoted, type_mismatch_};
 use fumola_syntax::ast::{BinOp, PrimType, RelOp, UnOp};
-use num_bigint::{BigUint, ToBigInt};
+use num_bigint::{BigInt, BigUint, Sign, ToBigInt};
 use num_traits::ToPrimitive;
 use ordered_float::OrderedFloat;
 
 use crate::{nyi, type_mismatch};
 
+/// A whole number as Fumola keeps it: 0 and up a Nat, below 0 an Int, so a
+/// number has one representation, and `==`, a map's keys and printing agree
+/// on it (^report(28)'s traps; Adapton/fumola, ticket 571 of Matthew's work
+/// notes).
+pub fn whole(i: BigInt) -> Value {
+    match i.to_biguint() {
+        Some(n) => Value::Nat(n),
+        None => Value::Int(i),
+    }
+}
+
+/// A whole number's value, whichever way it is kept.
+fn whole_of(v: &Value) -> Option<BigInt> {
+    match v {
+        Value::Nat(n) => Some(BigInt::from_biguint(Sign::Plus, n.clone())),
+        Value::Int(i) => Some(i.clone()),
+        _ => None,
+    }
+}
+
+/// A number's value as a float: a Float, or a whole number.
+fn float_of(v: &Value) -> Option<f64> {
+    match v {
+        Value::Float(f) => Some(**f),
+        _ => whole_of(v).and_then(|i| i.to_f64()),
+    }
+}
+
+/// Equality as `==` and `!=` (and literal patterns) see it: whole numbers by
+/// value, however kept; a Float and a whole number by value; anything else as
+/// the values are.
+pub fn values_eq(v1: &Value, v2: &Value) -> bool {
+    use Value::*;
+    match (v1, v2) {
+        (Nat(_) | Int(_), Nat(_) | Int(_)) => whole_of(v1) == whole_of(v2),
+        (Float(_), Nat(_) | Int(_)) | (Nat(_) | Int(_), Float(_)) => float_of(v1) == float_of(v2),
+        (v1, v2) => v1 == v2,
+    }
+}
+
+/// The order `<`, `<=`, `>` and `>=` use: numbers by value, whatever kind
+/// (whole numbers exactly; a Float against either as floats), text by code
+/// point, symbols as before. None: no order between these two.
+fn order(v1: &Value, v2: &Value) -> Option<Ordering> {
+    use Value::*;
+    match (v1, v2) {
+        (Nat(_) | Int(_), Nat(_) | Int(_)) => Some(whole_of(v1)?.cmp(&whole_of(v2)?)),
+        (Float(_) | Nat(_) | Int(_), Float(_) | Nat(_) | Int(_)) => float_of(v1)?.partial_cmp(&float_of(v2)?),
+        (Text(t1), Text(t2)) => Some(t1.to_string().cmp(&t2.to_string())),
+        (Symbol(s1), Symbol(s2)) => s1.partial_cmp(s2),
+        _ => None,
+    }
+}
+
 pub fn unop(un: UnOp, v: Value_) -> Result<Value, Interruption> {
     match (&un, &*v) {
-        (UnOp::Neg, Value::Nat(n)) => Ok(Value::Int(-n.to_bigint().unwrap())),
-        (UnOp::Neg, Value::Int(i)) => Ok(Value::Int(-i)),
+        (UnOp::Neg, Value::Nat(n)) => Ok(whole(-n.to_bigint().unwrap())),
+        (UnOp::Neg, Value::Int(i)) => Ok(whole(-i)),
         (UnOp::Neg, Value::Float(f)) => Ok(Value::Float(-f)),
         (unop, v) => {
             if let Ok(symbol) = v.into_sym_or(()) {
@@ -56,24 +110,20 @@ pub fn binop(
     match binop {
         Add => match (&*v1, &*v2) {
             (Nat(n1), Nat(n2)) => Ok(Nat(n1 + n2)),
-            (Int(i1), Int(i2)) => Ok(Int(i1 + i2)),
+            (Nat(_) | Int(_), Nat(_) | Int(_)) => Ok(whole(whole_of(&v1).unwrap() + whole_of(&v2).unwrap())),
             (Float(f1), Float(f2)) => Ok(Float(*f1 + *f2)),
-            (Float(f1), Nat(n2)) => Ok(Float(*f1 + n2.to_f64().unwrap())),
-            (Nat(n1), Float(f2)) => Ok(Float(OrderedFloat(n1.to_f64().unwrap()) + *f2)),
+            (Float(_), Nat(_) | Int(_)) | (Nat(_) | Int(_), Float(_)) => Ok(Float(OrderedFloat(float_of(&v1).unwrap() + float_of(&v2).unwrap()))),
 
             // _ => nyi!(line!()),
             (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
         Div => match (&*v1, &*v2) {
+            // (a whole number divided by 0 is the type mismatch it was, not a panic)
+            (Nat(_) | Int(_), Nat(n2)) if n2 == &BigUint::from(0u8) => type_mismatch!(file!(), line!()),
             (Nat(n1), Nat(n2)) => Ok(Nat(n1 / n2)),
-            (Int(i1), Int(i2)) => Ok(Int(i1 / i2)),
+            (Nat(_) | Int(_), Nat(_) | Int(_)) => Ok(whole(whole_of(&v1).unwrap() / whole_of(&v2).unwrap())),
             (Float(f1), Float(f2)) => Ok(Float(*f1 / *f2)),
-            // _ => nyi!(line!()),
-            (Nat(n1), Float(f2)) => {
-                let n1: f64 = n1.to_f64().unwrap();
-                let res = (n1 as f64) / **f2;
-                Ok(Float(OrderedFloat(res)))
-            }
+            (Float(_), Nat(_) | Int(_)) | (Nat(_) | Int(_), Float(_)) => Ok(Float(OrderedFloat(float_of(&v1).unwrap() / float_of(&v2).unwrap()))),
             (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
         Sub => match (&*v1, &*v2) {
@@ -84,22 +134,18 @@ pub fn binop(
                     Ok(Nat(n1 - n2))
                 }
             }
-            (Int(i1), Int(i2)) => Ok(Int(i1 - i2)),
-            (Int(i1), Nat(n2)) => Ok(Int(i1 - n2.to_bigint().unwrap())),
-            (Nat(n1), Int(i2)) => Ok(Int(n1.to_bigint().unwrap() - i2)),
+            (Nat(_) | Int(_), Nat(_) | Int(_)) => Ok(whole(whole_of(&v1).unwrap() - whole_of(&v2).unwrap())),
             (Float(f1), Float(f2)) => Ok(Float(*f1 - *f2)),
-            (Float(f1), Nat(n2)) => Ok(Float(*f1 - n2.to_f64().unwrap())),
-            (Nat(n1), Float(f2)) => Ok(Float(OrderedFloat(n1.to_f64().unwrap()) - *f2)),
+            (Float(_), Nat(_) | Int(_)) | (Nat(_) | Int(_), Float(_)) => Ok(Float(OrderedFloat(float_of(&v1).unwrap() - float_of(&v2).unwrap()))),
 
             // _ => nyi!(line!()),
             (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
         Mul => match (&*v1, &*v2) {
             (Nat(n1), Nat(n2)) => Ok(Nat(n1 * n2)),
-            (Int(i1), Int(i2)) => Ok(Int(i1 * i2)),
+            (Nat(_) | Int(_), Nat(_) | Int(_)) => Ok(whole(whole_of(&v1).unwrap() * whole_of(&v2).unwrap())),
             (Float(f1), Float(f2)) => Ok(Float(*f1 * *f2)),
-            (Float(f1), Nat(n2)) => Ok(Float(*f1 * n2.to_f64().unwrap())),
-            (Nat(n1), Float(f2)) => Ok(Float(OrderedFloat(n1.to_f64().unwrap()) * *f2)),
+            (Float(_), Nat(_) | Int(_)) | (Nat(_) | Int(_), Float(_)) => Ok(Float(OrderedFloat(float_of(&v1).unwrap() * float_of(&v2).unwrap()))),
 
             // _ => nyi!(line!()),
             (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
@@ -128,8 +174,9 @@ pub fn binop(
             (_, v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
         Mod => match (&*v1, &*v2) {
+            (Nat(_) | Int(_), Nat(n2)) if n2 == &BigUint::from(0u8) => type_mismatch!(file!(), line!()),
             (Nat(n1), Nat(n2)) => Ok(Nat(n1 % n2)),
-            (Int(i1), Int(i2)) => Ok(Int(i1 % i2)),
+            (Nat(_) | Int(_), Nat(_) | Int(_)) => Ok(whole(whole_of(&v1).unwrap() % whole_of(&v2).unwrap())),
             (v1, v2) => try_symbolic_binop(&binop, v1, v2).ok_or(type_mismatch_!()),
         },
 
@@ -147,61 +194,20 @@ pub fn relop(
 ) -> Result<Value, Interruption> {
     use RelOp::*;
     use Value::*;
+    let ordered = |op: &str| -> Result<Ordering, Interruption> {
+        match order(&v1, &v2) {
+            Some(o) => Ok(o),
+            None => nyi!(line!(), "{:?} {} {:?}", v1, op, v2),
+        }
+    };
     Ok(Bool(match relop {
-        Eq => match (&*v1, &*v2) {
-            (Unit, Unit) => true,
-            (Bool(b1), Bool(b2)) => b1 == b2,
-            (Text(t1), Text(t2)) => t1 == t2,
-            (Nat(n1), Nat(n2)) => n1 == n2,
-            (Int(i1), Int(i2)) => i1 == i2,
-            (v1, v2) => v1 == v2, //            _ => nyi!(line!(), "{:?} == {:?}", v1, v2)?,
-        },
-        Neq => match (&*v1, &*v2) {
-            (Unit, Unit) => false,
-            (Bool(b1), Bool(b2)) => b1 != b2,
-            (Text(t1), Text(t2)) => t1 == t2,
-            (Nat(n1), Nat(n2)) => n1 != n2,
-            (Int(i1), Int(i2)) => i1 != i2,
-            (v1, v2) => v1 != v2, //            _ => nyi!(line!(), "{:?} == {:?}", v1, v2)?,
-        },
-        Lt => match (&*v1, &*v2) {
-            (Unit, Unit) => false,
-            (Nat(n1), Nat(n2)) => n1 < n2,
-            (Int(i1), Int(i2)) => i1 < i2,
-            (Int(i), Nat(n)) => i.lt(&n.to_bigint().unwrap()),
-            (Nat(n), Int(i)) => n.to_bigint().unwrap().lt(i),
-            (Symbol(s1), Symbol(s2)) => s1.partial_cmp(s2) == Some(Ordering::Less),
-            _ => nyi!(line!(), "{:?} < {:?}", v1, v2)?,
-        },
-        Le => match (&*v1, &*v2) {
-            (Unit, Unit) => false,
-            (Nat(n1), Nat(n2)) => n1 <= n2,
-            (Int(i1), Int(i2)) => i1 <= i2,
-            (Symbol(s1), Symbol(s2)) => match s1.partial_cmp(s2) {
-                Some(Ordering::Less) => true,
-                Some(Ordering::Equal) => true,
-                _ => false,
-            },
-            _ => nyi!(line!(), "{:?} <= {:?}", v1, v2)?,
-        },
-        Gt => match (&*v1, &*v2) {
-            (Unit, Unit) => false,
-            (Nat(n1), Nat(n2)) => n1 > n2,
-            (Int(i1), Int(i2)) => i1 > i2,
-            (Symbol(s1), Symbol(s2)) => s1.partial_cmp(s2) == Some(Ordering::Greater),
-            _ => nyi!(line!(), "{:?} > {:?}", v1, v2)?,
-        },
-        Ge => match (&*v1, &*v2) {
-            (Unit, Unit) => false,
-            (Nat(n1), Nat(n2)) => n1 >= n2,
-            (Int(i1), Int(i2)) => i1 >= i2,
-            (Symbol(s1), Symbol(s2)) => match s1.partial_cmp(s2) {
-                Some(Ordering::Greater) => true,
-                Some(Ordering::Equal) => true,
-                _ => false,
-            },
-            _ => nyi!(line!(), "{:?} >= {:?}", v1, v2)?,
-        },
-        //        _ => nyi!(line!(), "relop({:?}, {:?}, {:?})", relop, v1, v2)?,
+        // (one equality for both, so they can never disagree again: text != was inverted)
+        Eq => values_eq(&v1, &v2),
+        Neq => !values_eq(&v1, &v2),
+        // (() against () keeps its old answer, false, for all four)
+        Lt => !matches!((&*v1, &*v2), (Unit, Unit)) && ordered("<")? == Ordering::Less,
+        Le => !matches!((&*v1, &*v2), (Unit, Unit)) && ordered("<=")? != Ordering::Greater,
+        Gt => !matches!((&*v1, &*v2), (Unit, Unit)) && ordered(">")? == Ordering::Greater,
+        Ge => !matches!((&*v1, &*v2), (Unit, Unit)) && ordered(">=")? != Ordering::Less,
     }))
 }

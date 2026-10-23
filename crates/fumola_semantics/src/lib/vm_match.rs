@@ -1,6 +1,6 @@
 use crate::value::{Value, Value_};
 use crate::vm_types::{Env, Interruption, Pointer};
-use fumola_syntax::ast::{Id_, Literal, Pat, Source};
+use fumola_syntax::ast::{Id_, Literal, Pat, Source, UnOp};
 use fumola_syntax::shared::{FastClone, Share};
 use std::vec::Vec;
 
@@ -72,6 +72,21 @@ pub fn match_tuple(size: u16, v: Value_) -> Result<Vec<Value_>, Interruption> {
     }
 }
 
+/// Whether a value is the literal a pattern names (negated, for `-1` or `-0.5`): the
+/// literal's own value, compared as `==` compares (`vm_ops::values_eq`). A
+/// literal that does not read as a value matches nothing.
+fn literal_matches(l: &Literal, neg: Option<&UnOp>, v: &Value) -> bool {
+    let Ok(lv) = Value::from_literal(l) else { return false };
+    let lv = match neg {
+        None => lv,
+        Some(u) => match crate::vm_ops::unop(u.clone(), lv.share()) {
+            Ok(x) => x,
+            Err(_) => return false,
+        },
+    };
+    crate::vm_ops::values_eq(&lv, v)
+}
+
 pub fn pattern_matches_temps(pat: &Pat, v: Value_) -> Option<Vec<Value_>> {
     pattern_matches_temps_(pat, v, vec![])
 }
@@ -82,7 +97,7 @@ fn pattern_matches_temps_(pat: &Pat, v: Value_, mut out: Vec<Value_>) -> Option<
     match (pat, &*v) {
         (Pat::Wild, _) => Some(out),
         (Pat::Annot(_), _) => Some(out),
-        (Pat::Literal(Literal::Unit), Value::Unit) => Some(out),
+        (Pat::Literal(l), _) => literal_matches(l, None, &v).then_some(out),
         (Pat::Paren(p), _) => pattern_matches_temps_(&p.0, v, out),
         (Pat::AnnotPat(p, _), _) => pattern_matches_temps_(&p.0, v, out),
         // Callers build these patterns with `pattern::temps`, which produces
@@ -146,15 +161,10 @@ pub fn get_pat_var(p: &Pat) -> Option<Id_> {
 pub fn pattern_matches(env: Env, pat: &Pat, v: Value_) -> Option<Env> {
     match (pat, &*v) {
         (Pat::Wild, _) => Some(env),
-        (Pat::Literal(Literal::Unit), Value::Unit) => Some(env),
-        (Pat::Literal(Literal::Null), Value::Null) => Some(env),
-        (Pat::Literal(Literal::Nat(n1)), Value::Nat(n2)) => {
-            if format!("{}", n2) == *n1 {
-                Some(env)
-            } else {
-                None
-            }
-        }
+        // (every literal, by the equality == uses: text, Bool, whole numbers however written (1_000, 0x10), Floats, chars;
+        // only Unit, Null and Nat literals ever matched before, and the rest fell through to no match, silently)
+        (Pat::Literal(l), _) => literal_matches(l, None, &v).then_some(env),
+        (Pat::UnOpLiteral(u, l), _) => literal_matches(&l.0, Some(&u.0), &v).then_some(env),
         (Pat::Optional(p), Value::Option(v)) => pattern_matches(env, &p.0, v.fast_clone()),
         (Pat::Paren(p), _) => pattern_matches(env, &p.0, v),
         (Pat::Annot(_), _) => Some(env),
