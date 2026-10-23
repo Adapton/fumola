@@ -196,7 +196,7 @@ pub fn relop(
     use Value::*;
     // (symbols by their partial order: two that are not comparable, distinct quoted ASTs, answer false to all four, which
     // says they are independent in time; anything else without an order stops, as before)
-    let ordered = |op: &str| -> Result<Option<Ordering>, Interruption> {
+    let ordered = |op: &str| -> Result<std::option::Option<Ordering>, Interruption> {
         match (&*v1, &*v2) {
             (Symbol(s1), Symbol(s2)) => Ok(s1.partial_cmp(s2)),
             _ => match order(&v1, &v2) {
