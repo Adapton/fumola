@@ -27,7 +27,7 @@ use std::collections::HashMap;
 use fumola::state::State;
 use fumola_semantics::adapton::{Space, Time};
 use fumola_semantics::format::format_one_line;
-use fumola_semantics::value::Value;
+use fumola_semantics::value::{Collection, Value};
 use fumola_semantics::Interruption;
 use fumola_syntax::ast::Id;
 use fumola_semantics::vm_types::{ActiveBorrow, Counts, LocalPointer, Pointer, ScheduleChoice};
@@ -973,29 +973,128 @@ pub fn fumola_reset(id: FumolaInstanceId) -> bool {
 /// reported as an untranslatable tag rather than being silently coerced;
 /// values whose meaning depends on the runtime (functions, thunks, pointers)
 /// would need opaque handles back into this instance, which is out of scope.
+///
+/// The JSON is written as text, with a stack of its own (ticket 549): a
+/// structural value opens its JSON, puts what closes it on the stack and its
+/// parts above that, so a value nested a hundred thousand deep takes that many
+/// entries on the heap rather than that many calls. Recursing once per nested
+/// value ran out of wasm's stack at about 700 nested options or 1,500 nested
+/// arrays, and a trap leaves the instance unusable. The text is the same as
+/// serde_json wrote for the same value: the keys in the same (sorted) order,
+/// no spaces.
 fn value_to_json(value: &Value) -> String {
-    match translate(value) {
-        Ok(Some((tag, value))) => {
-            serde_json::json!({ "ok": true, "tag": tag, "value": value }).to_string()
-        }
-        Ok(None) => error_json("Fumola value has no Hazel translation"),
+    match nested_json(value) {
+        // `{"tag":...` becomes `{"ok":true,"tag":...`
+        Ok(text) => format!("{{\"ok\":true,{}", &text[1..]),
         Err(message) => error_json(&message),
     }
 }
 
 type Translated = Result<Option<(&'static str, serde_json::Value)>, String>;
 
-/// Translate a value that sits inside another one, as `{tag, value}`. An
-/// untranslatable component fails the whole translation rather than being
-/// quietly replaced, so a tuple is never reported as though it were complete
-/// when part of it was dropped.
-fn nested(value: &Value) -> Result<serde_json::Value, String> {
-    match translate(value)? {
-        Some((tag, value)) => Ok(serde_json::json!({"tag": tag, "value": value})),
-        None => Err("Fumola value has no Hazel translation".to_string()),
+/// A value as `{"tag": ..., "value": ...}`, and every value inside it the same
+/// way. An untranslatable component fails the whole translation rather than
+/// being quietly replaced, so a tuple is never reported as though it were
+/// complete when part of it was dropped.
+///
+/// Structural values cross the boundary as structure, so that a Fumola tuple
+/// arrives in Hazel as a Hazel tuple rather than as something Hazel has to
+/// take apart. They are written here; every other value is a leaf, written
+/// from `translate`.
+fn nested_json(root: &Value) -> Result<String, String> {
+    enum Next<'a> {
+        Value(&'a Value),
+        Text(&'static str),
+        Key(String),
     }
+    // A sequence's parts, in order, a comma between each two
+    fn parts<'a>(next: &mut Vec<Next<'a>>, items: Vec<&'a Value>) {
+        for (i, item) in items.into_iter().enumerate().rev() {
+            next.push(Next::Value(item));
+            if i > 0 {
+                next.push(Next::Text(","));
+            }
+        }
+    }
+    let quoted = |s: &str| serde_json::Value::String(s.to_string()).to_string();
+    let mut out = String::new();
+    let mut next = vec![Next::Value(root)];
+    while let Some(step) = next.pop() {
+        let value = match step {
+            Next::Text(text) => {
+                out.push_str(text);
+                continue;
+            }
+            Next::Key(key) => {
+                out.push_str(&key);
+                continue;
+            }
+            Next::Value(value) => value,
+        };
+        match value {
+            Value::Option(inner) => {
+                out.push_str("{\"tag\":\"Option\",\"value\":");
+                next.push(Next::Text("}"));
+                next.push(Next::Value(inner));
+            }
+            // Arrays reach Hazel as lists. Adapton's own introspection returns
+            // them -- peekEvents, and the edge lists inside peekInfo -- so
+            // without this most of what the Adapton module reports is
+            // untranslatable.
+            Value::Array(_, items) => {
+                out.push_str("{\"tag\":\"List\",\"value\":[");
+                next.push(Next::Text("]}"));
+                parts(&mut next, items.iter().map(|item| &**item).collect());
+            }
+            Value::Tuple(items) => {
+                out.push_str("{\"tag\":\"Tuple\",\"value\":[");
+                next.push(Next::Text("]}"));
+                parts(&mut next, items.iter().map(|item| &**item).collect());
+            }
+            Value::Object(fields) => {
+                // Sorted by field name: Fumola holds these in a HashMap, whose
+                // iteration order is not stable, and a record whose fields came
+                // back in a different order on each evaluation would make the
+                // livelit's result flicker.
+                let mut names: Vec<&Id> = fields.keys().collect();
+                names.sort_by(|a, b| a.string.cmp(&b.string));
+                out.push_str("{\"tag\":\"Record\",\"value\":{");
+                next.push(Next::Text("}}"));
+                for (i, name) in names.into_iter().enumerate().rev() {
+                    next.push(Next::Value(
+                        &fields.get(name).expect("key from this map").val,
+                    ));
+                    next.push(Next::Key(format!("{}:", quoted(&name.string.to_string()))));
+                    if i > 0 {
+                        next.push(Next::Text(","));
+                    }
+                }
+            }
+            Value::Variant(name, payload) => {
+                out.push_str("{\"tag\":\"Variant\",\"value\":{\"name\":");
+                out.push_str(&quoted(&name.string.to_string()));
+                out.push_str(",\"value\":");
+                match payload {
+                    Some(payload) => {
+                        next.push(Next::Text("}}"));
+                        next.push(Next::Value(payload));
+                    }
+                    None => out.push_str("null}}"),
+                }
+            }
+            leaf => match translate(leaf)? {
+                Some((tag, json)) => {
+                    out.push_str(&serde_json::json!({"tag": tag, "value": json}).to_string())
+                }
+                None => return Err("Fumola value has no Hazel translation".to_string()),
+            },
+        }
+    }
+    Ok(out)
 }
 
+/// A leaf value's tag and JSON: every value but the structural ones, which
+/// nested_json writes.
 fn translate(value: &Value) -> Translated {
     match value {
         Value::Nat(n) => Ok(Some(("Int", serde_json::json!(n.to_string())))),
@@ -1009,52 +1108,6 @@ fn translate(value: &Value) -> Translated {
         // `peek` answers null for a name that was never written, and ?v for
         // one that was, so both turn up whenever a program peeks.
         Value::Null => Ok(Some(("Null", serde_json::Value::Null))),
-        Value::Option(inner) => Ok(Some(("Option", nested(inner)?))),
-        // Structural values cross the boundary as structure, so that a Fumola
-        // tuple arrives in Hazel as a Hazel tuple rather than as something
-        // Hazel has to take apart.
-        // Arrays reach Hazel as lists. Adapton's own introspection returns
-        // them -- peekEvents, and the edge lists inside peekInfo -- so
-        // without this most of what the Adapton module reports is
-        // untranslatable.
-        Value::Array(_, items) => {
-            let mut out = Vec::with_capacity(items.len());
-            for item in items.iter() {
-                out.push(nested(item)?);
-            }
-            Ok(Some(("List", serde_json::Value::Array(out))))
-        }
-        Value::Tuple(items) => {
-            let mut out = Vec::with_capacity(items.len());
-            for item in items.iter() {
-                out.push(nested(item)?);
-            }
-            Ok(Some(("Tuple", serde_json::Value::Array(out))))
-        }
-        Value::Object(fields) => {
-            // Sorted by field name: Fumola holds these in a HashMap, whose
-            // iteration order is not stable, and a record whose fields came
-            // back in a different order on each evaluation would make the
-            // livelit's result flicker.
-            let mut names: Vec<&Id> = fields.keys().collect();
-            names.sort_by(|a, b| a.string.cmp(&b.string));
-            let mut out = serde_json::Map::new();
-            for name in names {
-                let field = fields.get(name).expect("key from this map");
-                out.insert(name.string.to_string(), nested(&field.val)?);
-            }
-            Ok(Some(("Record", serde_json::Value::Object(out))))
-        }
-        Value::Variant(name, payload) => Ok(Some((
-            "Variant",
-            serde_json::json!({
-                "name": name.string.to_string(),
-                "value": match payload {
-                    Some(v) => nested(v)?,
-                    None => serde_json::Value::Null,
-                },
-            }),
-        ))),
         // A pointer names a cell in this runtime's store. It travels as the
         // source text of the symbol that names it, so the host can build the
         // expression that reads it -- get(`x) -- rather than receiving an
@@ -1143,8 +1196,60 @@ fn translate(value: &Value) -> Translated {
         // what it is; failing the translation instead meant that a tuple
         // holding one failed entirely, and the host had nothing to show but
         // an error where a value should be.
-        _ => Ok(Some(("Opaque", serde_json::json!(format_one_line(value))))),
+        _ => Ok(Some(("Opaque", serde_json::json!(printed_form(value))))),
     }
+}
+
+/// How deep a value may nest and still be printed (ticket 549). The printer
+/// recurses once per nested value, and more than once per value as it lays
+/// the text out: a function holding an option list of about 400 ran out of
+/// wasm's stack.
+const PRINT_DEPTH: usize = 100;
+
+/// A value's printed form, or a short note for one too deep to print.
+fn printed_form(value: &Value) -> String {
+    if deeper_than(value, PRINT_DEPTH) {
+        format!(
+            "{} (too deep to print: it holds values nested more than {} deep)",
+            match value {
+                Value::Function(_) => "@func",
+                _ => "a value",
+            },
+            PRINT_DEPTH
+        )
+    } else {
+        format_one_line(value)
+    }
+}
+
+/// Whether a value nests more than `limit` deep along what the printer prints
+/// of it: an option's value, a variant's, an array's and a tuple's items, a
+/// record's fields, a function's environment and a hash map's entries.
+/// Counted with a stack of its own, so it cannot overflow either.
+fn deeper_than(value: &Value, limit: usize) -> bool {
+    let mut next: Vec<(&Value, usize)> = vec![(value, 1)];
+    while let Some((value, depth)) = next.pop() {
+        if depth > limit {
+            return true;
+        }
+        let inner = depth + 1;
+        match value {
+            Value::Option(v) | Value::Variant(_, Some(v)) => next.push((v, inner)),
+            Value::Array(_, items) | Value::Tuple(items) => {
+                next.extend(items.iter().map(|v| (&**v, inner)))
+            }
+            Value::Object(fields) => next.extend(fields.values().map(|f| (&*f.val, inner))),
+            Value::Function(f) => next.extend(f.0.env.values().map(|v| (&**v, inner))),
+            Value::Collection(Collection::HashMap(map)) => {
+                for (k, v) in map.iter() {
+                    next.push((k, inner));
+                    next.push((v, inner));
+                }
+            }
+            _ => {}
+        }
+    }
+    false
 }
 
 fn pointer_to_json(pointer: &Pointer) -> serde_json::Value {
