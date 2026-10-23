@@ -198,6 +198,64 @@ pub enum Value {
     Thunk(ThunkBody),
 }
 
+// (ticket 549) A value is dropped in a loop, not by recursion. Dropping the last
+// holder of a value drops what it holds, and so on down: an option list of
+// 100,000 took 100,000 nested calls and overflowed the stack (in wasm a trap,
+// which leaves the instance unusable, and the instance keeps its last answer, so
+// the next program dropped it). Here a value's own drop takes out the values it
+// alone holds through an option, a variant, an index, or an array or tuple small
+// enough to sit inline (im_rc's inline vector, so no copy is made), leaving null
+// in their place, and drops those one at a time, each giving up its own the same
+// way. A value held elsewhere too is only let go of. A record's fields and a
+// closure's environment still drop as before: taking a map out would cost an
+// allocation on every drop.
+impl Drop for Value {
+    fn drop(&mut self) {
+        let mut taken = Vec::new();
+        self.give_up_sole_parts(&mut taken);
+        while let Some(mut value) = taken.pop() {
+            value.give_up_sole_parts(&mut taken);
+        }
+    }
+}
+
+impl Value {
+    /// Moves into `out` each value with parts of its own that this one alone
+    /// holds (see the drop above), leaving null in its place. A leaf is left
+    /// where it is: it has nothing to drop.
+    fn give_up_sole_parts(&mut self, out: &mut Vec<Value>) {
+        fn take(part: &mut Value_, out: &mut Vec<Value>) {
+            if let Some(value) = part.get_mut() {
+                if value.has_parts() {
+                    out.push(std::mem::replace(value, Value::Null));
+                }
+            }
+        }
+        match self {
+            Value::Option(part) | Value::Index(_, part) | Value::Variant(_, Some(part)) => {
+                take(part, out)
+            }
+            Value::Array(_, parts) | Value::Tuple(parts) if parts.is_inline() => {
+                for part in parts.iter_mut() {
+                    take(part, out)
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn has_parts(&self) -> bool {
+        matches!(
+            self,
+            Value::Option(_)
+                | Value::Index(..)
+                | Value::Variant(_, Some(_))
+                | Value::Array(..)
+                | Value::Tuple(_)
+        )
+    }
+}
+
 pub type ThunkBody = Closed<Exp_>;
 
 /// Actor value.
