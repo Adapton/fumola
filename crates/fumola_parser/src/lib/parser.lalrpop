@@ -756,7 +756,8 @@ ObjSortOpt: Option<ObjSort> = {
 #[inline]
 TypeParamsOpt: Option<Delim<TypeBind_>> = {
     => None,
-    "<" <ts:Delim0<TypeBind, ",">> ">" => None, // to do -- produce AST.
+    // (ticket 590) kept, each with its source, for a definition's outline
+    "<" <ts:Delim0<TypeBind_, ",">> ">" => Some(ts),
 
 }
 

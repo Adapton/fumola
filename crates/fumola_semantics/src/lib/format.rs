@@ -782,6 +782,10 @@ impl ToDoc for Function {
         // todo -- check self.sugar, and print the sugared form.
         kwd("func")
             .append(self.name.doc())
+            .append(match self.binds {
+                None => RcDoc::nil(),
+                Some(ref b) => bind(b),
+            })
             .append(self.input.doc())
             .append(match self.output {
                 None => RcDoc::nil(),

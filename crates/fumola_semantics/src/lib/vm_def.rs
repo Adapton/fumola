@@ -8,7 +8,8 @@ use crate::vm_types::{
     },
 };
 use fumola_syntax::ast::{
-    Dec, Delim, Exp, Exp_, ExpField, ExpField_, Id, Id_, Mut, Pat, Source, Stab_, Vis_,
+    Dec, Delim, Exp, Exp_, ExpField, ExpField_, Id, Id_, Mut, Pat, Pat_, Source, Stab_, TypId_,
+    TypeBinds, Type_, Vis_,
 };
 use fumola_syntax::shared::{FastClone, Share};
 use im_rc::{HashMap, Vector};
@@ -36,6 +37,7 @@ impl Defs {
         let root = Ctx {
             parent: None,
             fields: HashMap::new(),
+            types: HashMap::new(),
             local_id: None,
         };
         map.insert(CtxId(0), root);
@@ -62,6 +64,7 @@ impl Defs {
                 Some(self.active_ctx.clone())
             },
             fields: HashMap::new(),
+            types: HashMap::new(),
             local_id,
         };
         let prev = self.map.insert(CtxId(x), ctx);
@@ -88,6 +91,7 @@ impl Defs {
         let new_ctx = Ctx {
             parent: old_ctx.parent.clone(),
             fields: HashMap::new(),
+            types: HashMap::new(),
             local_id,
         };
         let saved = self.active_ctx.clone();
@@ -103,6 +107,18 @@ impl Defs {
         stab: Option<Stab_>,
         def: Def,
     ) -> Result<(), Interruption> {
+        self.insert_field_pat(i, source, vis, stab, def, None)
+    }
+    /// As `insert_field`, keeping the binder the definition was written with.
+    pub fn insert_field_pat(
+        &mut self,
+        i: &Id,
+        source: Source,
+        vis: Option<Vis_>,
+        stab: Option<Stab_>,
+        def: Def,
+        pat: Option<Pat_>,
+    ) -> Result<(), Interruption> {
         let s = source.clone();
         let y = self.active_ctx_mut(line!())?.fields.insert(
             i.clone(),
@@ -111,6 +127,7 @@ impl Defs {
                 stab,
                 vis,
                 def,
+                pat,
             },
         );
         if let Some(y) = y {
@@ -140,6 +157,7 @@ impl Defs {
                 stab,
                 vis,
                 def,
+                pat: None,
             },
         );
         if let Some(_) = y {
@@ -157,6 +175,34 @@ impl Defs {
     }
 
     /// The context this definition table is currently filling in.
+    /// Keep a type declaration in the active context's types.
+    pub fn insert_type(
+        &mut self,
+        name: &TypId_,
+        binds: Option<TypeBinds>,
+        typ: Type_,
+        vis: Option<Vis_>,
+        source: Source,
+    ) -> Result<(), Interruption> {
+        let y = self.active_ctx_mut(line!())?.types.insert(
+            name.0.clone(),
+            crate::vm_types::def::TypeField {
+                name: name.clone(),
+                binds,
+                typ,
+                vis,
+                source: source.clone(),
+            },
+        );
+        match y {
+            Some(y) => Err(Interruption::AmbiguousIdentifer(
+                name.0.clone(),
+                source,
+                y.source,
+            )),
+            None => Ok(()),
+        }
+    }
     fn active_ctx_mut(&mut self, line: u32) -> Result<&mut Ctx, Interruption> {
         let a = self.active_ctx.clone();
         match self.map.get_mut(&a) {
@@ -747,12 +793,13 @@ pub mod def {
                         Some(x) => {
                             let ctx_id = active.defs().active_ctx.clone();
                             if exp_is_static(&e.0) {
-                                active.defs().insert_field(
+                                active.defs().insert_field_pat(
                                     &x.0,
                                     source.clone(),
                                     df.vis.clone(),
                                     df.stab.clone(),
                                     Def::StaticValue(ctx_id, e.clone()),
+                                    Some(p.clone()),
                                 )?;
                                 Ok(())
                             } else {
@@ -778,7 +825,15 @@ pub mod def {
                 }
                 Ok(())
             }
-            Dec::Type(_id, _typ_binds, _typ) => {
+            Dec::Type(id, typ_binds, typ) => {
+                // Nothing to run: kept, as written, for an outline (ticket 590).
+                active.defs().insert_type(
+                    id,
+                    typ_binds.clone(),
+                    typ.clone(),
+                    df.vis.clone(),
+                    source.clone(),
+                )?;
                 if let Some(ref attrs) = df.attrs {
                     if attrs.vec.len() > 0 {
                         // warn!("Ignoring type attributes: {:?}", df.attrs);

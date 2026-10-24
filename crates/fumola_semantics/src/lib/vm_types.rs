@@ -106,7 +106,7 @@ macro_rules! impossible {
 }
 
 pub mod def {
-    use fumola_syntax::ast::{Id, Id_, Source, Stab_, Vis_};
+    use fumola_syntax::ast::{Id, Id_, Pat_, Source, Stab_, TypId_, TypeBinds, Type_, Vis_};
     use im_rc::HashMap;
     use serde::{Deserialize, Serialize};
 
@@ -132,6 +132,12 @@ pub mod def {
     pub struct Ctx {
         pub parent: Option<CtxId>,
         pub fields: HashMap<Id, Field>,
+        /// The context's type declarations, in a namespace of their own (as
+        /// Motoko keeps types apart from values). Nothing runs them; they are
+        /// kept, as written and with their sources, for whatever reads a
+        /// program's outline (an editor, a host page's own outline).
+        #[serde(default)]
+        pub types: HashMap<Id, TypeField>,
         pub local_id: Option<Id_>,
     }
 
@@ -140,6 +146,22 @@ pub mod def {
         pub def: Def,
         pub vis: Option<Vis_>,
         pub stab: Option<Stab_>,
+        pub source: Source,
+        /// The binder as written, for a definition made by a `let`: its
+        /// annotation, if any, and the name's own source. (A function keeps
+        /// its parameters and result annotation in its `ast::Function`.)
+        #[serde(default)]
+        pub pat: Option<Pat_>,
+    }
+
+    /// A type declaration, `type Name<binds> = typ`, as written: every part
+    /// carries the parser's source.
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+    pub struct TypeField {
+        pub name: TypId_,
+        pub binds: Option<TypeBinds>,
+        pub typ: Type_,
+        pub vis: Option<Vis_>,
         pub source: Source,
     }
 
