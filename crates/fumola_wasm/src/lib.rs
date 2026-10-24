@@ -1274,6 +1274,158 @@ fn token_kind(token: &fumola_syntax::lexer_types::Token, text: &str) -> &'static
     }
 }
 
+/// Every definition the runtime named by `id` holds, as JSON, for a host's
+/// outline of its program: per context (the top level, and each module or
+/// actor), its type declarations and its members, each with the parser's
+/// exact source, so the host can select a definition's own text rather than
+/// find it by matching (ticket 589).
+///
+/// `{"ok": true, "contexts": [{"ctx", "name", "parent", "types": [...],
+/// "members": [...]}]}`. A type: its `name`, `params` (its type parameters),
+/// `text` (the type, on one line), `vis`, `source` and `name_source`. A
+/// member: its `name`, `kind` (function, module, actor, variable, static
+/// value), `vis`, `source`; a function's `name_source`, `type_params`,
+/// `params` and `result` (each `{text, source}`, as written); a `let`'s
+/// `name_source` and, when annotated, its `annot`. A source is `{line, col,
+/// end_line, end_col, start, end}` (lines from 1, byte offsets), or null for
+/// a definition no parser wrote. Each list is in source order.
+#[wasm_bindgen]
+pub fn fumola_defs(id: FumolaInstanceId) -> String {
+    INSTANCES.with(|m| match m.borrow().get(&id) {
+        None => error_json(&format!("no Fumola instance {}", id)),
+        Some(state) => defs_json(&state.semantic_state.defs).to_string(),
+    })
+}
+
+fn source_json(s: &fumola_syntax::ast::Source) -> serde_json::Value {
+    match s {
+        fumola_syntax::ast::Source::Known(k) => serde_json::json!({
+            "line": k.start_line, "col": k.start_col,
+            "end_line": k.end_line, "end_col": k.end_col,
+            "start": k.span.start, "end": k.span.end,
+        }),
+        _ => serde_json::Value::Null,
+    }
+}
+
+fn written_json(text: String, s: &fumola_syntax::ast::Source) -> serde_json::Value {
+    serde_json::json!({ "text": text, "source": source_json(s) })
+}
+
+fn vis_name(v: &Option<fumola_syntax::ast::Vis_>) -> serde_json::Value {
+    use fumola_syntax::ast::Vis;
+    match v.as_ref().map(|v| &v.0) {
+        Some(Vis::Public(_)) => "public".into(),
+        Some(Vis::Private) => "private".into(),
+        Some(Vis::System) => "system".into(),
+        None => serde_json::Value::Null,
+    }
+}
+
+fn source_order(s: &fumola_syntax::ast::Source) -> usize {
+    s.span().map(|r| r.start).unwrap_or(usize::MAX)
+}
+
+fn defs_json(defs: &fumola_semantics::vm_types::def::Defs) -> serde_json::Value {
+    use fumola_semantics::format::format_one_line;
+    use fumola_semantics::vm_types::def::Def;
+    use fumola_syntax::ast::Pat;
+    // A context's name: the field that holds it, as a module or an actor.
+    let mut names: std::collections::HashMap<usize, String> = std::collections::HashMap::new();
+    for ctx in defs.map.values() {
+        for (x, field) in ctx.fields.iter() {
+            match &field.def {
+                Def::Module(m) => {
+                    names.insert(m.fields.0, x.string.to_string());
+                }
+                Def::Actor(a) => {
+                    names.insert(a.fields.0, x.string.to_string());
+                }
+                _ => (),
+            }
+        }
+    }
+    let mut ids: Vec<_> = defs.map.keys().map(|c| c.0).collect();
+    ids.sort();
+    let contexts: Vec<serde_json::Value> = ids
+        .into_iter()
+        .filter_map(|i| {
+            let ctx = defs.map.get(&fumola_semantics::vm_types::def::CtxId(i))?;
+            let mut types: Vec<_> = ctx.types.values().collect();
+            types.sort_by_key(|t| source_order(&t.source));
+            let types: Vec<serde_json::Value> = types
+                .into_iter()
+                .map(|t| {
+                    let params: Vec<String> = t
+                        .binds
+                        .as_ref()
+                        .map(|b| b.vec.iter().map(|b| b.0.var.0.string.to_string()).collect())
+                        .unwrap_or_default();
+                    serde_json::json!({
+                        "name": t.name.0.string.to_string(),
+                        "params": params,
+                        "text": format_one_line(&t.typ),
+                        "vis": vis_name(&t.vis),
+                        "source": source_json(&t.source),
+                        "name_source": source_json(&t.name.1),
+                    })
+                })
+                .collect();
+            let mut members: Vec<_> = ctx.fields.iter().collect();
+            members.sort_by_key(|(_, f)| source_order(&f.source));
+            let members: Vec<serde_json::Value> = members
+                .into_iter()
+                .map(|(x, f)| {
+                    let mut o = serde_json::json!({
+                        "name": x.string.to_string(),
+                        "kind": f.def.kind_name(),
+                        "vis": vis_name(&f.vis),
+                        "source": source_json(&f.source),
+                    });
+                    if let Def::Func(fd) = &f.def {
+                        let func = &fd.function;
+                        if let Some(n) = &func.name {
+                            o["name_source"] = source_json(&n.1);
+                        }
+                        let tps: Vec<String> = func
+                            .binds
+                            .as_ref()
+                            .map(|b| b.vec.iter().map(|b| b.0.var.0.string.to_string()).collect())
+                            .unwrap_or_default();
+                        o["type_params"] = tps.into();
+                        o["params"] = written_json(format_one_line(&func.input), &func.input.1);
+                        if let Some(t) = &func.output {
+                            o["result"] = written_json(format_one_line(t), &t.1);
+                        }
+                    }
+                    if let Some(p) = &f.pat {
+                        match &p.0 {
+                            Pat::AnnotPat(q, t) => {
+                                o["name_source"] = source_json(&q.1);
+                                o["annot"] = written_json(format_one_line(t), &t.1);
+                            }
+                            _ => o["name_source"] = source_json(&p.1),
+                        }
+                    }
+                    o
+                })
+                .collect();
+            Some(serde_json::json!({
+                "ctx": i,
+                // (else the name it was made with: a top-level module is
+                // no field of anything)
+                "name": names.get(&i).cloned().or_else(|| {
+                    ctx.local_id.as_ref().map(|l| l.0.string.to_string())
+                }),
+                "parent": ctx.parent.as_ref().map(|p| p.0),
+                "types": types,
+                "members": members,
+            }))
+        })
+        .collect();
+    serde_json::json!({ "ok": true, "contexts": contexts })
+}
+
 /// The token stream for `source`, as JSON, for a host that wants to highlight
 /// Fumola without reimplementing its grammar.
 ///
